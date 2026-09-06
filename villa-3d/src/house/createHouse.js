@@ -22,7 +22,7 @@ export function createHouse(materials) {
   addConnectorWall([.24,.3,1.5],[4.68,.15,-.6],'main-right-wall-lower-sill');
   addConnectorWall([.24,.87,1.5],[4.68,2.985,-.6],'main-right-wall-between-passages');
   addConnectorWall([.24,1.1,1.5],[4.68,6.25,-.6],'main-right-wall-upper-cap');
-  box(main,[9.65,.28,7.2],[.2,.18,0],materials.stone,'main-plinth');
+  box(main,[9.65,.28,7.24],[.2,.18,0],materials.stone,'main-plinth');
   createCornice(main,{width:9.65,depth:7.55,x:.2,y:3.35,materials}); createCornice(main,{width:9.75,depth:7.65,x:.2,y:6.72,materials});
   createWallTrim(main,{width:3.16,x:-2.86,y:.62,z:3.7,materials});
   createWallTrim(main,{width:3.56,x:3.06,y:.62,z:3.7,materials});
