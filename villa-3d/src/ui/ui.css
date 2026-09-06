@@ -116,7 +116,7 @@
   color: #50494d;
   opacity: 1;
   pointer-events: auto;
-  transition: opacity .75s ease;
+  transition: opacity .9s ease;
 }
 
 .villa-loading.is-hidden {

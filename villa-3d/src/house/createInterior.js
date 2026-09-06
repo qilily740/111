@@ -110,6 +110,7 @@ function bayLounge(root,mats) {
   group.add(mesh(new THREE.CylinderGeometry(.08,.1,.58,14),mats.dark,{position:[5.2,.64,.08],name:'bay-lounge-table-leg'}));
   plant(group,{x:6.55,y:.36,z:.48,scale:.82,mats,name:'bay-lounge-plant'});
   root.add(group);
+  pendant(root,{x:5.2,y:2.72,z:-.55,mats,name:'bay-lounge-pendant'});
 }
 
 function bayBathroom(root,mats) {
@@ -134,7 +135,7 @@ function bayBathroom(root,mats) {
   group.add(mesh(new THREE.TorusGeometry(.27,.045,8,20),mats.cream,{position:[6.8,4.05,.92],rotation:[Math.PI/2,0,0],name:'bathroom-toilet-seat'}));
   box(group,[.56,.62,.16],[6.8,4.14,1.16],mats.cream,'bathroom-toilet-tank');
   box(group,[1.2,1.0,.035],[4.15,4.92,-2.37],mats.glass,'bathroom-mirror');
-  pendant(group,{x:5.2,y:6.0,z:-.55,mats,light:false,name:'bathroom-pendant'});
+  pendant(group,{x:5.2,y:6.0,z:-.55,mats,light:true,name:'bathroom-pendant'});
   root.add(group);
 }
 
@@ -221,12 +222,16 @@ function phone(root,{x,y,z,rotation=0,mats,name='phone'}) {
 
 function secondFloorWithStairwell(root,mats) {
   const y=3.42;
+  // Keep enough clearance for the spiral stair and its handrail while the
+  // bed remains fully on the bedroom side of the opening.
+  const openingHalf=1.35;
+  const leftEdge=-4.11, rightEdge=4.51, backEdge=-3.28, frontEdge=3.28;
   // Compact square well for the spiral stair. It replaces the long slot that
   // belonged to the former straight flight and frees more usable floor area.
-  box(root,[2.96,.18,6.56],[-2.63,y,0],mats.floorLight,'second-floor-left');
-  box(root,[3.36,.18,6.56],[2.83,y,0],mats.floorLight,'second-floor-right');
-  box(root,[2.3,.18,2.13],[0,y,-2.215],mats.floorLight,'second-floor-stair-back');
-  box(root,[2.3,.18,2.13],[0,y,2.215],mats.floorLight,'second-floor-stair-front');
+  box(root,[openingHalf-leftEdge,.18,6.56],[(leftEdge-openingHalf)/2,y,0],mats.floorLight,'second-floor-left');
+  box(root,[rightEdge-openingHalf,.18,6.56],[(openingHalf+rightEdge)/2,y,0],mats.floorLight,'second-floor-right');
+  box(root,[2*openingHalf,.18,openingHalf-backEdge],[0,y,(backEdge-openingHalf)/2],mats.floorLight,'second-floor-stair-back');
+  box(root,[2*openingHalf,.18,frontEdge-openingHalf],[0,y,(openingHalf+frontEdge)/2],mats.floorLight,'second-floor-stair-front');
 }
 
 function spiralTreadGeometry(innerRadius,outerRadius,startAngle,endAngle,thickness) {
@@ -314,8 +319,8 @@ export function createInterior() {
   pendant(root,{x:-2.45,y:2.72,z:.55,mats,name:'living-pendant'});
 
   table(root,{x:2.15,y:1.12,z:1.18,width:1.65,depth:1.12,material:mats.wood});
-  chair(root,{x:1.08,y:.36,z:1.18,rotation:-Math.PI/2,material:mats.cream});
-  chair(root,{x:3.22,y:.36,z:1.18,rotation:Math.PI/2,material:mats.cream});
+  chair(root,{x:1.08,y:.36,z:1.18,rotation:Math.PI/2,material:mats.cream});
+  chair(root,{x:3.22,y:.36,z:1.18,rotation:-Math.PI/2,material:mats.cream});
   chair(root,{x:2.15,y:.36,z:2.02,rotation:Math.PI,material:mats.cream});
   for(const [x,z] of [[1.82,1.02],[2.48,1.02]]) { root.add(mesh(new THREE.CylinderGeometry(.2,.2,.025,24),mats.cream,{position:[x,1.2,z],name:'dining-plate'})); cup(root,{x:x+.18,y:1.28,z:z+.12,mats}); }
   const vase=mesh(new THREE.CylinderGeometry(.11,.17,.32,16),mats.blush,{position:[2.15,1.34,1.42],name:'dining-vase'}); root.add(vase);
@@ -332,15 +337,13 @@ export function createInterior() {
   kitchenElectronics(root,{mats});
   pendant(root,{x:1.85,y:2.72,z:-1.8,mats,name:'kitchen-pendant'});
 
-  bed(root,{x:-2.3,y:3.5,z:-.55,mats});
+  // Place the bed frame directly on the second-floor surface.
+  bed(root,{x:-2.72,y:3.27,z:-.55,mats});
   box(root,[.65,.55,.65],[-3.82,3.82,-1.15],mats.wood,'bedside-table');
-  box(root,[.65,.55,.65],[-.78,3.82,-1.15],mats.wood,'bedside-table');
   tableLamp(root,{x:-3.82,y:4.13,z:-1.15,mats,name:'left-bedside-lamp'});
-  tableLamp(root,{x:-.78,y:4.13,z:-1.15,mats,name:'right-bedside-lamp',light:false});
-  phone(root,{x:-.8,y:4.115,z:-1.12,rotation:.12,mats,name:'bedside-phone'});
-  const bedroomRug=mesh(new THREE.CylinderGeometry(1.55,1.55,.035,44),mats.fabric,{position:[-2.3,3.58,1.15],name:'bedroom-rug'}); bedroomRug.scale.z=.52; root.add(bedroomRug);
+  const bedroomRug=mesh(new THREE.CylinderGeometry(1.55,1.55,.035,44),mats.fabric,{position:[-2.82,3.53,1.15],name:'bedroom-rug'}); bedroomRug.scale.z=.52; root.add(bedroomRug);
   framedArt(root,{x:-2.3,y:5.7,z:-3.14,width:1.4,height:.72,mats,name:'bedroom-landscape'});
-  pendant(root,{x:-2.3,y:6.08,z:.7,mats,light:false,name:'bedroom-ceiling-fixture'});
+  pendant(root,{x:-2.3,y:6.08,z:.7,mats,light:true,name:'bedroom-ceiling-fixture'});
   table(root,{x:2.25,y:4.28,z:.8,width:1.9,depth:.75,material:mats.wood});
   chair(root,{x:2.25,y:3.52,z:1.55,rotation:Math.PI,material:mats.blush});
   // Bring the bookcase into the study sightline and turn its broad face toward
