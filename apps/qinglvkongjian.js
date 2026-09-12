@@ -11,7 +11,22 @@
 
   const esc = value => String(value || '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   const uid = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const fetch = (input, init = {}) => window.IdealMachineFetch ? window.IdealMachineFetch(input, { ...init, idealScope:'couple' }) : window.fetch(input, init);
+  const fetch = (input, init = {}) => {
+    let next = init;
+    try {
+      const chat = readChat();
+      const currentRole = chat.contacts.find(item => item.id === store.contactId) || {};
+      const profileId = chat.chats?.[currentRole.id]?.profileId || '';
+      const currentUser = chat.profiles.find(item => item.id === profileId) || {};
+      const payload = JSON.parse(init.body);
+      const system = payload.messages?.find(item => item.role === 'system');
+      if (system && window.IdealMachineRoleUserContext) {
+        system.content = `${window.IdealMachineRoleUserContext(currentRole, currentUser)}\n\n${system.content}`;
+        next = { ...init, body:JSON.stringify(payload) };
+      }
+    } catch {}
+    return window.IdealMachineFetch ? window.IdealMachineFetch(input, { ...next, idealScope:'couple' }) : window.fetch(input, next);
+  };
   const readChat = () => { try { const value = JSON.parse(localStorage.getItem(chatKey) || '{}'); return { contacts: Array.isArray(value.contacts) ? value.contacts : [], profiles: Array.isArray(value.profiles) ? value.profiles : [], chats: value.chats || {} }; } catch { return { contacts: [], profiles: [], chats: {} }; } };
   const emptySpace = () => ({ memories:[], moods:{}, moodReply:'', wishes:[], wishReplies:{}, letters:[], letterReplies:{}, events:[], answers:{}, roleAnswers:{}, roleNotes:{}, dailyQuestionDate:'', dailyQuestionText:'', interaction:'', interactionReply:'' });
   const normalizeSpace = value => ({ ...emptySpace(), ...(value && typeof value === 'object' ? value : {}), memories:Array.isArray(value?.memories) ? value.memories : [], moods:value?.moods || {}, wishes:Array.isArray(value?.wishes) ? value.wishes : [], wishReplies:value?.wishReplies || {}, letters:Array.isArray(value?.letters) ? value.letters : [], letterReplies:value?.letterReplies || {}, events:Array.isArray(value?.events) ? value.events : [], answers:value?.answers || {}, roleAnswers:value?.roleAnswers || {}, roleNotes:value?.roleNotes || {} });

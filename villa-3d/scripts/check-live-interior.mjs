@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import * as T from '../public/spring-whisper/three.module.js';
+import {createInteriorPreview} from '../public/spring-whisper/interior.js';
+import {GLTFLoader} from '../public/spring-whisper/GLTFLoader.js';
+import {interiorLampLevel} from '../public/spring-whisper/interior-lights.js';
+const buttons=[];
+globalThis.document={createElement(tag){if(tag==='canvas')return {getContext(){return {fillRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}}}};const el={style:{},append(){},setAttribute(){},textContent:'',onclick:null};if(tag==='button')buttons.push(el);return el},body:{append(){}}};
+const scene=new T.Scene(),house=new T.Group(),renderer={},camera=new T.PerspectiveCamera();scene.add(house);
+const wall=new T.Mesh(new T.BoxGeometry(6.6,6.5,5.6),new T.MeshStandardMaterial());wall.position.set(0,3.25,-.7);house.add(wall);
+const vine=new T.Mesh(new T.BoxGeometry(.1,2,.1),new T.MeshStandardMaterial());vine.userData.exteriorPlant=true;house.add(vine);
+const hiddenPlant=vine.clone();hiddenPlant.visible=false;house.add(hiddenPlant);
+const rearRail=new T.Group();rearRail.userData.hideInCutaway=true;const railMesh=new T.Mesh(new T.BoxGeometry(3,.1,.1),new T.MeshStandardMaterial());railMesh.position.set(-.65,4.4,-4.65);rearRail.add(railMesh);house.add(rearRail);
+const windowGroup=new T.Group();windowGroup.name='RectangularOpening';windowGroup.position.set(0,4,-3.515);windowGroup.rotation.y=Math.PI;house.add(windowGroup);
+const outline=new T.Shape().moveTo(-.5,0).lineTo(.5,0).lineTo(.5,1.5).lineTo(-.5,1.5).closePath();
+const backing=new T.Mesh(new T.ShapeGeometry(outline),new T.MeshStandardMaterial());backing.name='WindowRecess';windowGroup.add(backing);
+const pane=backing.clone();pane.name='RecessedGlass';pane.material=new T.MeshPhysicalMaterial({transparent:true,opacity:.82});windowGroup.add(pane);
+const interior=createInteriorPreview(scene,house,renderer,camera,{loadFurniture:false});
+assert.equal(interior.active,false);camera.position.set(0,7,26);interior.update();assert.equal(wall.visible,true);assert.equal(vine.visible,true);assert.equal(interior.root.visible,false);
+assert.equal(interior.lighting.fixtures.length,9);assert.equal(interiorLampLevel(12),0);assert.equal(interiorLampLevel(0),0);assert.equal(interiorLampLevel(24),0);assert.equal(interiorLampLevel(23.99),1);assert.ok(interiorLampLevel(18)>0&&interiorLampLevel(18)<1);
+interior.update(21);assert.ok(interior.lighting.sources.every(s=>s.light.intensity>0));interior.update(24);assert.ok(interior.lighting.sources.every(s=>s.light.intensity===0));
+interior.setActive(true);
+assert.ok(1.9-(interior.layout.bed.position.z+1.056)>.8,'Keep bed-foot walkway clear');
+assert.ok(interior.layout.wardrobe.position.z-.349+3.3>1.3,'Leave room in front of wardrobe and rear windows');
+assert.equal(interior.layout.desk.parent,interior.floors[0]);assert.equal(interior.floors[0].children.filter(o=>o.name==='Kitchen counter stool').length,3);
+assert.equal(interior.windowCurtains.curtains.length,1);
+for(const pos of [[0,7,26],[0,7,-26],[-26,7,0],[26,7,0]]){camera.position.set(...pos);interior.update();assert.equal(wall.visible,false);assert.equal(vine.visible,false);assert.equal(railMesh.visible,false)}
+// Botanical GLBs arrive asynchronously after cutaway is already open.
+const lateFlower=new T.InstancedMesh(new T.SphereGeometry(.1),new T.MeshStandardMaterial(),1);lateFlower.name='Blender cupped roses';lateFlower.userData.exteriorPlant=true;house.add(lateFlower);interior.update();assert.equal(lateFlower.visible,false);
+assert.equal(backing.visible,false);assert.equal(pane.material.opacity,.22);
+interior.shell.updateMatrixWorld(true);const backWall=interior.shell.getObjectByName('InteriorWall_back_2');
+const ray=new T.Raycaster(new T.Vector3(0,4.7,-.7),new T.Vector3(0,0,-1));assert.equal(ray.intersectObject(backWall).length,0,'Window must be an actual hole');
+ray.ray.origin.x=2;assert.ok(ray.intersectObject(backWall).length>0,'Adjacent plaster wall must remain solid');
+interior.setActive(false);interior.update();assert.equal(wall.visible,true);assert.equal(vine.visible,true);assert.equal(lateFlower.visible,true);assert.equal(hiddenPlant.visible,false);
+assert.equal(backing.visible,true);assert.equal(pane.material.opacity,.82);
+assert.equal(railMesh.visible,true);
+interior.setActive(true);buttons.find(b=>b.textContent==='一楼').onclick();interior.update();assert.equal(interior.floors[1].visible,false);assert.equal(vine.visible,false);
+buttons.find(b=>b.textContent==='二楼').onclick();interior.update();assert.equal(interior.floors[0].visible,false);assert.equal(interior.floors[1].visible,true);
+assert.ok(Math.abs(interior.stairs.userData.stair.risers*interior.stairs.userData.stair.rise+.48-3.4)<1e-8);
+const names=['sofa','chair','bed','entry','coffee','fireplace','dining','island','bedside','wardrobe','desk','cafe','vanity'];let bytes=0,meshes=0;
+const loader=new GLTFLoader();loader.register(parser=>({name:'NodeGeometryValidation',beforeRoot(){parser.loadTexture=()=>Promise.resolve(new T.Texture())}}));
+for(const name of names){const b=fs.readFileSync(new URL(`../public/spring-whisper/furniture/${name}.glb`,import.meta.url));assert.equal(b.toString('ascii',0,4),'glTF');const j=JSON.parse(b.toString('utf8',20,20+b.readUInt32LE(12)));assert.ok(j.meshes.length>0);assert.ok(j.accessors.every(a=>!a.min||a.min.every(Number.isFinite)));bytes+=b.length;meshes+=j.meshes.length;
+const asset=await loader.parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');const bounds=new T.Box3().setFromObject(asset.scene,true);assert.ok(!bounds.isEmpty());const size=bounds.getSize(new T.Vector3());assert.ok(size.x<3&&size.y<3&&size.z<3,`${name} must remain metre scale`);
+}
+console.log(`PASS: 13 Blender assets, ${meshes} meshes, ${(bytes/1048576).toFixed(1)} MiB; four directions; both floors; connected stairs; flowers hidden including late arrivals; original visibility restored.`);

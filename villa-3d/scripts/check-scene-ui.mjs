@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const html=fs.readFileSync(new URL('../public/spring-whisper/index.html',import.meta.url),'utf8');
+const css=fs.readFileSync(new URL('../public/spring-whisper/style.css',import.meta.url),'utf8');
+const main=fs.readFileSync(new URL('../public/spring-whisper/main.js',import.meta.url),'utf8');
+const weather=fs.readFileSync(new URL('../public/spring-whisper/weather.js',import.meta.url),'utf8');
+
+assert.match(html,/maximum-scale=1,user-scalable=no/);
+assert.match(css,/html,body\{[^}]*touch-action:none/);
+assert.match(css,/\.scene-controls\.open \.scene-dock/);
+assert.match(css,/bottom:max\(96px/);
+assert.equal((html.match(/data-view=/g)||[]).length,6);
+assert.equal((html.match(/data-tool=/g)||[]).length,4);
+assert.equal((html.match(/data-weather=/g)||[]).length,4);
+assert.match(html,/>全景<|>正面<|>背面<|>左侧<|>右侧<|>俯视</);
+assert.match(html,/>晴天<|>多云<|>下雨<|>下雪</);
+assert.doesNotMatch(html,/单指旋转/);
+assert.doesNotMatch(html,/panel-label/);
+assert.match(main,/gesturestart/);
+assert.match(main,/\['touchstart','touchmove','wheel','gesturestart'/);
+assert.match(main,/touchstart','touchmove','wheel'/);
+assert.match(main,/updateControlTone/);
+assert.match(main,/selectTool\(button\.dataset\.tool\)/);
+assert.match(main,/timeRange\.oninput/);
+assert.match(main,/musicFile\.onchange/);
+assert.match(main,/musicPlay\.onclick/);
+assert.match(weather,/next==='rain'/);
+assert.match(weather,/next==='snow'/);
+console.log('Scene UI checks passed: views, four weather states, 24-hour control, local music, dot dock, and page-zoom prevention.');

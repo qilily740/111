@@ -8,15 +8,22 @@
   }
   const appRoot = window.IdealMachineApps = window.IdealMachineApps || {};
   appRoot.meihua = { name: '美化' };
-  const appItems = [...document.querySelectorAll('[data-app-key]')].filter(item => !item.matches('[data-folder-open]'));
+  const appItems = [...new Map([...document.querySelectorAll('[data-app-key]')]
+    .filter(item => !item.matches('[data-folder-open]'))
+    .map(item => [item.dataset.appKey, item])).values()];
   const folderItems = [...document.querySelectorAll('[data-folder-open]')];
   const iconElement = item => item.querySelector('.app-icon, .dock-icon, .folder-app-icon');
   const nameElement = item => item.querySelector('.app-name, .dock-name, .folder-app-name');
-  const defaultApps = new Map(appItems.map(item => [item.dataset.appKey, { name: nameElement(item)?.textContent || '', icon: iconElement(item)?.innerHTML || '' }]));
+  const ios17IconKeys = new Set(['liaotian','ta','luntan','xiangce','rili','jiyiku','xiaozhen','jia','debate','fanfic','magazine','yinyue','doubao','gouwu','ifshikong','shezhi','meihua','shijieshu','qinglvkongjian']);
+  const defaultIconMarkup = key => ios17IconKeys.has(key)
+    ? `<img class="default-app-icon" src="assets/icons/default-ios17/${key}.png" alt="">`
+    : '';
+  // 美化页的默认值固定使用这 19 个 iOS17 图标，不再从旧版 SVG 节点继承默认图标。
+  const defaultApps = new Map(appItems.map(item => [item.dataset.appKey, { name: nameElement(item)?.textContent || '', icon: defaultIconMarkup(item.dataset.appKey) || iconElement(item)?.innerHTML || '' }]));
   const launcherPresets = {
     orbit: { name: '1', day: 'assets/icons/ideal-orbit-day.png', night: 'assets/icons/ideal-orbit-night.png' },
     cycle: { name: '2', day: 'assets/icons/ideal-cycle-day.png', night: 'assets/icons/ideal-cycle-night.png' },
-    fall: { name: '3', day: 'assets/icons/ideal-fall-day.png', night: 'assets/icons/ideal-fall-night.png' }
+    fall: { name: '3', day: 'assets/icons/ideal-fall-day-v2.png', night: 'assets/icons/ideal-fall-night-v2.png' }
   };
   const normalizeLauncherIcon = value => ({ preset: launcherPresets[value?.preset] ? value.preset : 'orbit', appearance: value?.appearance === 'night' ? 'night' : 'day', custom: typeof value?.custom === 'string' ? value.custom : '', revision: Number(value?.revision) || 1 });
   let launcherIconDraft = normalizeLauncherIcon(saved.launcherIcon);
@@ -38,6 +45,10 @@
           <div class="beauty-section-head"><h3 class="beauty-section-title">桌面壁纸</h3><span class="beauty-section-note">Wallpaper</span></div>
           <div class="beauty-wallpaper-box"><div class="beauty-wallpaper-preview" id="beautyWallpaperPreview"></div><input class="beauty-input" id="beautyWallpaperUrl" type="url" placeholder="粘贴图片 URL"><label class="beauty-file-label">从本地选择<input class="beauty-file" id="beautyWallpaperFile" type="file" accept="image/*"></label><button class="beauty-wallpaper-album" data-beauty-wallpaper-album type="button">从相册选择</button></div>
         </section>
+        <section class="beauty-section beauty-launch-animation-setting">
+          <div class="beauty-section-head"><h3 class="beauty-section-title">开屏动画</h3><span class="beauty-section-note">Launch</span></div>
+          <label class="beauty-launch-animation-card"><span class="beauty-launch-animation-copy"><b>进入理想机时播放</b><small>从手机桌面点击理想机图标后显示。仅添加到主屏的独立窗口生效。</small></span><span class="beauty-launch-animation-switch"><input type="checkbox" data-beauty-launch-animation checked><i aria-hidden="true"></i></span></label>
+        </section>
         <section class="beauty-section">
           <div class="beauty-section-head beauty-icon-section-head"><h3 class="beauty-section-title">App 图标与名称</h3><div class="beauty-icon-section-actions"><button class="beauty-btn beauty-batch-icons" data-beauty-batch-icons type="button">从相册批量设置</button><button class="beauty-btn beauty-other-import" data-beauty-other-import type="button">从其他导入</button><button class="beauty-btn beauty-inline-reset" id="beautyReset" type="button">恢复默认图标与名称</button></div></div>
           <p class="beauty-icon-swap-hint" data-beauty-swap-hint>依次点击两个 App 图标即可交换，保存更改后生效。</p><div class="beauty-app-list" id="beautyAppList"></div>
@@ -53,7 +64,7 @@
   document.body.appendChild(launcherSetup);
   const iconPicker = document.createElement('div');
   iconPicker.className = 'beauty-icon-picker';
-  iconPicker.innerHTML = '<div class="beauty-icon-picker-backdrop" data-beauty-picker-close></div><section class="beauty-icon-picker-sheet" role="dialog" aria-modal="true" aria-labelledby="beautyIconPickerTitle"><header><div><span>APP ICON</span><h3 id="beautyIconPickerTitle">更换图标</h3></div><button type="button" data-beauty-picker-close aria-label="关闭">×</button></header><div class="beauty-icon-picker-options"><button type="button" data-beauty-picker-local><b>⌁</b><span>本地图片</span><small>从手机相册选择</small></button><button type="button" data-beauty-picker-url-open><b>↗</b><span>图片 URL</span><small>粘贴网络图片地址</small></button></div><div class="beauty-icon-picker-url" data-beauty-picker-url-panel hidden><input type="url" data-beauty-picker-url placeholder="粘贴图片 URL"><button type="button" data-beauty-picker-url-save>使用</button></div></section>';
+  iconPicker.innerHTML = '<div class="beauty-icon-picker-backdrop" data-beauty-picker-close></div><section class="beauty-icon-picker-sheet" role="dialog" aria-modal="true" aria-labelledby="beautyIconPickerTitle"><header><div><span>APP ICON</span><h3 id="beautyIconPickerTitle">更换图标</h3></div><button type="button" data-beauty-picker-close aria-label="关闭">×</button></header><div class="beauty-icon-picker-options"><button type="button" data-beauty-picker-local><b>⌁</b><span>从相册选择</span><small>使用相册 App 中的图片</small></button><button type="button" data-beauty-picker-url-open><b>↗</b><span>图片 URL</span><small>粘贴网络图片地址</small></button></div><div class="beauty-icon-picker-url" data-beauty-picker-url-panel hidden><input type="url" data-beauty-picker-url placeholder="粘贴图片 URL"><button type="button" data-beauty-picker-url-save>使用</button></div></section>';
   modal.appendChild(iconPicker);
   const deleteWallpaperButton = document.createElement('button');
   deleteWallpaperButton.className = 'beauty-wallpaper-delete';
@@ -148,8 +159,7 @@
     const key = item.dataset.appKey;
     const name = saved.names?.[key] || nameElement(item).textContent;
     const icon = saved.icons?.[key] || '';
-    const sourceIcon = iconElement(item);
-    const previewMarkup = sourceIcon?.matches('.folder-app-icon') ? sourceIcon.outerHTML : sourceIcon?.innerHTML || '';
+    const previewMarkup = defaultApps.get(key)?.icon || defaultIconMarkup(key);
     return `<div class="beauty-app-row" data-beauty-app="${key}"><button class="beauty-app-preview" data-beauty-preview="${key}" data-beauty-swap="${key}" type="button" aria-label="选择${esc(name)}交换图标" aria-pressed="false">${previewMarkup}<span class="beauty-app-pick-mark">⇄</span></button><input class="beauty-input beauty-app-name" data-beauty-name="${key}" aria-label="${esc(name)}名称" value="${esc(name)}" maxlength="20"><input type="hidden" data-beauty-icon-url="${key}" value="${esc(icon.startsWith('data:') || icon.startsWith('idb:image:') ? '' : icon)}"><input class="beauty-file" data-beauty-file="${key}" type="file" accept="image/*"></div>`;
   }
 
@@ -157,9 +167,9 @@
     document.querySelector('#beautyAppList').innerHTML = appItems.map(appRow).join('');
     appItems.forEach(item => {
       const key = item.dataset.appKey;
-      if (saved.icons?.[key]) { const value = saved.icons[key]; if (String(value).startsWith('idb:image:') && window.IdealMachineGetImage) window.IdealMachineGetImage(value).then(image => setPreview(document.querySelector(`[data-beauty-preview="${key}"]`), image)); else setPreview(document.querySelector(`[data-beauty-preview="${key}"]`), value); }
+      if (saved.icons?.[key]) showIconDraft(key, saved.icons[key]);
     });
-    modal.querySelectorAll('[data-beauty-file]').forEach(input => input.addEventListener('change', async event => { if (!event.target.files[0]) return; delete batchIconDraft[event.target.dataset.beautyFile]; modal.querySelector(`[data-beauty-icon-url="${event.target.dataset.beautyFile}"]`).value = ''; setPreview(document.querySelector(`[data-beauty-preview="${event.target.dataset.beautyFile}"]`), await readIconFile(event.target.files[0])); }));
+    modal.querySelectorAll('[data-beauty-file]').forEach(input => input.addEventListener('change', async event => { if (!event.target.files[0]) return; const key=event.target.dataset.beautyFile;const value=await readIconFile(event.target.files[0]);if(!value)return;batchIconDraft[key]=value;modal.querySelector(`[data-beauty-icon-url="${key}"]`).value = '';setPreview(modal.querySelector(`[data-beauty-preview="${key}"]`),value); }));
     modal.querySelectorAll('[data-beauty-swap]').forEach(button => button.addEventListener('click', () => selectIconForSwap(button.dataset.beautySwap)));
   }
 
@@ -170,9 +180,15 @@
   let batchIconDragKey = '';
   let swapIconKey = '';
   let otherImportDraft = [];
+  const builtInIconToken = key => `builtin:${key}`;
+  const builtInIconKey = value => String(value || '').startsWith('builtin:') ? String(value).slice(8) : '';
   function iconDraftValue(key) {
     if (Object.prototype.hasOwnProperty.call(batchIconDraft, key)) return batchIconDraft[key] || '';
-    return saved.icons?.[key] || '';
+    return saved.icons?.[key] || builtInIconToken(key);
+  }
+  function customIconDraftValue(key) {
+    const value = iconDraftValue(key);
+    return value && !builtInIconKey(value) ? value : '';
   }
   function resetIconPreview(key) {
     const preview = modal.querySelector(`[data-beauty-preview="${key}"]`);
@@ -180,10 +196,20 @@
     preview.classList.remove('has-custom-image');
     preview.style.backgroundImage = '';
     preview.querySelectorAll('svg').forEach(icon => icon.style.removeProperty('display'));
+    preview.querySelectorAll('.default-app-icon').forEach(icon => icon.style.removeProperty('display'));
   }
   function showIconDraft(key, value) {
     if (!value) { resetIconPreview(key); return; }
     const preview = modal.querySelector(`[data-beauty-preview="${key}"]`);
+    const sourceKey = builtInIconKey(value);
+    if (sourceKey) {
+      const source = defaultApps.get(sourceKey);
+      if (!preview || !source) return;
+      preview.classList.remove('has-custom-image');
+      preview.style.backgroundImage = '';
+      preview.innerHTML = `${source.icon}<span class="beauty-app-pick-mark">⇄</span>`;
+      return;
+    }
     if (String(value).startsWith('idb:image:') && window.IdealMachineGetImage) {
       window.IdealMachineGetImage(value).then(source => { if (source && iconDraftValue(key) === value) setPreview(preview, source); });
     } else setPreview(preview, value);
@@ -249,7 +275,7 @@
     closeBatchIconPanel(true);
   }
   function openBatchIconPicker() {
-    const targetItems = appItems.filter(item => !iconDraftValue(item.dataset.appKey));
+    const targetItems = appItems.filter(item => !customIconDraftValue(item.dataset.appKey));
     if (!targetItems.length) { window.alert('所有 App 都已经有自定义图标了。'); return; }
     window.IdealMachineAlbum?.pickMany?.(targetItems.length, (urls = []) => {
       const selected = urls.filter(Boolean).slice(0, targetItems.length);
@@ -320,9 +346,11 @@
 
   function setPreview(element, value) {
     if (!element || !value) return;
+    element.querySelectorAll('.app-custom-image').forEach(image => image.remove());
     element.classList.add('has-custom-image');
     element.style.backgroundImage = `url("${cssUrl(value)}")`;
     element.querySelector('svg')?.setAttribute('style', 'display:none');
+    element.querySelector('.default-app-icon')?.setAttribute('style', 'display:none');
   }
 
   function applySettings() {
@@ -365,7 +393,13 @@
           image.src = value;
         };
         const storedIcon = saved.icons[key];
-        if (String(storedIcon).startsWith('idb:image:') && window.IdealMachineGetImage) {
+        const sourceKey = builtInIconKey(storedIcon);
+        if (sourceKey && defaultApps.has(sourceKey)) {
+          icon.classList.remove('has-custom-image');
+          icon.style.removeProperty('background-image');
+          icon.querySelector('.app-custom-image')?.remove();
+          icon.innerHTML = defaultApps.get(sourceKey).icon;
+        } else if (String(storedIcon).startsWith('idb:image:') && window.IdealMachineGetImage) {
           window.IdealMachineGetImage(storedIcon).then(value => value ? applyIcon(value) : restoreDefaultIcon());
         } else applyIcon(storedIcon);
       } else {
@@ -427,7 +461,10 @@
   function open() {
     closeIconPicker();
     swapIconKey = '';
+    batchIconDraft = Object.fromEntries(appItems.map(item => { const key = item.dataset.appKey; return [key, saved.icons?.[key] || builtInIconToken(key)]; }));
     document.querySelector('#beautyWallpaperUrl').value = saved.wallpaper?.startsWith('data:') ? '' : (saved.wallpaper || '');
+    const launchAnimationToggle = modal.querySelector('[data-beauty-launch-animation]');
+    if (launchAnimationToggle) launchAnimationToggle.checked = saved.launchAnimationEnabled !== false;
     if (String(saved.wallpaper || '').startsWith('idb:image:') && window.IdealMachineGetImage) window.IdealMachineGetImage(saved.wallpaper).then(value => previewWallpaper(value)); else previewWallpaper(saved.wallpaper || '');
     renderRows();
     modal.classList.add('is-open');
@@ -443,6 +480,7 @@
   async function save() {
     const wallpaperFile = document.querySelector('#beautyWallpaperFile').files[0];
     const wallpaperUrl = document.querySelector('#beautyWallpaperUrl').value.trim();
+    saved.launchAnimationEnabled = modal.querySelector('[data-beauty-launch-animation]')?.checked !== false;
     if (wallpaperFile) { const uploadedWallpaper = await readFile(wallpaperFile); saved.wallpaper = window.IdealMachinePutImage ? await window.IdealMachinePutImage(uploadedWallpaper) : uploadedWallpaper; }
     else if (wallpaperUrl) { saved.wallpaper = wallpaperUrl; window.IdealMachineAlbum?.archiveUrl?.(wallpaperUrl, '美化壁纸'); }
     saved.names = saved.names || {};
@@ -482,7 +520,7 @@
     modal.querySelector('.beauty-sheet').insertAdjacentHTML('beforeend', '<div class="beauty-confirm-backdrop" data-beauty-confirm-cancel></div><section class="beauty-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="beautyConfirmTitle"><h3 id="beautyConfirmTitle">恢复默认图标与名称？</h3><p>所有可自定义 App 的图标和名称都会恢复为默认形式。</p><div><button class="beauty-btn beauty-confirm-cancel" type="button" data-beauty-confirm-cancel>取消</button><button class="beauty-btn beauty-confirm-ok" type="button" data-beauty-confirm-ok>确定恢复</button></div></section>');
   }
   function exportBeauty() {
-    const payload = { format: 'ideal-machine-beauty', version: 2, exportedAt: new Date().toISOString(), wallpaper: saved.wallpaper || '', names: saved.names || {}, icons: saved.icons || {}, launcherIcon: saved.launcherIcon || null };
+    const payload = { format: 'ideal-machine-beauty', version: 2, exportedAt: new Date().toISOString(), wallpaper: saved.wallpaper || '', names: saved.names || {}, icons: saved.icons || {}, launcherIcon: saved.launcherIcon || null, launchAnimationEnabled: saved.launchAnimationEnabled !== false };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -501,6 +539,7 @@
         if (payload.names && typeof payload.names === 'object') saved.names = payload.names;
         if (payload.icons && typeof payload.icons === 'object') saved.icons = payload.icons;
         if (payload.launcherIcon && typeof payload.launcherIcon === 'object') saved.launcherIcon = normalizeLauncherIcon(payload.launcherIcon);
+        if (typeof payload.launchAnimationEnabled === 'boolean') saved.launchAnimationEnabled = payload.launchAnimationEnabled;
         localStorage.setItem(storageKey, JSON.stringify(saved));
         applySettings();
         open();
@@ -510,6 +549,8 @@
   }
   modal.addEventListener('click', event => { if (event.target.closest('[data-beauty-confirm-cancel]')) { closeRestoreConfirm(); return; } if (event.target.closest('[data-beauty-confirm-ok]')) { closeRestoreConfirm(); restoreDefaults(); return; } if (event.target.closest('[data-beauty-wallpaper-album]')) { window.IdealMachineAlbum?.pick?.(value => { const input = modal.querySelector('#beautyWallpaperUrl'); const file = modal.querySelector('#beautyWallpaperFile'); if (input) input.value = value || ''; if (file) file.value = ''; previewWallpaper(value || ''); }); return; } if (event.target.closest('[data-beauty-close]')) close(); });
   modal.addEventListener('click', event => {
+    const iconPickerButton = event.target.closest('[data-beauty-picker-open]');
+    if (iconPickerButton) { openIconPicker(iconPickerButton.dataset.beautyPickerOpen); return; }
     if (event.target.closest('[data-beauty-batch-icons]')) { openBatchIconPicker(); return; }
     if (event.target.closest('[data-beauty-batch-close]')) { closeBatchIconPanel(); return; }
     if (event.target.closest('[data-beauty-batch-apply]')) { applyBatchIconPreview(); return; }
@@ -582,7 +623,16 @@
     if (event.target.closest('[data-beauty-picker-local]')) {
       const key = activeIconKey;
       closeIconPicker();
-      if (key) modal.querySelector(`[data-beauty-file="${key}"]`)?.click();
+      if (!key) return;
+      if (window.IdealMachineAlbum?.pick) {
+        window.IdealMachineAlbum.pick(value => {
+          if (!value) return;
+          batchIconDraft[key] = value;
+          const hiddenUrl = modal.querySelector(`[data-beauty-icon-url="${key}"]`);
+          if (hiddenUrl) hiddenUrl.value = '';
+          showIconDraft(key, value);
+        });
+      } else modal.querySelector(`[data-beauty-file="${key}"]`)?.click();
       return;
     }
     if (event.target.closest('[data-beauty-picker-url-open]')) {
@@ -597,8 +647,8 @@
       const hiddenUrl = modal.querySelector(`[data-beauty-icon-url="${activeIconKey}"]`);
       if (file) file.value = '';
       if (hiddenUrl) hiddenUrl.value = url;
-      delete batchIconDraft[activeIconKey];
-      setPreview(document.querySelector(`[data-beauty-preview="${activeIconKey}"]`), url);
+      batchIconDraft[activeIconKey] = url;
+      setPreview(modal.querySelector(`[data-beauty-preview="${activeIconKey}"]`), url);
       closeIconPicker();
     }
   });

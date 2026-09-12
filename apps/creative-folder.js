@@ -6,17 +6,19 @@
   const removedAppsKey = 'ideal-machine-creative-folder-removed';
   const orderKey = 'ideal-machine-creative-folder-order';
   if (!folder || !shell || !folderTrigger) return;
+  const initialGridHTML = folder.querySelector('.desktop-folder-grid')?.innerHTML || '';
 
   const apps = {
     debate: { name: '辩论', className: 'is-debate', mark: 'VS' },
     fanfic: { name: '同人文', className: 'is-fanfic', mark: '文' },
     magazine: { name: '杂志社', className: 'is-magazine', mark: 'M' }
   };
+  const builtinIds = new Set(['app-debate', 'app-fanfic', 'app-magazine']);
 
   function readExtraApps() {
     try {
       const value = JSON.parse(localStorage.getItem(extraAppsKey) || '[]');
-      return Array.isArray(value) ? [...new Set(value.filter(id => String(id).startsWith('app-')))] : [];
+      return Array.isArray(value) ? [...new Set(value.filter(id => String(id).startsWith('app-') && !builtinIds.has(String(id))))] : [];
     } catch { return []; }
   }
 
@@ -48,7 +50,16 @@
   function renderExtraApps() {
     const grid = folder.querySelector('.desktop-folder-grid');
     if (!grid) return;
+    // 每次打开都从内置 App 的原始列表重建。这样移出后会持续隐藏，
+    // 拖回文件夹后也能恢复，而不会受上一次 DOM 删除状态影响。
+    grid.innerHTML = initialGridHTML;
     const removed = readRemovedApps();
+    // 兼容旧版本已经产生的“复制”数据：只要该内置 App 确实位于桌面，
+    // 就立即把它标记为已移出，保证文件夹与桌面不会同时显示。
+    builtinIds.forEach(id => {
+      if (document.querySelector(`.desktop-layout-grid [data-desktop-item="${id}"]`)) removed.add(id);
+    });
+    localStorage.setItem(removedAppsKey, JSON.stringify([...removed]));
     grid.querySelectorAll('[data-folder-app]').forEach(item => {
       if (removed.has(`app-${item.dataset.folderApp}`)) item.remove();
     });
@@ -109,7 +120,8 @@
     shell.querySelector('[data-folder-app-heading]').textContent = item.name;
     const hero = shell.querySelector('[data-folder-app-hero]');
     hero.className = `folder-app-icon ${item.className}`;
-    hero.querySelector('span').textContent = item.mark;
+    const sourceIcon = folder.querySelector(`[data-folder-app="${key}"] .folder-app-icon`);
+    hero.innerHTML = sourceIcon?.innerHTML || `<img class="default-app-icon" src="assets/icons/default-ios17/${key}.png" alt="">`;
     shell.classList.add('is-open');
     shell.setAttribute('aria-hidden', 'false');
     shell.querySelector('[data-folder-app-back]')?.focus();
@@ -127,7 +139,11 @@
   document.addEventListener('click', event => {
     if (event.target.closest('[data-folder-open]')) { openFolder(); return; }
     if (event.target.closest('[data-folder-close]')) { closeFolder(); return; }
-    const appButton = event.target.closest('[data-folder-app]');
+    // 移出创作文件夹后的桌面 App 仍会保留 data-folder-app，不能把它们
+    // 当作文件夹内点击处理，否则 closeFolder() 聚焦创作文件夹图标时会
+    // 把桌面强制滚回该图标所在的第三页。
+    const candidate = event.target.closest('[data-folder-app]');
+    const appButton = candidate?.closest('[data-desktop-folder]') === folder ? candidate : null;
     if (appButton) { const key = appButton.dataset.folderApp; if (['debate', 'fanfic', 'magazine'].includes(key) || window.IdealMachineApps?.[key]) { closeFolder(); return; } openApp(key); return; }
     if (event.target.closest('[data-folder-app-back]')) { openFolder(); return; }
     if (event.target.closest('[data-folder-app-close]')) closeApp();

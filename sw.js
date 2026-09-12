@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260903-1';
+const CACHE_NAME = 'ideal-machine-shell-v20260911-default-icons-20';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());

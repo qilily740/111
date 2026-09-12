@@ -9,6 +9,7 @@
   document.body.appendChild(app);
 
   let state = readState();
+  let openedFromCreativeFolder = false;
   let page = 'home';
   let activeId = '';
   let busy = false;
@@ -45,9 +46,9 @@
   function nameFor(participant) { return participant?.name || '开放席位'; }
   function participantOptions(selected, other) { const selectedIds = new Set(selected || []); const otherIds = new Set(other || []); return `<option value="">选择用户或角色添加</option>${participants().map(item => `<option value="${esc(item.id)}" ${selectedIds.has(item.id) || otherIds.has(item.id) ? 'disabled' : ''}>${esc(item.name)}${item.type === 'character' ? ' · 角色' : ''}</option>`).join('')}`; }
 
-  function openApp() { state = readState(); page = 'home'; activeId = ''; shell?.classList.remove('is-open'); shell?.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); app.classList.add('is-open'); app.setAttribute('aria-hidden', 'false'); render(); }
+  function openApp(fromCreativeFolder = false) { openedFromCreativeFolder = Boolean(fromCreativeFolder); state = readState(); page = 'home'; activeId = ''; shell?.classList.remove('is-open'); shell?.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); app.classList.add('is-open'); app.setAttribute('aria-hidden', 'false'); render(); }
   function closeApp() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); }
-  function backToFolder() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); folder?.classList.add('is-open'); folder?.setAttribute('aria-hidden', 'false'); }
+  function backToFolder() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); if (openedFromCreativeFolder) { folder?.classList.add('is-open'); folder?.setAttribute('aria-hidden', 'false'); } else { folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); } }
 
   function homePage() {
     const list = state.debates.slice().reverse().map(item => `<button class="debate-history-card" data-debate-open="${esc(item.id)}" type="button"><span class="debate-history-mark">${item.status === '已结束' ? '✓' : 'VS'}</span><span><b>${esc(item.topic)}</b><small>${esc(item.updatedAt || item.createdAt)} · ${item.turns.length} 条发言 · 正方 ${item.sides.affirmative.length} 人 / 反方 ${item.sides.negative.length} 人</small></span><i>›</i></button>`).join('');
@@ -102,7 +103,8 @@
   function recordTurn(event) { event.preventDefault(); const debate = activeDebate(); if (!debate) return; const side = app.querySelector('[data-debate-turn-side]')?.value || composerSide; const speakerId = app.querySelector('[data-debate-turn-speaker]')?.value; const text = app.querySelector('[data-debate-turn-text]')?.value.trim(); const round = Number(app.querySelector('[data-debate-turn-round]')?.value || debate.currentRound || 0); if (!text) return window.alert('请先写下这次发言。'); if (!debate.sides[side].length) { joinSide(side); return; } const speaker = debate.sides[side].find(item => item.id === speakerId) || debate.sides[side][0]; debate.turns.push({ id: uid('turn'), side, roundIndex: round, round: rounds[round], author: nameFor(speaker), text, time: now() }); debate.currentRound = Math.min(rounds.length - 1, round + 1); debate.updatedAt = now(); save(); render(); }
 
   document.addEventListener('click', event => {
-    if (event.target.closest('[data-folder-app="debate"]')) { openApp(); return; }
+    const launcher = event.target.closest('[data-folder-app="debate"]');
+    if (launcher) { openApp(Boolean(launcher.closest('[data-desktop-folder]'))); return; }
     if (!app.classList.contains('is-open')) return;
     if (event.target.closest('[data-debate-close]')) { closeApp(); return; }
     if (event.target.closest('[data-debate-folder]')) { backToFolder(); return; }

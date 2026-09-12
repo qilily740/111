@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import * as T from '../public/spring-whisper/three.module.js';
+import {createWeatherSystem} from '../public/spring-whisper/weather.js';
+const source=fs.readFileSync(new URL('../public/spring-whisper/main.js',import.meta.url),'utf8');
+const code=source.slice(source.indexOf('const house=new T.Group()'),source.indexOf('// Garden boundary'));
+const scene=new T.Scene();scene.fog=new T.Fog(0xffffff,45,95);
+const house=new Function('T','scene',`${code};return house;`)(T,scene);
+const assets=JSON.parse(fs.readFileSync(new URL('../public/spring-whisper/weather-assets.json',import.meta.url),'utf8'));
+globalThis.fetch=async()=>({ok:true,json:async()=>assets});
+const system=createWeatherSystem(scene,house);await system.ready;
+const snow=scene.getObjectByName('AccumulatedBlenderSnow');assert.ok(snow?.count>1000);
+system.set('snow');for(let i=0;i<300;i++)system.update(.05,i*.05);
+assert.ok(snow.visible);const matrix=new T.Matrix4(),position=new T.Vector3(),scale=new T.Vector3(),q=new T.Quaternion();
+let roof=0,ground=0;
+for(let i=0;i<snow.count;i++){snow.getMatrixAt(i,matrix);matrix.decompose(position,q,scale);assert.ok(Number.isFinite(position.y));if(position.y>6.6)roof++;if(position.y<.1)ground++;}
+assert.ok(roof>100&&ground>100,'Snow covers both roof and ground');
+const drops=scene.getObjectByName('RoofRunoffDrops');system.set('rain');system.update(.1,1);assert.ok(drops.visible);
+drops.getMatrixAt(10,matrix);const before=matrix.clone();system.update(.1,1.2);drops.getMatrixAt(10,matrix);assert.notDeepEqual(matrix.elements,before.elements,'Roof water must move');
+assert.ok(scene.getObjectByName('RainWetSurfaces').material.opacity>0);
+for(let i=0;i<300;i++)system.update(.05,2+i*.05);assert.equal(snow.visible,false,'Accumulated snow melts after snowfall stops');
+system.set('sunny');system.update(.1,20);assert.equal(drops.visible,false);assert.equal(scene.getObjectByName('WeatherRain').visible,false);
+system.set('cloudy');assert.equal(scene.getObjectByName('WeatherClouds').visible,true);
+console.log(`Weather checks passed: Blender assets, ${roof} roof snow samples, ${ground} ground samples, flowing runoff, wet surfaces, melting and weather switching.`);

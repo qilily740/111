@@ -8,6 +8,7 @@
   document.body.appendChild(app);
 
   let state = readState();
+  let openedFromCreativeFolder = false;
   let page = 'home';
   let activeId = '';
   let activeTab = 'plan';
@@ -38,9 +39,9 @@
   function activeIssue() { return state.issues.find(item => item.id === activeId); }
   function sectionArticle(issue, sectionId) { return issue.articles.find(item => item.sectionId === sectionId); }
 
-  function openApp() { state = readState(); page = 'home'; activeId = ''; activeTab = 'plan'; shell?.classList.remove('is-open'); shell?.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); app.classList.add('is-open'); app.setAttribute('aria-hidden', 'false'); render(); }
-  function closeApp() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); }
-  function backFolder() { closeApp(); folder?.classList.add('is-open'); folder?.setAttribute('aria-hidden', 'false'); }
+  function openApp(fromCreativeFolder = false) { openedFromCreativeFolder = Boolean(fromCreativeFolder); state = readState(); page = 'home'; activeId = ''; activeTab = 'plan'; shell?.classList.remove('is-open'); shell?.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); app.classList.add('is-open'); app.setAttribute('aria-hidden', 'false'); render(); }
+  function closeApp() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); }
+  function backFolder() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); if (openedFromCreativeFolder) { folder?.classList.add('is-open'); folder?.setAttribute('aria-hidden', 'false'); } else { folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); } }
 
   function header(kicker, title, subtitle, back = 'data-magazine-home') {
     return `<header class="magazine-header"><button ${back} class="magazine-round-button" type="button" aria-label="返回">‹</button><div><span>${esc(kicker)}</span><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div><button data-magazine-close class="magazine-round-button" type="button" aria-label="关闭杂志社">×</button></header>`;
@@ -153,7 +154,8 @@
   async function uploadCover(file) { const issue = activeIssue(); if (!issue || !file) return; const data = window.IdealMachineReadImage ? await window.IdealMachineReadImage(file,1500,.8) : await new Promise(resolve => { const reader=new FileReader(); reader.onload=()=>resolve(reader.result); reader.readAsDataURL(file); }); issue.cover.image = window.IdealMachinePutImage ? await window.IdealMachinePutImage(data) : data; issue.updatedAt=now(); save(); render(); }
 
   document.addEventListener('click', event => {
-    if (event.target.closest('[data-folder-app="magazine"]')) { openApp(); return; }
+    const launcher = event.target.closest('[data-folder-app="magazine"]');
+    if (launcher) { openApp(Boolean(launcher.closest('[data-desktop-folder]'))); return; }
     if (!app.classList.contains('is-open')) return;
     if (event.target.closest('[data-magazine-close]')) { closeApp(); return; }
     if (event.target.closest('[data-magazine-folder]')) { backFolder(); return; }

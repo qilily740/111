@@ -44,14 +44,114 @@
     const chat = readJSON(chatStorageKey, {});
     return (Array.isArray(chat.contacts) ? chat.contacts : []).filter(contact => contact.worldbook === bookId);
   }
+  function responseText(value) {
+    if (Array.isArray(value)) return value.map(responseText).join('');
+    if (typeof value === 'string') return value;
+    if (!value || typeof value !== 'object') return '';
+    return responseText(value.text ?? value.content ?? value.output_text ?? value.value ?? '');
+  }
+  function balancedJSONCandidates(text) {
+    const candidates = [];
+    for (let start = 0; start < text.length; start += 1) {
+      if (text[start] !== '{' && text[start] !== '[') continue;
+      const stack = []; let quoted = false; let escaped = false;
+      for (let i = start; i < text.length; i += 1) {
+        const char = text[i];
+        if (escaped) { escaped = false; continue; }
+        if (char === '\\' && quoted) { escaped = true; continue; }
+        if (char === '"') { quoted = !quoted; continue; }
+        if (quoted) continue;
+        if (char === '{' || char === '[') stack.push(char);
+        else if (char === '}' || char === ']') {
+          const expected = char === '}' ? '{' : '[';
+          if (stack.pop() !== expected) break;
+          if (!stack.length) { candidates.push(text.slice(start, i + 1)); break; }
+        }
+      }
+    }
+    return candidates;
+  }
+  function looseJSONSource(source) {
+    let normalized = ''; let quoted = false; let escaped = false;
+    for (const char of source) {
+      if (escaped) { normalized += char; escaped = false; continue; }
+      if (char === '\\' && quoted) { normalized += char; escaped = true; continue; }
+      if (char === '"') { normalized += char; quoted = !quoted; continue; }
+      if (quoted && char.charCodeAt(0) < 32) { normalized += char === '\n' ? '\\n' : char === '\r' ? '\\r' : char === '\t' ? '\\t' : ' '; continue; }
+      normalized += char;
+    }
+    return normalized
+      .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+      .replace(/([{,]\s*)([A-Za-z_$][\w$-]*)\s*:/g, '$1"$2":')
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/\bundefined\b/g, 'null').replace(/\bNaN\b/g, 'null')
+      .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, body) => JSON.stringify(body.replace(/\\'/g, "'")));
+  }
+  function unwrapAnalysisValue(value, depth = 0) {
+    if (depth > 3 || value == null) return value;
+    if (typeof value === 'string') {
+      const nested = balancedJSONCandidates(value);
+      for (const candidate of nested) {
+        try { return unwrapAnalysisValue(JSON.parse(candidate), depth + 1); } catch {}
+        try { return unwrapAnalysisValue(JSON.parse(looseJSONSource(candidate)), depth + 1); } catch {}
+      }
+      return value;
+    }
+    if (Array.isArray(value)) return value.find(item => item && typeof item === 'object') || value;
+    if (typeof value !== 'object') return value;
+    for (const key of ['analysis', 'result', 'data', 'output', 'worldbook', 'report']) {
+      if (value[key] !== undefined && value[key] !== value) {
+        const nested = unwrapAnalysisValue(value[key], depth + 1);
+        if (nested && typeof nested === 'object') return nested;
+      }
+    }
+    return value;
+  }
+  function textValue(value) {
+    if (value == null) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
+    if (typeof value === 'object') return String(value.text ?? value.description ?? value.content ?? value.name ?? value.title ?? '').trim();
+    return '';
+  }
+  function normalizeAnalysisShape(value) {
+    const source = unwrapAnalysisValue(value);
+    if (!source || typeof source !== 'object' || Array.isArray(source)) throw new Error('API 返回的分析格式不正确，请重新分析');
+    const worldSource = source.world || source.worldBackground || source.background || source.setting || source['世界背景'] || {};
+    const world = typeof worldSource === 'string' ? { summary:worldSource } : { ...(worldSource || {}) };
+    world.title = textValue(world.title || world.name || source.title || source['世界名称']);
+    world.summary = textValue(world.summary || world.overview || world.description || world.content || source.summary || source['背景概括']);
+    world.era = textValue(world.era || world.period || world.time || source.era || source['时代']);
+    world.location = textValue(world.location || world.place || source.location || source['地点']);
+    world.atmosphere = textValue(world.atmosphere || world.mood || source.atmosphere || source['氛围']);
+    const asItems = value => Array.isArray(value) ? value : (value && typeof value === 'object' ? Object.entries(value).map(([key, item]) => ({ ...(item && typeof item === 'object' ? item : { description:item }), name:(item && typeof item === 'object' && item.name) || key })) : (value == null ? [] : [value]));
+    const list = value => asItems(value).map(item => typeof item === 'object' ? textValue(item.text ?? item.description ?? item.content ?? item.name ?? item.title) : textValue(item)).filter(Boolean);
+    world.rules = list(world.rules || world.laws || world.worldRules || source.rules || source['世界规则']);
+    const npcs = source.npcs || source.characters || source.people || source.cast || source.NPCs || source['人物'] || source['NPC'] || [];
+    const relations = source.relations || source.relationships || source.relationship || source.relationNetwork || source['人物关系'] || source['关系网'] || source['关系'] || [];
+    const conflicts = source.conflicts || source.openQuestions || source.questions || source.issues || source.gaps || source['冲突'] || source['待确认'] || source['问题'] || [];
+    const normalizedNpcs = asItems(npcs).map(item => {
+      if (typeof item === 'string') return { name:item };
+      return { ...item, name:textValue(item?.name || item?.姓名 || item?.character || item?.person), identity:textValue(item?.identity || item?.role || item?.occupation || item?.身份), personality:textValue(item?.personality || item?.traits || item?.性格), motivation:textValue(item?.motivation || item?.goal || item?.动机), relationToRole:textValue(item?.relationToRole || item?.relation || item?.relationship || item?.与角色关系) };
+    }).filter(item => item.name);
+    const normalizedRelations = asItems(relations).map(item => {
+      if (typeof item === 'string') return { description:item };
+      return { ...item, source:textValue(item?.source || item?.from || item?.人物A || item?.主体), target:textValue(item?.target || item?.to || item?.人物B || item?.客体), relation:textValue(item?.relation || item?.type || item?.relationship || item?.关系), description:textValue(item?.description || item?.details || item?.说明) };
+    }).filter(item => item.source && item.target);
+    const knownShape = source.world || source.worldBackground || source.background || source.setting || source.npcs || source.characters || source.people || source.relations || source.relationships || source.conflicts || source.openQuestions || source['世界背景'] || source['人物'] || source['人物关系'] || source['关系'];
+    if (!knownShape) throw new Error('API 返回的分析格式不正确，请重新分析');
+    return { ...source, world, npcs:normalizedNpcs, relations:normalizedRelations, conflicts:list(conflicts) };
+  }
   function parseAnalysisJSON(value) {
-    const clean = String(value || '').replace(/```json|```/gi, '').trim();
-    const start = clean.indexOf('{'); const end = clean.lastIndexOf('}');
-    if (start < 0 || end <= start) throw new Error('API 没有返回完整的分析数据');
-    const source = clean.slice(start, end + 1);
-    try { return JSON.parse(source); } catch {}
-    try { return JSON.parse(source.replace(/([{,]\s*)([A-Za-z_][\w-]*)\s*:/g, '$1"$2":').replace(/,\s*([}\]])/g, '$1')); }
-    catch { throw new Error('API 返回的分析格式不正确，请重新分析'); }
+    const clean = responseText(value).replace(/^\uFEFF/, '').trim();
+    const fenced = clean.match(/```(?:json|JSON)?\s*([\s\S]*?)```/i);
+    const sourceText = (fenced ? fenced[1] : clean).trim();
+    const candidates = balancedJSONCandidates(sourceText);
+    if (!candidates.length) throw new Error('API 没有返回完整的分析数据');
+    for (const source of candidates) {
+      try { return normalizeAnalysisShape(JSON.parse(source)); } catch {}
+      try { return normalizeAnalysisShape(JSON.parse(looseJSONSource(source))); } catch {}
+    }
+    throw new Error('API 返回的分析格式不正确，请重新分析');
   }
   function relationForRole(result, roleName, npcName) {
     return (Array.isArray(result?.relations) ? result.relations : []).find(item => {
@@ -178,10 +278,16 @@ ${roleContext}
 世界书全部启用条目：
 ${entries || '暂无启用条目'}`;
     try {
-      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: 0.18, max_tokens:3000, stream:false, messages: [{ role: 'system', content: '你是严谨的世界观档案分析器，只返回完整合法 JSON。' }, { role: 'user', content: prompt }] }) });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
-      const result = parseAnalysisJSON(payload.choices?.[0]?.message?.content || payload.output_text || '');
+      const requestAnalysis = async compact => {
+        const compactRule = compact ? '\n这是格式修复重试：输出必须紧凑，summary 不超过 180 字，rules 最多 8 条，NPC 最多 20 位，conflicts 最多 8 条；不得省略闭合括号。' : '';
+        const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature:compact ? 0.08 : 0.18, max_tokens:compact ? 4500 : 3500, stream:false, messages: [{ role: 'system', content: '你是严谨的世界观档案分析器，只返回完整合法 JSON。' }, { role: 'user', content:prompt + compactRule }] }) });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json(); const message = payload.choices?.[0]?.message;
+        return { raw:message?.content || message?.reasoning_content || payload.output_text || payload.output?.[0]?.content || payload.response || '', finish:payload.choices?.[0]?.finish_reason || '' };
+      };
+      let answer = await requestAnalysis(false); let result;
+      try { result = parseAnalysisJSON(answer.raw); }
+      catch (firstError) { answer = await requestAnalysis(true); result = parseAnalysisJSON(answer.raw); }
       result.world ||= {}; result.npcs = Array.isArray(result.npcs) ? result.npcs : []; result.relations = Array.isArray(result.relations) ? result.relations : []; result.conflicts = Array.isArray(result.conflicts) ? result.conflicts : [];
       analysisResult = result;
       const analyses = readJSON(analysisStorageKey, {}); analyses[book.id] = { ...result, analyzedAt:Date.now() }; localStorage.setItem(analysisStorageKey, JSON.stringify(analyses));
