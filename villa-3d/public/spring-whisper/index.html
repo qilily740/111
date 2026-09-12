@@ -1,1 +1,28 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>春日絮语 · 3D 小屋</title><link rel="stylesheet" href="style.css"></head><body><div id="scene"></div><footer><nav aria-label="观察视角"><button data-view="home" class="active">全景</button><button data-view="front">正面</button><button data-view="back">背面</button><button data-view="left">左侧</button><button data-view="right">右侧</button><button data-view="top">俯视</button></nav><div class="options"><button id="rotate">自动旋转</button><button id="white">白模</button></div><p class="hint">单指拖动旋转 · 双指缩放</p></footer><div id="loading"><span></span></div><script type="module" src="main.js?v=20260906-1"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>春日絮语 · 3D 小屋</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="scene"></div>
+  <footer class="scene-controls">
+    <div class="dock-tools" aria-label="场景功能">
+      <button class="tool-dot active" data-tool="views" type="button" aria-label="观察不同方向" aria-expanded="false"><i class="icon-view"></i></button>
+      <button class="tool-dot" data-tool="weather" type="button" aria-label="控制天气" aria-expanded="false"><i class="icon-weather"></i></button>
+      <button class="tool-dot" data-tool="time" type="button" aria-label="改变时间" aria-expanded="false"><i class="icon-time"></i></button>
+      <button class="tool-dot" data-tool="music" type="button" aria-label="背景音乐" aria-expanded="false"><i class="icon-music"></i></button>
+    </div>
+    <div id="scene-dock" class="scene-dock" aria-hidden="true">
+      <section class="control-panel" data-panel="views"><nav class="view-dots" aria-label="观察视角"><button data-view="home" class="active" type="button"><span>全景</span></button><button data-view="front" type="button"><span>正面</span></button><button data-view="back" type="button"><span>背面</span></button><button data-view="left" type="button"><span>左侧</span></button><button data-view="right" type="button"><span>右侧</span></button><button data-view="top" type="button"><span>俯视</span></button></nav></section>
+      <section class="control-panel weather-panel" data-panel="weather"><button data-weather="sunny" class="active" type="button"><i>☀</i><span>晴天</span></button><button data-weather="cloudy" type="button"><i>☁</i><span>多云</span></button><button data-weather="rain" type="button"><i>╱</i><span>下雨</span></button><button data-weather="snow" type="button"><i>✣</i><span>下雪</span></button></section>
+      <section class="control-panel time-panel" data-panel="time"><label for="time-range">时间</label><i>☾</i><input id="time-range" type="range" min="0" max="24" step="0.25" aria-label="调整时间"><i>☀</i><output id="time-output">12:00</output></section>
+      <section class="control-panel music-panel" data-panel="music"><label class="music-add"><input id="music-file" type="file" accept="audio/*"><i>＋</i><span>添加音乐</span></label><button id="music-play" type="button" disabled><i></i><span>播放</span></button><span id="music-status" aria-live="polite"></span><audio id="music-audio" loop></audio></section>
+    </div>
+  </footer>
+  <div id="loading"><span></span></div>
+  <script type="module" src="main.js?v=20260908-scene-perf-7"></script>
+</body>
+</html>

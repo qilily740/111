@@ -29,18 +29,18 @@
     { id:'widget-frost-profile', key:'frost-profile', name:'磨砂个人名片', description:'完整背景下半区磨砂，可替换头像、用户名与个性签名', selector:'.frost-profile-widget', size:'wide', columns:4, rows:3, defaultHidden:true },
     { id:'widget-celestial-specimen', key:'celestial-specimen', name:'星月玻璃标本', description:'月亮、星轨、干花与胶片组成的纯装饰卡片', selector:'.celestial-specimen-widget', size:'wide', columns:4, rows:2, defaultHidden:true },
     { id:'widget-mist-rain-window', key:'mist-rain-window', name:'雾雨玻璃窗', description:'动态雨滴、雾夜灯光与轻纱窗景', selector:'.mist-rain-window-widget', size:'wide', columns:4, rows:2, defaultHidden:true },
-    { id:'widget-search', key:'search', name:'搜索条', description:'桌面搜索入口', selector:'.search-wrap', size:'wide', columns:4, rows:1 },
+    { id:'widget-search', key:'search', name:'搜索条', description:'桌面搜索入口', selector:'.search-wrap', size:'wide', columns:4, rows:1, defaultHidden:true },
     { id:'widget-photos', key:'photos', name:'三联照片', description:'三张竖版照片', selector:'.photo-group', size:'photos', columns:4, rows:2, defaultHidden:true },
     { id:'widget-calendar', key:'calendar', name:'日期日历', description:'日期、寄语与滚动日历', selector:'.date-calendar-card', size:'wide', columns:4, rows:1, defaultHidden:true }
   ];
-  const defaultLayoutVersion = 5;
+  const defaultLayoutVersion = 6;
   const legacyDefaultPages = [
     ['widget-profile','widget-todo','app-liaotian','app-ta','app-luntan','app-rili','app-jiyiku','app-xiaozhen','app-jia','app-creative-folder'],
     ['widget-search','widget-photos','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-calendar']
   ];
   const defaultPages = [
     ['widget-profile','widget-polaroid-mini','app-liaotian','app-ta','app-luntan','app-rili','app-xiangce'],
-    ['widget-search','widget-mood','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-relationship-mini','widget-time-photo'],
+    ['widget-mood','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-relationship-mini','widget-time-photo'],
     ['widget-chat','widget-image','app-jiyiku','app-xiaozhen','app-jia','app-creative-folder','widget-now']
   ];
   const defaultPositions = {
@@ -51,14 +51,13 @@
     'app-luntan':{ page:0, column:3, row:5 },
     'app-rili':{ page:0, column:4, row:5 },
     'app-xiangce':{ page:0, column:3, row:6 },
-    'widget-search':{ page:1, column:1, row:1 },
-    'widget-mood':{ page:1, column:1, row:2 },
-    'app-yinyue':{ page:1, column:1, row:4 },
-    'app-doubao':{ page:1, column:2, row:4 },
-    'app-gouwu':{ page:1, column:1, row:5 },
-    'app-ifshikong':{ page:1, column:2, row:5 },
-    'widget-relationship-mini':{ page:1, column:3, row:4 },
-    'widget-time-photo':{ page:1, column:1, row:6 },
+    'widget-mood':{ page:1, column:1, row:1 },
+    'app-yinyue':{ page:1, column:1, row:3 },
+    'app-doubao':{ page:1, column:2, row:3 },
+    'app-gouwu':{ page:1, column:1, row:4 },
+    'app-ifshikong':{ page:1, column:2, row:4 },
+    'widget-relationship-mini':{ page:1, column:3, row:3 },
+    'widget-time-photo':{ page:1, column:1, row:5 },
     'widget-chat':{ page:2, column:1, row:1 },
     'widget-image':{ page:2, column:1, row:3 },
     'app-jiyiku':{ page:2, column:3, row:3 },
@@ -82,6 +81,9 @@
     && versionOneThirdPage.every(id => currentThirdPage.includes(id))
     && currentThirdPage.every(id => versionOneThirdPage.includes(id));
   const currentFirstPage = Array.isArray(state.pages?.[0]) ? state.pages[0] : [];
+  const versionFiveSecondPage = ['widget-search','widget-mood','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-relationship-mini','widget-time-photo'];
+  const currentSecondPage = Array.isArray(state.pages?.[1]) ? state.pages[1] : [];
+  const isVersionFiveSecondDefault = state.layoutVersion === 5 && versionFiveSecondPage.every(id => currentSecondPage.includes(id)) && currentSecondPage.every(id => versionFiveSecondPage.includes(id));
   const currentDefaultFirstPage = defaultPages[0];
   const shouldRestoreFirstPageOffset = state.layoutVersion >= 1 && state.layoutVersion < defaultLayoutVersion
     && currentDefaultFirstPage.every(id => currentFirstPage.includes(id))
@@ -91,10 +93,16 @@
       state.pages = defaultPages.map(items => [...items]);
       state.positions = Object.fromEntries(Object.entries(defaultPositions).map(([id, position]) => [id, { ...position }]));
       const shown = new Set(defaultPages.flat());
-      state.hiddenWidgets = [...new Set([...(state.hiddenWidgets || []), 'widget-todo', 'widget-photos', 'widget-calendar'])].filter(id => !shown.has(id));
+      state.hiddenWidgets = [...new Set([...(state.hiddenWidgets || []), 'widget-todo', 'widget-photos', 'widget-calendar', 'widget-search'])].filter(id => !shown.has(id));
       state.pageOneTopSlots = true;
       state.pageOneRaised = true;
     } else {
+      if (isVersionFiveSecondDefault) {
+        state.pages[1] = [...defaultPages[1]];
+        defaultPages[1].forEach(id => { state.positions[id] = { ...defaultPositions[id] }; });
+        delete state.positions['widget-search'];
+        state.hiddenWidgets = [...new Set([...(state.hiddenWidgets || []), 'widget-search'])];
+      }
       if (isVersionOneDefault) {
         state.pages[2] = [...defaultPages[2]];
         defaultPages[2].forEach(id => { state.positions[id] = { ...defaultPositions[id] }; });
@@ -161,11 +169,18 @@
 
   function appSourceById(id) {
     const key = String(id || '').replace(/^app-/, '');
-    return [...document.querySelectorAll('.app-item[data-app-key], .dock-item[data-app-key], .folder-app-item[data-app-key]')].find(item => item.dataset.appKey === key);
+    const matches = [...document.querySelectorAll('.app-item[data-app-key], .dock-item[data-app-key], .folder-app-item[data-app-key]')].filter(item => item.dataset.appKey === key);
+    // 同一个 App 可能同时有文件夹入口和隐藏的真实桌面来源，真实来源优先。
+    return matches.find(item => item.dataset.desktopApp) || matches[0];
   }
   function syncFolderMiniIcon(mini, sourceIcon) {
     if (!mini) return;
     const customImage = sourceIcon?.classList.contains('has-custom-image') && sourceIcon.style.backgroundImage;
+    // 默认图片图标需要同步到文件夹缩略图；旧版只同步了自定义背景，
+    // 因此文件夹入口会一直保留初始化时的线条占位图。
+    if (!customImage && sourceIcon?.querySelector('.default-app-icon')) {
+      mini.innerHTML = sourceIcon.innerHTML;
+    }
     mini.classList.toggle('has-custom-image', Boolean(customImage));
     mini.style.backgroundImage = customImage || '';
     if (customImage) mini.replaceChildren();
@@ -179,14 +194,20 @@
     syncFolderMiniIcon(mini, sourceIcon);
     return mini;
   }
-  function readCreativeApps() { try { const value = JSON.parse(localStorage.getItem(creativeAppsKey) || '[]'); return Array.isArray(value) ? [...new Set(value.filter(id => String(id).startsWith('app-')))] : []; } catch { return []; } }
+  const builtinCreativeAppIds = ['app-debate','app-fanfic','app-magazine'];
+  function readCreativeApps() { try { const value = JSON.parse(localStorage.getItem(creativeAppsKey) || '[]'); return Array.isArray(value) ? [...new Set(value.filter(id => String(id).startsWith('app-') && !builtinCreativeAppIds.includes(String(id))))] : []; } catch { return []; } }
   function saveCreativeApps(ids) { localStorage.setItem(creativeAppsKey, JSON.stringify([...new Set(ids)])); }
   function readRemovedCreativeApps() { try { const value = JSON.parse(localStorage.getItem(creativeRemovedAppsKey) || '[]'); return Array.isArray(value) ? [...new Set(value.filter(id => ['app-debate','app-fanfic','app-magazine'].includes(id)))] : []; } catch { return []; } }
   function saveRemovedCreativeApps(ids) { localStorage.setItem(creativeRemovedAppsKey, JSON.stringify([...new Set(ids)])); }
   function refreshCreativeFolderIcon() {
     const icon = staticFolderTrigger?.querySelector('.desktop-folder-icon');
     if (!icon) return;
+    if (originalCreativeFolderIconHTML) icon.innerHTML = originalCreativeFolderIconHTML;
     const removed = new Set(readRemovedCreativeApps());
+    builtinCreativeAppIds.forEach(id => {
+      if (document.querySelector(`.desktop-layout-grid [data-desktop-item="${id}"]`)) removed.add(id);
+    });
+    saveRemovedCreativeApps([...removed]);
     [['app-debate', '.is-debate'], ['app-fanfic', '.is-fanfic'], ['app-magazine', '.is-magazine']].forEach(([id, selector]) => { if (removed.has(id)) icon.querySelector(`.folder-mini-app${selector}`)?.remove(); });
     [['app-debate', '.is-debate'], ['app-fanfic', '.is-fanfic'], ['app-magazine', '.is-magazine']].forEach(([id, selector]) => {
       const mini = icon.querySelector(`.folder-mini-app${selector}`);
@@ -210,7 +231,7 @@
       }));
     });
   }
-  function folderLauncher(folder) {
+  function folderLauncher(folder, sourceOverrides = null) {
     const launcher = document.createElement('div');
     launcher.className = 'app-item desktop-created-folder';
     launcher.dataset.desktopItem = folder.id;
@@ -221,8 +242,8 @@
     const icon = document.createElement('div');
     icon.className = 'app-icon desktop-folder-icon';
     folder.apps.slice(0, 9).forEach(id => {
-      const source = appSourceById(id);
-      const name = source?.querySelector('.app-name, .dock-name')?.textContent?.trim() || 'A';
+      const source = sourceOverrides?.get(id) || appSourceById(id);
+      const name = source?.querySelector('.app-name, .dock-name, .folder-app-name')?.textContent?.trim() || 'A';
       icon.appendChild(createFolderMiniIcon(source, name));
     });
     const name = document.createElement('div');
@@ -306,7 +327,17 @@
     if (!destination) return;
     setAppContainerType(item, false);
     const preferred = dropTarget?.position;
-    const position = preferred && cellsAreFree(gridOccupiedCells(destination, item), preferred, itemSpan(item)) ? preferred : trailingPosition(destination, item);
+    let position = preferred && validPosition(preferred, itemSpan(item)) ? preferred : null;
+    if (position && !cellsAreFree(gridOccupiedCells(destination, item), position, itemSpan(item))) {
+      const wanted = new Set(occupiedCells(position, itemSpan(item)));
+      const occupant = [...destination.children].find(entry => entry !== item && entry.dataset.desktopItem && occupiedCells(itemPosition(entry) || {}, itemSpan(entry)).some(cell => wanted.has(cell)));
+      if (occupant) {
+        const occupied = gridOccupiedCells(destination, occupant); occupy(occupied, position, itemSpan(item));
+        const relocated = firstFreePosition(occupied, itemSpan(occupant), 0);
+        if (relocated) applyDesktopPosition(occupant, relocated); else position = null;
+      } else position = null;
+    }
+    position ||= trailingPosition(destination, item);
     applyDesktopPosition(item, position);
     destination.appendChild(item);
     item.classList.remove('desktop-app-just-placed');
@@ -724,6 +755,7 @@
   const createdFolderTitle = createdFolderLayer?.querySelector('.desktop-folder-header h2');
   const originalFolderGridHTML = createdFolderGrid?.innerHTML || '';
   const staticFolderTrigger = document.querySelector('[data-folder-open]');
+  const originalCreativeFolderIconHTML = staticFolderTrigger?.querySelector('.desktop-folder-icon')?.innerHTML || '';
   const staticFolderTitle = createdFolderTitle?.textContent?.trim() || '创作';
   const staticFolderNameKey = 'ideal-machine-creative-folder-name';
   let openCreatedFolderId = '';
@@ -741,8 +773,8 @@
     if (createdFolderTitle) createdFolderTitle.textContent = folder.name;
     createdFolderGrid.innerHTML = folder.apps.map(appId => {
       const source = appSourceById(appId);
-      const name = source?.querySelector('.app-name, .dock-name')?.textContent?.trim() || 'App';
-      const icon = source?.querySelector('.app-icon, .dock-icon');
+      const name = source?.querySelector('.app-name, .dock-name, .folder-app-name')?.textContent?.trim() || 'App';
+      const icon = source?.querySelector('.app-icon, .dock-icon, .folder-app-icon');
       return `<button class="folder-app-item" data-created-folder-app="${escapeFolderText(appId)}" type="button"><i class="folder-app-icon generated-folder-icon" aria-hidden="true">${icon?.innerHTML || `<span>${escapeFolderText(name.slice(0, 1))}</span>`}</i><b class="folder-app-name">${escapeFolderText(name)}</b></button>`;
     }).join('');
     createdFolderLayer.classList.toggle('desktop-folder-edit-mode', editing);
@@ -775,6 +807,9 @@
     const sourceGrid = grids[0];
     if (!sourceGrid) return;
     readRemovedCreativeApps().forEach(id => {
+      // 旧版本可能同时把同一个内置 App 记录在自建文件夹和桌面恢复列表中；
+      // 文件夹归属优先，不能再额外恢复一个桌面副本。
+      if (state.folders.some(folder => Array.isArray(folder.apps) && folder.apps.includes(id))) return;
       const key = id.replace(/^app-/, '');
       if (document.querySelector(`.app-item[data-app-key="${key}"]`)) return;
       const folderButton = [...document.querySelectorAll('.desktop-folder-grid [data-folder-app]')].find(item => item.dataset.folderApp === key);
@@ -782,6 +817,22 @@
       const source = createCreativeDesktopSource(id, folderButton);
       sourceGrid.appendChild(source);
     });
+  }
+  function restoreMissingCreativeFolderSources() {
+    const missing = new Set();
+    state.folders.forEach(folder => (Array.isArray(folder.apps) ? folder.apps : []).forEach(id => {
+      if (!builtinCreativeAppIds.includes(id)) return;
+      const current = itemMap.get(id);
+      if (current?.dataset.desktopApp) {
+        if (current.parentElement?.matches('.desktop-layout-grid')) hiddenPool.appendChild(current);
+        return;
+      }
+      const key = id.replace(/^app-/, '');
+      const folderButton = [...document.querySelectorAll('.desktop-folder-grid [data-folder-app]')].find(item => item.dataset.folderApp === key);
+      const source = createCreativeDesktopSource(id, folderButton);
+      if (source) { hiddenPool.appendChild(source); missing.add(id); }
+    }));
+    if (missing.size) saveRemovedCreativeApps([...readRemovedCreativeApps(), ...missing]);
   }
   function closeCreatedFolder() {
     if (!openCreatedFolderId || !createdFolderLayer) return false;
@@ -863,7 +914,7 @@
     const container = target.parentElement;
     if (!container?.matches('.desktop-layout-grid')) return false;
     const folder = { id:`folder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name:'文件夹', apps:[target.dataset.desktopItem, source.dataset.desktopItem] };
-    const launcher = folderLauncher(folder);
+    const launcher = folderLauncher(folder, new Map([[target.dataset.desktopItem, target], [source.dataset.desktopItem, source]]));
     const position = itemPosition(target) || itemPosition(drag.placeholder) || trailingPosition(container, launcher);
     drag.placeholder.remove();
     target.remove();
@@ -874,6 +925,25 @@
     itemMap.set(folder.id, launcher);
     state.folders.push(folder);
     saveState();
+    return true;
+  }
+  function createFolderFromExtractedApp(source, target) {
+    if (!source?.dataset.desktopApp || !target?.dataset.desktopApp || target.matches('[data-folder-open]') || source === target) return false;
+    const container = target.parentElement;
+    if (!container?.matches('.desktop-layout-grid')) return false;
+    const sourceId = source.dataset.desktopItem;
+    const targetId = target.dataset.desktopItem;
+    if (!sourceId || !targetId) return false;
+    const folder = { id:`folder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name:'文件夹', apps:[targetId, sourceId] };
+    const launcher = folderLauncher(folder, new Map([[targetId, target], [sourceId, source]]));
+    const position = itemPosition(target) || trailingPosition(container, launcher);
+    target.remove();
+    source.remove();
+    hiddenPool.append(source, target);
+    applyDesktopPosition(launcher, position);
+    container.appendChild(launcher);
+    itemMap.set(folder.id, launcher);
+    state.folders.push(folder);
     return true;
   }
   function refreshFolderLauncher(folder) {
@@ -901,11 +971,13 @@
   function addAppToCreativeFolder(source, target) {
     if (!source?.dataset.desktopApp || !target?.matches('[data-folder-open]')) return false;
     const appId = source.dataset.desktopItem;
-    if (!appId || readCreativeApps().includes(appId)) return false;
+    const builtin = builtinCreativeAppIds.includes(appId);
+    if (!appId || (!builtin && readCreativeApps().includes(appId))) return false;
     drag.placeholder.remove();
     source.remove();
     hiddenPool.appendChild(source);
-    saveCreativeApps([...readCreativeApps(), appId]);
+    if (builtin) saveRemovedCreativeApps(readRemovedCreativeApps().filter(id => id !== appId));
+    else saveCreativeApps([...readCreativeApps(), appId]);
     refreshCreativeFolderIcon();
     saveState();
     return true;
@@ -932,25 +1004,27 @@
     } else {
       refreshFolderLauncher(folder);
     }
-    placeRemovedApp(source, dropTarget);
+    if (!createFolderFromExtractedApp(source, dropTarget?.app)) placeRemovedApp(source, dropTarget);
     syncPageGridRowHeights();
     saveState();
   }
   function removeAppFromCreativeFolder(appId, button, dropTarget = null) {
     if (!editing || !appId) return;
-    const builtin = ['app-debate','app-fanfic','app-magazine'].includes(appId);
+    const builtin = builtinCreativeAppIds.includes(appId);
     const ids = readCreativeApps();
     const removed = readRemovedCreativeApps();
     if (!builtin && !ids.includes(appId)) return;
-    let source = appSourceById(appId);
-    if (builtin && !source) {
+    // 内置项目在文件夹中只是一个按钮，不能把它当成桌面 App 本体移动。
+    // 移出时创建真正的桌面图标，并由 removed 状态控制文件夹里的显示。
+    let source = builtin ? itemMap.get(appId) : appSourceById(appId);
+    if (builtin && !source?.dataset.desktopApp) {
       const folderButton = button.closest('.folder-app-item');
       source = createCreativeDesktopSource(appId, folderButton);
     }
     closeOpenFolderLayer(true);
     if (builtin) saveRemovedCreativeApps([...removed, appId]);
     else saveCreativeApps(ids.filter(id => id !== appId));
-    if (source) placeRemovedApp(source, dropTarget);
+    if (source && !createFolderFromExtractedApp(source, dropTarget?.app)) placeRemovedApp(source, dropTarget);
     refreshCreativeFolderIcon();
     button.closest('.folder-app-item')?.remove();
     syncPageGridRowHeights();
@@ -1043,8 +1117,10 @@
     }).find(Boolean) : null;
     const returningToFolder = Boolean(commit && current.moved && returnLauncher);
     const outsidePanel = Boolean(commit && current.moved && event && !returningToFolder && (current.folderClosed || !pointStack.some(element => element.closest?.('.desktop-folder-panel'))));
-    const dropGrid = outsidePanel ? pointStack.find(element => element.matches?.('.desktop-layout-grid')) : null;
-    const dropTarget = dropGrid ? { grid:dropGrid, position:gridPositionFromPoint(dropGrid, event.clientX, event.clientY, current.item) } : null;
+    const dropPage = outsidePanel ? pointStack.map(element => element.closest?.('.desktop-page')).find(Boolean) : null;
+    const dropGrid = outsidePanel ? (pointStack.map(element => element.closest?.('.desktop-layout-grid')).find(Boolean) || dropPage?.querySelector('.desktop-layout-grid') || grids[currentPage()]) : null;
+    const targetApp = outsidePanel ? pointStack.map(element => element.closest?.('[data-desktop-item][data-desktop-app]')).find(element => element && !element.matches('[data-folder-open]')) : null;
+    const dropTarget = dropGrid ? { grid:dropGrid, position:gridPositionFromPoint(dropGrid, event.clientX, event.clientY, current.item), app:targetApp } : null;
     if (!outsidePanel && current.placeholder.parentNode) current.placeholder.parentNode.insertBefore(current.item, current.placeholder);
     current.item.classList.remove('is-folder-layout-source', 'is-folder-dragging');
     current.item.style.pointerEvents = '';
@@ -1426,8 +1502,10 @@
   });
 
   restoreRemovedCreativeApps();
+  restoreMissingCreativeFolderSources();
   registerItems();
   applyLayout();
+  state.folders.forEach(folder => refreshFolderLauncher(folder));
   refreshCreativeFolderIcon();
   window.IdealMachineRefreshCreativeFolderIcon = refreshCreativeFolderIcon;
   ensureWidgetControls();

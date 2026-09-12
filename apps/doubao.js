@@ -82,12 +82,12 @@
       save:'<path d="M10 8h25l5 5v27H8V8zM15 8v12h18V8M15 40V27h18v13"/>',
       phone:'<path d="M15 8c2 0 4 1 5 3l3 7-5 4c3 6 7 10 13 13l4-5 7 3c2 1 3 3 2 5l-3 6c-1 2-3 3-5 2C22 39 10 27 6 13c-1-2 0-4 2-5l5-1c1 0 1 0 2 1z"/>',
       mute:'<path d="M12 12 37 37M16 20v8l9 7V13l-5 4zM32 19c2 4 2 7 0 10M36 15c4 6 4 13 0 19"/>',
-      copy:'<rect x="14" y="12" width="18" height="22" rx="3"/><path d="M20 12V9h14a3 3 0 0 1 3 3v18h-5"/>',
-      voice:'<path d="M24 9a6 6 0 0 0-6 6v10a6 6 0 0 0 12 0V15a6 6 0 0 0-6-6zM12 23a12 12 0 0 0 24 0M24 35v6M19 41h10"/>',
-      like:'<path d="M20 39H12a3 3 0 0 1-3-3V23a3 3 0 0 1 3-3h8l5-10c1-2 5-1 5 2l-1 8h7c3 0 4 3 3 5l-4 11a4 4 0 0 1-4 3h-11z"/>',
-      dislike:'<path d="M20 9H12a3 3 0 0 0-3 3v13a3 3 0 0 0 3 3h8l5 10c1 2 5 1 5-2l-1-8h7c3 0 4-3 3-5l-4-11a4 4 0 0 0-4-3h-11z"/>',
-      share:'<path d="m12 27 23-16-4 11 8 4-23 12 5-10z"/>',
-      retry:'<path d="M36 19a13 13 0 1 0 1 11M36 19v9h-9"/>',
+      copy:'<rect x="11" y="15" width="19" height="24" rx="3"/><rect x="18" y="9" width="19" height="24" rx="3"/>',
+      voice:'<path d="M12 22h6l8-7v18l-8-7h-6zM31 20c3 2 3 6 0 8M35 16c6 4 6 12 0 16"/>',
+      like:'<path d="M18 39H11a3 3 0 0 1-3-3V24a3 3 0 0 1 3-3h9l6-10c1-2 4-1 4 2l-1 8h8a3 3 0 0 1 3 4l-4 11a4 4 0 0 1-4 3H18z"/>',
+      dislike:'<path d="M18 9H11a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h9l6 10c1 2 4 1 4-2l-1-8h8a3 3 0 0 0 3-4l-4-11a4 4 0 0 0-4-3H18z"/>',
+      share:'<path d="M8 30c5-12 14-17 28-17M27 7l9 6-9 6M36 13c-1 10-7 19-18 25"/>',
+      retry:'<path d="M37 20a14 14 0 0 0-24-5l-4 4M11 19v-7h7M11 28a14 14 0 0 0 24 5l4-4M37 29v7h-7"/>',
       bolt:'<path d="m27 6-13 20h10l-3 16 13-21H24z"/>',
       scan:'<rect x="11" y="9" width="22" height="30" rx="4"/><path d="M17 16h10M17 22h9M17 29h5M34 30l6 6M40 30l-6 6"/>',
       write:'<path d="m11 35 3-10L31 8l7 7-17 17zM28 11l7 7"/>',
@@ -99,7 +99,8 @@
 
   function assistantActions(message, disabled = false) {
     const reroll = message?.id ? `data-doubao-reroll="${esc(message.id)}" title="重roll"` : '';
-    return `<footer class="doubao-answer-actions"><button type="button" aria-label="复制">${icon('copy')}</button><button type="button" aria-label="语音">${icon('voice')}</button><button type="button" aria-label="赞">${icon('like')}</button><button type="button" aria-label="踩">${icon('dislike')}</button><button type="button" aria-label="转发">${icon('share')}</button><button class="doubao-reroll-button${disabled ? ' is-rerolling' : ''}" type="button" aria-label="刷新" ${reroll} ${disabled ? 'disabled' : ''}>${icon('retry')}</button></footer>`;
+    const actionImage = type => `<img src="assets/ui/doubao-action-${type}.jpeg" alt="">`;
+    return `<footer class="doubao-answer-actions"><button type="button" aria-label="复制">${actionImage('copy')}</button><button type="button" aria-label="语音">${actionImage('voice')}</button><button type="button" aria-label="赞">${actionImage('like')}</button><button type="button" aria-label="踩">${actionImage('dislike')}</button><button type="button" aria-label="转发">${actionImage('share')}</button><button class="doubao-reroll-button${disabled ? ' is-rerolling' : ''}" type="button" aria-label="刷新" ${reroll} ${disabled ? 'disabled' : ''}>${actionImage('retry')}</button></footer>`;
   }
 
   function formatText(value) {
@@ -154,20 +155,31 @@
     catch { return []; }
   }
 
+  function sharePickerMarkup() {
+    if (!shareHistoryId) return '';
+    const contacts = chatContacts();
+    return `<div class="doubao-share-layer"><button class="doubao-share-backdrop" data-doubao-share-close type="button" aria-label="关闭分享"></button><section><header><div><small>SHARE TO CHAT</small><h2>分享给谁？</h2></div><button type="button" data-doubao-share-close>×</button></header><main>${contacts.length ? contacts.map(contact => `<button type="button" data-doubao-share-contact="${esc(contact.id)}"><i>${contact.avatar ? `<img src="${esc(contact.avatar)}" alt="">` : esc((contact.nickname || contact.name || '角').slice(0,1))}</i><span><b>${esc(contact.nickname || contact.name)}</b><small>${esc(contact.name || contact.identity || '角色')}</small></span><em>›</em></button>`).join('') : '<p>聊天 App 里还没有角色。</p>'}</main></section></div>`;
+  }
+
+  function historyActionsMarkup(historyId) {
+    return `<div class="doubao-history-actions"><button type="button" data-doubao-history-share="${esc(historyId)}">分享到聊天 App</button></div>`;
+  }
+
+  function closeShareLayers(removeHistory = true) {
+    app.querySelector('.doubao-share-layer')?.remove();
+    if (removeHistory) app.querySelector('.doubao-history-layer')?.remove();
+  }
+
   function historyPanels() {
     const history = readHistory();
     let drawer = '';
     if (historyOpen) {
       const groups = new Map();
       history.forEach(item => { const day = historyDayLabel(item.savedAt); if (!groups.has(day)) groups.set(day, []); groups.get(day).push(item); });
-      const content = history.length ? [...groups].map(([day, rows]) => `<section><h3>${esc(day)}</h3>${rows.map(item => `<article><button class="doubao-history-entry" type="button" data-doubao-history-view="${esc(item.id)}"><b>${esc(item.title || historyTitle(item.messages || []))}</b><small>${new Date(item.savedAt).toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' })} · ${(item.messages || []).length} 条消息</small></button><button class="doubao-history-more" type="button" data-doubao-history-more="${esc(item.id)}" aria-label="更多操作">•••</button>${historyActionId === item.id ? `<div class="doubao-history-actions"><button type="button" data-doubao-history-share="${esc(item.id)}">分享到聊天 App</button></div>` : ''}</article>`).join('')}</section>`).join('') : '<p class="doubao-history-empty">还没有保存过对话。</p>';
+      const content = history.length ? [...groups].map(([day, rows]) => `<section><h3>${esc(day)}</h3>${rows.map(item => `<article><button class="doubao-history-entry" type="button" data-doubao-history-view="${esc(item.id)}"><b>${esc(item.title || historyTitle(item.messages || []))}</b><small>${new Date(item.savedAt).toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' })} · ${(item.messages || []).length} 条消息</small></button><button class="doubao-history-more" type="button" data-doubao-history-more="${esc(item.id)}" aria-label="更多操作">•••</button><button class="doubao-history-delete" type="button" data-doubao-history-delete="${esc(item.id)}" aria-label="删除聊天记录"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 10v7M14 10v7"/></svg></button>${historyActionId === item.id ? `<div class="doubao-history-actions"><button type="button" data-doubao-history-share="${esc(item.id)}">分享到聊天 App</button></div>` : ''}</article>`).join('')}</section>`).join('') : '<p class="doubao-history-empty">还没有保存过对话。</p>';
       drawer = `<div class="doubao-history-layer"><button class="doubao-history-backdrop" data-doubao-history-close type="button" aria-label="关闭历史记录"></button><aside><header><div><small>CHAT HISTORY</small><h2>历史记录</h2></div><button type="button" data-doubao-history-close>×</button></header><main>${content}</main></aside></div>`;
     }
-    let picker = '';
-    if (shareHistoryId) {
-      const contacts = chatContacts();
-      picker = `<div class="doubao-share-layer"><button class="doubao-share-backdrop" data-doubao-share-close type="button" aria-label="关闭分享"></button><section><header><div><small>SHARE TO CHAT</small><h2>分享给谁？</h2></div><button type="button" data-doubao-share-close>×</button></header><main>${contacts.length ? contacts.map(contact => `<button type="button" data-doubao-share-contact="${esc(contact.id)}"><i>${contact.avatar ? `<img src="${esc(contact.avatar)}" alt="">` : esc((contact.nickname || contact.name || '角').slice(0,1))}</i><span><b>${esc(contact.nickname || contact.name)}</b><small>${esc(contact.name || contact.identity || '角色')}</small></span><em>›</em></button>`).join('') : '<p>聊天 App 里还没有角色。</p>'}</main></section></div>`;
-    }
+    const picker = sharePickerMarkup();
     return drawer + picker;
   }
 
@@ -181,7 +193,7 @@
       shareHistoryId = '';
       historyActionId = '';
       historyOpen = false;
-      render();
+      closeShareLayers();
       window.alert('已分享到聊天 App，角色会在后台回复。');
     } catch (error) { window.alert(`分享失败：${error.message}`); }
   }
@@ -372,14 +384,50 @@
     }
     if (!app.classList.contains('is-open')) return;
     if (event.target.closest('[data-doubao-history-close]')) { historyOpen = false; historyActionId = ''; render(); return; }
-    if (event.target.closest('[data-doubao-share-close]')) { shareHistoryId = ''; render(); return; }
+    if (event.target.closest('[data-doubao-share-close]')) { shareHistoryId = ''; closeShareLayers(false); return; }
     if (event.target.closest('[data-doubao-history-current]')) { viewingHistoryId = ''; render(); return; }
+    const historyDelete = event.target.closest('[data-doubao-history-delete]');
+    if (historyDelete) {
+      const id = historyDelete.dataset.doubaoHistoryDelete;
+      const record = readHistory().find(item => item.id === id);
+      if (!record || !window.confirm(`确定删除“${record.title || historyTitle(record.messages || [])}”吗？`)) return;
+      saveHistory(readHistory().filter(item => item.id !== id));
+      if (viewingHistoryId === id) viewingHistoryId = '';
+      if (historyActionId === id) historyActionId = '';
+      if (shareHistoryId === id) shareHistoryId = '';
+      const article = historyDelete.closest('article');
+      const section = article?.closest('section');
+      article?.remove();
+      if (section && !section.querySelector('article')) section.remove();
+      const main = app.querySelector('.doubao-history-layer aside > main');
+      if (main && !main.querySelector('article')) main.innerHTML = '<p class="doubao-history-empty">还没有保存过对话。</p>';
+      return;
+    }
     const historyView = event.target.closest('[data-doubao-history-view]');
     if (historyView) { viewingHistoryId = historyView.dataset.doubaoHistoryView; historyOpen = false; historyActionId = ''; render(); return; }
     const historyMore = event.target.closest('[data-doubao-history-more]');
-    if (historyMore) { const id = historyMore.dataset.doubaoHistoryMore; historyActionId = historyActionId === id ? '' : id; render(); return; }
+    if (historyMore) {
+      const id = historyMore.dataset.doubaoHistoryMore;
+      const currentActions = app.querySelector('.doubao-history-actions');
+      if (historyActionId === id && currentActions) {
+        historyActionId = '';
+        currentActions.remove();
+        return;
+      }
+      currentActions?.remove();
+      historyActionId = id;
+      historyMore.closest('article')?.insertAdjacentHTML('beforeend', historyActionsMarkup(id));
+      return;
+    }
     const historyShare = event.target.closest('[data-doubao-history-share]');
-    if (historyShare) { shareHistoryId = historyShare.dataset.doubaoHistoryShare; historyActionId = ''; render(); return; }
+    if (historyShare) {
+      shareHistoryId = historyShare.dataset.doubaoHistoryShare;
+      historyActionId = '';
+      // 分享选择器只是一个覆盖层，直接插入即可，避免替换整个豆包页面造成闪屏。
+      app.querySelector('.doubao-history-actions')?.remove();
+      app.querySelector('.doubao-page')?.insertAdjacentHTML('beforeend', sharePickerMarkup());
+      return;
+    }
     const shareContact = event.target.closest('[data-doubao-share-contact]');
     if (shareContact) { shareHistoryToContact(shareContact.dataset.doubaoShareContact); return; }
     if (event.target.closest('[data-doubao-save]')) { saveCurrentConversation(); return; }

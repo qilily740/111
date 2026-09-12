@@ -34,6 +34,10 @@
   pickerSheet.className = 'album-picker-sheet';
   pickerSheet.setAttribute('aria-hidden', 'true');
   document.body.appendChild(pickerSheet);
+  const transferSheet = document.createElement('aside');
+  transferSheet.className = 'album-transfer-sheet';
+  transferSheet.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(transferSheet);
   pickerSheet.addEventListener('click', event => {
     if (!pickerMultiMode) return;
     const item = event.target.closest('[data-album-picker-multi-item]');
@@ -62,6 +66,7 @@
   let activeId = '';
   let importing = false;
   let selecting = false;
+  let exportSelection = false;
   let selectedIds = new Set();
   let pickerMode = false;
   let pickerCallback = null;
@@ -73,7 +78,8 @@
   function readState() {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      const items = Array.isArray(saved.items) ? saved.items.filter(item => item?.id && item?.url) : [];
+      const stickerUrls = stickerImageUrls();
+      const items = Array.isArray(saved.items) ? saved.items.filter(item => item?.id && item?.url && !/表情包|聊天表情/.test(String(item.source || '')) && !stickerUrls.has(String(item.url))) : [];
       return { items, migratedExisting:saved.migratedExisting === true };
     } catch { return { items:[], migratedExisting:false }; }
   }
@@ -82,6 +88,14 @@
     localStorage.setItem(storageKey, JSON.stringify({ items: state.items.slice(0, 1200), migratedExisting:state.migratedExisting === true }));
     window.dispatchEvent(new CustomEvent('ideal-machine-album-updated', { detail: { count: state.items.length } }));
   }
+  window.addEventListener('ideal-machine-chat-updated', () => {
+    const stickerUrls = stickerImageUrls();
+    const nextItems = state.items.filter(item => !/表情包|聊天表情/.test(String(item.source || '')) && !stickerUrls.has(String(item.url || '')));
+    if (nextItems.length === state.items.length) return;
+    state.items = nextItems;
+    saveState();
+    if (app.classList.contains('is-open')) render();
+  });
   const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
   const uid = () => `album-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const isImage = file => file && (String(file.type || '').startsWith('image/') || /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i.test(String(file.name || '')));
@@ -95,6 +109,13 @@
     if (openApp) return openApp[1];
     if (input.closest('#editModal, .desktop-scroll-wrap')) return '桌面';
     return '其他 App';
+  }
+
+  function stickerImageUrls() {
+    try {
+      const chat = JSON.parse(localStorage.getItem('ideal-machine-chat') || '{}');
+      return new Set((chat.emojis?.groups || []).flatMap(group => (group.items || []).map(item => String(item.url || '')).filter(Boolean)));
+    } catch { return new Set(); }
   }
 
   function fingerprint(file) {
@@ -141,6 +162,7 @@
 
   async function archiveFile(file, source = '其他 App') {
     if (!isImage(file)) return null;
+    if (/表情包|聊天表情/.test(String(source || ''))) return null;
     const mark = fingerprint(file);
     const existing = state.items.find(item => item.fingerprint === mark);
     if (existing) return existing;
@@ -178,6 +200,7 @@
   function archiveUrl(value, source = '其他 App') {
     const url = String(value || '').trim();
     if (!isPublicImageUrl(url)) return null;
+    if (/表情包|聊天表情/.test(String(source || ''))) return null;
     const existing = state.items.find(item => item.url === url);
     if (existing) return existing;
     const item = {
@@ -194,12 +217,14 @@
   function syncStoredImages() {
     if (state.migratedExisting) return;
     const known = new Set(state.items.map(item => item.url));
+    const stickerUrls = stickerImageUrls();
     let changed = false;
     Object.keys(localStorage).forEach(key => {
       if (key === storageKey) return;
       const value = localStorage.getItem(key) || '';
       const matches = value.match(/idb:image:[^"'\\\s,}\]]+/g) || [];
       matches.forEach(url => {
+        if (stickerUrls.has(url)) return;
         if (known.has(url)) return;
         known.add(url);
         state.items.push({ id:uid(), url, name:'已保存的图片', source:sourceLabels[key] || '已有数据', createdAt:Date.now(), size:0, type:'image/*', width:0, height:0, fingerprint:'' });
@@ -239,17 +264,32 @@
     const headerActions = pickerMode
       ? '<button class="album-picker-cancel" data-album-picker-cancel type="button">取消选择</button>'
       : selecting
-        ? `<button class="album-delete-selected-button" data-album-delete-selected type="button" ${selectedIds.size ? '' : 'disabled'}>删除${selectedIds.size ? ` (${selectedIds.size})` : ''}</button>`
+        ? exportSelection
+          ? `<button class="album-delete-selected-button album-export-selected-button" data-album-export-selected type="button" ${selectedIds.size ? '' : 'disabled'}>导出${selectedIds.size ? ` (${selectedIds.size})` : ''}</button>`
+          : `<button class="album-delete-selected-button" data-album-delete-selected type="button" ${selectedIds.size ? '' : 'disabled'}>删除${selectedIds.size ? ` (${selectedIds.size})` : ''}</button>`
         : '<button class="album-select-button" data-album-select-toggle type="button">选择</button>';
     const importAction = selecting
       ? '<button class="album-import album-finish-button" data-album-finish type="button">完成</button>'
-      : `<label class="album-import ${importing ? 'is-busy' : ''}">${importing ? '导入中…' : '导入'}<input data-album-file type="file" accept="image/*" multiple ${importing ? 'disabled' : ''}></label>`;
+      : `<button class="album-import ${importing ? 'is-busy' : ''}" data-album-transfer-open type="button" ${importing ? 'disabled' : ''}>${importing ? '导入中…' : '导入/导出'}</button>`;
     app.innerHTML = `<div class="album-page"><header class="album-header"><button data-album-close type="button" aria-label="关闭相册">‹</button><div><span>${pickerMode ? 'SELECT FROM ALBUM' : 'PHOTO HOSTING LIBRARY'}</span><h1>${pickerMode ? '选择图片' : '相册'}</h1></div><div class="album-header-actions">${headerActions}${importAction}</div></header><section class="album-hero"><div><small>全部照片</small><strong>${state.items.length}</strong><span>${pickerMode ? '点击一张图片返回小组件' : '张图片保存在这台设备'}</span></div><div class="album-hero-mark" aria-hidden="true"><i></i><i></i><i></i></div></section><div class="album-search"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="21" cy="21" r="11"/><path d="m30 30 10 10"/></svg><input data-album-search value="${esc(query)}" placeholder="搜索图片名称或来源…"><button data-album-clear type="button" ${query ? '' : 'hidden'}>×</button></div><main class="album-main">${items.length ? `<div class="album-grid">${items.map(photoMarkup).join('')}</div>` : `<div class="album-empty"><div>▧</div><h2>${query ? '没有找到图片' : '相册还是空的'}</h2><p>${query ? '换个关键词试试。' : '先导入一张图片，再返回这里选择。'}</p>${query ? '' : '<label>选择第一张图片<input data-album-file type="file" accept="image/*" multiple></label>'}</div>`}</main><footer class="album-footnote"><i></i><span>${esc(storageNote)}</span></footer></div>${detailMarkup(detail)}<div class="album-toast" data-album-toast role="status"></div>`;
     const privacyNote = document.createElement('p');
     privacyNote.className = 'album-privacy-note';
     privacyNote.textContent = '隐私提醒：请勿上传身份证、银行卡、证件或其他敏感隐私照片。';
     app.querySelector('.album-hero')?.after(privacyNote);
     hydrateImages();
+  }
+
+  function syncAlbumSelectionDOM(itemButton, id) {
+    const selected = selectedIds.has(id);
+    itemButton.classList.toggle('is-selected', selected);
+    itemButton.setAttribute('aria-pressed', String(selected));
+    const check = itemButton.querySelector('.album-photo-check');
+    if (check) check.textContent = selected ? '✓' : '';
+    const actionButton = app.querySelector('[data-album-delete-selected], [data-album-export-selected]');
+    if (actionButton) {
+      actionButton.disabled = selectedIds.size === 0;
+      actionButton.textContent = `${exportSelection ? '导出' : '删除'}${selectedIds.size ? ` (${selectedIds.size})` : ''}`;
+    }
   }
 
   function pickerPhotoMarkup(item) {
@@ -331,6 +371,69 @@
     }
   }
 
+  function openTransferSheet(mode = 'choose') {
+    const content = mode === 'links'
+      ? `<label class="album-transfer-links"><span>直接粘贴图片链接</span><textarea data-album-import-urls placeholder="https://example.com/photo-1.jpg\nhttps://example.com/photo-2.png"></textarea></label><label class="album-transfer-text-file"><b>或导入 URL 文件</b><small>选择由相册导出的 .txt 文件</small><input data-album-import-url-file type="file" accept=".txt,text/plain"></label><footer><button data-album-transfer-back type="button">返回</button><button class="is-primary" data-album-import-urls-save type="button">导入 URL</button></footer>`
+      : `<div class="album-transfer-options"><label><b>导入图片</b><small>从手机相册选择一张或多张图片</small><input data-album-transfer-files type="file" accept="image/*" multiple></label><button data-album-transfer-links type="button"><b>导入链接</b><small>每行输入一个可显示的图片 URL</small></button><button data-album-export-all type="button"><b>导出全部 URL</b><small>导出相册内全部图片链接</small></button><button data-album-export-custom type="button"><b>选择图片导出</b><small>进入多选，只导出选中的图片链接</small></button></div>`;
+    transferSheet.innerHTML = `<button class="album-transfer-backdrop" data-album-transfer-close type="button" aria-label="关闭导入导出"></button><section class="album-transfer-panel" role="dialog" aria-modal="true"><header><div><span>IMPORT / EXPORT</span><h2>${mode === 'links' ? '导入图片链接' : '导入 / 导出'}</h2></div><button data-album-transfer-close type="button" aria-label="关闭">×</button></header>${content}</section>`;
+    transferSheet.classList.add('is-open');
+    transferSheet.setAttribute('aria-hidden', 'false');
+    if (mode === 'links') requestAnimationFrame(() => transferSheet.querySelector('[data-album-import-urls]')?.focus());
+  }
+
+  function closeTransferSheet() {
+    transferSheet.classList.remove('is-open');
+    transferSheet.setAttribute('aria-hidden', 'true');
+    transferSheet.replaceChildren();
+  }
+
+  function urlsFromImportText(value) {
+    const urls = [];
+    String(value || '').split(/\r?\n/).forEach(line => {
+      const source = line.trim();
+      if (!source) return;
+      const markdown = source.match(/\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i);
+      const bare = source.match(/https?:\/\/[^\s)\]]+/i);
+      const url = markdown?.[1] || bare?.[0] || '';
+      if (isPublicImageUrl(url)) urls.push(url);
+    });
+    return [...new Set(urls)];
+  }
+
+  async function importUrlList(value) {
+    const urls = urlsFromImportText(value);
+    if (!urls.length) return window.alert('请至少填写一个正确的 http(s) 图片链接。');
+    urls.forEach(url => archiveUrl(url, '相册链接'));
+    closeTransferSheet();
+    render();
+    showToast(`已导入 ${urls.length} 个图片链接`);
+  }
+
+  async function exportUrlList(items) {
+    const targets = items.filter(Boolean);
+    if (!targets.length) return window.alert('请先选择要导出的图片。');
+    const urls = [];
+    for (const item of targets) {
+      try { urls.push(await makePublicUrl(item)); }
+      catch { if (item.url) urls.push(item.url); }
+    }
+    const text = [...new Set(urls.filter(Boolean))].join('\n');
+    if (!text) return window.alert('没有可以导出的图片链接。');
+    const blobUrl = URL.createObjectURL(new Blob([text], { type:'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `理想机相册图片链接-${new Date().toISOString().slice(0, 10)}.txt`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    await copyText(text);
+    closeTransferSheet();
+    selecting = false;
+    exportSelection = false;
+    selectedIds.clear();
+    render();
+    showToast(`已导出 ${urls.length} 个 URL，并复制到剪贴板`);
+  }
+
   async function copyUrl(id) {
     const item = state.items.find(entry => entry.id === id);
     if (!item) return;
@@ -361,6 +464,7 @@
     state.items = state.items.filter(entry => !idSet.has(entry.id));
     activeId = '';
     selecting = false;
+    exportSelection = false;
     selectedIds.clear();
     saveState();
     for (const { item, referencedElsewhere } of references) {
@@ -385,10 +489,45 @@
 
   document.addEventListener('change', event => {
     const input = event.target.closest?.('input[type="file"]');
-    if (!input || input.matches('[data-album-file]')) return;
+    if (!input || input.matches('[data-album-file], [data-album-transfer-files]')) return;
     const files = [...(input.files || [])].filter(isImage);
     if (files.length) files.forEach(file => archiveFile(file, sourceForInput(input)));
   }, true);
+
+  transferSheet.addEventListener('click', event => {
+    if (event.target.closest('[data-album-transfer-close]')) { closeTransferSheet(); return; }
+    if (event.target.closest('[data-album-transfer-back]')) { openTransferSheet(); return; }
+    if (event.target.closest('[data-album-transfer-links]')) { openTransferSheet('links'); return; }
+    if (event.target.closest('[data-album-import-urls-save]')) { importUrlList(transferSheet.querySelector('[data-album-import-urls]')?.value); return; }
+    if (event.target.closest('[data-album-export-all]')) { exportUrlList(state.items); return; }
+    if (event.target.closest('[data-album-export-custom]')) {
+      closeTransferSheet();
+      exportSelection = true;
+      selecting = true;
+      selectedIds.clear();
+      activeId = '';
+      render();
+    }
+  });
+  transferSheet.addEventListener('change', event => {
+    const imageInput = event.target.closest('[data-album-transfer-files]');
+    if (imageInput?.files?.length) {
+      const files = [...imageInput.files];
+      closeTransferSheet();
+      importFiles(files);
+      return;
+    }
+    const textInput = event.target.closest('[data-album-import-url-file]');
+    const file = textInput?.files?.[0];
+    if (!file) return;
+    file.text().then(text => {
+      const field = transferSheet.querySelector('[data-album-import-urls]');
+      if (field) field.value = text;
+      const count = urlsFromImportText(text).length;
+      if (!count) window.alert('这个 TXT 文件中没有识别到图片 URL。');
+      else showToast(`已读取 ${count} 个 URL，点击“导入 URL”完成导入`);
+    }).catch(() => window.alert('TXT 文件读取失败，请重新选择。'));
+  });
 
   document.addEventListener('click', event => {
     const pickerClose = event.target.closest('[data-album-picker-close]');
@@ -404,14 +543,16 @@
       return;
     }
     if (event.target.closest('[data-app-key="xiangce"]')) {
-      state = readState(); syncStoredImages(); query = ''; activeId = ''; selecting = false; selectedIds.clear();
+      state = readState(); syncStoredImages(); query = ''; activeId = ''; selecting = false; exportSelection = false; selectedIds.clear();
       app.classList.add('is-open'); app.setAttribute('aria-hidden', 'false'); render(); return;
     }
     if (!app.classList.contains('is-open')) return;
-    if (event.target.closest('[data-album-close], [data-album-picker-cancel]')) { pickerMode = false; pickerCallback = null; selecting = false; selectedIds.clear(); app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); return; }
-    if (event.target.closest('[data-album-finish]')) { selecting = false; selectedIds.clear(); activeId = ''; render(); return; }
-    if (event.target.closest('[data-album-select-toggle]')) { selecting = !selecting; selectedIds.clear(); activeId = ''; render(); return; }
+    if (event.target.closest('[data-album-close], [data-album-picker-cancel]')) { pickerMode = false; pickerCallback = null; selecting = false; exportSelection = false; selectedIds.clear(); closeTransferSheet(); app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); return; }
+    if (event.target.closest('[data-album-finish]')) { selecting = false; exportSelection = false; selectedIds.clear(); activeId = ''; render(); return; }
+    if (event.target.closest('[data-album-select-toggle]')) { selecting = !selecting; exportSelection = false; selectedIds.clear(); activeId = ''; render(); return; }
     if (event.target.closest('[data-album-delete-selected]')) { deleteItems([...selectedIds]); return; }
+    if (event.target.closest('[data-album-export-selected]')) { exportUrlList([...selectedIds].map(id => state.items.find(item => item.id === id))); return; }
+    if (event.target.closest('[data-album-transfer-open]')) { openTransferSheet(); return; }
     const open = event.target.closest('[data-album-open]');
     if (open) {
       if (pickerMode) {
@@ -428,7 +569,7 @@
       } else if (selecting) {
         const id = open.dataset.albumOpen;
         if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
-        render();
+        syncAlbumSelectionDOM(open, id);
       } else { activeId = open.dataset.albumOpen; render(); }
       return;
     }
@@ -457,6 +598,7 @@
   });
 
   document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && transferSheet.classList.contains('is-open')) { closeTransferSheet(); return; }
     if (event.key === 'Escape' && pickerSheet.classList.contains('is-open')) { closePickerSheet(); return; }
     if (event.key !== 'Escape' || !app.classList.contains('is-open')) return;
     if (activeId) { activeId = ''; render(); }

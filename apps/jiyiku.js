@@ -77,9 +77,9 @@
     return `<svg viewBox="0 0 48 48" aria-hidden="true">${paths[type] || ''}</svg>`;
   }
 
-  function themePanel() { return themePickerOpen ? `<div class="memory-theme-picker"><span>页面颜色</span><div><button type="button" data-memory-theme-choice="lavender" aria-label="薰衣草紫"></button><button type="button" data-memory-theme-choice="rose" aria-label="玫瑰粉"></button><button type="button" data-memory-theme-choice="sky" aria-label="天空蓝"></button><button type="button" data-memory-theme-choice="sage" aria-label="鼠尾草绿"></button><button type="button" data-memory-theme-choice="amber" aria-label="琥珀金"></button><button type="button" data-memory-theme-choice="white" aria-label="纯白"></button><button type="button" data-memory-theme-choice="black" aria-label="纯黑"></button></div></div>` : ''; }
+  function themePanel() { return ''; }
 
-  function applyTheme() { app.dataset.memoryTheme = localStorage.getItem(themeKey) || 'lavender'; }
+  function applyTheme() { app.dataset.memoryTheme = 'glass'; }
 
   function syncSourceMemories() {
     window.IdealMachineMemory?.syncLegacySources?.(readChat());

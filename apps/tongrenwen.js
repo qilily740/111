@@ -8,6 +8,7 @@
   document.body.appendChild(app);
 
   let state = readState();
+  let openedFromCreativeFolder = false;
   let page = 'home';
   let activeId = '';
   let editingId = '';
@@ -41,9 +42,9 @@
   function saveCustomStyle() { const nameInput = app.querySelector('[data-fanfic-style-name-input]'); const contentInput = app.querySelector('[data-fanfic-style-content-input]'); const name = nameInput?.value.trim(); const content = contentInput?.value.trim(); if (!name) { nameInput?.focus(); return; } if (!content) { contentInput?.focus(); return; } const style = { name: name.slice(0, 60), content: content.slice(0, 1000) }; state.styles = [...(state.styles || []).filter(item => item.name !== style.name), style].slice(-40); draft.style = style.name; draft.styleContent = style.content; styleNotice = `已保存并选中：${style.name}`; save(); render(); }
   function settingField(label, key, content) { return `<label class="fanfic-setting-field"><span>${label}</span>${content.replace('<FIELD>', `data-fanfic-setting="${key}"`)}</label>`; }
 
-  function openApp() { state = readState(); page = 'home'; activeId = ''; editingId = ''; shell?.classList.remove('is-open'); shell?.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); app.classList.add('is-open'); app.setAttribute('aria-hidden', 'false'); render(); }
+  function openApp(fromCreativeFolder = false) { openedFromCreativeFolder = Boolean(fromCreativeFolder); state = readState(); page = 'home'; activeId = ''; editingId = ''; shell?.classList.remove('is-open'); shell?.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); app.classList.add('is-open'); app.setAttribute('aria-hidden', 'false'); render(); }
   function closeApp() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); }
-  function backToFolder() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); folder?.classList.add('is-open'); folder?.setAttribute('aria-hidden', 'false'); }
+  function backToFolder() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); if (openedFromCreativeFolder) { folder?.classList.add('is-open'); folder?.setAttribute('aria-hidden', 'false'); } else { folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); } }
 
   function homePage() {
     const list = state.stories.slice().reverse().map(item => `<button class="fanfic-story-card" data-fanfic-open="${esc(item.id)}" type="button"><span class="fanfic-story-mark">${item.chapters.length ? '文' : '＋'}</span><span><b>${esc(item.title || item.settings.background)}</b><small>${esc(item.updatedAt || item.createdAt)} · ${item.chapters.length} 章 · ${esc(item.settings.background)}</small></span><i>›</i></button>`).join('');
@@ -129,7 +130,8 @@
   }
 
   document.addEventListener('click', event => {
-    if (event.target.closest('[data-folder-app="fanfic"]')) { openApp(); return; }
+    const launcher = event.target.closest('[data-folder-app="fanfic"]');
+    if (launcher) { openApp(Boolean(launcher.closest('[data-desktop-folder]'))); return; }
     if (!app.classList.contains('is-open')) return;
     if (event.target.closest('[data-fanfic-close]')) { closeApp(); return; }
     if (event.target.closest('[data-fanfic-folder]')) { backToFolder(); return; }

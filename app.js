@@ -592,7 +592,31 @@
       refreshing = true;
       location.reload();
     });
-    navigator.serviceWorker.register('./sw.js?v=20260902-1', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=20260909-1', { updateViaCache: 'none' }).catch(() => {});
   }
+  // 所有角色型 API 请求共用的身份顺序：先读角色，再读当前绑定用户。
+  // 基础资料只认明确字段，避免模型从称呼、名字或语气反推生日和性别。
+  window.IdealMachineRoleUserContext = (role = {}, user = {}) => {
+    const value = item => String(item ?? '').trim() || '未填写（未知，不得推测）';
+    const roleDetails = role.details || role.persona || role.signature || '未填写（未知，不得推测）';
+    const userDetails = user.persona || user.details || '未填写（未知，不得推测）';
+    return `【第一优先：角色本人资料】
+真实姓名：${value(role.name || role.realName)}
+显示称呼：${value(role.nickname || role.name || role.realName)}
+身份：${value(role.identity)}
+性别：${value(role.gender)}
+生日：${value(role.birthday)}
+完整设定：${value(roleDetails)}
+
+【第二优先：当前绑定用户资料】
+真实姓名：${value(user.realName || user.name)}
+显示称呼：${value(user.nickname || user.realName || user.name)}
+性别：${value(user.gender)}
+生日：${value(user.birthday)}
+完整设定：${value(userDetails)}
+
+【资料边界】
+先完整读取角色本人资料，再读取当前绑定用户资料。角色资料决定角色的身份、性格、行为和说话方式；用户资料只用于理解对方。姓名、性别、生日和年龄只能使用上面明确填写的值，未填写就保持未知，绝对不能根据名字、称呼、头像、语气、关系或上下文猜测，也不能把角色资料与用户资料互换。`;
+  };
   registerIdealMachineServiceWorker();
 })();

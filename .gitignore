@@ -1,0 +1,14 @@
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.wrangler/
+**/.wrangler/
+coverage/
+.cache/
+.turbo/
+.env
+.env.*
