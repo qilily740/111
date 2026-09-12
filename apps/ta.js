@@ -683,7 +683,8 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
   function incompleteTakeoverBubble(value,minLength=4) {
     const text=cleanTakeoverBubble(value);
     const unfinishedPhrase=/(?:拿个|找个|说个|讲个|看个|做个|买个|弄个|取个|挑个|选个|写个|发个|来个|问个|拿一下|找一下|说一下|讲一下|看一下|听一下|做一下|弄一下|问一下|一点|一个|一份|一张|一件|一条|一遍|一场|一趟|听着|因为|但是|可是|所以|如果|而且|然后|就是|以及|或者|还是|并且|不过|至于|关于)$/;
-    return text.length<minLength||/[，,：:；;、]$/.test(text)||/(?:因为|但是|可是|所以|如果|而且|然后|就是|这个|那个|以及|或者|还是|并且|不过|至于|关于|让|把|被|从|向|对|跟|和)$/.test(text)||unfinishedPhrase.test(text)||(/[（(《【]/.test(text)&&!/[）)》】]/.test(text));
+    // 短消息可以自然地以问号、省略号或口语停顿结束；只拦截真正为空的结果，避免误把完整台词判成“半句话”。
+    return text.length<minLength;
   }
   function splitCompleteTakeoverMessages(rows) {
     const parts=[];

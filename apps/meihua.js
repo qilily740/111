@@ -45,10 +45,6 @@
           <div class="beauty-section-head"><h3 class="beauty-section-title">桌面壁纸</h3><span class="beauty-section-note">Wallpaper</span></div>
           <div class="beauty-wallpaper-box"><div class="beauty-wallpaper-preview" id="beautyWallpaperPreview"></div><input class="beauty-input" id="beautyWallpaperUrl" type="url" placeholder="粘贴图片 URL"><label class="beauty-file-label">从本地选择<input class="beauty-file" id="beautyWallpaperFile" type="file" accept="image/*"></label><button class="beauty-wallpaper-album" data-beauty-wallpaper-album type="button">从相册选择</button></div>
         </section>
-        <section class="beauty-section beauty-launch-animation-setting">
-          <div class="beauty-section-head"><h3 class="beauty-section-title">开屏动画</h3><span class="beauty-section-note">Launch</span></div>
-          <label class="beauty-launch-animation-card"><span class="beauty-launch-animation-copy"><b>进入理想机时播放</b><small>从手机桌面点击理想机图标后显示。仅添加到主屏的独立窗口生效。</small></span><span class="beauty-launch-animation-switch"><input type="checkbox" data-beauty-launch-animation checked><i aria-hidden="true"></i></span></label>
-        </section>
         <section class="beauty-section">
           <div class="beauty-section-head beauty-icon-section-head"><h3 class="beauty-section-title">App 图标与名称</h3><div class="beauty-icon-section-actions"><button class="beauty-btn beauty-batch-icons" data-beauty-batch-icons type="button">从相册批量设置</button><button class="beauty-btn beauty-other-import" data-beauty-other-import type="button">从其他导入</button><button class="beauty-btn beauty-inline-reset" id="beautyReset" type="button">恢复默认图标与名称</button></div></div>
           <p class="beauty-icon-swap-hint" data-beauty-swap-hint>依次点击两个 App 图标即可交换，保存更改后生效。</p><div class="beauty-app-list" id="beautyAppList"></div>
@@ -463,8 +459,6 @@
     swapIconKey = '';
     batchIconDraft = Object.fromEntries(appItems.map(item => { const key = item.dataset.appKey; return [key, saved.icons?.[key] || builtInIconToken(key)]; }));
     document.querySelector('#beautyWallpaperUrl').value = saved.wallpaper?.startsWith('data:') ? '' : (saved.wallpaper || '');
-    const launchAnimationToggle = modal.querySelector('[data-beauty-launch-animation]');
-    if (launchAnimationToggle) launchAnimationToggle.checked = saved.launchAnimationEnabled !== false;
     if (String(saved.wallpaper || '').startsWith('idb:image:') && window.IdealMachineGetImage) window.IdealMachineGetImage(saved.wallpaper).then(value => previewWallpaper(value)); else previewWallpaper(saved.wallpaper || '');
     renderRows();
     modal.classList.add('is-open');
@@ -480,7 +474,6 @@
   async function save() {
     const wallpaperFile = document.querySelector('#beautyWallpaperFile').files[0];
     const wallpaperUrl = document.querySelector('#beautyWallpaperUrl').value.trim();
-    saved.launchAnimationEnabled = modal.querySelector('[data-beauty-launch-animation]')?.checked !== false;
     if (wallpaperFile) { const uploadedWallpaper = await readFile(wallpaperFile); saved.wallpaper = window.IdealMachinePutImage ? await window.IdealMachinePutImage(uploadedWallpaper) : uploadedWallpaper; }
     else if (wallpaperUrl) { saved.wallpaper = wallpaperUrl; window.IdealMachineAlbum?.archiveUrl?.(wallpaperUrl, '美化壁纸'); }
     saved.names = saved.names || {};
@@ -520,7 +513,7 @@
     modal.querySelector('.beauty-sheet').insertAdjacentHTML('beforeend', '<div class="beauty-confirm-backdrop" data-beauty-confirm-cancel></div><section class="beauty-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="beautyConfirmTitle"><h3 id="beautyConfirmTitle">恢复默认图标与名称？</h3><p>所有可自定义 App 的图标和名称都会恢复为默认形式。</p><div><button class="beauty-btn beauty-confirm-cancel" type="button" data-beauty-confirm-cancel>取消</button><button class="beauty-btn beauty-confirm-ok" type="button" data-beauty-confirm-ok>确定恢复</button></div></section>');
   }
   function exportBeauty() {
-    const payload = { format: 'ideal-machine-beauty', version: 2, exportedAt: new Date().toISOString(), wallpaper: saved.wallpaper || '', names: saved.names || {}, icons: saved.icons || {}, launcherIcon: saved.launcherIcon || null, launchAnimationEnabled: saved.launchAnimationEnabled !== false };
+    const payload = { format: 'ideal-machine-beauty', version: 2, exportedAt: new Date().toISOString(), wallpaper: saved.wallpaper || '', names: saved.names || {}, icons: saved.icons || {}, launcherIcon: saved.launcherIcon || null };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -539,7 +532,6 @@
         if (payload.names && typeof payload.names === 'object') saved.names = payload.names;
         if (payload.icons && typeof payload.icons === 'object') saved.icons = payload.icons;
         if (payload.launcherIcon && typeof payload.launcherIcon === 'object') saved.launcherIcon = normalizeLauncherIcon(payload.launcherIcon);
-        if (typeof payload.launchAnimationEnabled === 'boolean') saved.launchAnimationEnabled = payload.launchAnimationEnabled;
         localStorage.setItem(storageKey, JSON.stringify(saved));
         applySettings();
         open();

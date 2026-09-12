@@ -45,8 +45,10 @@
   function avatarMarkup(item, extra = '') { const avatar = item?.avatar || ''; return `<div class="chat-avatar ${extra}">${avatar ? `<img src="${esc(avatar)}" alt="${esc(item.name || '角色')}头像">` : esc((item?.name || '角').slice(0, 1))}</div>`; }
   function uid(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
   function time() { return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); }
+  let chatViewRendering = false;
+  let replyExecution = false;
   function currentContactId() { return backgroundReplyContactId || activeContact; }
-  function currentChat() { const contactId = currentContactId(); if (!contactId) return null; state.chats[contactId] ||= { profileId: '', messages: [] }; return state.chats[contactId]; }
+  function currentChat() { const contactId = chatViewRendering ? activeContact : (replyExecution ? currentContactId() : activeContact); if (!contactId) return null; state.chats[contactId] ||= { profileId: '', messages: [] }; return state.chats[contactId]; }
   function chatUnreadCount(contactId) {
     return (state.chats?.[contactId]?.messages || []).filter(message => message?.role === 'character' && message.unread === true).length;
   }
@@ -1116,6 +1118,9 @@ ${roundText}
       if (text) {
         // 先清空旧 DOM，再发送；render() 会重建输入框，避免旧内容被重复提交。
         input.value = '';
+        // 清除持久化草稿，避免 render() 重建输入框后恢复已发送内容。
+        const sendingChat = currentChat();
+        if (sendingChat) { sendingChat.draft = ''; delete sendingChat.takeoverDraftByRoleId; save(); }
         addMessage(text);
         const restoreFocus = () => {
           const nextInput = document.querySelector('#chatInput');
@@ -1131,6 +1136,11 @@ ${roundText}
     }
     if (event.key === 'Escape' && app.classList.contains('is-open')) app.classList.remove('is-open');
   });
+  document.addEventListener('click', event => {
+    if (!event.target.closest?.('[data-chat-send]')) return;
+    const chat = currentChat();
+    if (chat) { chat.draft = ''; delete chat.takeoverDraftByRoleId; save(); }
+  }, true);
   window.IdealMachineApps = window.IdealMachineApps || {}; window.IdealMachineApps.liaotian = { name: '聊天' };
   function renderContacts() { const groups = state.contactGroups; const manage = state.contactGroupManageOpen; const groupPanel = manage ? `<section class="chat-contact-group-panel"><header><div><span class="chat-kicker">MOMENTS GROUPS</span><h2>管理朋友圈分组</h2><p>点击角色头像即可加入或移出分组。分组只用于朋友圈可见范围。</p></div><button data-chat-group-manage type="button">完成</button></header>${groups.length ? groups.map(group => `<div class="chat-group-editor-row"><b>${esc(group.name)}</b><div class="chat-group-contacts-scroll">${state.contacts.length ? state.contacts.map(contact => `<label class="chat-group-contact-choice"><input type="checkbox" data-chat-group-toggle="${esc(group.id)}" data-chat-group-contact="${esc(contact.id)}" ${(contact.groupIds || []).includes(group.id) ? 'checked' : ''}><span>${avatarMarkup(contact, 'chat-group-avatar')}<small>${esc(contact.name || '未命名')}</small></span></label>`).join('') : '<small>还没有联系人</small>'}</div></div>`).join('') : '<p class="chat-group-empty">还没有分组，请先添加一个。</p>'}</section>` : ''; return `<div class="chat-subhead"><div><span>CHARACTERS</span></div><div class="chat-contact-head-actions"><button data-chat-group-add type="button">＋ 添加分组</button><button data-chat-group-manage type="button">${manage ? '完成' : '管理分组'}</button><button data-chat-add-contact type="button">＋ 添加角色</button></div></div>${groups.length ? `<div class="chat-contact-groups">${groups.map(group => `<span>${esc(group.name)}</span>`).join('')}</div>` : ''}${groupPanel}<div class="chat-contact-list">${state.contacts.length ? state.contacts.map(contact => { const contactGroupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; const lastMessage = state.chats?.[contact.id]?.messages?.slice(-1)[0]; const preview = lastMessage?.text || (lastMessage?.type === 'image' ? '[图片]' : '还没有聊天记录'); return `<article class="chat-contact-card">${avatarMarkup(contact)}<div><b>${esc(contact.nickname || contact.name)} <span class="chat-contact-real-name">${esc(contact.name || '未设置真实姓名')}</span></b><p>${esc(preview)}${contactGroupIds.length ? ` · ${contactGroupIds.map(id => esc(groups.find(group => group.id === id)?.name || '')).filter(Boolean).join('、')}` : ''}</p></div><div class="chat-contact-actions"><button data-chat-open="${contact.id}" type="button">聊天</button><button data-chat-edit-contact="${contact.id}" type="button">编辑</button><button data-chat-delete-contact="${contact.id}" type="button">删除</button></div></article>`; }).join('') : '<div class="chat-empty small"><div class="chat-empty-mark">◎</div><h2>还没有角色</h2><p>添加角色后，就可以为每段关系绑定不同的用户设定。</p></div>'}</div>`; }
   function renderChat() { const contact = state.contacts.find(item => item.id === activeContact); if (!contact) return `<div class="chat-launch-list"><div class="chat-launch-head"><span>YOUR CONTACTS</span><p>选择一个角色进入聊天</p></div>${state.contacts.length ? state.contacts.map(item => `<button class="chat-launch-contact" data-chat-open="${item.id}" type="button">${avatarMarkup(item)}<span><b>${esc(item.nickname || item.name)}</b><small>${esc(item.name || '未设置真实姓名')}</small></span><i>›</i></button>`).join('') : '<div class="chat-empty"><div class="chat-empty-mark">✦</div><h2>还没有角色</h2><p>添加一个角色，绑定你的用户设定后开始聊天。</p><button data-chat-go="contacts" type="button">添加角色</button></div>'}</div>`; const chat = currentChat(); const profile = state.profiles.find(item => item.id === chat.profileId); return `<div class="chat-conversation"><div class="chat-person">${avatarMarkup(contact)}<div><b>${esc(contact.name)}</b><small>${profile ? `使用设定：${esc(profile.name)}` : '尚未绑定用户设定'}</small></div><button data-chat-bind type="button">${profile ? '更换设定' : '绑定设定'}</button></div>${profilePickerOpen ? profilePicker() : ''}<div class="chat-messages" id="chatMessages">${chat.messages.length ? chat.messages.map(message => messageHtml(message)).join('') : '<div class="chat-hint">你可以从一句问候开始。</div>'}</div><div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${replying ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div></div>`; }
@@ -1865,9 +1875,9 @@ ${roundText}
     if (!panel || !chatSettingsOpen || panel.querySelector('[data-character-message-settings]')) return;
     const settings = chatSettingsFor(currentChat());
     settings.characterMultiMessage = Boolean(settings.characterMultiMessage);
-    const legacyCount = Math.min(4, Math.max(2, Number(settings.characterMessageCount) || 2));
-    settings.characterMessageMin = Math.min(4, Math.max(2, Number(settings.characterMessageMin) || (legacyCount > 2 ? 2 : legacyCount)));
-    settings.characterMessageMax = Math.min(4, Math.max(settings.characterMessageMin, Number(settings.characterMessageMax) || legacyCount));
+    const legacyCount = Math.max(2, Number(settings.characterMessageCount) || 2);
+    settings.characterMessageMin = Math.max(2, Number(settings.characterMessageMin) || (legacyCount > 2 ? 2 : legacyCount));
+    settings.characterMessageMax = Math.max(settings.characterMessageMin, Number(settings.characterMessageMax) || legacyCount);
     settings.characterEmojiIds = Array.isArray(settings.characterEmojiIds) ? settings.characterEmojiIds : [];
     const legacyEmojiGroups = [...new Set(characterEmojiItems().filter(item => settings.characterEmojiIds.includes(item.id)).map(item => item.groupId))];
     if (!Array.isArray(settings.characterEmojiGroupIds) || (!settings.characterEmojiGroupIds.length && settings.characterEmojiConfigured !== true)) {
@@ -1887,6 +1897,11 @@ ${roundText}
     anchor.insertAdjacentElement('afterend', category);
     if (tap) category.appendChild(tap);
     category.insertAdjacentHTML('beforeend', `<div class="character-setting-item" data-character-message-settings><button class="character-setting-head" data-character-message-toggle type="button"><span><b>角色连续消息</b><small>${settings.characterMultiMessage ? `已开启 · 目标 ${settings.characterMessageMin}～${settings.characterMessageMax} 条` : '默认 1 条短消息'}</small></span><i>${characterMessageSettingsOpen ? '⌃' : '⌄'}</i></button>${characterMessageSettingsOpen ? `<div class="character-setting-body"><label class="character-message-toggle"><input type="checkbox" data-character-multi ${settings.characterMultiMessage ? 'checked' : ''}><span><b>允许角色连续发送多条消息</b><small>默认只发一条；开启后角色会根据内容自然拆分，普通闲聊最多 3 条，避免连续刷屏。</small></span></label><div class="character-message-range"><label>最少<input type="number" min="2" max="4" step="1" data-character-message-min value="${settings.characterMessageMin}"></label><span>至</span><label>最多<input type="number" min="2" max="4" step="1" data-character-message-max value="${settings.characterMessageMax}"></label><em>条消息</em><button type="button" data-character-message-range-save>确定</button></div></div>` : ''}</div><div class="character-setting-item" data-character-emoji-settings><button class="character-setting-head" data-character-emoji-toggle type="button"><span><b>角色可用表情包</b><small>${settings.characterEmojiGroupIds.length ? `已选择 ${settings.characterEmojiGroupIds.length} 个分组` : '默认未分配'}</small></span><i>${characterEmojiSettingsOpen ? '⌃' : '⌄'}</i></button>${characterEmojiSettingsOpen ? `<div class="character-setting-body"><div class="character-emoji-title"><b>选择角色可发送的分组表情包</b><small>勾选后，角色可以使用该分组中的表情包。</small></div><div class="character-emoji-list">${emojiOptions}</div></div>` : ''}</div>`);
+    category.querySelectorAll('[data-character-message-min], [data-character-message-max]').forEach(input => { input.removeAttribute('max'); });
+    const messageHint = category.querySelector('.character-message-toggle small');
+    if (messageHint) messageHint.textContent = '默认只发一条；开启后按你设置的数量自然拆分。';
+    const messageNote = category.querySelector('[data-character-message-settings] small');
+    if (messageNote) messageNote.textContent = settings.characterMultiMessage ? `已开启 · 目标 ${settings.characterMessageMin}～${settings.characterMessageMax} 条` : '默认 1 条短消息';
   };
 
   document.addEventListener('click', event => {
@@ -1895,8 +1910,8 @@ ${roundText}
     event.preventDefault();
     event.stopImmediatePropagation();
     const settings = chatSettingsFor(currentChat());
-    const min = Math.min(4, Math.max(2, Number(document.querySelector('[data-character-message-min]')?.value) || 2));
-    const max = Math.min(4, Math.max(min, Number(document.querySelector('[data-character-message-max]')?.value) || min));
+    const min = Math.max(2, Number(document.querySelector('[data-character-message-min]')?.value) || 2);
+    const max = Math.max(min, Number(document.querySelector('[data-character-message-max]')?.value) || min);
     settings.characterMessageMin = min;
     settings.characterMessageMax = max;
     settings.characterMultiMessage = document.querySelector('[data-character-multi]')?.checked || false;
@@ -1924,8 +1939,8 @@ ${roundText}
     if (input.matches('[data-character-multi]')) {
       settings.characterMultiMessage = input.checked;
     } else if (input.matches('[data-character-message-min], [data-character-message-max]')) {
-      const min = Math.min(4, Math.max(2, Number(document.querySelector('[data-character-message-min]')?.value) || settings.characterMessageMin || 2));
-      const max = Math.min(4, Math.max(min, Number(document.querySelector('[data-character-message-max]')?.value) || settings.characterMessageMax || min));
+      const min = Math.max(2, Number(document.querySelector('[data-character-message-min]')?.value) || settings.characterMessageMin || 2);
+      const max = Math.max(min, Number(document.querySelector('[data-character-message-max]')?.value) || settings.characterMessageMax || min);
       settings.characterMessageMin = min;
       settings.characterMessageMax = max;
     } else if (input.matches('[data-character-emoji-group]')) {
@@ -2002,12 +2017,11 @@ ${roundText}
   }
 
   function characterReplyBounds(chat, multi) {
-    const legacyCount = Math.min(4, Math.max(2, Number(chatSettingsFor(chat).characterMessageCount) || 2));
-    const configuredMin = Math.min(4, Math.max(2, Number(chatSettingsFor(chat).characterMessageMin) || (legacyCount > 2 ? 2 : legacyCount)));
-    const configuredMax = Math.min(4, Math.max(configuredMin, Number(chatSettingsFor(chat).characterMessageMax) || legacyCount));
-    // 普通闲聊即使旧设置保存过 6 条，也不再一次刷出很多气泡。
+    const legacyCount = Math.max(2, Number(chatSettingsFor(chat).characterMessageCount) || 2);
+    const configuredMin = Math.max(2, Number(chatSettingsFor(chat).characterMessageMin) || (legacyCount > 2 ? 2 : legacyCount));
+    const configuredMax = Math.max(configuredMin, Number(chatSettingsFor(chat).characterMessageMax) || legacyCount);
     const ordinary = !characterReplyIsElaborate(chat);
-    const maxMessages = ordinary ? Math.min(3, configuredMax) : configuredMax;
+    const maxMessages = configuredMax;
     const minMessages = Math.min(maxMessages, configuredMin);
     return {
       min: multi ? minMessages : 1,
@@ -2166,6 +2180,9 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         const system = payload.messages?.find(item => item.role === 'system');
         if (system) {
           system.content += instruction;
+          // 这里的上限完全来自当前聊天设置，不能再被旧的“最多 3 条”提示覆盖。
+          system.content = system.content.replace(/普通闲聊最多发送 3 条/g, `普通闲聊最多发送 ${rangeMax} 条`)
+            .replace(/普通闲聊通常每条控制在 2—18 个汉字，本轮角色文字总量尽量不超过 42 个汉字/g, '每条消息保持自然完整，不按固定总字数截断');
           // 短回复靠提示词控制，不靠过小的 token 上限硬截断；否则长一点的完整句子会被 API 从末尾截掉。
           if (!payload.max_tokens) payload.max_tokens = replyBounds.chunkLimit ? 512 : 768;
           init = { ...init, body: JSON.stringify(payload) };
@@ -2898,7 +2915,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     // been appended, all redraws in that reply/transfer cycle stay pinned to the latest item.
     const shouldRestore = chatVisible && Boolean(messageBox) && !chatScrollToLatestPending;
     const snapshot = shouldRestore ? captureChatPanelScroll() : null;
-    if (shouldRestore && replying) {
+    if (shouldRestore && replying && !(backgroundReplyContactId && activeContact !== backgroundReplyContactId)) {
       const contact = state.contacts.find(item => item.id === activeContact);
       const topName = document.querySelector('.chat-top-name');
       const replyButton = document.querySelector('[data-chat-reply]');
@@ -2906,7 +2923,8 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       if (replyButton) replyButton.disabled = true;
       return;
     }
-    renderWithChatScrollRestore();
+    chatViewRendering = true;
+    try { renderWithChatScrollRestore(); } finally { chatViewRendering = false; }
     if (chatScrollToLatestPending) {
       const scrollLatest = () => {
         if (!app.classList.contains('is-open') || activeTab !== 'chat' || !activeContact) return;
@@ -3245,11 +3263,14 @@ ${recentConversation}`
     const targetContactId = activeContact;
     if (!targetContactId) return replyBeforeBackgroundDelivery();
     const previousTarget = backgroundReplyContactId;
+    const previousReplyExecution = replyExecution;
     backgroundReplyContactId = targetContactId;
+    replyExecution = true;
     try {
       return await replyBeforeBackgroundDelivery();
     } finally {
       if (backgroundReplyContactId === targetContactId) backgroundReplyContactId = previousTarget;
+      replyExecution = previousReplyExecution;
     }
   };
 
