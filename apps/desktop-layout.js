@@ -34,10 +34,6 @@
     { id:'widget-calendar', key:'calendar', name:'日期日历', description:'日期、寄语与滚动日历', selector:'.date-calendar-card', size:'wide', columns:4, rows:1, defaultHidden:true }
   ];
   const defaultLayoutVersion = 6;
-  const legacyDefaultPages = [
-    ['widget-profile','widget-todo','app-liaotian','app-ta','app-luntan','app-rili','app-jiyiku','app-creative-folder'],
-    ['widget-search','widget-photos','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-calendar']
-  ];
   const defaultPages = [
     ['widget-profile','widget-polaroid-mini','app-liaotian','app-ta','app-luntan','app-rili','app-xiangce'],
     ['widget-mood','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-relationship-mini','widget-time-photo'],
@@ -67,27 +63,10 @@
   const defaultDock = ['app-shezhi','app-meihua','app-shijieshu','app-qinglvkongjian'];
   const itemMap = new Map();
   let state = readState();
-  const legacyItems = new Set(legacyDefaultPages.flat());
   const placedItems = Array.isArray(state.pages) ? state.pages.flat().filter(Boolean) : [];
-  const isLegacyDefault = !placedItems.length || (
-    ['widget-profile','widget-todo','widget-search','widget-photos','widget-calendar'].every(id => placedItems.includes(id))
-    && placedItems.every(id => legacyItems.has(id))
-  );
-  const versionOneThirdPage = ['widget-chat','app-jiyiku','app-creative-folder','widget-now'];
-  const currentThirdPage = Array.isArray(state.pages?.[2]) ? state.pages[2] : [];
-  const isVersionOneDefault = state.layoutVersion === 1
-    && versionOneThirdPage.every(id => currentThirdPage.includes(id))
-    && currentThirdPage.every(id => versionOneThirdPage.includes(id));
-  const currentFirstPage = Array.isArray(state.pages?.[0]) ? state.pages[0] : [];
-  const versionFiveSecondPage = ['widget-search','widget-mood','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-relationship-mini','widget-time-photo'];
-  const currentSecondPage = Array.isArray(state.pages?.[1]) ? state.pages[1] : [];
-  const isVersionFiveSecondDefault = state.layoutVersion === 5 && versionFiveSecondPage.every(id => currentSecondPage.includes(id)) && currentSecondPage.every(id => versionFiveSecondPage.includes(id));
-  const currentDefaultFirstPage = defaultPages[0];
-  const shouldRestoreFirstPageOffset = state.layoutVersion >= 1 && state.layoutVersion < defaultLayoutVersion
-    && currentDefaultFirstPage.every(id => currentFirstPage.includes(id))
-    && currentFirstPage.every(id => currentDefaultFirstPage.includes(id));
-  if (state.layoutVersion < defaultLayoutVersion) {
-    if (isLegacyDefault) {
+  const shouldRestoreCurrentDefault = !placedItems.length || state.pages.length < defaultPages.length;
+  if (state.layoutVersion < defaultLayoutVersion || state.pages.length < defaultPages.length) {
+    if (shouldRestoreCurrentDefault) {
       state.pages = defaultPages.map(items => [...items]);
       state.positions = Object.fromEntries(Object.entries(defaultPositions).map(([id, position]) => [id, { ...position }]));
       const shown = new Set(defaultPages.flat());
@@ -95,18 +74,7 @@
       state.pageOneTopSlots = true;
       state.pageOneRaised = true;
     } else {
-      if (isVersionFiveSecondDefault) {
-        state.pages[1] = [...defaultPages[1]];
-        defaultPages[1].forEach(id => { state.positions[id] = { ...defaultPositions[id] }; });
-        delete state.positions['widget-search'];
-        state.hiddenWidgets = [...new Set([...(state.hiddenWidgets || []), 'widget-search'])];
-      }
-      if (isVersionOneDefault) {
-        state.pages[2] = [...defaultPages[2]];
-        defaultPages[2].forEach(id => { state.positions[id] = { ...defaultPositions[id] }; });
-        state.hiddenWidgets = (state.hiddenWidgets || []).filter(id => id !== 'widget-image');
-      }
-      if (shouldRestoreFirstPageOffset) currentDefaultFirstPage.forEach(id => { state.positions[id] = { ...defaultPositions[id] }; });
+      // 已有三页的自定义桌面保留用户布局，只执行通用的清理与补齐。
     }
     // 旧版本会把“当前页放不下”的小组件自动转移到新页面。那些页面没有 App，
     // 只是溢出兜底产生的，升级时把组件放回默认页，避免继续继承错误布局。

@@ -694,7 +694,10 @@ ${boundWorldbookContext(contact)}
   }
   async function rerollCurrentChatRound() {
     const chat = currentChat();
-    if (!chat || replying || thoughtLoading) return;
+    if (!chat || replying || isContactReplying(activeContact)) return;
+    // 重roll对话时允许打断正在读取的心声；心声请求会通过 requestId
+    // 自行丢弃过期结果，不应阻止最新角色回复生成。
+    if (thoughtLoading) { thoughtRequestId += 1; thoughtLoading = false; }
     const lastUserIndex = (chat.messages || []).map(item => item.role).lastIndexOf('user');
     if (lastUserIndex < 0) return window.alert('这一轮还没有用户消息。');
     const removed = chat.messages.splice(lastUserIndex + 1);
@@ -705,6 +708,9 @@ ${boundWorldbookContext(contact)}
     thoughtKey = '';
     thoughtOpen = false;
     renderThought();
+    // 先把旧的角色回复从页面移除，再进入回复状态；否则固定滚动恢复逻辑
+    // 可能暂时保留旧气泡，让用户看起来像是重roll没有生效。
+    render();
     await reply();
   }
   async function loadCurrentThought(force = false) {
@@ -1173,6 +1179,7 @@ ${roundText}
   const offlineReplyPresetsKey = 'ideal-machine-offline-reply-presets';
   function readOfflineReplyPresets() { try { const list = JSON.parse(localStorage.getItem(offlineReplyPresetsKey) || '[]'); return Array.isArray(list) ? list.filter(item => item?.id && item?.name && item?.prompt) : []; } catch { return []; } }
   function offlineReplyPresetOptions(selected) { return `<option value="default" ${selected === 'default' ? 'selected' : ''}>内置默认预设</option>${readOfflineReplyPresets().map(item => `<option value="${esc(item.id)}" ${selected === item.id ? 'selected' : ''}>${esc(item.name)} · 自建</option>`).join('')}${selected && selected !== 'default' && !readOfflineReplyPresets().some(item => item.id === selected) ? '<option value="session" selected>本次自定义</option>' : ''}`; }
+  function offlineReplyPresetVariableGuide() { return `<div class="offline-preset-variable-guide"><b>变量说明</b><span><code>{{char_name}}</code> 当前角色名</span><span><code>{{user_name}}</code> 用户称呼</span><span><code>{{reply_length}}</code> 本次目标字数</span><span><code>{{user_person}}</code> 用户叙述人称</span><span><code>{{char_person}}</code> 角色叙述人称</span><span><code>{{world_background}}</code> 世界书分析背景</span><span><code>{{writing_style}}</code> 当前文风</span><span><code>{{scene}}</code> 地点、原因和角色状态</span><span><code>{{user_message}}</code> 用户本轮输入</span><span><code>{{online_chat}}</code> 线下开始前的线上聊天</span><span><code>{{offline_history}}</code> 已发生的线下内容</span></div>`; }
   function offlineWritingStyleOptions(selected) { return `${Object.entries(offlineWritingStyles).map(([id, item]) => `<option value="${id}" ${selected === id ? 'selected' : ''}>${item.name}</option>`).join('')}${readOfflineWritingStyles().map(item => `<option value="${esc(item.id)}" ${selected === item.id ? 'selected' : ''}>${esc(item.name)} · 自定义</option>`).join('')}`; }
   function offlineWritingStyle(session) { const id = session.writingStyleId || 'natural'; const custom = readOfflineWritingStyles().find(item => item.id === id); const preset = custom || offlineWritingStyles[id] || offlineWritingStyles.natural; const prompt = session.writingStylePrompt || preset.prompt; return { id: preset.id || id, name: preset.name, prompt: custom ? prompt : `${prompt}${offlineStyleExecutionFramework}` }; }
   function offlineReplyPreset(session, values = {}) { const raw = session.replyPreset || offlineDefaultReplyPreset; const replacements = { char_name:'角色', user_name:'用户', reply_length:'500', user_person:'我', char_person:'我', world_background:'暂无世界书分析结果。', writing_style:'自然细腻', scene:'暂无', user_message:'暂无', online_chat:'暂无', offline_history:'暂无', ...values }; return raw.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (match, key) => Object.prototype.hasOwnProperty.call(replacements, key.toLowerCase()) ? replacements[key.toLowerCase()] : match); }
@@ -1198,7 +1205,7 @@ ${roundText}
   function promptProfile(profile) { const name = window.prompt('设定名称', profile?.name || ''); if (!name?.trim()) return; const persona = window.prompt('用户设定：身份、性格、说话方式等', profile?.persona || '') || ''; if (profile) { profile.name = name.trim(); profile.persona = persona; } else state.profiles.push({ id: uid('profile'), name: name.trim(), persona }); save(); render(); }
   function bindProfile() { if (!currentChat()) return; if (chatSettingsOpen) { settingsProfilePickerOpen = !settingsProfilePickerOpen; render(); return; } profilePickerOpen = true; render(); }
   async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => !['image'].includes(item.type)).map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text })); const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); await addMessage(data.choices?.[0]?.message?.content || '……', 'character'); } catch (error) { if (error?.name !== 'AbortError') await addMessage(`回复失败：${error.message}`, 'character'); } replying = false; render(); }
-  function handleTool(tool) { if (tool === 'offline') { menuOpen = false; emojiOpen = false; openOfflineMode(); return; } if (tool === 'image-file') { imageChoiceOpen = true; imageDescriptionOpen = false; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderImageChoice(); return; } if (tool === 'transfer') { transferOpen = true; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderTransfer(); return; } if (tool === 'together') { menuOpen = false; emojiOpen = false; openBookPicker(); return; } menuOpen = false; const labels = { voice: ['语音内容', 'voice'], video: ['通话主题', 'video'], location: ['位置名称', 'location'] }; const data = labels[tool]; if (!data) return render(); const value = window.prompt(data[0]); if (value?.trim()) addMessage(value.trim(), 'user', data[1]); }
+  function handleTool(tool) { if (tool === 'reroll') { menuOpen = false; emojiOpen = false; syncChatPanelDOM(); rerollCurrentChatRound().catch(error => window.alert(`重新生成失败：${error.message}`)); return; } if (tool === 'offline') { menuOpen = false; emojiOpen = false; openOfflineMode(); return; } if (tool === 'image-file') { imageChoiceOpen = true; imageDescriptionOpen = false; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderImageChoice(); return; } if (tool === 'transfer') { transferOpen = true; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderTransfer(); return; } if (tool === 'together') { menuOpen = false; emojiOpen = false; openBookPicker(); return; } menuOpen = false; const labels = { voice: ['语音内容', 'voice'], video: ['通话主题', 'video'], location: ['位置名称', 'location'] }; const data = labels[tool]; if (!data) return render(); const value = window.prompt(data[0]); if (value?.trim()) addMessage(value.trim(), 'user', data[1]); }
   function addEmoji() {
     const group = state.emojis.groups.find(item => item.id === activeEmojiGroup);
     if (!group) return;
@@ -1366,11 +1373,37 @@ ${roundText}
   async function offlineReply(text) { const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); const contact = state.contacts.find(item => item.id === activeContact); if (!session || !contact) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) { session.messages.push({ role:'character', text:'（请先配置聊天 API，才能让角色回应这次见面。）' }); save(); openOfflineMode(); return; } offlineBusy = true; openOfflineMode(); try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.85, messages:[{role:'system',content:`你正在扮演角色“${contact.name}”，和用户在线下见面。地点：${session.place}。见面原因：${session.reason}。角色状态：${session.mood}。这次经历独立于普通聊天记录，请用现场感自然回应，不要提及 AI。`}, ...session.messages.map(item => ({ role:item.role === 'user' ? 'user' : 'assistant', content:item.text }))]}) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); session.messages.push({ role:'character', text:data.choices?.[0]?.message?.content || '……' }); save(); } catch (error) { session.messages.push({ role:'character', text:`（这次见面暂时无法继续：${error.message}）` }); save(); } finally { offlineBusy = false; openOfflineMode(); } }
   function enhanceOfflineMode() { const modal = document.querySelector('[data-chat-offline-modal]'); if (!modal) return; const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); const contact = state.contacts.find(item => item.id === activeContact) || {}; const now = new Date(); const stamp = `${now.getMonth() + 1}月${now.getDate()}日 · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; if (!session) { modal.querySelector('.chat-offline-card')?.classList.add('is-setup'); return; } const card = modal.querySelector('.chat-offline-card'); if (!card) return; card.classList.add('is-immersive'); const messages = session.messages.map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text)}</p></article>`).join(''); card.innerHTML = `<header class="chat-offline-topbar"><button type="button" data-offline-close>‹</button><div><span class="chat-kicker">LIVE MEETING</span><h2>线下见面</h2></div><button type="button" class="chat-offline-more" data-offline-close>×</button></header><div class="chat-offline-meta"><b>${esc(session.place)}</b><span>${stamp}</span></div><section class="chat-offline-atmosphere"><div class="chat-offline-orbit"><i></i><strong>现场</strong></div><div><span>正在和 ${esc(contact.nickname || contact.name || '角色')} 见面</span><b>${esc(session.reason)}</b></div></section><section class="chat-offline-character"><div class="chat-offline-pulse"></div><div><span>角色此刻的状态</span><b>${esc(session.mood)}</b></div><em>${offlineBusy ? '正在回应…' : '在你身边'}</em></section><main class="chat-offline-messages">${messages || '<div class="chat-offline-empty">你们刚刚见面。先观察一下此刻的他吧。</div>'}</main><div class="chat-offline-actions"><button type="button" data-offline-action="说些什么">✦<span>说些什么</span></button><button type="button" data-offline-action="做个动作">◌<span>做个动作</span></button><button type="button" data-offline-action="观察周围">⌁<span>观察周围</span></button><button type="button" data-offline-action="结束见面">□<span>结束见面</span></button></div><form data-offline-form><input data-offline-input placeholder="在现场说点什么…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}>发送</button></form>`; const box = modal.querySelector('.chat-offline-messages'); if (box) box.scrollTop = box.scrollHeight; }
   const legacyOpenOfflineMode = openOfflineMode;
-  function offlineThemePicker() { return `<div class="offline-theme-picker" data-offline-theme-picker><span>现场壁纸</span><div class="offline-wallpaper-actions"><label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 15l3-3 3 3 2-2 3 3M8 9h.01"/></svg><span>选择本地图片</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-offline-wallpaper-file></label><button type="button" data-offline-wallpaper-album>从相册选择</button><input class="offline-wallpaper-url" type="url" data-offline-wallpaper-url placeholder="粘贴图片 URL"><button type="button" data-offline-wallpaper-url-save>使用 URL</button><button type="button" data-offline-wallpaper-reset>恢复默认</button></div></div>`; }
+  function offlineThemePicker() { return `<div class="offline-theme-picker" data-offline-theme-picker><span>现场壁纸</span><div class="offline-wallpaper-actions"><label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.75 5.57 6.15.89-4.45 4.34 1.05 6.13L12 17.24l-5.5 2.89 1.05-6.13L3.1 9.66l6.15-.89L12 3.2z"/></svg><span>选择本地图片</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-offline-wallpaper-file></label><button type="button" data-offline-wallpaper-album>从相册选择</button><input class="offline-wallpaper-url" type="url" data-offline-wallpaper-url placeholder="粘贴图片 URL"><button type="button" data-offline-wallpaper-url-save>使用 URL</button><button type="button" data-offline-wallpaper-reset>恢复默认</button></div></div>`; }
   function applyOfflineTheme(modal) { modal.dataset.offlineTheme = 'mono'; const card = modal.querySelector('.chat-offline-card'); if (card && !modal.querySelector('[data-offline-theme-picker]')) card.querySelector('.chat-offline-meta')?.after(Object.assign(document.createElement('div'), { className:'offline-theme-picker-anchor', innerHTML:offlineThemePicker() })); }
+  const offlineThemePickerBase = offlineThemePicker;
+  offlineThemePicker = session => {
+    const fontSize = Math.max(9, Math.min(22, Number(session?.fontSize) || 11));
+    return offlineThemePickerBase().replace('</div></div>', `</div><label class="offline-font-size-control"><span><b>文字大小</b><output data-offline-font-size-value>${fontSize}px</output></span><input type="number" min="9" max="22" step="1" value="${fontSize}" data-offline-font-size inputmode="numeric" aria-label="线下文字大小"></label></div>`);
+  };
+  function applyOfflineFontSize(modal, value) {
+    const size = Math.max(9, Math.min(22, Number(value) || 11));
+    const card = modal?.querySelector('.offline-meeting-v2');
+    if (card) {
+      card.style.setProperty('--offline-message-font-size', `${size}px`);
+      // 直接同步现有气泡，避免只改 CSS 变量但被旧版嵌套 p 样式盖住。
+      card.querySelectorAll('.chat-offline-v2-message-text, .chat-offline-v2-message-text > p').forEach(node => {
+        node.style.setProperty('font-size', `${size}px`, 'important');
+      });
+      card.querySelectorAll('.chat-offline-v2-dock textarea[data-offline-input], .chat-offline-v2-dock input[data-offline-input]').forEach(node => {
+        node.style.setProperty('font-size', `${Math.max(9, Math.min(16, size))}px`, 'important');
+      });
+    }
+    const input = modal?.querySelector('[data-offline-font-size]');
+    const output = modal?.querySelector('[data-offline-font-size-value]');
+    if (input && document.activeElement !== input) input.value = String(size);
+    if (output) output.textContent = `${size}px`;
+    return size;
+  }
   function applyOfflineWallpaper(modal, source) {
     const card = modal?.querySelector('.offline-meeting-v2');
     if (!card) return;
+    const session = currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId);
+    applyOfflineFontSize(modal, session?.fontSize || 11);
     modal.dataset.offlineContrast = 'light';
     const paint = value => {
       if (!card.isConnected) return;
@@ -1380,7 +1413,10 @@ ${roundText}
       else card.style.removeProperty('--offline-wallpaper-image');
       if (!image) return;
       const probe = new Image();
-      probe.crossOrigin = 'anonymous';
+      probe.decoding = 'async';
+      // 只有远程图片需要 CORS；data/blob/idb 解出的本地图片加上它反而会让
+      // iOS Safari 无法正常读取像素，导致对比度一直停留在默认的浅色状态。
+      if (/^https?:\/\//i.test(image)) probe.crossOrigin = 'anonymous';
       probe.onload = () => {
         if (!card.isConnected) return;
         try {
@@ -1491,7 +1527,7 @@ ${roundText}
     const stamp = `${now.getMonth() + 1}月${now.getDate()}日 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const contextCount = (session.contextMessages || []).length;
     modal.className = 'chat-offline-modal is-open is-fullscreen-modal';
-    modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-fullscreen is-immersive offline-meeting-v2"><header class="chat-offline-v2-topbar"><button type="button" data-offline-close aria-label="返回聊天"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg></button><div><span>IN PERSON</span><h2>与 ${esc(roleName)} 见面</h2></div><nav><button type="button" data-offline-theme-button aria-label="切换现场颜色"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z"/></svg></button><button type="button" data-offline-settings aria-label="打开现场设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></button></nav></header>${offlineThemePicker()}<section class="chat-offline-v2-scene"><div class="chat-offline-v2-scene-copy"><span><i></i> MEETING IN PROGRESS</span><h1>${esc(session.place)}</h1><p>${esc(session.reason)}</p></div>${avatarMarkup(contact, 'chat-offline-v2-hero-avatar')}<dl><div><dt>时间</dt><dd>${stamp}</dd></div><div><dt>角色状态</dt><dd>${esc(session.mood)}</dd></div><div><dt>关系背景</dt><dd>${contextCount ? `已承接最近 ${contextCount} 条聊天` : '独立现场'}</dd></div></dl></section><section class="chat-offline-v2-presence"><div><i class="${offlineBusy ? 'is-busy' : ''}"></i><span><b>${esc(roleName)}</b>${offlineBusy ? ' 正在组织回应' : ' 此刻就在你身边'}</span></div><small>线下记录不会混入普通聊天</small></section><main class="chat-offline-messages" aria-live="polite">${offlineMeetingMessages(session, contact)}</main><footer class="chat-offline-v2-dock"><div class="chat-offline-v2-shortcuts" style="box-sizing:border-box;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;width:100%!important;max-width:none!important;margin:0!important"><button type="button" data-offline-reply ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 1-2.3-5.7L20 8M20 3v5h-5"/></svg><span>${offlineBusy ? '正在回应' : `让 ${esc(roleName)} 继续`}</span></button><button type="button" data-offline-finish ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg><span>${offlineBusy ? '正在整理现场' : '结束并生成纪念'}</span></button></div><form data-offline-form style="box-sizing:border-box;width:100%!important;max-width:none!important;margin:0!important"><input data-offline-input autocomplete="off" placeholder="说点什么，或描述你的动作…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}><span>发送</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-4 14-3-6zM5 12h7"/></svg></button></form></footer>${offlineSettingsPanel(session)}</section>`;
+    modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-fullscreen is-immersive offline-meeting-v2"><header class="chat-offline-v2-topbar"><button type="button" data-offline-close aria-label="返回聊天"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg></button><div><span>IN PERSON</span><h2>与 ${esc(roleName)} 见面</h2></div><nav><button type="button" data-offline-theme-button aria-label="切换现场颜色"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.75 5.57 6.15.89-4.45 4.34 1.05 6.13L12 17.24l-5.5 2.89 1.05-6.13L3.1 9.66l6.15-.89L12 3.2z"/></svg></button><button type="button" data-offline-settings aria-label="打开现场设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></button></nav></header>${offlineThemePicker(session)}<section class="chat-offline-v2-scene"><div class="chat-offline-v2-scene-copy"><span><i></i> MEETING IN PROGRESS</span><h1>${esc(session.place)}</h1><p>${esc(session.reason)}</p></div>${avatarMarkup(contact, 'chat-offline-v2-hero-avatar')}<dl><div><dt>时间</dt><dd>${stamp}</dd></div><div><dt>角色状态</dt><dd>${esc(session.mood)}</dd></div><div><dt>关系背景</dt><dd>${contextCount ? `已承接最近 ${contextCount} 条聊天` : '独立现场'}</dd></div></dl></section><section class="chat-offline-v2-presence"><div><i class="${offlineBusy ? 'is-busy' : ''}"></i><span><b>${esc(roleName)}</b>${offlineBusy ? ' 正在组织回应' : ' 此刻就在你身边'}</span></div><small>线下记录不会混入普通聊天</small></section><main class="chat-offline-messages" aria-live="polite">${offlineMeetingMessages(session, contact)}</main><footer class="chat-offline-v2-dock"><div class="chat-offline-v2-shortcuts" style="box-sizing:border-box;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;width:100%!important;max-width:none!important;margin:0!important"><button type="button" data-offline-reply ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 1-2.3-5.7L20 8M20 3v5h-5"/></svg><span>${offlineBusy ? '正在回应' : `让 ${esc(roleName)} 继续`}</span></button><button type="button" data-offline-finish ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg><span>${offlineBusy ? '正在整理现场' : '结束并生成纪念'}</span></button></div><form data-offline-form style="box-sizing:border-box;width:100%!important;max-width:none!important;margin:0!important"><input data-offline-input autocomplete="off" placeholder="说点什么，或描述你的动作…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}><span>发送</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-4 14-3-6zM5 12h7"/></svg></button></form></footer>${offlineSettingsPanel(session)}</section>`;
     const singleLineInput = modal.querySelector('.chat-offline-v2-dock [data-offline-input]');
     if (singleLineInput?.tagName === 'INPUT') {
       const multilineInput = document.createElement('textarea');
@@ -1527,7 +1563,7 @@ ${roundText}
     const wallpaperButton = modal.querySelector('[data-offline-theme-button]');
     if (wallpaperButton) {
       wallpaperButton.setAttribute('aria-label', '更换现场壁纸');
-      wallpaperButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 15l3-3 3 3 2-2 3 3M8 9h.01"/></svg>';
+      wallpaperButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.75 5.57 6.15.89-4.45 4.34 1.05 6.13L12 17.24l-5.5 2.89 1.05-6.13L3.1 9.66l6.15-.89L12 3.2z"/></svg>';
     }
     const shortcutBar = modal.querySelector('.chat-offline-v2-shortcuts');
     const finishButton = shortcutBar?.querySelector('[data-offline-finish]');
@@ -1558,6 +1594,23 @@ ${roundText}
     applyOfflineTheme(modal);
     applyOfflineWallpaper(modal, session.wallpaper || '');
   }
+  document.addEventListener('input', event => {
+    const input = event.target.closest?.('[data-offline-font-size]');
+    if (!input) return;
+    const modal = document.querySelector('[data-chat-offline-modal]');
+    const size = applyOfflineFontSize(modal, input.value);
+    const session = currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId);
+    if (session) { session.fontSize = size; save(); }
+  }, true);
+  document.addEventListener('change', event => {
+    const input = event.target.closest?.('[data-offline-font-size]');
+    if (!input) return;
+    const modal = document.querySelector('[data-chat-offline-modal]');
+    const size = applyOfflineFontSize(modal, input.value);
+    input.value = String(size);
+    const session = currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId);
+    if (session) { session.fontSize = size; save(); }
+  }, true);
   document.addEventListener('change', async event => {
     const input = event.target.closest('[data-offline-wallpaper-file]');
     if (!input?.files?.[0]) return;
@@ -1685,7 +1738,24 @@ ${roundText}
   let chatMessageEditMode = false; let selectedChatMessageIds = new Set(); let chatMessageEditingId = ''; let messageLongPressTimer = null;
   function selectedMessages() { const chat = currentChat(); return chat ? chat.messages.filter(message => selectedChatMessageIds.has(message.id)) : []; }
   function syncDeletedMemory(chat, deleted) { if (!chat || !deleted.length) return; const ids = new Set(deleted.map(item => item.id)); const texts = deleted.map(item => String(item.text || item.recalledText || '')).filter(Boolean); ['memoryMessages', 'summaryMessages', 'memories'].forEach(key => { if (Array.isArray(chat[key])) chat[key] = chat[key].filter(item => !ids.has(item?.id) && !ids.has(item?.messageId) && !texts.includes(String(item?.text || item?.content || ''))); }); ['memorySummary', 'summary'].forEach(key => { if (typeof chat[key] === 'string' && texts.length) chat[key] = chat[key].split(/\n/).filter(line => !texts.some(text => line.includes(text))).join('\n').trim(); }); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat.profileId); window.IdealMachineMemory?.invalidateMessages?.({ roleId: activeContact, profileId: chat.profileId || '', messageIds: [...ids], chat, role: contact, profile }).catch(error => console.warn('同步遗忘聊天记录失败：', error)); }
-  function exitMessageEdit() { const snapshot = captureChatPanelScroll(); chatMessageEditMode = false; selectedChatMessageIds.clear(); chatMessageEditingId = ''; render(); requestAnimationFrame(() => restoreChatPanelScroll(snapshot)); setTimeout(() => restoreChatPanelScroll(snapshot), 80); }
+  function syncChatReplyButtonAfterMessageEdit() {
+    const button = app.querySelector('[data-chat-reply]');
+    if (!button) return;
+    const busy = isContactReplying(activeContact);
+    button.disabled = busy;
+    button.setAttribute('aria-disabled', String(busy));
+  }
+  function exitMessageEdit() {
+    const snapshot = captureChatPanelScroll();
+    chatMessageEditMode = false;
+    selectedChatMessageIds.clear();
+    chatMessageEditingId = '';
+    render();
+    // 删除后可能走到“保留滚动位置”的局部刷新分支，下一帧再同步一次，
+    // 确保角色回复键不会沿用编辑模式/旧请求留下的 disabled 属性。
+    requestAnimationFrame(() => { restoreChatPanelScroll(snapshot); syncChatReplyButtonAfterMessageEdit(); });
+    setTimeout(() => { restoreChatPanelScroll(snapshot); syncChatReplyButtonAfterMessageEdit(); }, 80);
+  }
   function renderMessageEditor() {
     let portal = document.querySelector('#chatMessageEditor');
     if (!portal) { portal = document.createElement('div'); portal.id = 'chatMessageEditor'; app.appendChild(portal); }
@@ -1708,7 +1778,7 @@ ${roundText}
   document.addEventListener('pointerdown', event => { const message = event.target.closest('[data-chat-message-id]'); if (!message || !app.classList.contains('is-chatting')) return; clearTimeout(messageLongPressTimer); messageLongPressTimer = setTimeout(() => { const snapshot = captureChatPanelScroll(); chatMessageEditMode = true; selectedChatMessageIds.clear(); selectedChatMessageIds.add(message.dataset.chatMessageId); render(); requestAnimationFrame(() => restoreChatPanelScroll(snapshot)); setTimeout(() => restoreChatPanelScroll(snapshot), 80); }, 560); });
   document.addEventListener('pointerup', () => clearTimeout(messageLongPressTimer)); document.addEventListener('pointercancel', () => clearTimeout(messageLongPressTimer)); document.addEventListener('contextmenu', event => { if (event.target.closest('[data-chat-message-id]')) event.preventDefault(); });
   function syncMessageEditBarDOM() { const bar=app.querySelector('.chat-message-editbar');if(!bar)return;const count=selectedChatMessageIds.size;const label=bar.querySelector('span');const edit=bar.querySelector('[data-chat-message-edit]');const remove=bar.querySelector('[data-chat-message-delete]');const recall=bar.querySelector('[data-chat-message-recall]');if(label)label.textContent=`已选择 ${count} 条`;if(edit)edit.disabled=count!==1;if(remove)remove.disabled=!count;if(recall)recall.disabled=!count; }
-  document.addEventListener('click', event => { const message = event.target.closest('[data-chat-message-id]'); if (chatMessageEditMode && message) { event.stopImmediatePropagation(); const id = message.dataset.chatMessageId; selectedChatMessageIds.has(id) ? selectedChatMessageIds.delete(id) : selectedChatMessageIds.add(id); message.classList.toggle('is-selected',selectedChatMessageIds.has(id)); syncMessageEditBarDOM(); return; } const cancel = event.target.closest('[data-chat-message-cancel]'); if (cancel) return exitMessageEdit(); const edit = event.target.closest('[data-chat-message-edit]'); if (edit && !edit.disabled && selectedChatMessageIds.size === 1) { chatMessageEditingId = [...selectedChatMessageIds][0]; renderMessageEditor(); return; } const remove = event.target.closest('[data-chat-message-delete]'); if (remove && !remove.disabled) { const chat = currentChat(); const deleted = chat?.messages.filter(item => selectedChatMessageIds.has(item.id)) || []; if (chat) { chat.messages = chat.messages.filter(item => !selectedChatMessageIds.has(item.id)); save(); syncDeletedMemory(chat, deleted); } exitMessageEdit(); return; } const recall = event.target.closest('[data-chat-message-recall]'); if (recall && !recall.disabled) { const chat = currentChat(); const selected = selectedMessages(); selected.forEach(item => { item.recalled = true; item.recalledText = item.text; item.text = ''; }); save(); syncDeletedMemory(chat, selected); exitMessageEdit(); return; } }, true);
+  document.addEventListener('click', event => { const message = event.target.closest('[data-chat-message-id]'); if (chatMessageEditMode && message) { event.stopImmediatePropagation(); const id = message.dataset.chatMessageId; selectedChatMessageIds.has(id) ? selectedChatMessageIds.delete(id) : selectedChatMessageIds.add(id); message.classList.toggle('is-selected',selectedChatMessageIds.has(id)); syncMessageEditBarDOM(); return; } const cancel = event.target.closest('[data-chat-message-cancel]'); if (cancel) return exitMessageEdit(); const edit = event.target.closest('[data-chat-message-edit]'); if (edit && !edit.disabled && selectedChatMessageIds.size === 1) { chatMessageEditingId = [...selectedChatMessageIds][0]; renderMessageEditor(); return; } const remove = event.target.closest('[data-chat-message-delete]'); if (remove && !remove.disabled) { const chat = currentChat(); const deleted = chat?.messages.filter(item => selectedChatMessageIds.has(item.id)) || []; if (chat) { const deletedIds = new Set(deleted.map(item => item.id)); chat.messages = chat.messages.filter(item => !selectedChatMessageIds.has(item.id)); if (chatQuote && deletedIds.has(chatQuote.id)) chatQuote = null; save(); syncDeletedMemory(chat, deleted); } exitMessageEdit(); return; } const recall = event.target.closest('[data-chat-message-recall]'); if (recall && !recall.disabled) { const chat = currentChat(); const selected = selectedMessages(); selected.forEach(item => { item.recalled = true; item.recalledText = item.text; item.text = ''; }); save(); syncDeletedMemory(chat, selected); exitMessageEdit(); return; } }, true);
   document.addEventListener('click', event => {
     const cancel = event.target.closest('[data-chat-message-editor-cancel]');
     const saveButton = event.target.closest('[data-chat-message-editor-save]');
@@ -3497,6 +3567,31 @@ ${recentConversation}`
     return String(message.text || '').trim() || '[空消息]';
   }
   function quoteMessageSpeaker(message) { const contact = state.contacts.find(item => item.id === activeContact); return message?.role === 'user' ? '你' : (contact?.nickname || contact?.name || '角色'); }
+  let chatKeyboardPositionFrame = 0;
+  function syncChatKeyboardPosition() {
+    chatKeyboardPositionFrame = 0;
+    const conversation = app.querySelector('.chat-conversation');
+    const wrap = conversation?.querySelector(':scope > .chat-compose-wrap');
+    const input = wrap?.querySelector('#chatInput');
+    if (!wrap || !input) return;
+    const visualViewport = window.visualViewport;
+    const focused = document.activeElement === input;
+    const viewportBottom = visualViewport ? visualViewport.offsetTop + visualViewport.height : window.innerHeight;
+    const keyboardInset = focused && visualViewport
+      ? Math.max(0, window.innerHeight - viewportBottom)
+      : 0;
+    wrap.style.setProperty('--chat-keyboard-inset', `${Math.ceil(keyboardInset)}px`);
+    wrap.classList.toggle('is-keyboard-lifted', keyboardInset > 8);
+  }
+  function scheduleChatKeyboardPosition() {
+    if (chatKeyboardPositionFrame) return;
+    chatKeyboardPositionFrame = requestAnimationFrame(syncChatKeyboardPosition);
+  }
+  window.visualViewport?.addEventListener('resize', scheduleChatKeyboardPosition);
+  window.visualViewport?.addEventListener('scroll', scheduleChatKeyboardPosition);
+  window.addEventListener('resize', scheduleChatKeyboardPosition);
+  document.addEventListener('focusin', event => { if (event.target.closest?.('#chatInput')) scheduleChatKeyboardPosition(); });
+  document.addEventListener('focusout', event => { if (event.target.closest?.('#chatInput')) setTimeout(scheduleChatKeyboardPosition, 80); });
   function syncChatQuoteBar() {
     const wrap = document.querySelector('.chat-conversation .chat-compose-wrap');
     if (!wrap) return;
@@ -3524,6 +3619,8 @@ ${recentConversation}`
       const end = input.value.length;
       try { input.setSelectionRange(end, end); } catch {}
       syncChatComposerControls(input);
+      scheduleChatKeyboardPosition();
+      setTimeout(scheduleChatKeyboardPosition, 80);
     }
   }
   const baseRenderWithQuote = render;
@@ -3993,8 +4090,10 @@ ${recentConversation}`
     if (presetInput) {
       const controls = document.createElement('div');
       controls.className = 'chat-offline-preset-controls';
-      controls.innerHTML = `<label>选择回复预设<select data-offline-preset-select>${offlineReplyPresetOptions(currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId)?.replyPresetId || 'default')}</select></label><button type="button" data-offline-preset-new>＋ 新建预设</button><button type="button" data-offline-preset-save>保存当前预设</button><small>可用变量：{{char_name}}、{{user_name}}、{{reply_length}}、{{user_person}}、{{char_person}}、{{world_background}}、{{writing_style}}、{{scene}}、{{user_message}}、{{online_chat}}、{{offline_history}}</small>`;
-      presetInput.before(controls);
+      controls.innerHTML = `<label>选择回复预设<select data-offline-preset-select>${offlineReplyPresetOptions(currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId)?.replyPresetId || 'default')}</select></label><button type="button" data-offline-preset-new>＋ 新建预设</button><button type="button" data-offline-preset-save>保存当前预设</button><section class="chat-offline-preset-editor" data-offline-preset-editor hidden><label>预设名称<input data-offline-preset-name maxlength="32" placeholder="例如：克制但有现场感"></label><label>回复规则<textarea data-offline-preset-prompt maxlength="12000" placeholder="填写角色回复规则……"></textarea></label><div><button type="button" data-offline-preset-editor-cancel>取消</button><button type="button" data-offline-preset-editor-save>保存并使用</button></div></section>${offlineReplyPresetVariableGuide()}<small class="offline-preset-read-note">保存设置后，下面编辑区里你自己写的内容会在每次线下回复前被读取；变量会先替换成当前角色、用户、世界背景和现场记录，再发送给 API。</small>`;
+      const presetField = presetInput.closest('.chat-offline-v2-preset');
+      if (presetField) presetField.before(controls);
+      else presetInput.before(controls);
     }
   };
   document.addEventListener('pointerdown', event => {
@@ -4074,28 +4173,55 @@ ${recentConversation}`
     const input = panel?.querySelector('[data-offline-preset]');
     if (input) input.value = item?.prompt || offlineDefaultReplyPreset;
   });
-  document.addEventListener('click', event => {
-    const create = event.target.closest('[data-offline-preset-new]');
-    const savePreset = event.target.closest('[data-offline-preset-save]');
-    if (!create && !savePreset) return;
-    const panel = event.target.closest('[data-offline-settings-panel]');
+  function openOfflinePresetEditor(panel, item = null) {
+    const editor = panel?.querySelector('[data-offline-preset-editor]');
+    const name = editor?.querySelector('[data-offline-preset-name]');
+    const prompt = editor?.querySelector('[data-offline-preset-prompt]');
+    const input = panel?.querySelector('[data-offline-preset]');
+    if (!editor || !name || !prompt) return;
+    editor.dataset.editId = item?.id || '';
+    name.value = item?.name || '';
+    prompt.value = input?.value.trim() || item?.prompt || offlineDefaultReplyPreset;
+    editor.hidden = false;
+    name.focus();
+  }
+  function saveOfflinePresetFromEditor(panel) {
+    const editor = panel?.querySelector('[data-offline-preset-editor]');
+    const name = editor?.querySelector('[data-offline-preset-name]')?.value.trim();
+    const prompt = editor?.querySelector('[data-offline-preset-prompt]')?.value.trim();
     const input = panel?.querySelector('[data-offline-preset]');
     const select = panel?.querySelector('[data-offline-preset-select]');
-    if (!input || !select) return;
+    if (!editor || !name || !prompt || !input || !select) return window.alert(!name ? '请填写预设名称。' : '请填写回复规则。');
     const existing = readOfflineReplyPresets();
-    const selected = existing.find(item => item.id === select.value);
-    const name = create || !selected ? window.prompt('给这份回复预设起个名字：', '')?.trim() : selected.name;
-    if (!name) return;
-    const prompt = create ? offlineDefaultReplyPreset : input.value.trim();
-    if (!prompt) return window.alert('请先填写回复预设。');
-    const item = create || !selected ? { id:`preset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name, prompt } : selected;
-    if (item === selected) item.prompt = prompt;
-    else existing.push(item);
-    localStorage.setItem(offlineReplyPresetsKey, JSON.stringify(existing));
+    const editId = editor.dataset.editId || '';
+    const item = existing.find(entry => entry.id === editId) || { id:`preset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name, prompt };
+    item.name = name;
+    item.prompt = prompt;
+    const next = existing.filter(entry => entry.id !== item.id && entry.name !== name);
+    next.push(item);
+    localStorage.setItem(offlineReplyPresetsKey, JSON.stringify(next));
     select.innerHTML = offlineReplyPresetOptions(item.id);
     select.value = item.id;
     input.value = item.prompt;
-    if (create) input.focus();
+    const session = currentChat()?.offlineSessions?.find(entry => entry.id === offlineSessionId);
+    if (session) { session.replyPreset = item.prompt; session.replyPresetId = item.id; save(); }
+    editor.hidden = true;
+  }
+  document.addEventListener('click', event => {
+    const create = event.target.closest('[data-offline-preset-new]');
+    const savePreset = event.target.closest('[data-offline-preset-save]');
+    const cancelEditor = event.target.closest('[data-offline-preset-editor-cancel]');
+    const saveEditor = event.target.closest('[data-offline-preset-editor-save]');
+    if (!create && !savePreset && !cancelEditor && !saveEditor) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const panel = event.target.closest('[data-offline-settings-panel]');
+    if (!panel) return;
+    if (cancelEditor) { const editor = panel.querySelector('[data-offline-preset-editor]'); if (editor) editor.hidden = true; return; }
+    if (saveEditor) { saveOfflinePresetFromEditor(panel); return; }
+    const select = panel.querySelector('[data-offline-preset-select]');
+    const selected = readOfflineReplyPresets().find(item => item.id === select?.value);
+    openOfflinePresetEditor(panel, create ? null : selected);
   });
   document.addEventListener('click', event => {
     if (event.target.closest('[data-offline-close]')) {
