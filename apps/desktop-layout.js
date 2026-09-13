@@ -35,13 +35,13 @@
   ];
   const defaultLayoutVersion = 6;
   const legacyDefaultPages = [
-    ['widget-profile','widget-todo','app-liaotian','app-ta','app-luntan','app-rili','app-jiyiku','app-xiaozhen','app-jia','app-creative-folder'],
+    ['widget-profile','widget-todo','app-liaotian','app-ta','app-luntan','app-rili','app-jiyiku','app-creative-folder'],
     ['widget-search','widget-photos','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-calendar']
   ];
   const defaultPages = [
     ['widget-profile','widget-polaroid-mini','app-liaotian','app-ta','app-luntan','app-rili','app-xiangce'],
     ['widget-mood','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-relationship-mini','widget-time-photo'],
-    ['widget-chat','widget-image','app-jiyiku','app-xiaozhen','app-jia','app-creative-folder','widget-now']
+    ['widget-chat','widget-image','app-jiyiku','app-creative-folder','widget-now']
   ];
   const defaultPositions = {
     'widget-profile':{ page:0, column:1, row:2 },
@@ -61,8 +61,6 @@
     'widget-chat':{ page:2, column:1, row:1 },
     'widget-image':{ page:2, column:1, row:3 },
     'app-jiyiku':{ page:2, column:3, row:3 },
-    'app-xiaozhen':{ page:2, column:4, row:3 },
-    'app-jia':{ page:2, column:3, row:4 },
     'app-creative-folder':{ page:2, column:4, row:4 },
     'widget-now':{ page:2, column:1, row:5 }
   };
@@ -75,7 +73,7 @@
     ['widget-profile','widget-todo','widget-search','widget-photos','widget-calendar'].every(id => placedItems.includes(id))
     && placedItems.every(id => legacyItems.has(id))
   );
-  const versionOneThirdPage = ['widget-chat','app-jiyiku','app-xiaozhen','app-jia','app-creative-folder','widget-now'];
+  const versionOneThirdPage = ['widget-chat','app-jiyiku','app-creative-folder','widget-now'];
   const currentThirdPage = Array.isArray(state.pages?.[2]) ? state.pages[2] : [];
   const isVersionOneDefault = state.layoutVersion === 1
     && versionOneThirdPage.every(id => currentThirdPage.includes(id))
