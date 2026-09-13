@@ -255,6 +255,11 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .chat-offline-modal .offline-wallpaper-actions .offline-wallpaper-url::placeholder { color:rgba(40,40,40,.58); }
 .chat-offline-modal .offline-wallpaper-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .chat-offline-modal .offline-wallpaper-actions .offline-wallpaper-url { grid-column:1 / -1; }
+.chat-offline-modal .offline-font-size-control { display:grid; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,.28); color:var(--offline-ink); }
+.chat-offline-modal .offline-font-size-control > span { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:9px; }
+.chat-offline-modal .offline-font-size-control > span b { font-size:9px; font-weight:650; }
+.chat-offline-modal .offline-font-size-control output { color:var(--offline-muted); font-variant-numeric:tabular-nums; }
+.chat-offline-modal .offline-font-size-control input[type="number"] { box-sizing:border-box; width:100%; min-height:36px; padding:0 10px; border:1px solid var(--offline-line); border-radius:10px; background:var(--offline-glass); color:var(--offline-ink); font:inherit; font-size:12px; outline:0; }
 @media (prefers-color-scheme:dark) { .chat-offline-modal .offline-wallpaper-actions .offline-wallpaper-url { background:rgba(20,20,22,.42); color:#fff; border-color:rgba(255,255,255,.34); } .chat-offline-modal .offline-wallpaper-actions .offline-wallpaper-url::placeholder { color:rgba(255,255,255,.66); } }
 
 .chat-offline-modal .offline-meeting-v2 .chat-offline-v2-scene {
@@ -322,7 +327,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
   background:var(--offline-glass-strong) !important;
   color:var(--offline-ink) !important;
   box-shadow:0 8px 22px rgba(30,20,39,.1),inset 0 1px 0 rgba(255,255,255,.45);
-  font-size:10px !important;
+  font-size:var(--offline-message-font-size,10px) !important;
   line-height:1.7 !important;
   white-space:pre-wrap;
   -webkit-backdrop-filter:blur(24px) saturate(155%);
@@ -356,11 +361,25 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .chat-offline-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-message-body > span { color:var(--offline-muted) !important; }
 .chat-offline-modal[data-offline-contrast="dark"] .offline-meeting-v2 > .offline-theme-picker { background:rgba(12,15,20,.5); }
 .chat-offline-modal .offline-meeting-v2 .chat-offline-v2-message-body .chat-offline-inner-voice { font-style:italic; }
-.chat-offline-preset-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:8px 0; }
-.chat-offline-preset-controls label { flex:1 1 180px; display:grid; gap:5px; font-size:12px; }
+.chat-offline-preset-controls { display:grid; grid-template-columns:minmax(0,1fr); align-items:stretch; gap:8px; width:100%; margin:8px 0; }
+.chat-offline-preset-controls label { display:grid; width:100%; gap:5px; font-size:12px; }
 .chat-offline-preset-controls select { width:100%; min-height:34px; border:1px solid #ddd; border-radius:8px; background:transparent; color:inherit; }
-.chat-offline-preset-controls button { padding:8px 10px; border:1px solid #ddd; border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
-.chat-offline-preset-controls small { flex-basis:100%; line-height:1.6; overflow-wrap:anywhere; opacity:.65; }
+.chat-offline-preset-controls button { width:100%; min-height:34px; padding:8px 10px; border:1px solid #ddd; border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
+.chat-offline-preset-controls small { line-height:1.6; overflow-wrap:anywhere; opacity:.65; }
+.chat-offline-preset-controls .offline-preset-variable-guide { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px 8px; padding:9px 10px; border:1px solid rgba(0,0,0,.08); border-radius:10px; background:rgba(255,255,255,.24); color:inherit; font-size:9px; line-height:1.45; }
+.chat-offline-preset-controls .offline-preset-variable-guide b { grid-column:1 / -1; font-size:10px; }
+.chat-offline-preset-controls .offline-preset-variable-guide code { color:var(--offline-accent-dark,var(--offline-ink)); font:600 9px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.chat-offline-preset-controls .offline-preset-read-note { padding:0 2px; color:var(--offline-muted,var(--offline-ink)); }
+.chat-offline-preset-editor { display:grid; grid-column:1 / -1; gap:8px; margin-top:2px; padding:11px; border:1px solid var(--offline-line); border-radius:13px; background:rgba(255,255,255,.18); }
+.chat-offline-preset-editor[hidden] { display:none; }
+.chat-offline-preset-editor label { display:grid; gap:5px; color:var(--offline-ink); font-size:10px; }
+.chat-offline-preset-editor input,
+.chat-offline-preset-editor textarea { box-sizing:border-box; width:100%; min-width:0; padding:8px 9px; border:1px solid var(--offline-line); border-radius:9px; outline:0; background:var(--offline-glass-strong); color:var(--offline-ink); font:inherit; font-size:10px; }
+.chat-offline-preset-editor input { height:34px; }
+.chat-offline-preset-editor textarea { min-height:115px; line-height:1.55; resize:vertical; }
+.chat-offline-preset-editor > div { display:grid; grid-template-columns:1fr 1.35fr; gap:7px; }
+.chat-offline-preset-editor > div button { min-height:34px; border:1px solid var(--offline-line); border-radius:9px; background:var(--offline-glass); color:var(--offline-ink); font:inherit; font-size:10px; cursor:pointer; }
+.chat-offline-preset-editor > div button:last-child { border-color:var(--offline-accent); background:var(--offline-accent); color:#fff; }
 .chat-offline-selection-toolbar { display:flex; align-items:center; gap:8px; padding:8px 15px; color:var(--offline-ink); font-size:12px; }
 .chat-offline-selection-toolbar[hidden] { display:none; }
 .chat-offline-selection-toolbar span { flex:1; }
@@ -398,8 +417,8 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
   background:linear-gradient(0deg,rgba(18,12,23,.14),transparent);
 }
 .chat-offline-v2-shortcuts { box-sizing:border-box; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); justify-content:stretch; align-self:stretch; flex:0 0 auto; gap:7px; width:calc(100% - 28px); max-width:none; margin:0 auto; position:relative; left:0; }
-.chat-offline-v2-shortcuts button { display:flex; flex:1; align-items:center; justify-content:center; gap:6px; min-height:31px; padding:0 10px; border:1px solid var(--offline-line); border-radius:12px; background:var(--offline-glass); color:var(--offline-ink); box-shadow:inset 0 1px 0 rgba(255,255,255,.35); font:inherit; font-size:8px; -webkit-backdrop-filter:blur(22px) saturate(155%); backdrop-filter:blur(22px) saturate(155%); cursor:pointer; }
-.chat-offline-v2-shortcuts button svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.chat-offline-v2-shortcuts button { display:flex; flex:1; align-items:center; justify-content:center; gap:clamp(4px,1.3vw,8px); min-height:31px; padding:0 clamp(5px,2vw,10px); border:1px solid var(--offline-line); border-radius:12px; background:var(--offline-glass); color:var(--offline-ink); box-shadow:inset 0 1px 0 rgba(255,255,255,.35); font:inherit; font-size:clamp(8px,2.4vw,12px); line-height:1.2; -webkit-appearance:none; appearance:none; -webkit-backdrop-filter:blur(22px) saturate(155%); backdrop-filter:blur(22px) saturate(155%); cursor:pointer; }
+.chat-offline-v2-shortcuts button svg { flex:0 0 auto; width:clamp(12px,3.3vw,16px); height:clamp(12px,3.3vw,16px); fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
 .chat-offline-v2-shortcuts button:disabled { opacity:.55; cursor:default; }
 .chat-offline-modal .offline-meeting-v2 .chat-offline-v2-dock form {
   box-sizing:border-box;
@@ -2171,7 +2190,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .chat-reading-font-file:hover > b { background: #dedee2 !important; }
 .chat-reading-modal { position: fixed; inset: 0; z-index: 78; display: flex; flex-direction: column; overflow: hidden; background: #f5f5f3; color: #222; }.chat-reading-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; padding: max(20px, env(safe-area-inset-top)) 18px 14px; border-bottom: 1px solid rgba(0,0,0,.08); background: rgba(255,255,255,.9); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }.chat-reading-header h1 { margin-top: 4px; max-width: 240px; overflow: hidden; font-size: 20px; text-overflow: ellipsis; white-space: nowrap; }.chat-reading-header > button { width: 31px; height: 31px; border: 0; border-radius: 50%; background: #efefed; color: #444; font-size: 22px; }.chat-reading-shelf { flex: 1; overflow-y: auto; padding: 28px 20px 40px; }.chat-reading-intro > span { color: #aaa; font-size: 10px; letter-spacing: .15em; }.chat-reading-intro p { margin-top: 7px; color: #777; font-size: 12px; }.chat-reading-books { display: grid; gap: 10px; margin-top: 22px; }.chat-reading-books > button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px; border: 1px solid rgba(0,0,0,.08); border-radius: 15px; background: #fff; color: #222; text-align: left; box-shadow: 0 8px 22px rgba(0,0,0,.05); }.chat-book-cover { display: grid; flex: 0 0 43px; place-items: center; width: 43px; height: 57px; border-radius: 8px; background: #222; color: #fff; font-family: Georgia, serif; font-size: 22px; }.chat-reading-books > button > span:nth-child(2) { display: grid; flex: 1; gap: 4px; }.chat-reading-books b { font-size: 13px; }.chat-reading-books small { color: #999; font-size: 10px; }.chat-reading-books i { color: #aaa; font-size: 20px; font-style: normal; }.chat-reading-body { flex: 1; overflow-y: auto; padding: 31px 25px 95px; }.chat-reading-text { max-width: 620px; margin: 0 auto; color: #333; font-family: Georgia, 'Songti SC', serif; font-size: 16px; line-height: 2; }.chat-reading-text p { margin: 0 0 15px; }.chat-reading-empty { color: #aaa; text-align: center; }.chat-reading-progress { position: sticky; bottom: 12px; max-width: 620px; margin: 25px auto 0; padding: 10px 12px; border: 1px solid rgba(0,0,0,.07); border-radius: 12px; background: rgba(255,255,255,.86); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #999; font-size: 10px; }.chat-reading-progress > div { height: 3px; margin-top: 7px; overflow: hidden; border-radius: 3px; background: #e3e3e0; }.chat-reading-progress i { display: block; height: 100%; border-radius: inherit; background: #222; transition: width .25s ease; }.chat-reading-avatar { position: absolute; right: 20px; bottom: 25px; z-index: 4; width: 52px; height: 52px; padding: 0; overflow: hidden; border: 2px solid #fff; border-radius: 18px; background: #ddd; box-shadow: 0 10px 25px rgba(0,0,0,.18); }.chat-reading-avatar .chat-avatar { width: 100%; height: 100%; border-radius: 15px; }.chat-reading-actions { position: absolute; right: 20px; bottom: 86px; z-index: 5; display: flex; gap: 7px; padding: 7px; border: 1px solid rgba(0,0,0,.1); border-radius: 12px; background: #fff; box-shadow: 0 10px 25px rgba(0,0,0,.15); }.chat-reading-actions[hidden] { display: none; }.chat-reading-actions button { min-height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: #f0f0ee; color: #444; font: inherit; font-size: 10px; }.chat-reading-mini { position: absolute; right: 16px; bottom: 85px; z-index: 6; display: flex; flex-direction: column; width: min(340px, calc(100vw - 30px)); height: min(44vh, 390px); overflow: hidden; border: 1px solid rgba(0,0,0,.1); border-radius: 18px; background: rgba(255,255,255,.96); box-shadow: 0 20px 55px rgba(0,0,0,.24); }.chat-reading-mini header { display: flex; align-items: center; justify-content: space-between; padding: 13px 14px; border-bottom: 1px solid rgba(0,0,0,.07); }.chat-reading-mini header button { width: 25px; height: 25px; border: 0; border-radius: 50%; background: #eee; color: #555; }.chat-reading-mini-messages { flex: 1; overflow-y: auto; padding: 12px; }.chat-reading-mini-messages p { margin: 7px 0; color: #555; font-size: 11px; line-height: 1.5; }.chat-reading-mini-messages p.is-user { color: #111; text-align: right; }.chat-reading-mini-messages p b { margin-right: 5px; font-size: 10px; }.chat-reading-mini-messages > small { color: #aaa; font-size: 10px; }.chat-reading-mini footer { display: flex; gap: 6px; padding: 10px; border-top: 1px solid rgba(0,0,0,.07); }.chat-reading-mini footer input { min-width: 0; flex: 1; height: 35px; padding: 0 9px; border: 1px solid rgba(0,0,0,.12); border-radius: 9px; outline: 0; font: inherit; font-size: 11px; }.chat-reading-mini footer button { min-width: 38px; border: 0; border-radius: 9px; background: #222; color: #fff; font: inherit; font-size: 10px; }.chat-reading-mini footer button:last-child { background: #eee; color: #444; }
 .chat-message .chat-bubble.tap, .chat-message.is-user .chat-bubble.tap { display: block; width: max-content; max-width: min(86vw, 300px); padding: 7px 12px; border: 0; border-radius: 999px !important; background: #f0f0ee !important; color: #888 !important; box-shadow: none; font-size: 10px; line-height: 1.35; text-align: center; }
-.chat-message:has(.chat-bubble.tap) { width: 100%; max-width: 100%; align-items: center; margin-left: 0; margin-right: 0; }.chat-message:has(.chat-bubble.tap) .chat-message-line { justify-content: center; }.chat-message:has(.chat-bubble.tap) .chat-message-avatar, .chat-message:has(.chat-bubble.tap) > small { display: none; }
+.chat-message:has(.chat-bubble.tap) { width: 100%; max-width: 100%; align-items: center; margin-left: 0; margin-right: 0; }.chat-message:has(.chat-bubble.tap) .chat-message-line { justify-content: center; }.chat-message:has(.chat-bubble.tap) .chat-message-avatar, .chat-message:has(.chat-bubble.tap) > small, .chat-message:has(.chat-bubble.tap) .chat-message-line > small { display: none !important; }
 .chat-message.is-selected .chat-bubble { outline: 2px solid #222 !important; outline-offset: 3px; box-shadow: 0 0 0 5px rgba(0,0,0,.08), 0 8px 20px rgba(0,0,0,.12); transform: translateY(-1px); }
 .chat-message.is-selected .chat-message-avatar { outline: 2px solid #222; outline-offset: 2px; filter: saturate(.65); }
 .chat-recalled { cursor: pointer; }.chat-recalled-original { margin-top: 6px; padding: 6px 9px; border-radius: 8px; background: rgba(0,0,0,.06); color: #777; font-size: 10px; line-height: 1.45; }
@@ -4115,6 +4134,89 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .chat-offline-modal[data-offline-theme="black"] .chat-offline-card.is-fullscreen form input::placeholder { color:#aaa; }
 .chat-offline-modal[data-offline-theme="black"] .chat-offline-settings-panel select, .chat-offline-modal[data-offline-theme="black"] .chat-offline-settings-panel textarea, .chat-offline-modal[data-offline-theme="black"] .chat-offline-settings-panel input { border-color:rgba(255,255,255,.18); background:#242424; color:#f5f5f5; }
 
+/* 壁纸取色必须优先于旧主题的固定深色规则，尤其是移动端的线下全屏页。 */
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-topbar,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-scene,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-presence,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-dock,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-summary { color:var(--offline-ink) !important; }
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-topbar > div span,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-topbar h2,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-topbar > button,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-topbar nav button,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-scene-copy > span,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-scene-copy h1,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-scene-copy p,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-scene dt,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-scene dd,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-presence span,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-presence small,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-presence b,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-message-body > span,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-message-text,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-message-text > p,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-empty,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-shortcuts button,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-dock input,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-dock textarea,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings h2,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings p,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings label,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings label b,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings label small,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings input,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings select,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings textarea { color:var(--offline-ink) !important; }
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-dock input::placeholder,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-dock textarea::placeholder { color:var(--offline-muted) !important; }
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-dock form button,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-settings-actions button { color:var(--offline-ink) !important; }
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-dock form button[type="submit"] { color:#fff !important; }
+
+/* 线下设置的字数、人称条目也保持毛玻璃，不使用旧版的纯白控件底色。 */
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-settings > section,
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-settings > section label { background:var(--offline-glass) !important; }
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-settings > section [data-offline-length],
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-settings > section [data-offline-user-person],
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-settings > section [data-offline-character-person] { background:var(--offline-glass-strong) !important; color:var(--offline-ink) !important; }
+
+/* iOS 会给 disabled button 套原生浅灰底，必须显式保留线下玻璃和明暗对比。 */
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-shortcuts button,
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-shortcuts button:disabled { background:rgba(255,255,255,.68) !important; color:#171717 !important; opacity:.82; }
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-shortcuts button,
+.chat-offline-modal.is-fullscreen-modal[data-offline-contrast="dark"] .offline-meeting-v2 .chat-offline-v2-shortcuts button:disabled { background:rgba(12,15,20,.62) !important; color:#fff !important; opacity:.82; }
+
+/* 线下文字大小由设置面板实时控制，连同气泡内的段落和输入框一起应用。 */
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-message-text,
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-message-text > p { font-size:var(--offline-message-font-size,10px) !important; }
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-dock textarea[data-offline-input],
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-dock input[data-offline-input] { font-size:clamp(9px,var(--offline-message-font-size,10px),16px) !important; }
+
+/* 快捷键按屏幕宽度缩放，按钮文案保持单行，避免“继续”被挤到下一行。 */
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-shortcuts button,
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-shortcuts button:disabled {
+  min-width:0;
+  gap:clamp(2px, 1vw, 6px);
+  padding-right:clamp(3px, 1.5vw, 8px);
+  padding-left:clamp(3px, 1.5vw, 8px);
+  font-size:clamp(7px, calc(100vw / 40), 12px) !important;
+  letter-spacing:-.02em;
+  white-space:nowrap !important;
+}
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-shortcuts button > span {
+  min-width:0;
+  overflow:visible;
+  white-space:nowrap !important;
+  font-size:inherit !important;
+}
+.chat-offline-modal.is-fullscreen-modal .offline-meeting-v2 .chat-offline-v2-shortcuts button > svg {
+  width:clamp(10px, calc(100vw / 30), 14px);
+  height:clamp(10px, calc(100vw / 30), 14px);
+}
+
 /* 同人文：先自选故事设定，再生成和保存章节。 */
 .fanfic-app { position:fixed; inset:0; z-index:76; display:none; background:#f3f0f4; color:#403746; }
 .fanfic-app.is-open { display:block; }
@@ -5083,6 +5185,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .chat-conversation > .chat-compose-wrap .chat-compose > .chat-plus .chat-action-icon,
 .chat-conversation > .chat-compose-wrap .chat-compose > .chat-send .chat-action-icon,
 .chat-conversation > .chat-compose-wrap .chat-compose > .chat-reply .chat-action-icon { width:18px !important; height:18px !important; }
+.chat-conversation > .chat-compose-wrap.is-keyboard-lifted { position:relative; z-index:12; transform:translate3d(0,calc(-1 * var(--chat-keyboard-inset,0px)),0); transition:transform .16s ease; will-change:transform; }
 .chat-card-import-box{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;column-gap:16px;row-gap:7px;margin-bottom:18px;padding:14px 16px;border:1px solid rgba(0,0,0,.1);border-radius:16px;background:rgba(248,248,246,.9)}
 .chat-card-import-box>div{display:grid;gap:5px;min-width:0}.chat-card-import-box b{font-size:13px}.chat-card-import-box small,.chat-card-import-note{color:#8c8c88;font-size:11px;line-height:1.5}.chat-card-import-box .chat-file-button{flex:none;white-space:nowrap}.chat-card-import-note{grid-column:1/-1;grid-row:2;margin:0}.chat-editor-sheet .chat-card-import-box{flex-wrap:nowrap}
 .chat-card-import-actions{grid-column:2;grid-row:1;display:flex!important;align-items:center;justify-content:flex-end;gap:10px;margin-left:0}.chat-card-lock{position:relative;display:inline-block;width:24px;height:24px;color:#202020;font-size:0;line-height:1;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10V7a5 5 0 0 1 10 0v3' fill='none' stroke='%23202020' stroke-width='2' stroke-linecap='round'/%3E%3Crect x='4' y='10' width='16' height='11' rx='2' fill='none' stroke='%23202020' stroke-width='2'/%3E%3Ccircle cx='12' cy='15' r='1.2' fill='%23202020'/%3E%3Cpath d='M12 16.2v2' stroke='%23202020' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E") center/24px 24px no-repeat}.chat-card-lock::before,.chat-card-lock::after{display:none}.chat-card-unlock{padding:9px 13px;border:1px solid rgba(0,0,0,.12);border-radius:999px;background:#202020;color:#fff;font:inherit;font-size:12px;cursor:pointer}.chat-card-import-actions .chat-file-button{display:inline-flex;align-items:center;justify-content:center;padding:9px 13px;border-radius:999px;font-size:0}.chat-card-import-actions .chat-file-button::after{content:"\5BFC\5165";font-size:12px}
