@@ -14,15 +14,13 @@
     'ideal-machine-calendar-events': '日历',
     'ideal-machine-image-activity': '生图',
     'ideal-machine-couple': '情侣空间',
-    'ideal-machine-home': '家',
-    'ideal-machine-town': '小镇',
     'ideal-machine-magazine': '杂志社'
   };
   const appSourceSelectors = [
     ['.chat-app', '聊天'], ['.forum-app', '论坛'], ['.calendar-app', '日历'],
     ['.beauty-app', '美化'], ['.settings-app', '设置'], ['.couple-app', '情侣空间'],
-    ['.doubao-app', '豆包'], ['.shopping-app', '购物'], ['.house-app', '家'],
-    ['.town-app', '小镇'], ['.magazine-app', '杂志社'], ['.music-app', '音乐'],
+    ['.doubao-app', '豆包'], ['.shopping-app', '购物'],
+    ['.magazine-app', '杂志社'], ['.music-app', '音乐'],
     ['.ifspace-app', '如果时空'], ['.worldbook-app', '世界书'], ['.memory-library-app', '记忆库'],
     ['.debate-app', '辩论'], ['.fanfic-app', '同人文'], ['.ta-app', 'Ta'], ['.image-app', '生图']
   ];

@@ -1,7 +1,8 @@
 (() => {
   const key = 'ideal-machine-chat';
   const initial = { contacts: [], profiles: [], chats: {}, moments: [], contactGroups: [], emojis: { groups: [{ id: 'emoji-default', name: '默认', items: [] }] } };
-  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let momentFilter = 'all'; let momentBusy = false; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let chatQuote = null;
+  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let chatQuote = null; let chatDraftSaveTimer = 0;
+  let activeContactGroupId = '';
   const app = document.createElement('div'); app.className = 'chat-app';
   app.innerHTML = `<div class="chat-page"><header class="chat-header"><div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">聊天</h1></div><button class="chat-close" data-chat-close type="button">×</button></header><main class="chat-main" id="chatMain"></main><nav class="chat-tabs"><button data-chat-tab="chat" class="is-active" type="button">${tabIcon('chat')}<small>聊天</small></button><button data-chat-tab="contacts" type="button">${tabIcon('contacts')}<small>联系人</small></button><button data-chat-tab="moments" type="button">${tabIcon('moments')}<small>朋友圈</small></button><button data-chat-tab="me" type="button">${tabIcon('me')}<small>我</small></button></nav></div><div class="chat-editor" id="chatEditor" aria-hidden="true"></div><div class="chat-profile-editor" id="chatProfileEditor" aria-hidden="true"></div><div class="chat-thought" id="chatThought" aria-hidden="true"></div><div class="chat-settings" id="chatSettings" aria-hidden="true"></div><div class="chat-moment-composer" id="chatMomentComposer" aria-hidden="true"></div><div class="chat-group-composer" id="chatGroupComposer" aria-hidden="true"></div><div class="chat-role-moment-composer" id="chatRoleMomentComposer" aria-hidden="true"></div><input id="chatImageFile" type="file" accept="image/*" hidden><input id="chatMomentImageFile" type="file" accept="image/*" hidden>`;
   document.body.appendChild(app);
@@ -19,8 +20,26 @@
   function actionIcon(type) { const paths = { back: '<path d="M30 10 16 24l14 14"/>', settings: '<path d="M12 24h.01M24 24h.01M36 24h.01" stroke-width="5"/>', emoji: '<circle cx="24" cy="24" r="16"/><path d="M17 27c2 4 12 4 14 0M18 20h.01M30 20h.01"/>', plus: '<path d="M24 12v24M12 24h24"/>', send: '<path d="m8 23 31-13-9 29-7-13zM8 23l15 3"/>', reply: '<path d="M24 39S8 29 8 18a8 8 0 0 1 15-4 8 8 0 0 1 15 4c0 11-14 21-14 21z"/>' }; return `<svg class="chat-action-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; }
   function readingIcon(type) { const paths = { chapters: '<path d="M10 12h28M10 24h28M10 36h17"/><circle cx="35" cy="36" r="4"/>', night: '<path d="M34 30c-8 1-15-5-15-13 0-3 1-6 3-8-8 1-14 8-14 16 0 9 7 16 16 16 5 0 9-2 12-5 1-2 1-4-2-6z"/>', day: '<circle cx="24" cy="24" r="7"/><path d="M24 6v5M24 37v5M6 24h5M37 24h5M11 11l4 4M33 33l4 4M37 11l-4 4M15 33l-4 4"/>', favorites: '<path d="m24 8 4.9 10 11.1 1.6-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8L19.1 18z"/>', settings: '<path d="M10 13h28M10 24h28M10 35h28"/><circle cx="18" cy="13" r="3"/><circle cx="31" cy="24" r="3"/><circle cx="21" cy="35" r="3"/>' }; return `<svg class="chat-reading-action-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; }
   function read() { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); const profiles = Array.isArray(value.profiles) ? value.profiles.filter(item => !(item.id === 'profile-default' && item.name === '我的设定' && item.persona === '请在这里写下你的性格、身份和说话方式。')) : []; const storedEmojis = Array.isArray(value.emojis) ? { groups: value.emojis } : value.emojis; const emojis = storedEmojis && Array.isArray(storedEmojis.groups) ? storedEmojis : JSON.parse(JSON.stringify(initial.emojis)); return normalizeChatState({ ...initial, ...value, profiles, emojis }); } catch { return normalizeChatState(JSON.parse(JSON.stringify(initial))); } }
-  function normalizeChatState(value) { const result = value && typeof value === 'object' ? value : {}; result.contacts = Array.isArray(result.contacts) ? result.contacts : []; result.contacts.forEach(contact => { contact.groupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; }); result.contactGroups = Array.isArray(result.contactGroups) ? result.contactGroups : []; result.profiles = Array.isArray(result.profiles) ? result.profiles : []; result.chats = result.chats && typeof result.chats === 'object' && !Array.isArray(result.chats) ? result.chats : {}; result.moments = Array.isArray(result.moments) ? result.moments : []; result.moments = result.moments.map(post => ({ ...post, authorType: post.authorType || (post.author === '我' ? 'user' : 'character'), likes: Number(post.likes || 0), comments: Array.isArray(post.comments) ? post.comments : [], visibleGroups: Array.isArray(post.visibleGroups) ? post.visibleGroups : [] })); result.emojis = result.emojis && typeof result.emojis === 'object' ? result.emojis : {}; result.emojis.groups = Array.isArray(result.emojis.groups) ? result.emojis.groups : [{ id: 'emoji-default', name: '默认', items: [] }]; result.emojis.groups.forEach(group => { group.items = (Array.isArray(group.items) ? group.items : []).map(item => ({ ...item, url: cleanEmojiUrl(item?.url) })).filter(item => item.url); }); return result; }
+  function normalizeChatState(value) { const result = value && typeof value === 'object' ? value : {}; result.contacts = Array.isArray(result.contacts) ? result.contacts : []; result.contacts.forEach(contact => { contact.groupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; }); result.contactGroups = Array.isArray(result.contactGroups) ? result.contactGroups : []; result.profiles = Array.isArray(result.profiles) ? result.profiles : []; result.chats = result.chats && typeof result.chats === 'object' && !Array.isArray(result.chats) ? result.chats : {}; result.moments = Array.isArray(result.moments) ? result.moments : []; result.moments = result.moments.map(post => ({ ...post, authorType: post.authorType || (post.author === '我' ? 'user' : 'character'), likes: Number(post.likes || 0), roleLikeIds: Array.isArray(post.roleLikeIds) ? post.roleLikeIds : [], comments: Array.isArray(post.comments) ? post.comments : [], visibleGroups: Array.isArray(post.visibleGroups) ? post.visibleGroups : [] })); result.moments.forEach(post => { if (post.authorType !== 'user' && post.visibility === 'private') post.userOnly = true; if (post.authorType !== 'user' && !['all', 'private'].includes(post.visibility)) post.visibility = 'all'; if (post.authorType !== 'user' && post.userOnly) post.visibility = 'all'; }); result.emojis = result.emojis && typeof result.emojis === 'object' ? result.emojis : {}; result.emojis.groups = Array.isArray(result.emojis.groups) ? result.emojis.groups : [{ id: 'emoji-default', name: '默认', items: [] }]; result.emojis.groups.forEach(group => { group.items = (Array.isArray(group.items) ? group.items : []).map(item => ({ ...item, url: cleanEmojiUrl(item?.url) })).filter(item => item.url); }); return result; }
   function save() { localStorage.setItem(key, JSON.stringify(state)); window.dispatchEvent(new CustomEvent('ideal-machine-chat-updated')); }
+  function cancelChatDraftSave() { if (!chatDraftSaveTimer) return; window.clearTimeout(chatDraftSaveTimer); chatDraftSaveTimer = 0; }
+  function scheduleChatDraftSave() {
+    cancelChatDraftSave();
+    chatDraftSaveTimer = window.setTimeout(() => { chatDraftSaveTimer = 0; save(); }, 400);
+  }
+  function flushChatDraftSave() { if (!chatDraftSaveTimer) return; cancelChatDraftSave(); save(); }
+  let chatObserverFrame = 0;
+  const chatObserverJobs = new Set();
+  function scheduleChatObserverJob(job) {
+    chatObserverJobs.add(job);
+    if (chatObserverFrame) return;
+    chatObserverFrame = window.requestAnimationFrame(() => {
+      chatObserverFrame = 0;
+      const jobs = Array.from(chatObserverJobs);
+      chatObserverJobs.clear();
+      jobs.forEach(task => task());
+    });
+  }
   const nativeChatFetch = window.fetch.bind(window);
   let chatFetch = (input, init = {}) => {
     let next = init;
@@ -45,8 +64,17 @@
   function avatarMarkup(item, extra = '') { const avatar = item?.avatar || ''; return `<div class="chat-avatar ${extra}">${avatar ? `<img src="${esc(avatar)}" alt="${esc(item.name || '角色')}头像">` : esc((item?.name || '角').slice(0, 1))}</div>`; }
   function uid(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
   function time() { return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); }
+  let chatViewRendering = false;
+  let replyExecution = false;
+  const replyingContacts = new Set();
   function currentContactId() { return backgroundReplyContactId || activeContact; }
-  function currentChat() { const contactId = currentContactId(); if (!contactId) return null; state.chats[contactId] ||= { profileId: '', messages: [] }; return state.chats[contactId]; }
+  // `replying` is shared by the layered reply pipeline, while the user can
+  // switch conversations during a background reply. UI state must therefore
+  // be scoped to the conversation that owns the active request.
+  function isContactReplying(contactId = activeContact) {
+    return Boolean(contactId && (replyingContacts.has(contactId) || (replying && (backgroundReplyContactId ? backgroundReplyContactId === contactId : contactId === activeContact))));
+  }
+  function currentChat() { const contactId = chatViewRendering ? activeContact : (replyExecution ? currentContactId() : activeContact); if (!contactId) return null; state.chats[contactId] ||= { profileId: '', messages: [] }; return state.chats[contactId]; }
   function chatUnreadCount(contactId) {
     return (state.chats?.[contactId]?.messages || []).filter(message => message?.role === 'character' && message.unread === true).length;
   }
@@ -144,7 +172,7 @@
     return true;
   }
   function createEmojiGroup() { const name = window.prompt('新分组名称'); if (name?.trim()) { const item = { id: uid('emoji-group'), name: name.trim(), items: [] }; state.emojis.groups.push(item); activeEmojiGroup = item.id; save(); render(); } }
-  function render() { document.querySelectorAll('[data-chat-tab]').forEach(button => button.classList.toggle('is-active', button.dataset.chatTab === activeTab)); const contact = state.contacts.find(item => item.id === activeContact); const chatting = activeTab === 'chat' && Boolean(contact); const topName = contact ? `${contact.nickname || contact.name}${replying ? ' 回复中' : ''}` : ''; document.querySelector('.chat-header').innerHTML = chatting ? `<button class="chat-top-back" data-chat-back type="button">${actionIcon('back')}</button><button class="chat-top-name" data-chat-thought type="button">${esc(topName)}</button><button class="chat-top-settings" data-chat-settings type="button">${actionIcon('settings')}</button>` : `<div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">${({ chat: '聊天', contacts: '联系人', moments: '朋友圈', me: '我' })[activeTab]}</h1></div><button class="chat-close" data-chat-close type="button">×</button>`; app.classList.toggle('is-chatting', chatting); app.classList.toggle('is-emoji-open', emojiOpen); app.classList.toggle('is-menu-open', menuOpen); document.querySelector('#chatMain').innerHTML = ({ chat: renderChat, contacts: renderContacts, moments: renderMoments, me: renderMe })[activeTab](); document.querySelector('[data-emoji-create-group]')?.addEventListener('click', createEmojiGroup); renderEditor(); renderProfileEditor(); renderThought(); renderChatSettings(); renderMomentComposer(); renderGroupComposer(); renderRoleMomentComposer(); }
+  function render() { document.querySelectorAll('[data-chat-tab]').forEach(button => button.classList.toggle('is-active', button.dataset.chatTab === activeTab)); const contact = state.contacts.find(item => item.id === activeContact); const chatting = activeTab === 'chat' && Boolean(contact); const topName = contact ? `${contact.nickname || contact.name}${isContactReplying(activeContact) ? ' 回复中' : ''}` : ''; document.querySelector('.chat-header').innerHTML = chatting ? `<button class="chat-top-back" data-chat-back type="button">${actionIcon('back')}</button><button class="chat-top-name" data-chat-thought type="button">${esc(topName)}</button><button class="chat-top-settings" data-chat-settings type="button">${actionIcon('settings')}</button>` : `<div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">${({ chat: '聊天', contacts: '联系人', moments: '朋友圈', me: '我' })[activeTab]}</h1></div><button class="chat-close" data-chat-close type="button">×</button>`; app.classList.toggle('is-chatting', chatting); app.classList.toggle('is-emoji-open', emojiOpen); app.classList.toggle('is-menu-open', menuOpen); document.querySelector('#chatMain').innerHTML = ({ chat: renderChat, contacts: renderContacts, moments: renderMoments, me: renderMe })[activeTab](); document.querySelector('[data-emoji-create-group]')?.addEventListener('click', createEmojiGroup); renderEditor(); renderProfileEditor(); renderThought(); renderChatSettings(); renderMomentComposer(); renderGroupComposer(); renderRoleMomentComposer(); }
   function worldbookOptions(selected) { try { const data = JSON.parse(localStorage.getItem('ideal-machine-worldbooks') || '{}'); const books = data.local || []; return books.map(book => `<option value="${esc(book.id)}" ${book.id === selected ? 'selected' : ''}>${esc(book.name)}</option>`).join(''); } catch { return ''; } }
   function decodeBase64Text(value) { try { const binary = atob(String(value || '').replace(/\s/g, '')); const bytes = Uint8Array.from(binary, char => char.charCodeAt(0)); return new TextDecoder().decode(bytes); } catch { return ''; } }
   function pngTextChunks(bytes) {
@@ -629,6 +657,27 @@ ${boundWorldbookContext(contact)}
     return saved.slice().sort((a, b) => (order.get(String(a.key)) ?? Number.MAX_SAFE_INTEGER) - (order.get(String(b.key)) ?? Number.MAX_SAFE_INTEGER));
   }
   function chatApiConfig(chat = currentChat()) { try { const settings = JSON.parse(localStorage.getItem('ideal-machine-settings') || '{}').api || {}; const profile = settings.profiles?.find(item => item.id === chat?.apiProfileId); return profile ? { endpoint: profile.endpoint, key: profile.key } : window.IdealMachineAPI?.getConfig?.(); } catch { return window.IdealMachineAPI?.getConfig?.(); } }
+  function thoughtModelsFor(chat) {
+    let api = {};
+    try { api = JSON.parse(localStorage.getItem('ideal-machine-settings') || '{}').api || {}; } catch {}
+    const profile = (api.profiles || []).find(item => item.id === chat?.apiProfileId) || (api.profiles || []).find(item => item.id === api.activeProfileId);
+    const source = profile || api;
+    // `availableModels` is the fetched catalog; only `selected` is the saved
+    // "保留模型" list. Older profiles stored that list under `models`.
+    const retained = Array.isArray(source.selected) ? source.selected : source.models;
+    return [...new Set((Array.isArray(retained) ? retained : []).filter(model => typeof model === 'string' && model.trim()))];
+  }
+  function thoughtApiFor(chat) {
+    let api = {};
+    try { api = JSON.parse(localStorage.getItem('ideal-machine-settings') || '{}').api || {}; } catch {}
+    const profile = (api.profiles || []).find(item => item.id === chat?.apiProfileId) || (api.profiles || []).find(item => item.id === api.activeProfileId);
+    const configuredModels = thoughtModelsFor(chat);
+    const selectedModel = String(chatSettingsFor(chat).thoughtModel || '');
+    return {
+      config: chatApiConfig(chat),
+      model: selectedModel && configuredModels.includes(selectedModel) ? selectedModel : (configuredModels.includes(profile?.assignments?.thought || api.assignments?.thought) ? (profile?.assignments?.thought || api.assignments?.thought) : configuredModels[0] || '')
+    };
+  }
   function renderThought() {
     const panel = document.querySelector('#chatThought');
     if (!panel) return;
@@ -672,8 +721,10 @@ ${boundWorldbookContext(contact)}
       return;
     }
     if (!force && thoughtKey === key && thoughtText) { renderThought(); return; }
-    const config = chatApiConfig(chat);
-    const model = window.IdealMachineAPI?.getModel?.('thought') || window.IdealMachineAPI?.getModel?.('chat');
+    if (chatSettingsFor(chat).thoughtEnabled === false) return;
+    const thoughtApi = thoughtApiFor(chat);
+    const config = thoughtApi.config;
+    const model = thoughtApi.model;
     if (!config?.endpoint || !config.key || !model) {
       thoughtText = '请先在设置中配置聊天 API。'; thoughtKey = key; renderThought(); return;
     }
@@ -1023,14 +1074,121 @@ ${roundText}
   function renderRoleMomentComposer() { const panel = document.querySelector('#chatRoleMomentComposer'); if (!panel) return; panel.classList.toggle('is-open', roleMomentComposerOpen); panel.setAttribute('aria-hidden', String(!roleMomentComposerOpen)); if (!roleMomentComposerOpen) { panel.innerHTML = ''; return; } const imageConfig = window.IdealMachineImageAPI?.getConfig?.() || {}; const imageReady = Boolean(imageConfig.endpoint && imageConfig.model); panel.innerHTML = `<div class="chat-moment-composer-backdrop" data-chat-role-moment-close></div><section class="chat-moment-composer-card"><header><div><span class="chat-kicker">ROLE MOMENTS</span><h2>生成角色动态</h2><small>由角色自己决定动态内容和可见范围。</small></div><button data-chat-role-moment-close type="button">×</button></header><main><button class="chat-role-action-choice" data-chat-role-target="random" type="button"><span><b>随机角色</b><small>选择本次发帖人数</small></span><i>${roleMomentMode === 'random' ? '✓' : '›'}</i></button><div class="chat-role-random-count" data-chat-role-random-count ${roleMomentMode === 'random' ? '' : 'hidden'}><label>发帖角色人数<select id="chatRoleMomentCount">${Array.from({ length: Math.max(1, state.contacts.length) }, (_, index) => `<option value="${index + 1}" ${roleMomentCount === index + 1 ? 'selected' : ''}>${index + 1} 人</option>`).join('')}</select></label></div><button class="chat-role-action-choice" data-chat-role-target="select" type="button"><span><b>指定角色</b><small>点击后可多选角色</small></span><i>${roleMomentMode === 'select' ? '✓' : '›'}</i></button><div class="chat-role-list chat-role-avatar-list" data-chat-role-list ${roleMomentMode === 'select' ? '' : 'hidden'}>${state.contacts.length ? state.contacts.map(contact => `<label class="chat-role-choice"><input type="checkbox" data-chat-role-target="${esc(contact.id)}" ${roleMomentTargets.includes(contact.id) ? 'checked' : ''}><span>${avatarMarkup(contact, 'chat-role-select-avatar')}<small>${esc(contact.nickname || contact.name)}</small></span></label>`).join('') : '<small>请先添加角色。</small>'}</div><label class="chat-role-action-choice chat-role-image-toggle"><span><b>同时生成配图</b><small>${imageReady ? '根据本次动态生成一张配图' : '请先在设置中配置生图 API'}</small></span><i aria-hidden="true"></i><input type="checkbox" data-chat-role-moment-image ${imageReady ? '' : 'disabled'} ${roleMomentWithImage ? 'checked' : ''}></label></main><footer><button data-chat-role-moment-close type="button">取消</button><button data-chat-role-moment-save type="button">生成动态</button></footer></section>`; }
   function renderMoments() { const filters = [['all', '全部'], ['mine', '我的'], ['role', '角色'], ['image', '图片']]; const posts = state.moments.filter(post => (post.visibility !== 'private' && post.visibility !== 'character') || post.authorType === 'user').filter(post => momentFilter === 'all' || (momentFilter === 'mine' && post.authorType === 'user') || (momentFilter === 'role' && post.authorType !== 'user') || (momentFilter === 'image' && post.image)); const profile = momentProfile(); return `<section class="chat-moment-hero"><div class="chat-moment-hero-avatar">${avatarMarkup({ name: profile.nickname || profile.realName || '我', avatar: profile.avatar })}</div><div class="chat-moment-hero-copy"><span class="chat-kicker">MOMENTS</span><h2>朋友圈</h2><p>所有角色共享同一个朋友圈身份。</p><button class="chat-moment-profile-edit" data-chat-moment-profile type="button">${profile.nickname || profile.realName ? '编辑朋友圈用户' : '设置朋友圈用户'}</button></div></section><div class="chat-moment-actions"><button data-chat-post type="button">＋ 发布动态</button><button data-chat-role-post type="button" ${momentBusy ? 'disabled' : ''}>${momentBusy ? '生成中…' : '✦ 生成角色动态'}</button></div><div class="chat-moment-filters">${filters.map(([id, label]) => `<button class="${momentFilter === id ? 'is-active' : ''}" data-chat-moment-filter="${id}" type="button">${label}</button>`).join('')}</div><div class="chat-moments">${posts.length ? posts.map(renderMomentPost).join('') : '<div class="chat-empty small"><div class="chat-empty-mark">◌</div><h2>这里还没有动态</h2><p>发布一条动态，或者让角色写下今天的片段。</p></div>'}</div>`; }
   async function generateMomentRolePost() { const contact = state.contacts.find(item => item.id === activeContact) || state.contacts[0]; if (!contact) return window.alert('请先添加角色。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。'); momentBusy = true; render(); const chat = state.chats[contact.id] || {}; const recent = (chat.messages || []).slice(-12).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name}：${item.type === 'text' ? item.text : `[${item.type || '消息'}]`}`).join('\n') || '最近没有聊天记录。'; const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }); const prompt = `请为角色“${contact.nickname || contact.name}”生成一条自然的朋友圈动态。只输出动态正文，不要标题、引号、解释或 JSON。控制在 1—3 句，像角色本人在发帖，可带一点当天的情绪和生活细节。\n\n角色设定：${contact.details || contact.signature || '暂无角色设定'}\n当天状态：${today}\n最近聊天内容：\n${recent}\n\n只依据以上三类信息创作，不要读取、引用或推测任何世界书内容。`; try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .9, messages: [{ role: 'system', content: '你是角色朋友圈文案助手。' }, { role: 'user', content: prompt }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const text = String(data.choices?.[0]?.message?.content || '').replace(/^['“”"\s]+|['“”"\s]+$/g, '').trim(); if (!text) throw new Error('API 没有返回内容'); state.moments.unshift({ id: uid('moment'), author: contact.nickname || contact.name, realName: contact.name, authorType: 'character', authorId: contact.id, avatar: contact.avatar || '', text, time: time(), likes: 0, comments: [] }); save(); } catch (error) { window.alert(`角色动态生成失败：${error.message}`); } finally { momentBusy = false; render(); } }
-  async function generateRoleInteraction(post) { const candidates = state.contacts.filter(item => item.id !== post.authorId); const contact = candidates[Math.floor(Math.random() * candidates.length)] || state.contacts[0]; if (!contact) return window.alert('请先添加角色。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。'); momentBusy = true; render(); const chat = state.chats[contact.id] || {}; const recent = (chat.messages || []).slice(-8).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name}：${item.text || '[消息]'}`).join('\n') || '暂无聊天记录。'; const prompt = `请让角色“${contact.nickname || contact.name}”决定如何与这条朋友圈互动。只能输出 JSON：{"action":"like"} 或 {"action":"comment","text":"评论内容"}。角色可以选择点赞或评论，不要解释。\n动态作者：${post.author || '用户'}\n动态内容：${post.text || '[图片动态]'}\n角色设定：${contact.details || contact.signature || '暂无'}\n最近聊天：${recent}\n当天状态：${new Date().toLocaleDateString('zh-CN')}\n${boundWorldbookContext(contact)}`; try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: '你是角色朋友圈互动决策助手，只返回 JSON。' }, { role: 'user', content: prompt }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim(); let decision; try { decision = JSON.parse(raw); } catch { decision = { action: 'like' }; } if (decision.action === 'comment' && decision.text) { post.comments ||= []; post.comments.push({ id: uid('comment'), author: contact.nickname || contact.name, text: decision.text.trim(), authorType: 'character', authorId: contact.id, time: time() }); } else { post.likes = Number(post.likes || 0) + 1; post.roleLikes = Number(post.roleLikes || 0) + 1; } save(); } catch (error) { window.alert(`角色互动失败：${error.message}`); } finally { momentBusy = false; render(); } }
+  async function generateRoleInteraction(post) { const candidates = state.contacts.filter(item => item.id !== post.authorId); const contact = candidates[Math.floor(Math.random() * candidates.length)] || state.contacts[0]; if (!contact) return window.alert('请先添加角色。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。'); momentBusy = true; render(); const chat = state.chats[contact.id] || {}; const recent = (chat.messages || []).slice(-8).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name}：${item.text || '[消息]'}`).join('\n') || '暂无聊天记录。'; const prompt = `请让角色“${contact.nickname || contact.name}”决定如何与这条朋友圈互动。只能输出 JSON：{"action":"like"} 或 {"action":"comment","text":"评论内容"}。角色可以选择点赞或评论，不要解释。\n动态作者：${post.author || '用户'}\n动态内容：${post.text || '[图片动态]'}\n角色设定：${contact.details || contact.signature || '暂无'}\n最近聊天：${recent}\n当天状态：${new Date().toLocaleDateString('zh-CN')}\n${boundWorldbookContext(contact)}`; try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: '你是角色朋友圈互动决策助手，只返回 JSON。' }, { role: 'user', content: prompt }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim(); let decision; try { decision = JSON.parse(raw); } catch { decision = { action: 'like' }; } if (decision.action === 'comment' && decision.text) { post.comments ||= []; post.comments.push({ id: uid('comment'), author: contact.nickname || contact.name, text: decision.text.trim(), authorType: 'character', authorId: contact.id, time: time() }); } else { post.roleLikeIds = Array.isArray(post.roleLikeIds) ? post.roleLikeIds : []; if (!post.roleLikeIds.includes(contact.id)) { post.roleLikeIds.push(contact.id); post.likes = Number(post.likes || 0) + 1; post.roleLikes = Number(post.roleLikes || 0) + 1; } } save(); } catch (error) { window.alert(`角色互动失败：${error.message}`); } finally { momentBusy = false; render(); } }
   const rawGenerateRoleMoment = generateRoleMoment;
-  async function generateRoleMomentWithVisibility(contactId, targetPost = null) { if (targetPost) return rawGenerateRoleMoment(contactId, targetPost); await rawGenerateRoleMoment(contactId); const post = state.moments[0]; const contact = state.contacts.find(item => item.id === post?.authorId); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!post || !contact || !config?.endpoint || !config.key || !model) return; try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .7, messages: [{ role: 'system', content: '你决定角色朋友圈的可见范围，只输出 PUBLIC 或 PRIVATE。' }, { role: 'user', content: `角色：${contact.nickname || contact.name}\n动态：${post.text}\n角色设定：${contact.details || contact.signature || ''}\n${boundWorldbookContext(contact)}\n请根据角色性格决定是所有人可见还是仅角色可见。` }] }) }); const data = await response.json(); post.visibility = String(data.choices?.[0]?.message?.content || '').toUpperCase().includes('PRIVATE') ? 'character' : 'all'; save(); render(); } catch {} }
+  async function generateRoleMomentWithVisibility(contactId, targetPost = null) {
+    momentGenerationDepth += 1;
+    momentBusy = true;
+    render();
+    try {
+      if (targetPost) return await rawGenerateRoleMoment(contactId, targetPost);
+      await rawGenerateRoleMoment(contactId);
+      const post = state.moments[0];
+      if (!post) return;
+      // 角色动态只保留“所有人可见 / 仅用户可见”两种范围，且大概率公开。
+      post.userOnly = Math.random() < 0.18;
+      post.visibility = 'all';
+      save();
+    } finally {
+      momentGenerationDepth = Math.max(0, momentGenerationDepth - 1);
+      if (!momentGenerationDepth) { momentBusy = false; render(); }
+    }
+  }
   generateRoleMoment = generateRoleMomentWithVisibility;
   const singleRoleMomentGenerator = generateRoleMoment;
   generateRoleMoment = async (contactId, targetPost = null) => { if (targetPost) return singleRoleMomentGenerator(contactId, targetPost); const ids = roleMomentMode === 'select' ? roleMomentTargets.slice() : Array.from({ length: Math.min(roleMomentCount, Math.max(1, state.contacts.length)) }, () => null); if (roleMomentMode === 'select' && !ids.length) return window.alert('请至少选择一个角色。'); for (const id of ids) await singleRoleMomentGenerator(id); };
   function boundWorldbookContext(contact) { try { const data = JSON.parse(localStorage.getItem('ideal-machine-worldbooks') || '{}'); const book = (data.local || []).find(item => item.id === contact?.worldbook); if (!book) return '未绑定局部世界书。'; const entries = (book.entries || []).filter(entry => entry.enabled !== false); return entries.length ? `绑定局部世界书：${book.name}\n${entries.map(entry => `${entry.name}：${entry.content}`).join('\n')}` : `绑定局部世界书：${book.name}\n当前没有启用的世界书条目。`; } catch { return '未绑定局部世界书。'; } }
-  async function generateRoleMoment(contactId, targetPost = null) { const contact = state.contacts.find(item => item.id === contactId) || state.contacts[Math.floor(Math.random() * state.contacts.length)]; if (!contact) return window.alert('请先添加角色。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。'); momentBusy = true; render(); const chat = state.chats[contact.id] || {}; const recent = (chat.messages || []).slice(-12).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name}：${item.text || `[${item.type || '消息'}]`}`).join('\n') || '最近没有聊天记录。'; const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }); const prompt = targetPost ? `请让角色“${contact.nickname || contact.name}”评论这条朋友圈，只输出评论正文，控制在1—2句。朋友圈内容：${targetPost.text || '[图片动态]'}\n角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：${recent}\n${boundWorldbookContext(contact)}\n请结合以上信息，不要提及你看到了世界书。` : `请为角色“${contact.nickname || contact.name}”生成一条自然的朋友圈动态，只输出正文，控制在1—3句。角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：\n${recent}\n${boundWorldbookContext(contact)}\n请结合角色绑定的局部世界书创作，不要提及世界书。`; try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .85, messages: [{ role: 'system', content: '你是角色朋友圈互动助手。' }, { role: 'user', content: prompt }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const text = String(data.choices?.[0]?.message?.content || '……').replace(/^['“”"\s]+|['“”"\s]+$/g, '').trim(); if (targetPost) { targetPost.comments ||= []; targetPost.comments.push({ id: uid('comment'), author: contact.nickname || contact.name, text, authorType: 'character', authorId: contact.id, time: time() }); } else state.moments.unshift({ id: uid('moment'), author: contact.nickname || contact.name, realName: contact.name, authorType: 'character', authorId: contact.id, avatar: contact.avatar || '', text, visibility: 'character', time: time(), likes: 0, comments: [] }); save(); } catch (error) { window.alert(`角色互动生成失败：${error.message}`); } finally { momentBusy = false; render(); } }
+  const offlineWritingStyleKey = 'ideal-machine-if-writing-styles';
+  const offlineWritingStyles = {
+    natural: { name:'自然细腻', prompt:'[CRAFT REFERENCES] Draw only on broad, non-copying techniques: Wang Zengqi\'s use of food, objects, weather, and local routines to make a setting credible, with feeling carried by what people do; and Chekhov\'s use of hesitation, self-correction, ineffective gestures, and material circumstances to reveal contradiction without diagnosing the character. [BLENDING METHOD] Select two or three concrete details already present in the scene, then let action and dialogue change the relationship. Narrate only what the viewpoint character can presently perceive. Do not name an emotion when behavior can carry it. Vary sentence length with the speed of action. End on a specific change that remains open to response.' },
+    cinematic: { name:'电影感', prompt:'[CRAFT REFERENCES] Draw only on broad, non-copying techniques: the distance between surface dialogue and actual intent in Hemingway\'s Hills Like White Elephants, where pauses and evasions carry crucial information; and the clear blocking, physical action, and object states used to propel scenes in Dashiell Hammett\'s The Maltese Falcon. [BLENDING METHOD] Establish the positions of people, exits, and consequential objects, then alternate action, dialogue, and environmental consequence. Use shorter sentences under pressure and longer observation during quiet intervals. Never use camera terminology. Do not explain what the visible action has already established. [ORIGINAL DEMONSTRATION — NEVER COPY OR PARAPHRASE] The lock clicked twice. Fang Yikai did not turn around. He slid the second cup behind the newspaper.' },
+    literary: { name:'文学抒情', prompt:'[CRAFT REFERENCES] Draw only on broad, non-copying techniques: Shen Congwen\'s integration of landscape, daily order, and human fate in Border Town; Calvino\'s structural repetition and light conceptual architecture in Invisible Cities; and Virginia Woolf\'s close sensory attention, where a present object briefly opens memory before returning to the room. [BLENDING METHOD] Images must come from objects that truly exist in the current scene and must later affect meaning or action. Perception and memory may briefly overlap, but narration must promptly return to physical space and ongoing action. Keep figurative language sparse. Never announce a theme or moral. [ORIGINAL DEMONSTRATION — NEVER COPY OR PARAPHRASE] At the sixth bell, Su Qian folded the letter along its old crease. The umbrellas below had dispersed; the cut left by the paper still marked her finger.' },
+    concise: { name:'克制简洁', prompt:'[CRAFT REFERENCES] Draw only on broad, non-copying techniques: Hemingway\'s omission of explanation so facts, actions, and dialogue carry subtext; and Raymond Carver\'s use of kitchens, bills, ashtrays, and unfinished speech to create relational pressure. [BLENDING METHOD] Prefer exact verbs and concrete nouns. Remove modifiers that do not change meaning. Each paragraph completes one action or exchange without restating known information. Dialogue may be brief, but it needs a clear addressee and immediate purpose. Silence must be shown through an interrupted action, an unanswered question, or unfinished work. [ORIGINAL DEMONSTRATION — NEVER COPY OR PARAPHRASE] He finished reading the bill and placed his phone facedown. “Next month.” The refrigerator stopped humming. The tap continued to drip.' },
+    suspense: { name:'悬疑紧张', prompt:'[CRAFT REFERENCES] Draw only on broad, non-copying techniques: Agatha Christie\'s control over the order of clues, allowing ordinary details to acquire new meaning later; Borges\'s use of catalogues, maps, mirrored structures, and branching time; and Edgar Allan Poe\'s accumulation of pressure through enclosed spaces, recurring sounds, and altered objects. [BLENDING METHOD] Add only one verifiable fact per paragraph. Clues must arise from behavior, spatial change, object state, or conflicting testimony. Misdirection must remain retrospectively explainable; never invent the answer at the reveal. Fear should grow from narrowing choices, not exaggerated emotional vocabulary. [ORIGINAL DEMONSTRATION — NEVER COPY OR PARAPHRASE] The roster showed that no one entered the archive overnight. Fang Yikai turned it over. His signature appeared beside 3:00 a.m., and the ink had not dried.' },
+    daily: { name:'生活流', prompt:'[CRAFT REFERENCES] Draw only on broad, non-copying techniques: Wang Zengqi\'s attention to food, seasons, and practiced hands; Lao She\'s dialogue shaped by profession, social position, and relational distance; and Jane Austen\'s judgments, misunderstandings, and social calibration beneath polite speech. [BLENDING METHOD] Build scenes around meals, travel, errands, tidying, and pauses in work. Let relationships shift through forms of address, division of labor, avoidance, jokes, and minor friction. Dialogue may pause, self-correct, or answer sideways. Do not manufacture quotable aphorisms. [ORIGINAL DEMONSTRATION — NEVER COPY OR PARAPHRASE] Su Qian said she did not eat breakfast. Ten minutes later, she took half a slice of toast from Fang Yikai\'s plate. He moved the jam toward her without comment.' },
+    classical: { name:'古风通用', prompt:'[CRAFT REFERENCES] Draw only on broad, non-copying techniques: the concise record of consequential action in Zuo Zhuan, where speech, rank, and timing alter a political situation; and the attention to everyday procedures, social obligation, and material life in The Scholars. Borrow methods of scene construction only, never their wording, characters, or plots. [SCOPE] Write original Chinese historical or historically inspired prose suited to the established dynasty, region, class, and character. Use restrained period-appropriate vocabulary and forms of address; do not assume an imperial court, martial world, or supernatural system unless the setting provides one. [BLENDING METHOD] Ground each scene in work, etiquette, travel, documents, tools, food, and the consequences of a concrete choice. Let dialogue reflect rank, intimacy, education, and circumstance without turning everyone into the same archaic voice. Balance lucid modern readability with occasional compact classical phrasing; never produce pseudo-classical word salad, gratuitous poetry, modern slang, or anachronistic objects. Build tension through what a character can say publicly versus what they can do privately. Keep action and spatial continuity clear. [ORIGINAL DEMONSTRATION — NEVER COPY OR PARAPHRASE] The clerk left the last column blank. Outside the hall, the messenger shook rain from his sleeves and waited until the seal was dry before speaking. [CHECK] Obey the actual worldbook, POV, character boundaries, length, and anti-cliche rules; style never invents history or overrides characterization.' }
+  };
+  const offlineStyleExecutionFramework = `\n[SCOPE] Apply this style to relationships, psychological change, physical action, and continuous narrative. Style governs narrative organization and verbal texture only. It must never overwrite a character's education, personality, knowledge, identity, or habitual voice.\n[RESPONSIBILITY BOUNDARIES] Plot determines what happens. Character data determines what a character knows and would do. Style determines which details receive attention, when information appears, and how sentences carry relational change. Never grant a character knowledge outside the established setting. Never use narration to make the character deliver the author's opinion.\n[PARAGRAPH ENGINE] Every paragraph must create a verifiable change: position, object state, new information, relational distance, an executed decision, or a revised judgment. Begin from the current scene, develop action or cognition, and end on a fact that permits the next response. Atmosphere without progression is insufficient.\n[DETAIL ADMISSION RULE] Keep a detail only when it affects a choice, changes the meaning of a line, exposes a relational habit, plants a later clue, or revises the reader's judgment. Remove decorative clothing, weather, streetscape, and furnishing details with no function. Prefer precise nouns to chains of adjectives, while respecting the character's era, profession, and knowledge.\n[PSYCHOLOGICAL SEQUENCE] First show the observable trigger. Then show judgment, self-defense, or hesitation. Finally let action carry the consequence. A character may misunderstand themself; narration must not turn conflict into a diagnosis or life lesson.\n[DIALOGUE FUNCTION] Every spoken line must perform at least one task: ask, evade, test, refuse, confirm, redirect, or alter the relationship. Length follows character habit and scene pressure. Silence must cause a consequence and appear through interrupted action, a displaced answer, or unfinished work.\n[EXAMPLE BOUNDARY] Any examples are craft demonstrations only. Never copy or closely paraphrase their names, object combinations, sentence endings, or relational situations. Derive all new material from the current characters, location, era, and history.\n[FINAL SELF-CHECK] Check every paragraph for concrete progression, clear pronoun reference, out-of-character knowledge, actions or thoughts imposed on the user, duplicated emotional explanation, decorative sentences removable without loss, and whether the ending preserves space for the user to act.`;
+  const offlineAntiClichePrompt = `共同使用 if 时空的八股禁用规则：不写空泛升华、总结用户、连续排比、形容词堆叠或没有信息的抒情句；避免预制比喻和“像……一样”“像是……”“仿佛”“不是……而是……”等模板；不要用“命运齿轮、空气凝固、这一刻成为永恒”等套话，也不要用“泛白、极其、一丝、不易察觉、不容置疑、共犯、震动”等空泛表达充当情绪。把抽象情绪改成可观察的动作、距离、重量、光线、手、视线和声音。人设只能通过选择、习惯、语气和反应呈现，不能把角色卡改写成自我介绍。每段必须有具体推进：位置、物件状态、新信息、关系距离、执行的决定或新的判断至少改变一项；删掉不影响剧情的装饰描写。不得代替用户决定动作、心理、感受或台词。输出前在内部自检并改写，不输出分析过程。`;
+  const offlineLegacyReplyPreset = '保持自然、细腻、有现场感的表达，结合角色性格回应，不要机械复述。';
+  const offlineDefaultReplyPreset = `【线下角色回复总规则】
+你正在以 {{char_name}} 的身份参与一段仍在继续的线下剧情。{{user_name}} 是现场中的用户，不是由你操控的配角。你的任务是让这一轮真实发生、自然向前，并留下下一步可以继续发展的空间；不要把一次回复写成总结、结局或作者说明。
+
+【一、资料读取顺序】
+1. 先读取 {{world_background}}，确认时代、地点、社会秩序、特殊规则、现实限制和正在影响人物的主要矛盾。这里有内容时，以它作为世界背景的首要依据。
+2. 如果世界背景为空，才根据角色设定中的身份、经历、职业、生活环境、关系和已知事实谨慎整理背景。不能因为常识、类型惯例或模型记忆擅自增加关键设定。
+3. 背景确认后，读取 {{char_name}} 的完整人设、{{user_name}} 的用户设定、线上聊天背景、线下历史、当前地点、见面原因、角色状态、字数和人称要求。
+4. 最后处理用户本轮输入，判断其中哪些是说话、哪些是动作、哪些是叙事补充、哪些只是情绪或意图。不要把角色无法看见或听见的叙事信息当成角色已经知道的事实。
+
+【二、人物身份与信息边界】
+你只能扮演 {{char_name}}。角色说什么、做什么、知道什么，都必须能从角色人设、个人经历、当前关系、已经发生的事件和现场可获得的信息中成立。角色可以误解、犹豫、隐瞒、试探或判断失误，但不能凭空获得幕后信息，也不能因为提示词知道用户没有表达的秘密。
+
+{{char_name}} 的身份要通过选择、习惯、语气、行动方式、关注的细节和对关系的处理体现，不要把人设逐条念成自我介绍。不要为了强调设定强行加入口癖、标签、职业术语或夸张行为；只有当前场景确实触发时才使用。
+
+{{user_name}} 的行动、心理、感觉、决定、对白和身体反应属于用户控制范围。你可以描写角色如何看见、听见或理解用户已经给出的内容，也可以写角色的猜测，但不能替用户补写下一步，更不能让用户自动接受、同意、脸红、害怕、沉默或完成某个动作。
+
+【三、先在内部完成本轮判断】
+不要展示分析，但生成前必须完成以下判断：
+- 用户这句话或这个动作真正改变了什么；
+- 角色此刻最直接的感知是什么，随后产生了怎样的解释、联想、欲望、顾虑和取舍；
+- 角色和用户当前的关系距离、未解决的问题、正在形成的期待或冲突是什么；
+- 角色依据自身性格会选择靠近、回避、确认、试探、转移、拒绝、妥协还是采取具体行动；
+- 这个选择会造成什么可见后果，并把哪一个变化交给下一轮继续。
+
+心理必须为行动、对白或判断服务。不要把“他很复杂”“气氛很暧昧”“两人关系发生变化”当作变化本身，要让读者从语气、停顿、动作、距离、物件状态或新的信息中看见变化。
+
+【四、剧情推进与节奏】
+每一轮至少推进一项：角色位置改变、现场物件改变、信息被确认或误读、关系距离改变、角色做出实际决定、外部事务介入、一个未解决的问题获得新的方向。没有变化的环境描写、重复的情绪确认和对上一轮的同义改写都应删除。
+
+当前正在发生的冲突、决定和关系转折可以放慢，写清触发、反应、选择和结果；没有张力的移动、等待和日常过渡应适当压缩，不要让角色原地循环。段落长短随事件速度变化，避免整篇挤成一块，也避免为了分段而把一句完整动作拆碎。
+
+结尾停在角色侧、现场侧或事件侧已经发生的具体变化上：一个动作开始、一个信息出现、一个现实问题进入、一个决定造成后果，或一个关系状态被重新摆放。不要用提问、催促、等待用户决定、替用户回答或空泛感情总结来制造所谓开放结尾。
+
+【五、现场与文风】
+本轮现场资料：
+{{scene}}
+
+使用以下文风要求，但文风只能改变叙述的取景、节奏、句法密度、细节取舍和语言质地，不能覆盖角色性格、时代知识、身份边界或人物惯用说话方式：
+{{writing_style}}
+
+线上聊天背景：
+{{online_chat}}
+
+线下已经发生：
+{{offline_history}}
+
+【六、文字执行要求】
+回复目标篇幅约 {{reply_length}} 字，通常应达到目标字数的 80%—110%，这里是创作目标而不是单纯的上限；除非剧情确实已经完整结束，不要只写一小段就停止。用户叙述使用“{{user_person}}”，角色叙述使用“{{char_person}}”。优先写当前能被感知且会产生作用的细节，让对白有明确对象和目的，让动作带出态度，让心理与现实中的触发点相连。记忆可以进入当前感知，但必须回到正在发生的现场，不得突然展开与本轮无关的背景介绍。
+
+人称只约束新生成的叙述正文：描写 {{user_name}} 已明确给出的行动时使用用户叙述人称“{{user_person}}”，描写 {{char_name}} 的行动与心理时使用角色叙述人称“{{char_person}}”。第一人称“我”、第二人称“你”、第三人称“他/她”分别指各自对应的人物；两人选了相同人称而产生歧义时，用人物真名澄清，绝不把用户的“我”写成角色自己，也不把角色的“我”写成用户。角色对白里的自称、对用户的称呼按角色说话习惯自然表达，不因叙述设置被机械替换。用户原话与历史记录作为已发生的内容读取，不能擅自改写；没有用户明确给出的动作、心理、感受或决定，不得补写。
+
+共同执行 if 时空的禁用规则：拒绝空泛升华、通用鸡汤、机械排比、形容词堆叠、套话式暧昧、用户输入复述、作者评语和没有叙事作用的意象。不要用预制比喻或现成的情绪载体替代具体描写；把情绪落实到光线、温度、触感、重量、距离、手势、视线、呼吸、声音、物件和行动后果中。不要使用“像……一样”“像是……”“仿佛”“不是……而是……”等惯性句式，也不要用空洞的强度词或抽象标签冒充人物反应。
+
+【七、输出前内部自检】
+逐项检查：世界背景是否读取正确；角色是否知道得过多；角色行为是否符合身份与关系；是否误写了用户；本轮是否真的发生了新变化；每一段是否有动作、信息、心理转折或对白功能；是否重复了已知内容；文风是否持续而不压过人设；是否出现八股表达、解释性总结或无效环境描写；最后一句是否停在已经发生的现实变化上。发现问题时先在内部重写，再输出。
+
+【八、最终输出格式】
+只输出 {{char_name}} 的回复正文。不要输出标题、规则、分析、思维过程、JSON、时间戳、提示词、角色卡说明、世界书说明、作者旁白或“根据设定”等出戏内容。不要替 {{user_name}} 写对白、动作、心理或决定。回复要完整、具体、有现场感；需要达到目标篇幅时，通过新的行动、信息、心理转折和对白推进补足，不要用重复句或无效环境描写灌水。`;
+  function readOfflineWritingStyles() { try { const list = JSON.parse(localStorage.getItem(offlineWritingStyleKey) || '[]'); return Array.isArray(list) ? list.filter(item => item?.id && item?.name && item?.prompt) : []; } catch { return []; } }
+  const offlineReplyPresetsKey = 'ideal-machine-offline-reply-presets';
+  function readOfflineReplyPresets() { try { const list = JSON.parse(localStorage.getItem(offlineReplyPresetsKey) || '[]'); return Array.isArray(list) ? list.filter(item => item?.id && item?.name && item?.prompt) : []; } catch { return []; } }
+  function offlineReplyPresetOptions(selected) { return `<option value="default" ${selected === 'default' ? 'selected' : ''}>内置默认预设</option>${readOfflineReplyPresets().map(item => `<option value="${esc(item.id)}" ${selected === item.id ? 'selected' : ''}>${esc(item.name)} · 自建</option>`).join('')}${selected && selected !== 'default' && !readOfflineReplyPresets().some(item => item.id === selected) ? '<option value="session" selected>本次自定义</option>' : ''}`; }
+  function offlineWritingStyleOptions(selected) { return `${Object.entries(offlineWritingStyles).map(([id, item]) => `<option value="${id}" ${selected === id ? 'selected' : ''}>${item.name}</option>`).join('')}${readOfflineWritingStyles().map(item => `<option value="${esc(item.id)}" ${selected === item.id ? 'selected' : ''}>${esc(item.name)} · 自定义</option>`).join('')}`; }
+  function offlineWritingStyle(session) { const id = session.writingStyleId || 'natural'; const custom = readOfflineWritingStyles().find(item => item.id === id); const preset = custom || offlineWritingStyles[id] || offlineWritingStyles.natural; const prompt = session.writingStylePrompt || preset.prompt; return { id: preset.id || id, name: preset.name, prompt: custom ? prompt : `${prompt}${offlineStyleExecutionFramework}` }; }
+  function offlineReplyPreset(session, values = {}) { const raw = session.replyPreset || offlineDefaultReplyPreset; const replacements = { char_name:'角色', user_name:'用户', reply_length:'500', user_person:'我', char_person:'我', world_background:'暂无世界书分析结果。', writing_style:'自然细腻', scene:'暂无', user_message:'暂无', online_chat:'暂无', offline_history:'暂无', ...values }; return raw.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (match, key) => Object.prototype.hasOwnProperty.call(replacements, key.toLowerCase()) ? replacements[key.toLowerCase()] : match); }
+  function ensureOfflineReplyPreset(session) { if (!session.replyPreset || session.replyPreset === offlineLegacyReplyPreset) session.replyPreset = offlineDefaultReplyPreset; return session.replyPreset; }
+  function offlineWorldMaterial(contact) {
+    let data = {};
+    try { data = JSON.parse(localStorage.getItem('ideal-machine-worldbooks') || '{}'); } catch {}
+    const book = (data.local || []).find(item => item.id === contact?.worldbook);
+    let analyses = {};
+    try { analyses = JSON.parse(localStorage.getItem('ideal-machine-worldbook-analyses') || '{}'); } catch {}
+    const analysis = book ? analyses[book.id] : null;
+    const world = analysis?.world || {};
+    const background = [world.title && `世界名称：${world.title}`, world.summary && `世界背景：${world.summary}`, world.era && `时代：${world.era}`, world.location && `主要地点：${world.location}`, world.atmosphere && `氛围：${world.atmosphere}`, Array.isArray(world.rules) && world.rules.length ? `世界规则：${world.rules.join('；')}` : ''].filter(Boolean).join('\n');
+    return { background: background || '', raw: boundWorldbookContext(contact) || '当前没有绑定世界书。', hasAnalysis: Boolean(background) };
+  }
+  async function generateRoleMoment(contactId, targetPost = null) { const contact = state.contacts.find(item => item.id === contactId) || state.contacts[Math.floor(Math.random() * state.contacts.length)]; if (!contact) return window.alert('请先添加角色。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。'); momentBusy = true; render(); const chat = state.chats[contact.id] || {}; const recent = (chat.messages || []).slice(-12).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name}：${item.text || `[${item.type || '消息'}]`}`).join('\n') || '最近没有聊天记录。'; const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }); const prompt = targetPost ? `请让角色“${contact.nickname || contact.name}”评论这条朋友圈，只输出评论正文，控制在1—2句。朋友圈内容：${targetPost.text || '[图片动态]'}\n角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：${recent}\n${boundWorldbookContext(contact)}\n请结合以上信息，不要提及你看到了世界书。` : `请为角色“${contact.nickname || contact.name}”生成一条自然的朋友圈动态，只输出正文，控制在1—3句。角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：\n${recent}\n${boundWorldbookContext(contact)}\n请结合角色绑定的局部世界书创作，不要提及世界书。`; try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .85, messages: [{ role: 'system', content: '你是角色朋友圈互动助手。' }, { role: 'user', content: prompt }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const text = String(data.choices?.[0]?.message?.content || '……').replace(/^['“”"\s]+|['“”"\s]+$/g, '').trim(); if (targetPost) { targetPost.comments ||= []; targetPost.comments.push({ id: uid('comment'), author: contact.nickname || contact.name, text, authorType: 'character', authorId: contact.id, time: time() }); } else state.moments.unshift({ id: uid('moment'), author: contact.nickname || contact.name, realName: contact.name, authorType: 'character', authorId: contact.id, avatar: contact.avatar || '', text, visibility: 'character', time: time(), likes: 0, comments: [] }); save(); } catch (error) { window.alert(`角色互动生成失败：${error.message}`); } finally { if (!momentGenerationDepth) { momentBusy = false; render(); } } }
   function renderMe() { return `<div class="chat-subhead"><div><span>IDENTITY</span></div><button data-chat-add-profile type="button">＋ 新建设定</button></div><p class="chat-note">和角色聊天前，先绑定一套你想使用的身份。</p><div class="chat-profile-list">${state.profiles.map(profile => `<article class="chat-profile-card">${avatarMarkup({ name: profile.name, avatar: profile.avatar })}<div><b>${esc(profile.nickname || profile.realName || '未命名用户')}</b><p>${esc(profile.realName ? `${profile.realName} · ` : '')}${esc(profile.persona)}</p></div><div class="chat-contact-actions"><button data-chat-edit-profile="${profile.id}" type="button">编辑</button><button data-chat-delete-profile="${profile.id}" type="button">删除</button></div></article>`).join('')}</div>`; }
   function renderProfileEditor() { const panel = document.querySelector('#chatProfileEditor'); if (!panel) return; panel.classList.toggle('is-open', profileEditorOpen); panel.setAttribute('aria-hidden', String(!profileEditorOpen)); if (!profileEditorOpen) { panel.innerHTML = ''; return; } const moments = profileEditorPurpose === 'moments'; const profile = moments ? (state.momentsProfile || {}) : (state.profiles.find(item => item.id === profileEditId) || {}); const identityFields = moments ? `<label>网名<input id="profileNickname" value="${esc(profile.nickname)}" placeholder="填写朋友圈网名"></label><label>性别<select id="profileGender"><option value="">未设置</option><option ${profile.gender === '男' ? 'selected' : ''}>男</option><option ${profile.gender === '女' ? 'selected' : ''}>女</option><option ${profile.gender === '其他' ? 'selected' : ''}>其他</option></select></label>` : `<label>真实姓名<input id="profileRealName" value="${esc(profile.realName)}" placeholder="填写真实姓名"></label><label>网名<input id="profileNickname" value="${esc(profile.nickname)}" placeholder="填写网名"></label><label>生日<input id="profileBirthday" type="date" value="${esc(profile.birthday)}"></label><label>性别<select id="profileGender"><option value="">未设置</option><option ${profile.gender === '男' ? 'selected' : ''}>男</option><option ${profile.gender === '女' ? 'selected' : ''}>女</option><option ${profile.gender === '其他' ? 'selected' : ''}>其他</option></select></label>`; const extra = moments ? '<p class="chat-moment-profile-reminder">这是所有角色共用的朋友圈用户身份，只设置头像、网名和性别。</p>' : '<label class="chat-editor-wide">具体设定<textarea id="profilePersona" placeholder="填写身份、性格、经历和说话方式">' + esc(profile.persona) + '</textarea></label>'; panel.innerHTML = `<section class="chat-editor-sheet"><header><div><span class="chat-kicker">USER IDENTITY</span><h2>${moments ? '朋友圈用户' : (profileEditId ? '编辑用户设定' : '新建用户设定')}</h2></div><button data-profile-editor-close type="button">×</button></header><div class="chat-editor-body"><div class="chat-avatar-picker"><span class="chat-editor-avatar">${profileAvatar ? `<img src="${esc(profileAvatar)}" alt="用户头像">` : esc((profile.realName || profile.nickname || '我').slice(0, 1))}</span><div><div class="chat-avatar-actions"><label class="chat-file-button">上传头像<input id="profileAvatarFile" type="file" accept="image/*"></label><button class="chat-file-button" data-profile-album-avatar type="button">从相册选择</button></div><input class="chat-avatar-url" id="profileAvatarUrl" type="url" value="${esc(profileAvatar.startsWith('data:') ? '' : profileAvatar)}" placeholder="或粘贴头像 URL"></div></div><div class="chat-editor-grid">${identityFields}</div>${extra}</div><footer><button data-profile-editor-close type="button">取消</button><button data-profile-editor-save type="button">保存设定</button></footer></section>`; }
   function openProfileEditor(profile) { profileEditorOpen = true; profileEditId = profile?.id || null; profileAvatar = profileEditorPurpose === 'moments' ? (state.momentsProfile?.avatar || '') : (profile?.avatar || ''); renderProfileEditor(); }
@@ -1062,7 +1220,7 @@ ${roundText}
     render();
   }
   function editEmoji(id) { const group = state.emojis.groups.find(item => item.id === activeEmojiGroup); const item = group?.items.find(entry => entry.id === id); if (!item) return; const text = window.prompt('修改表情包文字描述', item.text); if (text?.trim()) { const url = window.prompt('修改表情包链接', item.url); if (url?.trim()) { item.text = text.trim(); item.url = cleanEmojiUrl(url); save(); render(); } } }
-  document.addEventListener('click', event => { if (event.target.closest('[data-app-key="liaotian"]')) { state = read(); activeTab = 'chat'; activeContact = null; app.classList.add('is-open'); render(); return; } if (!app.classList.contains('is-open')) return; if (event.target.closest('[data-chat-close]')) { app.classList.remove('is-open'); return; } if (event.target.closest('[data-chat-back]')) { activeContact = null; menuOpen = false; emojiOpen = false; render(); return; } if (event.target.closest('[data-chat-editor-close]')) { editorMode = ''; renderEditor(); return; } if (event.target.closest('[data-chat-editor-save]')) return saveContactEditor(); const tab = event.target.closest('[data-chat-tab]'); if (tab) { activeTab = tab.dataset.chatTab; if (activeTab !== 'chat') activeContact = null; render(); return; } if (event.target.closest('[data-chat-go="contacts"]')) { activeTab = 'contacts'; render(); return; } if (event.target.closest('[data-chat-add-contact]')) return openContactEditor(); const open = event.target.closest('[data-chat-open]'); if (open) { activeContact = open.dataset.chatOpen; activeTab = 'chat'; menuOpen = false; emojiOpen = false; render(); return; } const editContact = event.target.closest('[data-chat-edit-contact]'); if (editContact) return openContactEditor(state.contacts.find(item => item.id === editContact.dataset.chatEditContact)); const deleteContact = event.target.closest('[data-chat-delete-contact]'); if (deleteContact) { const id = deleteContact.dataset.chatDeleteContact; const contact = state.contacts.find(item => item.id === id); if (contact && window.confirm(`确定删除角色“${contact.name}”吗？聊天记录也会一并删除。`)) { state.contacts = state.contacts.filter(item => item.id !== id); delete state.chats[id]; if (activeContact === id) activeContact = null; save(); render(); } return; } if (event.target.closest('[data-chat-add-profile]')) return promptProfile(); const editProfile = event.target.closest('[data-chat-edit-profile]'); if (editProfile) return promptProfile(state.profiles.find(item => item.id === editProfile.dataset.chatEditProfile)); if (event.target.closest('[data-chat-bind]')) return bindProfile(); const momentFilterButton = event.target.closest('[data-chat-moment-filter]'); if (momentFilterButton) { momentFilter = momentFilterButton.dataset.chatMomentFilter; render(); return; } const momentLike = event.target.closest('[data-moment-like]'); if (momentLike) { const post = state.moments.find(item => item.id === momentLike.dataset.momentLike); if (post) { post.liked = !post.liked; post.likes = Math.max(0, Number(post.likes || 0) + (post.liked ? 1 : -1)); save(); render(); } return; } const momentComment = event.target.closest('[data-moment-comment]'); if (momentComment) { const text = window.prompt('写下评论'); if (text?.trim()) { const post = state.moments.find(item => item.id === momentComment.dataset.momentComment); const profile = momentProfile(); if (post) { post.comments ||= []; post.comments.push({ id: uid('comment'), author: profile.nickname || profile.realName || '我', text: text.trim(), time: time() }); save(); render(); } } return; } const momentDelete = event.target.closest('[data-moment-delete]'); if (momentDelete) { const post = state.moments.find(item => item.id === momentDelete.dataset.momentDelete); if (post?.authorType === 'user' && window.confirm('确定删除这条朋友圈吗？')) { state.moments = state.moments.filter(item => item.id !== post.id); save(); render(); } return; } if (event.target.closest('[data-chat-plus]')) { menuOpen = !menuOpen; emojiOpen = false; render(); return; } if (event.target.closest('[data-chat-emoji]')) { emojiOpen = !emojiOpen; menuOpen = false; render(); return; } if (event.target.closest('[data-emoji-cancel]')) { emojiOpen = false; emojiEditorOpen = false; render(); return; } if (event.target.closest('[data-emoji-editor-cancel]')) { emojiEditorOpen = false; render(); return; } if (event.target.closest('[data-emoji-open-editor]')) { emojiEditorOpen = true; render(); return; } if (event.target.closest('[data-emoji-import]')) return addEmoji(); const group = event.target.closest('[data-emoji-group]'); if (group) { activeEmojiGroup = group.dataset.emojiGroup; emojiEditorOpen = false; render(); return; } if (event.target.closest('[data-emoji-add-group]')) { const name = window.prompt('新分组名称'); if (name?.trim()) { const item = { id: uid('emoji-group'), name: name.trim(), items: [] }; state.emojis.groups.push(item); activeEmojiGroup = item.id; save(); render(); } return; } if (event.target.closest('[data-emoji-edit-group]')) { const current = state.emojis.groups.find(item => item.id === activeEmojiGroup); const name = window.prompt('修改分组名称', current?.name || ''); if (current && name?.trim()) { current.name = name.trim(); save(); render(); } return; } if (event.target.closest('[data-emoji-delete-group]')) { if (state.emojis.groups.length <= 1) return window.alert('至少保留一个表情包分组。'); if (window.confirm('确定删除这个表情包分组吗？')) { state.emojis.groups = state.emojis.groups.filter(item => item.id !== activeEmojiGroup); activeEmojiGroup = state.emojis.groups[0].id; save(); render(); } return; } const useEmoji = event.target.closest('[data-emoji-use]'); if (useEmoji && !emojiEditMode) { const groupData = state.emojis.groups.find(item => item.id === activeEmojiGroup); const item = groupData?.items.find(entry => entry.id === useEmoji.dataset.emojiUse); if (item) { event.stopImmediatePropagation(); emojiOpen = false; addMessage(emojiDisplaySource(item.url), 'user', 'image', { sticker: true, stickerDescription: item.text || '' }); } return; } const editEmojiButton = event.target.closest('[data-emoji-edit]'); if (editEmojiButton) return editEmoji(editEmojiButton.dataset.emojiEdit); const deleteEmoji = event.target.closest('[data-emoji-delete]'); if (deleteEmoji) { const groupData = state.emojis.groups.find(item => item.id === activeEmojiGroup); if (groupData && window.confirm('确定删除这个表情包吗？')) { groupData.items = groupData.items.filter(item => item.id !== deleteEmoji.dataset.emojiDelete); save(); render(); } return; } const tool = event.target.closest('[data-chat-tool]'); if (tool) return handleTool(tool.dataset.chatTool); if (event.target.closest('[data-chat-send]')) { const input = document.querySelector('#chatInput'); if (input?.value.trim()) addMessage(input.value.trim()); return; } if (event.target.closest('[data-chat-reply]')) return reply(); if (event.target.closest('[data-chat-role-post]')) return generateMomentRolePost(); if (event.target.closest('[data-chat-post]')) { const text = window.prompt('写下这条朋友圈'); if (text?.trim()) { const profile = momentProfile(); state.moments.unshift({ id: uid('moment'), author: profile.nickname || profile.realName || '我', realName: profile.realName || '', authorType: 'user', authorId: profile.id || '', avatar: profile.avatar || '', text: text.trim(), time: time(), likes: 0, comments: [] }); save(); render(); } return; } });
+  document.addEventListener('click', event => { if (event.target.closest('[data-app-key="liaotian"]')) { state = read(); activeTab = 'chat'; activeContact = null; app.classList.add('is-open'); render(); return; } if (!app.classList.contains('is-open')) return; if (event.target.closest('[data-chat-close]')) { app.classList.remove('is-open'); return; } if (event.target.closest('[data-chat-back]')) { activeContact = null; menuOpen = false; emojiOpen = false; render(); return; } if (event.target.closest('[data-chat-editor-close]')) { editorMode = ''; renderEditor(); return; } if (event.target.closest('[data-chat-editor-save]')) return saveContactEditor(); const tab = event.target.closest('[data-chat-tab]'); if (tab) { activeTab = tab.dataset.chatTab; if (activeTab !== 'chat') activeContact = null; render(); return; } if (event.target.closest('[data-chat-go="contacts"]')) { activeTab = 'contacts'; render(); return; } if (event.target.closest('[data-chat-add-contact]')) return openContactEditor(); const open = event.target.closest('[data-chat-open]'); if (open) { activeContact = open.dataset.chatOpen; activeTab = 'chat'; menuOpen = false; emojiOpen = false; render(); return; } const editContact = event.target.closest('[data-chat-edit-contact]'); if (editContact) return openContactEditor(state.contacts.find(item => item.id === editContact.dataset.chatEditContact)); const deleteContact = event.target.closest('[data-chat-delete-contact]'); if (deleteContact) { const id = deleteContact.dataset.chatDeleteContact; const contact = state.contacts.find(item => item.id === id); if (contact && window.confirm(`确定删除角色“${contact.name}”吗？聊天记录也会一并删除。`)) { state.contacts = state.contacts.filter(item => item.id !== id); delete state.chats[id]; if (activeContact === id) activeContact = null; save(); render(); } return; } if (event.target.closest('[data-chat-add-profile]')) return promptProfile(); const editProfile = event.target.closest('[data-chat-edit-profile]'); if (editProfile) return promptProfile(state.profiles.find(item => item.id === editProfile.dataset.chatEditProfile)); if (event.target.closest('[data-chat-bind]')) return bindProfile(); const momentFilterButton = event.target.closest('[data-chat-moment-filter]'); if (momentFilterButton) { momentFilter = momentFilterButton.dataset.chatMomentFilter; render(); return; } const momentLike = event.target.closest('[data-moment-like]'); if (momentLike) { const post = state.moments.find(item => item.id === momentLike.dataset.momentLike); if (post) { post.liked = !post.liked; post.likes = Math.max(0, Number(post.likes || 0) + (post.liked ? 1 : -1)); save(); render(); } return; } const momentComment = event.target.closest('[data-moment-comment]'); if (momentComment) { const text = window.prompt('写下评论'); if (text?.trim()) { const post = state.moments.find(item => item.id === momentComment.dataset.momentComment); const profile = momentProfile(); if (post) { post.comments ||= []; post.comments.push({ id: uid('comment'), author: profile.nickname || profile.realName || '我', text: text.trim(), time: time() }); save(); render(); } } return; } const momentDelete = event.target.closest('[data-moment-delete]'); if (momentDelete) { const post = state.moments.find(item => item.id === momentDelete.dataset.momentDelete); if (post?.authorType === 'user' && window.confirm('确定删除这条朋友圈吗？')) { state.moments = state.moments.filter(item => item.id !== post.id); save(); render(); } return; } if (event.target.closest('[data-chat-plus]')) { menuOpen = !menuOpen; emojiOpen = false; render(); return; } if (event.target.closest('[data-chat-emoji]')) { emojiOpen = !emojiOpen; menuOpen = false; render(); return; } if (event.target.closest('[data-emoji-cancel]')) { emojiOpen = false; emojiEditorOpen = false; render(); return; } if (event.target.closest('[data-emoji-editor-cancel]')) { emojiEditorOpen = false; render(); return; } if (event.target.closest('[data-emoji-open-editor]')) { emojiEditorOpen = true; render(); return; } if (event.target.closest('[data-emoji-import]')) return addEmoji(); const group = event.target.closest('[data-emoji-group]'); if (group) { activeEmojiGroup = group.dataset.emojiGroup; emojiEditorOpen = false; render(); return; } if (event.target.closest('[data-emoji-add-group]')) { const name = window.prompt('新分组名称'); if (name?.trim()) { const item = { id: uid('emoji-group'), name: name.trim(), items: [] }; state.emojis.groups.push(item); activeEmojiGroup = item.id; save(); render(); } return; } if (event.target.closest('[data-emoji-edit-group]')) { const current = state.emojis.groups.find(item => item.id === activeEmojiGroup); const name = window.prompt('修改分组名称', current?.name || ''); if (current && name?.trim()) { current.name = name.trim(); save(); render(); } return; } if (event.target.closest('[data-emoji-delete-group]')) { if (state.emojis.groups.length <= 1) return window.alert('至少保留一个表情包分组。'); if (window.confirm('确定删除这个表情包分组吗？')) { state.emojis.groups = state.emojis.groups.filter(item => item.id !== activeEmojiGroup); activeEmojiGroup = state.emojis.groups[0].id; save(); render(); } return; } const useEmoji = event.target.closest('[data-emoji-use]'); if (useEmoji && !emojiEditMode) { const groupData = state.emojis.groups.find(item => item.id === activeEmojiGroup); const item = groupData?.items.find(entry => entry.id === useEmoji.dataset.emojiUse); if (item) { event.stopImmediatePropagation(); emojiOpen = false; addMessage(emojiDisplaySource(item.url), 'user', 'image', { sticker: true, stickerDescription: item.text || '' }); } return; } const editEmojiButton = event.target.closest('[data-emoji-edit]'); if (editEmojiButton) return editEmoji(editEmojiButton.dataset.emojiEdit); const deleteEmoji = event.target.closest('[data-emoji-delete]'); if (deleteEmoji) { const groupData = state.emojis.groups.find(item => item.id === activeEmojiGroup); if (groupData && window.confirm('确定删除这个表情包吗？')) { groupData.items = groupData.items.filter(item => item.id !== deleteEmoji.dataset.emojiDelete); save(); render(); } return; } const tool = event.target.closest('[data-chat-tool]'); if (tool) return handleTool(tool.dataset.chatTool); if (event.target.closest('[data-chat-send]')) { const input = document.querySelector('#chatInput'); if (input?.value.trim()) addMessage(input.value.trim()); return; } if (event.target.closest('[data-chat-reply]')) return reply(); if (event.target.closest('[data-chat-post]')) { const text = window.prompt('写下这条朋友圈'); if (text?.trim()) { const profile = momentProfile(); state.moments.unshift({ id: uid('moment'), author: profile.nickname || profile.realName || '我', realName: profile.realName || '', authorType: 'user', authorId: profile.id || '', avatar: profile.avatar || '', text: text.trim(), time: time(), likes: 0, comments: [] }); save(); render(); } return; } });
   document.addEventListener('click', event => { if (!app.classList.contains('is-open')) return; if (event.target.closest('[data-chat-settings]')) { chatSettingsOpen = true; renderChatSettings(); return; } if (event.target.closest('[data-chat-settings-close]')) { chatSettingsOpen = false; renderChatSettings(); return; } if (event.target.closest('[data-chat-clear]')) { if (window.confirm('确定清空这段聊天记录吗？')) { currentChat().messages = []; save(); chatSettingsOpen = false; render(); } return; } if (event.target.closest('[data-chat-edit-current]')) { chatSettingsOpen = false; openContactEditor(state.contacts.find(item => item.id === activeContact)); } });
   document.addEventListener('change', event => { const select = event.target.closest?.('[data-chat-api-profile]'); if (!select || !app.classList.contains('is-open')) return; const chat = currentChat(); if (!chat) return; chat.apiProfileId = select.value; save(); });
   document.addEventListener('click', event => { if (!app.classList.contains('is-open')) return; const addGroup = event.target.closest('[data-emoji-add-group]'); const group = event.target.closest('[data-emoji-group]'); const editMode = event.target.closest('[data-emoji-edit-mode]'); const use = event.target.closest('[data-emoji-use]'); const selectAll = event.target.closest('[data-emoji-select-all]'); const deleteSelected = event.target.closest('[data-emoji-delete-selected]'); const cancelEdit = event.target.closest('[data-emoji-cancel-edit]'); if (addGroup) { event.stopImmediatePropagation(); const name = window.prompt('新分组名称'); if (name?.trim()) { const item = { id: uid('emoji-group'), name: name.trim(), items: [] }; state.emojis.groups.push(item); activeEmojiGroup = item.id; save(); render(); } return; } if (group) { event.stopImmediatePropagation(); activeEmojiGroup = group.dataset.emojiGroup; emojiEditorOpen = false; emojiEditMode = false; selectedEmojiIds.clear(); render(); return; } if (editMode) { event.stopImmediatePropagation(); emojiEditMode = true; selectedEmojiIds.clear(); render(); return; } if (selectAll && emojiEditMode) { event.stopImmediatePropagation(); const current = state.emojis.groups.find(item => item.id === activeEmojiGroup); if (current) { const shouldSelectAll = !current.items.length || current.items.some(item => !selectedEmojiIds.has(item.id)); if (shouldSelectAll) current.items.forEach(item => selectedEmojiIds.add(item.id)); else selectedEmojiIds.clear(); render(); } return; } if (use && emojiEditMode) { event.stopImmediatePropagation(); const id = use.dataset.emojiUse; selectedEmojiIds.has(id) ? selectedEmojiIds.delete(id) : selectedEmojiIds.add(id); render(); return; } if (deleteSelected) { event.stopImmediatePropagation(); const current = state.emojis.groups.find(item => item.id === activeEmojiGroup); if (current && selectedEmojiIds.size && window.confirm('确定删除已选择的表情包吗？')) { current.items = current.items.filter(item => !selectedEmojiIds.has(item.id)); selectedEmojiIds.clear(); save(); render(); } return; } if (cancelEdit) { event.stopImmediatePropagation(); emojiEditMode = false; selectedEmojiIds.clear(); render(); return; } if ((!menuOpen && !emojiOpen) || event.target.closest('.chat-compose-wrap')) return; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); }, true);
@@ -1114,25 +1272,83 @@ ${roundText}
       event.preventDefault();
       const text = input.value.trim();
       if (text) {
-        // 先清空旧 DOM，再发送；render() 会重建输入框，避免旧内容被重复提交。
+        // Keep the existing input node alive while sending. Replacing it via
+        // render() makes mobile browsers dismiss the on-screen keyboard.
         input.value = '';
-        addMessage(text);
+        input.closest('.chat-compose-wrap')?.classList.remove('has-text');
+        // 清除持久化草稿，避免 render() 重建输入框后恢复已发送内容。
+        const focusContactId = activeContact;
+        const previousChatViewRendering = chatViewRendering;
+        chatViewRendering = true;
+        const sendingChat = currentChat();
+        if (sendingChat) { sendingChat.draft = ''; delete sendingChat.takeoverDraftByRoleId; cancelChatDraftSave(); }
+        const previousRender = render;
+        render = function() {};
+        try { addMessage(text); } finally { render = previousRender; chatViewRendering = previousChatViewRendering; }
+        const sentMessages = state.chats?.[focusContactId]?.messages || [];
+        const sentMessage = sentMessages[sentMessages.length - 1];
+        const messageBox = document.querySelector('#chatMessages');
+        if (messageBox && sentMessage && sentMessage.role === 'user') {
+          messageBox.querySelector('.chat-hint')?.remove();
+          chatViewRendering = true;
+          try { messageBox.insertAdjacentHTML('beforeend', messageHtml(sentMessage)); } finally { chatViewRendering = previousChatViewRendering; }
+          messageBox.scrollTop = messageBox.scrollHeight;
+        }
         const restoreFocus = () => {
+          if (activeContact !== focusContactId) return;
           const nextInput = document.querySelector('#chatInput');
           if (!nextInput || !app.classList.contains('is-open')) return;
           nextInput.focus({ preventScroll: true });
           const end = nextInput.value.length;
           try { nextInput.setSelectionRange(end, end); } catch {}
         };
+        // Keep the focus restoration in the trusted key event. Mobile
+        // browsers may hide the IME if focus is restored only from a timer.
+        restoreFocus();
         requestAnimationFrame(restoreFocus);
         setTimeout(restoreFocus, 0);
+        setTimeout(restoreFocus, 60);
+        setTimeout(restoreFocus, 180);
       }
       return;
     }
     if (event.key === 'Escape' && app.classList.contains('is-open')) app.classList.remove('is-open');
   });
+  document.addEventListener('pointerdown', event => {
+    const button = event.target.closest?.('[data-chat-reply]');
+    if (!button || !app.classList.contains('is-open')) return;
+    const input = document.querySelector('#chatInput');
+    if (input && document.activeElement === input) input.blur();
+  }, true);
   window.IdealMachineApps = window.IdealMachineApps || {}; window.IdealMachineApps.liaotian = { name: '聊天' };
   function renderContacts() { const groups = state.contactGroups; const manage = state.contactGroupManageOpen; const groupPanel = manage ? `<section class="chat-contact-group-panel"><header><div><span class="chat-kicker">MOMENTS GROUPS</span><h2>管理朋友圈分组</h2><p>点击角色头像即可加入或移出分组。分组只用于朋友圈可见范围。</p></div><button data-chat-group-manage type="button">完成</button></header>${groups.length ? groups.map(group => `<div class="chat-group-editor-row"><b>${esc(group.name)}</b><div class="chat-group-contacts-scroll">${state.contacts.length ? state.contacts.map(contact => `<label class="chat-group-contact-choice"><input type="checkbox" data-chat-group-toggle="${esc(group.id)}" data-chat-group-contact="${esc(contact.id)}" ${(contact.groupIds || []).includes(group.id) ? 'checked' : ''}><span>${avatarMarkup(contact, 'chat-group-avatar')}<small>${esc(contact.name || '未命名')}</small></span></label>`).join('') : '<small>还没有联系人</small>'}</div></div>`).join('') : '<p class="chat-group-empty">还没有分组，请先添加一个。</p>'}</section>` : ''; return `<div class="chat-subhead"><div><span>CHARACTERS</span></div><div class="chat-contact-head-actions"><button data-chat-group-add type="button">＋ 添加分组</button><button data-chat-group-manage type="button">${manage ? '完成' : '管理分组'}</button><button data-chat-add-contact type="button">＋ 添加角色</button></div></div>${groups.length ? `<div class="chat-contact-groups">${groups.map(group => `<span>${esc(group.name)}</span>`).join('')}</div>` : ''}${groupPanel}<div class="chat-contact-list">${state.contacts.length ? state.contacts.map(contact => { const contactGroupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; const lastMessage = state.chats?.[contact.id]?.messages?.slice(-1)[0]; const preview = lastMessage?.text || (lastMessage?.type === 'image' ? '[图片]' : '还没有聊天记录'); return `<article class="chat-contact-card">${avatarMarkup(contact)}<div><b>${esc(contact.nickname || contact.name)} <span class="chat-contact-real-name">${esc(contact.name || '未设置真实姓名')}</span></b><p>${esc(preview)}${contactGroupIds.length ? ` · ${contactGroupIds.map(id => esc(groups.find(group => group.id === id)?.name || '')).filter(Boolean).join('、')}` : ''}</p></div><div class="chat-contact-actions"><button data-chat-open="${contact.id}" type="button">聊天</button><button data-chat-edit-contact="${contact.id}" type="button">编辑</button><button data-chat-delete-contact="${contact.id}" type="button">删除</button></div></article>`; }).join('') : '<div class="chat-empty small"><div class="chat-empty-mark">◎</div><h2>还没有角色</h2><p>添加角色后，就可以为每段关系绑定不同的用户设定。</p></div>'}</div>`; }
+  const renderContactsBeforeGroupFilter = renderContacts;
+  renderContacts = function() {
+    if (!state.contactGroups.some(group => group.id === activeContactGroupId)) activeContactGroupId = '';
+    const template = document.createElement('template');
+    template.innerHTML = renderContactsBeforeGroupFilter();
+    const chips = template.content.querySelector('.chat-contact-groups');
+    if (chips) {
+      chips.innerHTML = `<button type="button" data-chat-contact-group="" class="${activeContactGroupId ? '' : 'is-active'}">全部</button>${state.contactGroups.map(group => `<button type="button" data-chat-contact-group="${esc(group.id)}" class="${activeContactGroupId === group.id ? 'is-active' : ''}">${esc(group.name)} <small>${state.contacts.filter(contact => (contact.groupIds || []).includes(group.id)).length}</small></button>`).join('')}`;
+    }
+    if (activeContactGroupId) {
+      const list = template.content.querySelector('.chat-contact-list');
+      list?.querySelectorAll('.chat-contact-card').forEach(card => {
+        const id = card.querySelector('[data-chat-open]')?.dataset.chatOpen;
+        if (!state.contacts.find(contact => contact.id === id)?.groupIds?.includes(activeContactGroupId)) card.remove();
+      });
+      if (list && !list.querySelector('.chat-contact-card')) list.innerHTML = '<div class="chat-empty small"><div class="chat-empty-mark">◎</div><h2>这个分组还没有角色</h2><p>点“管理分组”添加成员。</p></div>';
+    }
+    return template.innerHTML;
+  };
+  document.addEventListener('click', event => {
+    const chip = event.target.closest?.('[data-chat-contact-group]');
+    if (!chip || !app.classList.contains('is-open') || activeTab !== 'contacts') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    activeContactGroupId = chip.dataset.chatContactGroup || '';
+    render();
+  }, true);
   function renderChat() { const contact = state.contacts.find(item => item.id === activeContact); if (!contact) return `<div class="chat-launch-list"><div class="chat-launch-head"><span>YOUR CONTACTS</span><p>选择一个角色进入聊天</p></div>${state.contacts.length ? state.contacts.map(item => `<button class="chat-launch-contact" data-chat-open="${item.id}" type="button">${avatarMarkup(item)}<span><b>${esc(item.nickname || item.name)}</b><small>${esc(item.name || '未设置真实姓名')}</small></span><i>›</i></button>`).join('') : '<div class="chat-empty"><div class="chat-empty-mark">✦</div><h2>还没有角色</h2><p>添加一个角色，绑定你的用户设定后开始聊天。</p><button data-chat-go="contacts" type="button">添加角色</button></div>'}</div>`; const chat = currentChat(); const profile = state.profiles.find(item => item.id === chat.profileId); return `<div class="chat-conversation"><div class="chat-person">${avatarMarkup(contact)}<div><b>${esc(contact.name)}</b><small>${profile ? `使用设定：${esc(profile.name)}` : '尚未绑定用户设定'}</small></div><button data-chat-bind type="button">${profile ? '更换设定' : '绑定设定'}</button></div>${profilePickerOpen ? profilePicker() : ''}<div class="chat-messages" id="chatMessages">${chat.messages.length ? chat.messages.map(message => messageHtml(message)).join('') : '<div class="chat-hint">你可以从一句问候开始。</div>'}</div><div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${replying ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div></div>`; }
   function toolIcon(type) { const paths = { transfer: '<rect x="9" y="13" width="30" height="22" rx="4"/><path d="M9 19h30M16 27h8"/>', 'image-desc': '<rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="19" r="3"/><path d="m12 33 8-8 6 6 4-4 6 6M35 8v7M31.5 11.5h7"/>', 'image-file': '<rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="19" r="3"/><path d="m12 33 8-8 6 6 4-4 6 6"/>', voice: '<path d="M16 22a8 8 0 0 0 16 0V14a8 8 0 0 0-16 0zM12 22a12 12 0 0 0 24 0M24 36v6M18 42h12"/>', video: '<rect x="7" y="14" width="25" height="20" rx="4"/><path d="m32 21 9-5v16l-9-5z"/>', location: '<path d="M24 42s12-10 12-21a12 12 0 1 0-24 0c0 11 12 21 12 21z"/><circle cx="24" cy="21" r="4"/>', music: '<path d="M31 11v22.5a5.5 5.5 0 1 1-3-5V15l13-3v17.5a5.5 5.5 0 1 1-3-5V9z"/>', together: '<path d="M9 10h13a5 5 0 0 1 5 5v23H14a5 5 0 0 0-5 0zM39 10H26a5 5 0 0 0-5 5v23h13a5 5 0 0 1 5 0zM14 17h8M14 23h8M34 17h-5M34 23h-5"/>', reroll: '<path d="M38 17a15 15 0 0 0-26-3l-3 4M10 14v6h6M10 31a15 15 0 0 0 26 3l3-4M38 34v-6h-6"/>' }; return `<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type] || ''}</svg>`; }
   function toolMenu() { const tools = [['transfer', '转账'], ['image-desc', '描述图片'], ['image-file', '发送图片'], ['voice', '发送语音'], ['video', '视频通话'], ['location', '发送定位'], ['music', '分享音乐'], ['together', '一起看书'], ['reroll', '重roll']]; return `<div class="chat-tools">${tools.map(([type, label]) => `<button data-chat-tool="${type}" type="button" ${type === 'reroll' && replying ? 'disabled' : ''}>${toolIcon(type)}<span>${label}</span></button>`).join('')}</div>`; }
@@ -1150,16 +1366,35 @@ ${roundText}
   async function offlineReply(text) { const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); const contact = state.contacts.find(item => item.id === activeContact); if (!session || !contact) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) { session.messages.push({ role:'character', text:'（请先配置聊天 API，才能让角色回应这次见面。）' }); save(); openOfflineMode(); return; } offlineBusy = true; openOfflineMode(); try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.85, messages:[{role:'system',content:`你正在扮演角色“${contact.name}”，和用户在线下见面。地点：${session.place}。见面原因：${session.reason}。角色状态：${session.mood}。这次经历独立于普通聊天记录，请用现场感自然回应，不要提及 AI。`}, ...session.messages.map(item => ({ role:item.role === 'user' ? 'user' : 'assistant', content:item.text }))]}) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); session.messages.push({ role:'character', text:data.choices?.[0]?.message?.content || '……' }); save(); } catch (error) { session.messages.push({ role:'character', text:`（这次见面暂时无法继续：${error.message}）` }); save(); } finally { offlineBusy = false; openOfflineMode(); } }
   function enhanceOfflineMode() { const modal = document.querySelector('[data-chat-offline-modal]'); if (!modal) return; const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); const contact = state.contacts.find(item => item.id === activeContact) || {}; const now = new Date(); const stamp = `${now.getMonth() + 1}月${now.getDate()}日 · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; if (!session) { modal.querySelector('.chat-offline-card')?.classList.add('is-setup'); return; } const card = modal.querySelector('.chat-offline-card'); if (!card) return; card.classList.add('is-immersive'); const messages = session.messages.map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text)}</p></article>`).join(''); card.innerHTML = `<header class="chat-offline-topbar"><button type="button" data-offline-close>‹</button><div><span class="chat-kicker">LIVE MEETING</span><h2>线下见面</h2></div><button type="button" class="chat-offline-more" data-offline-close>×</button></header><div class="chat-offline-meta"><b>${esc(session.place)}</b><span>${stamp}</span></div><section class="chat-offline-atmosphere"><div class="chat-offline-orbit"><i></i><strong>现场</strong></div><div><span>正在和 ${esc(contact.nickname || contact.name || '角色')} 见面</span><b>${esc(session.reason)}</b></div></section><section class="chat-offline-character"><div class="chat-offline-pulse"></div><div><span>角色此刻的状态</span><b>${esc(session.mood)}</b></div><em>${offlineBusy ? '正在回应…' : '在你身边'}</em></section><main class="chat-offline-messages">${messages || '<div class="chat-offline-empty">你们刚刚见面。先观察一下此刻的他吧。</div>'}</main><div class="chat-offline-actions"><button type="button" data-offline-action="说些什么">✦<span>说些什么</span></button><button type="button" data-offline-action="做个动作">◌<span>做个动作</span></button><button type="button" data-offline-action="观察周围">⌁<span>观察周围</span></button><button type="button" data-offline-action="结束见面">□<span>结束见面</span></button></div><form data-offline-form><input data-offline-input placeholder="在现场说点什么…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}>发送</button></form>`; const box = modal.querySelector('.chat-offline-messages'); if (box) box.scrollTop = box.scrollHeight; }
   const legacyOpenOfflineMode = openOfflineMode;
-  function offlineThemePicker() { return `<div class="offline-theme-picker" data-offline-theme-picker><span>现场壁纸</span><div class="offline-wallpaper-actions"><label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 15l3-3 3 3 2-2 3 3M8 9h.01"/></svg><span>选择壁纸</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-offline-wallpaper-file></label><button type="button" data-offline-wallpaper-reset>恢复默认</button></div></div>`; }
+  function offlineThemePicker() { return `<div class="offline-theme-picker" data-offline-theme-picker><span>现场壁纸</span><div class="offline-wallpaper-actions"><label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 15l3-3 3 3 2-2 3 3M8 9h.01"/></svg><span>选择本地图片</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-offline-wallpaper-file></label><button type="button" data-offline-wallpaper-album>从相册选择</button><input class="offline-wallpaper-url" type="url" data-offline-wallpaper-url placeholder="粘贴图片 URL"><button type="button" data-offline-wallpaper-url-save>使用 URL</button><button type="button" data-offline-wallpaper-reset>恢复默认</button></div></div>`; }
   function applyOfflineTheme(modal) { modal.dataset.offlineTheme = 'mono'; const card = modal.querySelector('.chat-offline-card'); if (card && !modal.querySelector('[data-offline-theme-picker]')) card.querySelector('.chat-offline-meta')?.after(Object.assign(document.createElement('div'), { className:'offline-theme-picker-anchor', innerHTML:offlineThemePicker() })); }
   function applyOfflineWallpaper(modal, source) {
     const card = modal?.querySelector('.offline-meeting-v2');
     if (!card) return;
+    modal.dataset.offlineContrast = 'light';
     const paint = value => {
+      if (!card.isConnected) return;
       const image = String(value || '');
       card.classList.toggle('has-custom-wallpaper', Boolean(image));
       if (image) card.style.setProperty('--offline-wallpaper-image', `url(${JSON.stringify(image)})`);
       else card.style.removeProperty('--offline-wallpaper-image');
+      if (!image) return;
+      const probe = new Image();
+      probe.crossOrigin = 'anonymous';
+      probe.onload = () => {
+        if (!card.isConnected) return;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 8;
+          const context = canvas.getContext('2d', { willReadFrequently:true });
+          context.drawImage(probe, 0, 0, 8, 8);
+          const pixels = context.getImageData(0, 0, 8, 8).data;
+          let luminance = 0;
+          for (let index = 0; index < pixels.length; index += 4) luminance += (pixels[index] * 299 + pixels[index + 1] * 587 + pixels[index + 2] * 114) / 1000;
+          modal.dataset.offlineContrast = luminance / 64 < 145 ? 'dark' : 'light';
+        } catch { /* Cross-origin images without CORS stay on the readable default. */ }
+      };
+      probe.src = image;
     };
     if (String(source || '').startsWith('idb:image:') && window.IdealMachineGetImage) {
       paint('');
@@ -1167,11 +1402,12 @@ ${roundText}
     } else paint(source);
   }
   function openOfflineFullscreen() { const chat = currentChat(); if (!chat) return; const contact = state.contacts.find(item => item.id === activeContact) || {}; const resumableId = offlineSessionId || chat.activeOfflineSessionId || ''; let session = chat.offlineSessions?.find(item => item.id === resumableId && !item.ended); if (!session) { const contextMessages = (chat.messages || []).slice(-8).map(item => ({ role: item.role, text: item.text, type: item.type })); const contextText = contextMessages.map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); session = { id: uid('offline'), place: '从聊天继续', reason: '把刚才的聊天延续到线下', mood: '延续刚才的情绪', contextMessages, messages: [{ role: 'user', text: `【聊天背景】\n${contextText || '你们刚刚结束了一段聊天。'}\n请承接这段关系和情绪，进入线下见面。`, contextPrompt: true }] }; chat.offlineSessions ||= []; chat.offlineSessions.push(session); chat.activeOfflineSessionId = session.id; } offlineSessionId = session.id; save(); let modal = document.querySelector('[data-chat-offline-modal]'); if (!modal) { modal = document.createElement('div'); modal.dataset.chatOfflineModal = ''; document.body.appendChild(modal); } modal.className = 'chat-offline-modal is-open'; const now = new Date(); const stamp = `${now.getMonth() + 1}月${now.getDate()}日 · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; const context = (session.contextMessages || []).map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text || '')}</p></article>`).join(''); const messages = session.messages.filter(item => !item.contextPrompt).map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text || '')}</p></article>`).join(''); modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-immersive is-fullscreen"><header class="chat-offline-topbar"><button type="button" data-offline-close>‹</button><div><span class="chat-kicker">OFFLINE MODE</span><h2>线下见面</h2></div><button type="button" class="chat-offline-more" data-offline-close>×</button></header><div class="chat-offline-meta"><b>${esc(contact.nickname || contact.name || '角色')} · 关系延续</b><span>${stamp}</span></div><section class="chat-offline-context"><div class="chat-offline-context-label"><span>刚才的聊天</span><small>作为这次见面的背景</small></div><div class="chat-offline-context-messages">${context || '<p class="chat-offline-context-empty">你们刚刚从一句话开始走到这里。</p>'}</div></section><section class="chat-offline-atmosphere"><div class="chat-offline-orbit"><div class="chat-offline-orbit"><i></i><strong>现场</strong></div><div><span>你们从刚才的聊天里走到这里</span><b>现在，可以继续发生一点什么</b></div></section><section class="chat-offline-character"><div class="chat-offline-pulse"></div><div><span>角色此刻的状态</span><b>${esc(session.mood)}</b></div><em>在你身边</em></section><main class="chat-offline-messages">${messages || '<div class="chat-offline-empty">现场安静下来，角色正在等你先开口。</div>'}</main><div class="chat-offline-actions"><button type="button" data-offline-action="说些什么">✦<span>说些什么</span></button><button type="button" data-offline-action="做个动作">◌<span>做个动作</span></button><button type="button" data-offline-action="观察周围">⌁<span>观察周围</span></button><button type="button" data-offline-action="结束见面">□<span>结束见面</span></button></div><form data-offline-form><input data-offline-input placeholder="在现场说点什么…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}>发送</button></form></section>`; const box = modal.querySelector('.chat-offline-messages'); if (box) box.scrollTop = box.scrollHeight; }
-  function refreshOfflinePrompt(session) { const contextText = (session.contextMessages || []).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); const prompt = session.messages.find(item => item.contextPrompt); if (prompt) prompt.text = `请先在内部概括下面前几轮线上聊天发生了什么、双方关系如何、角色此刻的情绪和未说完的话。不要展示这份概括，直接自然进入线下见面。用户输入可能是说的话、动作描写，或两者混合，请结合语境自然识别，不要替用户补写动作或决定。\n\n聊天内容：\n${contextText || '你们刚刚结束了一段聊天。'}\n\n回复要求：角色回复约${session.replyLength || 500}字；用户叙述使用“${session.userPerson || '我'}”；角色叙述使用“${session.characterPerson || '我'}”。\n\n角色回复预设：${session.replyPreset || '保持自然、细腻、有现场感的表达，结合角色性格回应，不要机械复述。'}`;
+  function refreshOfflinePrompt(session) { const contextText = (session.contextMessages || []).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); const style = offlineWritingStyle(session); const preset = offlineReplyPreset(session, { reply_length:session.replyLength || 500, user_person:session.userPerson || '我', char_person:session.characterPerson || '我', writing_style:`${style.name}\n${style.prompt}` }); const prompt = session.messages.find(item => item.contextPrompt); if (prompt) prompt.text = `请先在内部概括下面前几轮线上聊天发生了什么、双方关系如何、角色此刻的情绪和未说完的话。不要展示这份概括，直接自然进入线下见面。用户输入可能是说的话、动作描写，或两者混合，请结合语境自然识别，不要替用户补写动作或决定。\n\n聊天内容：\n${contextText || '你们刚刚结束了一段聊天。'}\n\n${preset}\n\n${offlineAntiClichePrompt}`;
   }
   function openOfflineSettings(session) {
     const panel = document.querySelector('[data-chat-offline-modal] [data-offline-settings-panel]');
     if (!panel) return;
+    ensureOfflineReplyPreset(session);
     const opening = panel.hidden;
     panel.hidden = !opening;
     if (!opening) return;
@@ -1179,6 +1415,11 @@ ${roundText}
     panel.querySelector('[data-offline-user-person]').value = session.userPerson || '我';
     panel.querySelector('[data-offline-character-person]').value = session.characterPerson || '我';
     panel.querySelector('[data-offline-preset]').value = session.replyPreset || '保持自然、细腻、有现场感的表达，结合角色性格回应，不要机械复述。';
+    const style = offlineWritingStyle(session);
+    const styleSelect = panel.querySelector('[data-offline-style]');
+    const styleDetail = panel.querySelector('[data-offline-style-detail]');
+    if (styleSelect) styleSelect.value = style.id;
+    if (styleDetail) styleDetail.value = style.prompt;
   }
   function saveOfflineSettings(session) {
     const panel = document.querySelector('[data-chat-offline-modal] [data-offline-settings-panel]');
@@ -1186,42 +1427,63 @@ ${roundText}
     session.replyLength = Math.max(50, Math.min(3000, Number(panel.querySelector('[data-offline-length]')?.value || 500)));
     session.userPerson = panel.querySelector('[data-offline-user-person]')?.value || '我';
     session.characterPerson = panel.querySelector('[data-offline-character-person]')?.value || '我';
-    session.replyPreset = panel.querySelector('[data-offline-preset]')?.value.trim() || '保持自然、细腻、有现场感的表达，结合角色性格回应，不要机械复述。';
+    session.replyPreset = panel.querySelector('[data-offline-preset]')?.value.trim() || offlineDefaultReplyPreset;
+    session.replyPresetId = panel.querySelector('[data-offline-preset-select]')?.value || 'default';
+    session.writingStyleId = panel.querySelector('[data-offline-style]')?.value || 'natural';
+    session.writingStylePrompt = panel.querySelector('[data-offline-style-detail]')?.value.trim() || '';
     refreshOfflinePrompt(session);
     save();
     openOfflineMode();
+  }
+  function offlineMessageMarkup(value) {
+    const lines = String(value || '').split(/\r?\n/).filter(line => line.trim());
+    return (lines.length ? lines : ['']).map(line => {
+      const content = esc(line).replace(/\*\*([\s\S]+?)\*\*/g, (whole, inner) => inner.trim() ? `<em class="chat-offline-inner-voice">${inner}</em>` : whole);
+      return `<p>${content || '&nbsp;'}</p>`;
+    }).join('');
   }
   function offlineMeetingMessages(session, contact) {
     const roleName = contact.name || contact.nickname || '角色';
     const chat = currentChat();
     const profile = state.profiles.find(item => item.id === chat?.profileId);
     const userName = profile?.realName || profile?.nickname || profile?.name || '用户';
-    const items = session.messages.filter(item => !item.contextPrompt).map(item => {
+    const items = session.messages.map((item, index) => ({ item, index })).filter(({ item }) => !item.contextPrompt).map(({ item, index }) => {
       const isUser = item.role === 'user';
+      const isError = item.role === 'error';
       const speaker = isUser ? `<div class="chat-offline-v2-user-avatar">${esc(userName.slice(0, 1))}</div>` : avatarMarkup(contact, 'chat-offline-v2-avatar');
-      return `<article class="${isUser ? 'is-user' : 'is-character'}">${speaker}<div class="chat-offline-v2-message-body"><span>${isUser ? esc(userName) : esc(roleName)}</span><p>${esc(item.text || '')}</p></div></article>`;
+      return `<article data-offline-message-index="${index}" class="${isUser ? 'is-user' : isError ? 'is-error' : 'is-character'}">${speaker}<div class="chat-offline-v2-message-body"><span>${isUser ? esc(userName) : isError ? '生成提醒' : esc(roleName)}</span><div class="chat-offline-v2-message-text">${offlineMessageMarkup(item.text)}</div>${item.retryable && session.pendingOfflineReply ? '<button type="button" class="chat-offline-complete" data-offline-complete>补足这条回复</button>' : ''}</div></article>`;
     }).join('');
     const thinking = offlineBusy ? `<article class="is-character is-thinking">${avatarMarkup(contact, 'chat-offline-v2-avatar')}<div class="chat-offline-v2-message-body"><span>${esc(roleName)} · 正在回应</span><p><i></i><i></i><i></i></p></div></article>` : '';
     return items || thinking ? `${items}${thinking}` : '<div class="chat-offline-empty"><b>你们已经来到同一个现场</b><span>说一句话、描述一个动作，或让角色先回应。</span></div>';
   }
   function offlineSettingsPanel(session) {
-    const preset = session.replyPreset || '保持自然、细腻、有现场感的表达，结合角色性格回应，不要机械复述。';
+    const preset = session.replyPreset || offlineDefaultReplyPreset;
+    const style = offlineWritingStyle(session);
     const personOptions = value => ['我', '你', '他/她'].map(item => `<option value="${item}" ${value === item ? 'selected' : ''}>${item === '他/她' ? '他 / 她' : item}</option>`).join('');
     const rowStyle = 'box-sizing:border-box;display:grid!important;align-items:stretch!important;gap:9px;width:100%!important;min-width:0!important;padding-left:0!important;padding-right:0!important';
     const fieldStyle = 'box-sizing:border-box;display:block!important;width:calc(100% - 8px)!important;min-width:calc(100% - 8px)!important;max-width:calc(100% - 8px)!important;margin-left:4px!important;margin-right:4px!important';
     const titleStyle = 'box-sizing:border-box;display:grid!important;width:100%!important;padding-left:13px!important;padding-right:13px!important';
-    return `<aside class="chat-offline-settings-panel chat-offline-v2-settings" data-offline-settings-panel hidden><header><div><span>MEETING PREFERENCES</span><h2>现场设置</h2></div><button type="button" data-offline-settings aria-label="关闭现场设置">×</button></header><p>修改完成后点击底部保存，只影响本次线下见面。</p><section><label style="${rowStyle}"><span style="${titleStyle}"><b>角色回复字数</b><small>控制每次回应的大致长度</small></span><input data-offline-length style="${fieldStyle}" type="number" min="50" max="3000" step="50" inputmode="numeric" value="${esc(String(session.replyLength || 500))}"></label><label style="${rowStyle}"><span style="${titleStyle}"><b>用户叙述人称</b><small>识别用户动作时使用</small></span><select data-offline-user-person style="${fieldStyle}">${personOptions(session.userPerson || '我')}</select></label><label style="${rowStyle}"><span style="${titleStyle}"><b>角色叙述人称</b><small>角色描述自己时使用</small></span><select data-offline-character-person style="${fieldStyle}">${personOptions(session.characterPerson || '我')}</select></label></section><label class="chat-offline-v2-preset" style="${rowStyle}"><span style="${titleStyle}"><b>角色回复预设</b><small>输入再多内容也只在框内上下滑动</small></span><textarea data-offline-preset style="${fieldStyle}" placeholder="例如：回复细腻克制，多写动作、停顿和环境，不要替用户做决定。">${esc(preset)}</textarea></label><div class="chat-offline-v2-settings-note"><i></i><span>线上聊天和线下记录彼此独立，但最近的聊天会作为关系背景带入。</span></div><footer class="chat-offline-v2-settings-actions"><button type="button" data-offline-settings>取消</button><button type="button" data-offline-settings-save>保存设置</button></footer></aside>`;
+    return `<aside class="chat-offline-settings-panel chat-offline-v2-settings" data-offline-settings-panel hidden><header><div><span>MEETING PREFERENCES</span><h2>现场设置</h2></div><button type="button" data-offline-settings aria-label="关闭现场设置">×</button></header><p>这里的文风、字数、人称和回复预设只影响本次线下见面。</p><section><label style="${rowStyle}"><span style="${titleStyle}"><b>角色回复字数</b><small>每次回复按设定字数上下浮动 100 字</small></span><input data-offline-length style="${fieldStyle}" type="number" min="50" max="3000" step="50" inputmode="numeric" value="${esc(String(session.replyLength || 500))}"></label><label style="${rowStyle}"><span style="${titleStyle}"><b>用户叙述人称</b><small>识别用户动作时使用</small></span><select data-offline-user-person style="${fieldStyle}">${personOptions(session.userPerson || '我')}</select></label><label style="${rowStyle}"><span style="${titleStyle}"><b>角色叙述人称</b><small>角色描述自己时使用</small></span><select data-offline-character-person style="${fieldStyle}">${personOptions(session.characterPerson || '我')}</select></label></section><label class="chat-offline-v2-preset" style="${rowStyle}"><span style="${titleStyle}"><b>角色回复预设</b><small>默认显示完整模板；支持 {{char_name}} 等变量，发送前自动替换</small></span><textarea data-offline-preset style="${fieldStyle}" placeholder="填写角色回复规则……">${esc(preset)}</textarea></label><label class="chat-offline-v2-preset" style="${rowStyle}"><span style="${titleStyle}"><b>现场文风</b><small>沿用 if 时空文风，也可以自己增加</small></span><select data-offline-style style="${fieldStyle}">${offlineWritingStyleOptions(style.id)}</select><textarea data-offline-style-detail style="${fieldStyle}" maxlength="5000" placeholder="描述语言、节奏、对白和描写重点……">${esc(style.prompt)}</textarea><button type="button" class="chat-offline-style-new" data-offline-style-new>＋ 新建文风</button></label><section class="chat-offline-style-editor" data-offline-style-editor hidden><label>文风名称<input data-offline-style-name maxlength="24" placeholder="例如：冷冽电影感"></label><label>具体写作要求<textarea data-offline-style-prompt maxlength="5000" placeholder="描述用词、节奏、氛围、对白和叙事偏好……"></textarea></label><button type="button" data-offline-style-save>保存并使用</button></section><div class="chat-offline-v2-settings-note"><i></i><span>生成前会先读取世界书分析出的世界背景；没有分析结果时，再根据角色设定推断背景。之后才读取人设、字数、人称、文风和现场记录。</span></div><footer class="chat-offline-v2-settings-actions"><button type="button" data-offline-settings>取消</button><button type="button" data-offline-settings-save>保存设置</button></footer></aside>`;
   }
+  const offlineSettingsPanelMarkup = offlineSettingsPanel;
+  offlineSettingsPanel = session => offlineSettingsPanelMarkup(session).replace('上下浮动 100 字', '上下浮动 20%');
   openOfflineMode = function() {
+    const existingSessionIds = new Set(currentChat()?.offlineSessions?.map(item => item.id) || []);
     openOfflineFullscreen();
     const modal = document.querySelector('[data-chat-offline-modal]');
     const chat = currentChat();
     const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId);
     const contact = state.contacts.find(item => item.id === activeContact) || {};
     if (!modal || !session) return;
+    if (!Array.isArray(session.onlineContextMessages)) {
+      const source = existingSessionIds.has(session.id) ? session.contextMessages || [] : (chat.messages || []).slice(-20);
+      session.onlineContextMessages = source.map(item => ({ role:item.role, text:item.text, type:item.type }));
+    }
     session.replyLength ||= 500;
     session.userPerson ||= '我';
     session.characterPerson ||= '我';
+    session.writingStyleId ||= 'natural';
+    ensureOfflineReplyPreset(session);
     if (!session.wallpaper && chat.offlineWallpaper) session.wallpaper = chat.offlineWallpaper;
     refreshOfflinePrompt(session);
     const roleName = contact.name || contact.nickname || '角色';
@@ -1230,6 +1492,16 @@ ${roundText}
     const contextCount = (session.contextMessages || []).length;
     modal.className = 'chat-offline-modal is-open is-fullscreen-modal';
     modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-fullscreen is-immersive offline-meeting-v2"><header class="chat-offline-v2-topbar"><button type="button" data-offline-close aria-label="返回聊天"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg></button><div><span>IN PERSON</span><h2>与 ${esc(roleName)} 见面</h2></div><nav><button type="button" data-offline-theme-button aria-label="切换现场颜色"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z"/></svg></button><button type="button" data-offline-settings aria-label="打开现场设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></button></nav></header>${offlineThemePicker()}<section class="chat-offline-v2-scene"><div class="chat-offline-v2-scene-copy"><span><i></i> MEETING IN PROGRESS</span><h1>${esc(session.place)}</h1><p>${esc(session.reason)}</p></div>${avatarMarkup(contact, 'chat-offline-v2-hero-avatar')}<dl><div><dt>时间</dt><dd>${stamp}</dd></div><div><dt>角色状态</dt><dd>${esc(session.mood)}</dd></div><div><dt>关系背景</dt><dd>${contextCount ? `已承接最近 ${contextCount} 条聊天` : '独立现场'}</dd></div></dl></section><section class="chat-offline-v2-presence"><div><i class="${offlineBusy ? 'is-busy' : ''}"></i><span><b>${esc(roleName)}</b>${offlineBusy ? ' 正在组织回应' : ' 此刻就在你身边'}</span></div><small>线下记录不会混入普通聊天</small></section><main class="chat-offline-messages" aria-live="polite">${offlineMeetingMessages(session, contact)}</main><footer class="chat-offline-v2-dock"><div class="chat-offline-v2-shortcuts" style="box-sizing:border-box;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;width:100%!important;max-width:none!important;margin:0!important"><button type="button" data-offline-reply ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 1-2.3-5.7L20 8M20 3v5h-5"/></svg><span>${offlineBusy ? '正在回应' : `让 ${esc(roleName)} 继续`}</span></button><button type="button" data-offline-finish ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg><span>${offlineBusy ? '正在整理现场' : '结束并生成纪念'}</span></button></div><form data-offline-form style="box-sizing:border-box;width:100%!important;max-width:none!important;margin:0!important"><input data-offline-input autocomplete="off" placeholder="说点什么，或描述你的动作…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}><span>发送</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-4 14-3-6zM5 12h7"/></svg></button></form></footer>${offlineSettingsPanel(session)}</section>`;
+    const singleLineInput = modal.querySelector('.chat-offline-v2-dock [data-offline-input]');
+    if (singleLineInput?.tagName === 'INPUT') {
+      const multilineInput = document.createElement('textarea');
+      multilineInput.dataset.offlineInput = '';
+      multilineInput.placeholder = singleLineInput.placeholder;
+      multilineInput.setAttribute('aria-label', '线下消息，回车换行');
+      multilineInput.rows = 2;
+      multilineInput.disabled = singleLineInput.disabled;
+      singleLineInput.replaceWith(multilineInput);
+    }
     const offlineDock = modal.querySelector('.chat-offline-v2-dock');
     if (offlineDock) {
       // These are inline values because the original template also uses !important
@@ -1269,6 +1541,8 @@ ${roundText}
     }
     applyOfflineTheme(modal);
     applyOfflineWallpaper(modal, session.wallpaper || '');
+    const wallpaperUrl = modal.querySelector('[data-offline-wallpaper-url]');
+    if (wallpaperUrl && /^(?:https?:\/\/|data:image\/|idb:image:)/i.test(String(session.wallpaper || ''))) wallpaperUrl.value = session.wallpaper;
     save();
     const box = modal.querySelector('.chat-offline-messages');
     if (box) box.scrollTop = box.scrollHeight;
@@ -1300,6 +1574,35 @@ ${roundText}
     if (!data) return window.alert('壁纸读取失败，请换一张图片重试。');
     session.wallpaper = window.IdealMachinePutImage ? await window.IdealMachinePutImage(data) : data;
     chat.offlineWallpaper = session.wallpaper;
+    save();
+    openOfflineMode();
+  });
+  document.addEventListener('click', event => {
+    const album = event.target.closest?.('[data-offline-wallpaper-album]');
+    const urlButton = event.target.closest?.('[data-offline-wallpaper-url-save]');
+    if (!album && !urlButton) return;
+    const chat = currentChat();
+    const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId);
+    if (!session) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (album) {
+      window.IdealMachineAlbum?.pick?.(value => {
+        if (!value) return;
+        session.wallpaper = value;
+        chat.offlineWallpaper = value;
+        window.IdealMachineAlbum?.archiveUrl?.(value, '线下聊天壁纸');
+        save();
+        openOfflineMode();
+      });
+      return;
+    }
+    const url = document.querySelector('[data-offline-wallpaper-url]')?.value.trim();
+    if (!url) return window.alert('请粘贴图片 URL。');
+    if (!/^https?:\/\//i.test(url) && !/^data:image\//i.test(url) && !/^idb:image:/i.test(url)) return window.alert('请输入有效的图片 URL。');
+    session.wallpaper = url;
+    chat.offlineWallpaper = url;
+    window.IdealMachineAlbum?.archiveUrl?.(url, '线下聊天壁纸');
     save();
     openOfflineMode();
   });
@@ -1442,15 +1745,19 @@ ${roundText}
   function renderChatSettings() { const panel = document.querySelector('#chatSettings'); if (!panel) return; panel.classList.toggle('is-open', chatSettingsOpen); panel.setAttribute('aria-hidden', String(!chatSettingsOpen)); if (!chatSettingsOpen) { panel.innerHTML = ''; return; } const contact = state.contacts.find(item => item.id === activeContact); const chat = currentChat(); const settings = chatSettingsFor(chat); const profile = state.profiles.find(item => item.id === chat?.profileId); const colorInput = (label, key, fallback, placeholder) => `<label>${label}<div class="chat-color-control"><input type="text" data-chat-color="${key}" value="${esc(settings[key])}" placeholder="${placeholder}"><input type="color" data-chat-color-picker="${key}" value="${/^#[0-9a-f]{6}$/i.test(settings[key]) ? settings[key] : fallback}"></div></label>`; panel.innerHTML = `<div class="chat-settings-page"><header><button data-chat-settings-close type="button">${actionIcon('back')}</button><h1>聊天设置</h1><span></span></header><main><section><span class="chat-kicker">CONVERSATION</span><h2>${esc(contact?.nickname || contact?.name || '')}</h2><p>管理这段关系的聊天显示与气泡样式。</p></section><button class="chat-settings-row" data-chat-bind type="button"><span>${profile ? '换绑用户设定' : '绑定用户设定'}</span><b>${esc(profile?.nickname || profile?.realName || '未绑定')}</b></button>${settingsProfilePickerOpen ? profilePicker() : ''}<section class="chat-display-settings"><label class="chat-setting-toggle"><span>隐藏头像<small>隐藏聊天内容旁的双方头像</small></span><input type="checkbox" data-chat-setting-toggle="hideAvatar" ${settings.hideAvatar ? 'checked' : ''}></label><label class="chat-setting-toggle"><span>隐藏时间戳<small>隐藏每条消息下方的发送时间</small></span><input type="checkbox" data-chat-setting-toggle="hideTimestamp" ${settings.hideTimestamp ? 'checked' : ''}></label></section><section class="chat-wallpaper-settings"><h3>聊天壁纸</h3><div class="chat-wallpaper-preview" style="${settings.wallpaper ? `background-image:url("${esc(settings.wallpaper)}")` : ''}"></div><input class="chat-wallpaper-url" data-chat-wallpaper-url type="url" value="${esc(settings.wallpaper?.startsWith('data:') ? '' : settings.wallpaper)}" placeholder="粘贴图片 URL"><div class="chat-wallpaper-actions"><label class="chat-file-button">选择本地图片<input type="file" accept="image/*" data-chat-wallpaper-file></label><button type="button" data-chat-wallpaper-reset>恢复默认</button></div></section><section class="chat-color-settings"><h3>气泡设置</h3><div class="chat-bubble-preview"><span>聊天预览</span><div class="chat-preview-row is-character"><div class="chat-preview-bubble" style="background:${esc(settings.characterBubbleColor)};color:${esc(settings.characterBubbleTextColor)}">${esc(contact?.nickname || '角色')}：你好</div></div><div class="chat-preview-row is-user"><div class="chat-preview-bubble" style="background:${esc(settings.userBubbleColor)};color:${esc(settings.userBubbleTextColor)}">${esc(profile?.nickname || profile?.realName || '我')}：收到</div></div></div>${colorInput('用户气泡', 'userBubbleColor', '#222222', '#222222 或 rgba(...)')}${colorInput('用户文字', 'userBubbleTextColor', '#ffffff', '#ffffff 或 rgba(...)')}${colorInput('角色气泡', 'characterBubbleColor', '#ffffff', '#ffffff 或 rgba(...)')}${colorInput('角色文字', 'characterBubbleTextColor', '#111111', '#111111 或 rgba(...)')}<small>可分别设置双方气泡与气泡内文字颜色，预览会同步更新。</small></section><button class="chat-settings-row danger" data-chat-block-contact type="button"><span>拉黑角色</span><b>拉黑</b></button><button class="chat-settings-row danger" data-chat-delete-contact type="button"><span>删除角色</span><b>删除</b></button><button class="chat-settings-row danger" data-chat-clear type="button"><span>清空聊天记录</span><b>清空</b></button></main></div>`; }
   document.addEventListener('change', event => { const file = event.target.closest('[data-chat-wallpaper-file]'); const url = event.target.closest('[data-chat-wallpaper-url]'); if (!file && !url) return; const chat = currentChat(); if (!chat) return; const settings = chatSettingsFor(chat); if (url) { settings.wallpaper = url.value.trim(); window.IdealMachineAlbum?.archiveUrl?.(settings.wallpaper, '聊天壁纸'); save(); render(); chatSettingsOpen = true; renderChatSettings(); return; } const image = file.files?.[0]; if (!image) return; const read = window.IdealMachineReadImage ? window.IdealMachineReadImage(image, 900, .68) : new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(image); }); read.then(value => { settings.wallpaper = value; save(); render(); chatSettingsOpen = true; renderChatSettings(); }); });
   document.addEventListener('click', event => { if (!event.target.closest('[data-chat-wallpaper-reset]')) return; const chat = currentChat(); if (!chat) return; chatSettingsFor(chat).wallpaper = ''; save(); render(); chatSettingsOpen = true; renderChatSettings(); });
-  function applyChatWallpaper() { const chat = currentChat(); const conversation = document.querySelector('.chat-conversation'); const wallpaper = conversation ? (chatSettingsFor(chat).wallpaper || '') : ''; [app, conversation].forEach(element => { if (!element) return; element.style.backgroundImage = wallpaper ? `url("${wallpaper.replace(/"/g, '\\"')}")` : ''; element.style.backgroundSize = wallpaper ? 'cover' : ''; element.style.backgroundPosition = wallpaper ? 'center' : ''; element.style.backgroundRepeat = wallpaper ? 'no-repeat' : ''; }); }
-  function applyChatWallpaperPreview() { const preview = document.querySelector('.chat-wallpaper-preview'); if (!preview) return; const wallpaper = chatSettingsFor().wallpaper || ''; preview.style.backgroundImage = wallpaper ? `url("${wallpaper.replace(/"/g, '\\"')}")` : ''; preview.style.backgroundSize = wallpaper ? 'cover' : ''; preview.style.backgroundPosition = wallpaper ? 'center' : ''; preview.style.backgroundRepeat = wallpaper ? 'no-repeat' : ''; }
+  function applyChatWallpaper() { const chat = activeContact ? state.chats?.[activeContact] : null; const conversation = document.querySelector('.chat-conversation'); const wallpaper = conversation ? (chatSettingsFor(chat).wallpaper || '') : ''; [app, conversation].forEach(element => { if (!element) return; element.style.backgroundImage = wallpaper ? `url("${wallpaper.replace(/"/g, '\\"')}")` : ''; element.style.backgroundSize = wallpaper ? 'cover' : ''; element.style.backgroundPosition = wallpaper ? 'center' : ''; element.style.backgroundRepeat = wallpaper ? 'no-repeat' : ''; }); }
+  function applyChatWallpaperPreview() { const preview = document.querySelector('.chat-wallpaper-preview'); if (!preview) return; const chat = activeContact ? state.chats?.[activeContact] : null; const wallpaper = chatSettingsFor(chat).wallpaper || ''; preview.style.backgroundImage = wallpaper ? `url("${wallpaper.replace(/"/g, '\\"')}")` : ''; preview.style.backgroundSize = wallpaper ? 'cover' : ''; preview.style.backgroundPosition = wallpaper ? 'center' : ''; preview.style.backgroundRepeat = wallpaper ? 'no-repeat' : ''; }
   function previewChatWallpaper(value) { const wallpaper = String(value || ''); const conversation = document.querySelector('.chat-conversation'); const preview = document.querySelector('.chat-wallpaper-preview'); [conversation, preview].forEach(element => { if (!element) return; element.style.backgroundImage = wallpaper ? `url("${wallpaper.replace(/"/g, '\\"')}")` : ''; element.style.backgroundSize = wallpaper ? 'cover' : ''; element.style.backgroundPosition = wallpaper ? 'center' : ''; element.style.backgroundRepeat = wallpaper ? 'no-repeat' : ''; }); }
   document.addEventListener('input', event => { const url = event.target.closest('[data-chat-wallpaper-url]'); if (url) previewChatWallpaper(url.value.trim()); });
-  document.addEventListener('input', event => { const input = event.target.closest('#chatInput'); if (!input) return; input.closest('.chat-compose-wrap')?.classList.toggle('has-text', Boolean(input.value.trim())); });
-  new MutationObserver(() => applyChatWallpaper()).observe(document.querySelector('#chatMain'), { childList: true, subtree: true });
-  new MutationObserver(() => applyChatWallpaperPreview()).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
+  function syncChatComposerControls(input) { const wrap = input?.closest('.chat-compose-wrap'); if (!wrap) return; const focused = document.activeElement === input; wrap.classList.toggle('is-input-focused', focused); wrap.classList.toggle('has-text', (focused || wrap.classList.contains('is-send-press')) && Boolean(input.value.trim())); }
+  document.addEventListener('input', event => { const input = event.target.closest('#chatInput'); if (!input) return; syncChatComposerControls(input); });
+  document.addEventListener('focusin', event => { const input = event.target.closest?.('#chatInput'); if (input) syncChatComposerControls(input); });
+  document.addEventListener('focusout', event => { const input = event.target.closest?.('#chatInput'); if (!input) return; syncChatComposerControls(input); setTimeout(() => syncChatComposerControls(input), 0); });
+  document.addEventListener('pointerdown', event => { const input = document.querySelector('#chatInput'); if (!input || event.target.closest?.('#chatInput') || event.target.closest?.('[data-chat-send], [data-chat-plus], [data-chat-emoji], [data-chat-reply]')) return; if (document.activeElement === input) input.blur(); }, true);
+  new MutationObserver(() => scheduleChatObserverJob(applyChatWallpaper)).observe(document.querySelector('#chatMain'), { childList: true, subtree: true });
+  new MutationObserver(() => scheduleChatObserverJob(applyChatWallpaperPreview)).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
   function simplifyChatBubblePreview() { document.querySelectorAll('.chat-bubble-preview .chat-preview-bubble').forEach(item => { if (item.textContent !== '你好') item.textContent = '你好'; }); }
-  new MutationObserver(() => simplifyChatBubblePreview()).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
+  new MutationObserver(() => scheduleChatObserverJob(simplifyChatBubblePreview)).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
   function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const isSticker = Boolean(message.sticker || (message.type === 'image' && state.emojis.groups.some(group => group.items.some(item => item.url === message.text)))); const body = message.recalled ? `<span class="chat-recalled">${message.role === 'user' ? '你' : '角色'}撤回了一条消息</span>` : message.type === 'image' ? `<img src="${esc(message.text)}" alt="图片">` : message.type === 'image-desc' ? `<div class="chat-image-description"><strong>文字图片</strong><p>${esc(message.text)}</p></div>` : message.type === 'transfer' ? `<div class="chat-transfer-message"><strong>转账</strong><b>¥ ${esc(message.amount || message.text)}</b><p>${esc(message.note || '无备注')}</p><small>${message.status === 'accepted' ? '已收下' : message.status === 'returned' ? '已退回' : '待处理'}</small></div>` : message.type === 'voice' ? `<span class="chat-voice">◖ ${esc(message.text)}</span>` : message.type === 'video' ? `▣ ${esc(message.text)}` : message.type === 'location' ? `⌖ ${esc(message.text)}` : message.type === 'together' ? `▤ ${esc(message.text)}` : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp ? '' : `<small>${esc(message.time || '')}</small>`; const typeClass = `${message.type || ''}${isSticker ? ' sticker' : ''}`; return `<div class="chat-message ${message.role === 'user' ? 'is-user' : 'is-character'} ${selectedChatMessageIds.has(message.id) ? 'is-selected' : ''}" data-chat-message-id="${esc(message.id)}"><div class="chat-message-line">${avatar}<div class="chat-bubble ${typeClass}">${body}</div>${stamp}</div></div>`; }
   document.addEventListener('click', event => { const bubbleToggle = event.target.closest('[data-chat-bubble-toggle]'); if (bubbleToggle) { const section = bubbleToggle.closest('.chat-color-settings'); const open = section?.classList.toggle('is-open'); section?.classList.toggle('is-collapsed', !open); return; } const replyButton = event.target.closest('[data-chat-reply]'); if (!replyButton || !app.classList.contains('is-open')) return; const contact = state.contacts.find(item => item.id === activeContact); if (!contact?.blocked) return; event.stopImmediatePropagation(); addMessage('发送失败', 'character', 'blocked-failure', { internalNotice: '你已被对方拉黑，无法回复。' }); });
   function applyCustomChatCSS() { let style = document.querySelector('#chatCustomStyle'); if (!style) { style = document.createElement('style'); style.id = 'chatCustomStyle'; document.head.appendChild(style); } const chat = currentChat(); const css = app.classList.contains('is-chatting') ? (chatSettingsFor(chat).customCSS || '') : ''; style.textContent = css; }
@@ -1460,7 +1767,7 @@ ${roundText}
   function annotateChatCSSHints() { document.querySelectorAll('.chat-css-hint').forEach(item => { if (item.dataset.annotated) return; item.dataset.annotated = 'true'; item.innerHTML = '可用类名说明：<br><code>.chat-conversation</code> 整个聊天页面　<code>.chat-person</code> 顶部角色栏　<code>.chat-messages</code> 消息列表　<code>.chat-message</code> 单条消息　<code>.chat-message-avatar</code> 头像　<code>.chat-bubble</code> 消息气泡　<code>.chat-compose-wrap</code> 底部输入区域　<code>.chat-compose</code> 输入框与操作按钮'; }); }
   function collapseChatBubbleSettings() { document.querySelectorAll('.chat-color-settings').forEach(section => { const title = section.querySelector('h3'); if (!title || section.dataset.collapsible) return; section.dataset.collapsible = 'true'; section.classList.add('is-collapsed'); title.dataset.chatBubbleToggle = 'true'; }); }
   function annotateChatRoleHints() { document.querySelectorAll('.chat-css-hint').forEach(item => { if (item.dataset.roleAnnotated) return; item.dataset.roleAnnotated = 'true'; item.insertAdjacentHTML('beforeend', '<br><code>.chat-message.is-user</code> 用户消息　<code>.chat-message.is-character</code> 角色消息　<code>.chat-message.is-user .chat-bubble</code> 用户气泡　<code>.chat-message.is-character .chat-bubble</code> 角色气泡　<code>.chat-message.is-user .chat-message-avatar</code> 用户头像　<code>.chat-message.is-character .chat-message-avatar</code> 角色头像'); }); }
-  new MutationObserver(() => { ensureChatCSSEditor(); annotateChatCSSHints(); annotateChatRoleHints(); collapseChatBubbleSettings(); applyCustomChatCSS(); }).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
+  new MutationObserver(() => scheduleChatObserverJob(() => { ensureChatCSSEditor(); annotateChatCSSHints(); annotateChatRoleHints(); collapseChatBubbleSettings(); applyCustomChatCSS(); })).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
   const chatBeautyPresets = { default: '' };
   function chatBeautyPresetKey(css) { const value = String(css || '').trim(); return Object.entries(chatBeautyPresets).find(([, preset]) => preset.trim() === value)?.[0] || 'custom'; }
   function previewChatBeautyPreset(key) { const css = chatBeautyPresets[key] ?? document.querySelector('[data-chat-css-input]')?.value ?? ''; const input = document.querySelector('[data-chat-css-input]'); if (input && key !== 'custom') input.value = css; let style = document.querySelector('#chatCustomStyle'); if (!style) { style = document.createElement('style'); style.id = 'chatCustomStyle'; document.head.appendChild(style); } style.textContent = app.classList.contains('is-chatting') ? css : ''; }
@@ -1472,7 +1779,7 @@ ${roundText}
   document.addEventListener('click', event => { const cancel = event.target.closest('[data-chat-css-name-cancel]'); if (cancel) { document.querySelector('[data-chat-css-name-modal]')?.remove(); return; } const confirm = event.target.closest('[data-chat-css-name-confirm]'); if (!confirm) return; const modal = confirm.closest('[data-chat-css-name-modal]'); const name = modal?.querySelector('[data-chat-css-name-input]')?.value.trim(); if (!name) return window.alert('请输入美化方案名称。'); const settings = chatSettingsFor(currentChat()); settings.cssPresets = Array.isArray(settings.cssPresets) ? settings.cssPresets : []; const css = document.querySelector('[data-chat-css-input]')?.value || ''; const item = { id: uid('css-preset'), name, css }; settings.cssPresets = settings.cssPresets.filter(entry => entry.name !== name); settings.cssPresets.push(item); save(); const select = document.querySelector('[data-chat-css-preset]'); if (select) { const option = document.createElement('option'); option.value = `saved:${item.id}`; option.textContent = item.name; select.appendChild(option); select.value = option.value; } const editor = document.querySelector('[data-chat-css-editor]'); if (editor) editor.dataset.chatCssActivePreset = item.id; modal.remove(); });
   document.addEventListener('click', event => { const saveButton = event.target.closest('[data-chat-css-save]'); if (!saveButton) return; const select = document.querySelector('[data-chat-css-preset]'); const id = select?.value.startsWith('saved:') ? select.value.slice(6) : document.querySelector('[data-chat-css-editor]')?.dataset.chatCssActivePreset; if (!id) return; const settings = chatSettingsFor(currentChat()); const item = (settings.cssPresets || []).find(entry => entry.id === id); if (!item) return; item.css = document.querySelector('[data-chat-css-input]')?.value || ''; save(); });
   document.addEventListener('change', event => { const file = event.target.closest('[data-chat-css-file]'); if (!file?.files?.[0]) return; const source = file.files[0]; const reader = new FileReader(); reader.onload = () => { const settings = chatSettingsFor(currentChat()); settings.cssPresets = Array.isArray(settings.cssPresets) ? settings.cssPresets : []; const baseName = source.name.replace(/\.[^.]+$/, '').trim() || '导入的美化'; const name = settings.cssPresets.some(item => item.name === baseName) ? `${baseName} ${settings.cssPresets.length + 1}` : baseName; const item = { id: uid('css-preset'), name, css: String(reader.result || '') }; settings.cssPresets.push(item); save(); const select = document.querySelector('[data-chat-css-preset]'); if (select) { const option = document.createElement('option'); option.value = `saved:${item.id}`; option.textContent = item.name; select.appendChild(option); select.value = option.value; } const input = document.querySelector('[data-chat-css-input]'); if (input) input.value = item.css; const editor = document.querySelector('[data-chat-css-editor]'); if (editor) editor.dataset.chatCssActivePreset = item.id; previewChatBeautyPreset('custom'); }; reader.readAsText(source); });
-  new MutationObserver(ensureChatBeautyPresetSelect).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
+  new MutationObserver(() => scheduleChatObserverJob(ensureChatBeautyPresetSelect)).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
   ensureChatBeautyPresetSelect();
   const expandedVoiceMessages = new Set();
   function voiceMessageBody(message) { const text = message.voiceText || message.text || ''; const seconds = Math.max(1, Math.round(Number(message.seconds) || Math.max(1, Math.ceil(String(text).length / 5)))); const expanded = expandedVoiceMessages.has(message.id); return '<div class="chat-voice-wrap"><button class="chat-voice-bubble" data-chat-voice-toggle="' + esc(message.id) + '" type="button" aria-label="点击转文字"><span class="chat-voice-wave"><i></i><i></i><i></i><i></i><i></i></span><b>' + seconds + '"</b></button>' + (expanded ? '<p class="chat-voice-text">' + esc(text) + '</p>' : '') + '</div>'; }
@@ -1480,12 +1787,10 @@ ${roundText}
   document.addEventListener('click', event => { const toggle = event.target.closest('[data-chat-voice-toggle]'); if (!toggle) return; const box = document.querySelector('#chatMessages'); const scrollTop = box?.scrollTop || 0; const id = toggle.dataset.chatVoiceToggle; if (expandedVoiceMessages.has(id)) expandedVoiceMessages.delete(id); else expandedVoiceMessages.add(id); event.preventDefault(); event.stopImmediatePropagation(); render(); requestAnimationFrame(() => { const nextBox = document.querySelector('#chatMessages'); if (nextBox) nextBox.scrollTop = scrollTop; }); }, true);
   document.addEventListener('click', event => { const tool = event.target.closest('[data-chat-tool="voice"]'); if (!tool || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); menuOpen = false; emojiOpen = false; syncChatPanelDOM(); openVoiceComposer(); }, true);
   document.addEventListener('click', event => { if (event.target.closest('[data-chat-voice-cancel]')) { document.querySelector('[data-chat-voice-modal]')?.remove(); return; } const send = event.target.closest('[data-chat-voice-send]'); if (!send) return; const modal = send.closest('[data-chat-voice-modal]'); const text = modal?.querySelector('[data-chat-voice-text]')?.value.trim(); const seconds = Number(modal?.querySelector('[data-chat-voice-seconds]')?.value); if (!text) return window.alert('请输入语音文字。'); if (!Number.isFinite(seconds) || seconds < 1) return window.alert('请输入正确的语音秒数。'); addMessage(text, 'user', 'voice', { voiceText: text, seconds: Math.min(300, Math.round(seconds)) }); modal.remove(); });
-  document.addEventListener('click', event => { const toggle = event.target.closest('[data-chat-voice-toggle]'); if (!toggle) return; const id = toggle.dataset.chatVoiceToggle; if (expandedVoiceMessages.has(id)) expandedVoiceMessages.delete(id); else expandedVoiceMessages.add(id); render(); });
   function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const body = message.recalled ? '<span class="chat-recalled">' + (message.role === 'user' ? '你' : '角色') + '撤回了一条消息</span>' : message.type === 'voice' ? voiceMessageBody(message) : message.type === 'image' ? '<img src="' + esc(message.text) + '" alt="图片">' : message.type === 'image-desc' ? '<div class="chat-image-description"><strong>文字图片</strong><p>' + esc(message.text) + '</p></div>' : message.type === 'transfer' ? '<div class="chat-transfer-message"><strong>转账</strong><b>¥ ' + esc(message.amount || message.text) + '</b><p>' + esc(message.note || '无备注') + '</p><small>' + (message.status === 'accepted' ? '已收下' : message.status === 'returned' ? '已退回' : '待处理') + '</small></div>' : message.type === 'video' ? '▣ ' + esc(message.text) : message.type === 'location' ? '⌖ ' + esc(message.text) : message.type === 'together' ? '▤ ' + esc(message.text) : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp || message.recalled ? '' : '<small>' + esc(message.time || '') + '</small>'; const typeClass = (message.type || '') + (message.sticker ? ' sticker' : ''); return '<div class="chat-message ' + (message.role === 'user' ? 'is-user' : 'is-character') + '" data-chat-message-id="' + esc(message.id) + '"><div class="chat-message-line">' + avatar + '<div class="chat-bubble ' + typeClass + '">' + body + '</div>' + stamp + '</div></div>'; }
   function openVoiceComposer() { if (document.querySelector('[data-chat-voice-modal]')) return; const modal = document.createElement('div'); modal.dataset.chatVoiceModal = ''; modal.innerHTML = '<div class="chat-voice-backdrop" data-chat-voice-cancel></div><section class="chat-voice-card" role="dialog" aria-modal="true"><header><b>发送语音</b><button type="button" data-chat-voice-cancel>×</button></header><label>语音文字<textarea data-chat-voice-text placeholder="输入这段语音要表达的内容"></textarea></label><label>语音秒数<input data-chat-voice-seconds type="number" min="1" max="300" step="1" value="3"></label><p>发送后点击语音气泡，可以展开文字内容。</p><footer><button type="button" data-chat-voice-cancel>取消</button><button type="button" data-chat-voice-send>发送语音</button></footer></section>'; document.body.appendChild(modal); }
   document.addEventListener('click', event => { const tool = event.target.closest('[data-chat-tool="voice"]'); if (!tool || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); menuOpen = false; emojiOpen = false; syncChatPanelDOM(); openVoiceComposer(); }, true);
   document.addEventListener('click', event => { if (event.target.closest('[data-chat-voice-cancel]')) { document.querySelector('[data-chat-voice-modal]')?.remove(); return; } const send = event.target.closest('[data-chat-voice-send]'); if (!send) return; const modal = send.closest('[data-chat-voice-modal]'); const text = modal?.querySelector('[data-chat-voice-text]')?.value.trim(); const seconds = Number(modal?.querySelector('[data-chat-voice-seconds]')?.value); if (!text) return window.alert('请输入语音文字。'); if (!Number.isFinite(seconds) || seconds < 1) return window.alert('请输入正确的语音秒数。'); addMessage(text, 'user', 'voice', { voiceText: text, seconds: Math.min(300, Math.round(seconds)) }); modal.remove(); });
-  document.addEventListener('click', event => { const toggle = event.target.closest('[data-chat-voice-toggle]'); if (!toggle) return; const id = toggle.dataset.chatVoiceToggle; if (expandedVoiceMessages.has(id)) expandedVoiceMessages.delete(id); else expandedVoiceMessages.add(id); render(); });
   let videoCallMessages = [];
   let videoCallContact = null;
   function renderVideoCallModal(status = 'connecting') { const modal = document.querySelector('[data-chat-video-call]'); if (!modal) return; modal.dataset.videoStatus = status; const contact = videoCallContact || state.contacts.find(item => item.id === activeContact) || {}; const log = videoCallMessages.map(item => '<p class="' + (item.role === 'user' ? 'is-user' : '') + '"><b>' + (item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')) + '：</b>' + esc(item.text) + '</p>').join(''); const avatar = avatarMarkup(contact, 'chat-video-call-avatar'); if (status === 'connecting' || status === 'rejected') { modal.innerHTML = '<div class="chat-video-call-head"><b>视频通话</b><button data-video-call-close type="button">×</button></div><div class="chat-video-call-stage"><div>' + avatar + '<p class="chat-video-call-status">' + (status === 'connecting' ? '正在连接……' : '已拒绝通话') + '</p>' + (status === 'rejected' ? '<div class="chat-video-call-actions"><button data-video-call-close type="button">关闭</button></div>' : '') + '</div></div>'; return; } modal.innerHTML = '<div class="chat-video-call-head"><b>' + esc(contact.nickname || contact.name || '角色') + '</b><button data-video-call-close type="button">×</button></div><div class="chat-video-call-stage"><div>' + avatar + '<p class="chat-video-call-status">通话中</p></div></div><div class="chat-video-call-log">' + log + '</div><div class="chat-video-call-bottom"><input data-video-call-input placeholder="输入通话内容…" autocomplete="off"><button data-video-call-send type="button">发送</button><button data-video-reply type="button">回复</button></div>'; }
@@ -1517,7 +1822,7 @@ ${roundText}
   document.addEventListener('click', event => { const tool = event.target.closest('[data-chat-tool="location"]'); if (!tool || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); menuOpen = false; emojiOpen = false; syncChatPanelDOM(); openLocationComposer(); }, true);
   document.addEventListener('click', event => { if (event.target.closest('[data-chat-location-cancel]')) { document.querySelector('[data-chat-location-modal]')?.remove(); return; } const send = event.target.closest('[data-chat-location-send]'); if (!send) return; const modal = send.closest('[data-chat-location-modal]'); const name = modal?.querySelector('[data-chat-location-name]')?.value.trim(); const detail = modal?.querySelector('[data-chat-location-detail]')?.value.trim(); const distance = modal?.querySelector('[data-chat-location-distance]')?.value.trim(); if (!name) return window.alert('请输入地点名称。'); if (!detail) return window.alert('请输入具体地点。'); if (!distance) return window.alert('请输入距离。'); addMessage(name, 'user', 'location', { locationName: name, locationDetail: detail, distance }); modal.remove(); }, true);
   function formatLocationDistances(root = document) { root.querySelectorAll?.('.chat-location-distance').forEach(item => { if (item.dataset.locationDistanceFormatted === 'true') return; item.dataset.locationDistanceFormatted = 'true'; const raw = item.textContent.trim().replace(/(\d)．(?=\d)/g, '$1.'); const match = raw.match(/^([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*(.*)$/); if (!match) { item.classList.add('is-text'); item.textContent = raw; return; } const number = match[1]; item.classList.toggle('is-decimal', number.includes('.')); item.classList.toggle('is-long-number', number.length >= 5); item.title = raw; item.textContent = ''; const value = document.createElement('b'); value.textContent = number; item.appendChild(value); if (match[2]) { const label = document.createElement('small'); label.textContent = match[2]; item.appendChild(label); } }); }
-  const locationObserver = new MutationObserver(() => { if (app.classList.contains('is-open')) formatLocationDistances(app); });
+  const locationObserver = new MutationObserver(() => scheduleChatObserverJob(() => { if (app.classList.contains('is-open')) formatLocationDistances(app); }));
   locationObserver.observe(app, { childList: true, subtree: true });
   formatLocationDistances(document);
   const baseTapSettings = chatSettingsFor;
@@ -1553,7 +1858,7 @@ ${roundText}
   const baseTapSettingsByTargetRender = renderChatSettings;
   renderChatSettings = function() { baseTapSettingsByTargetRender(); const section = document.querySelector('[data-chat-tap-settings]'); if (!section || !tapSettingsOpen) return; const settings = chatSettingsFor(currentChat()); const labels = section.querySelectorAll('.chat-tap-settings-body label'); const userInput = labels[0]?.querySelector('input'); const characterInput = labels[1]?.querySelector('input'); if (labels[0]?.firstChild) labels[0].firstChild.nodeValue = tapName('user') + ' 被拍一拍'; if (labels[1]?.firstChild) labels[1].firstChild.nodeValue = tapName('character') + ' 被拍一拍'; if (userInput) { userInput.dataset.chatTapSetting = 'userBeTappedText'; userInput.value = settings.userBeTappedText || ''; userInput.placeholder = '可选附加文字'; } if (characterInput) { characterInput.dataset.chatTapSetting = 'characterBeTappedText'; characterInput.value = settings.characterBeTappedText || ''; characterInput.placeholder = '可选附加文字'; } };
   function syncSelectedMessageStyles() { document.querySelectorAll('[data-chat-message-id]').forEach(row => { row.classList.toggle('is-selected', chatMessageEditMode && selectedChatMessageIds.has(row.dataset.chatMessageId)); }); }
-  const selectedMessageObserver = new MutationObserver(() => syncSelectedMessageStyles());
+  const selectedMessageObserver = new MutationObserver(() => scheduleChatObserverJob(syncSelectedMessageStyles));
   selectedMessageObserver.observe(document.querySelector('#chatMain'), { childList: true, subtree: true });
   syncSelectedMessageStyles();
   let bookPickerOpen = false; let bookShelfOpen = false; let selectedBookId = ''; let readingBookId = ''; let readingChatOpen = false; let readingChatMessages = []; let readingTimer = null; let readingStartedAt = 0; let readingLongPressTimer = null; let readingQuote = ''; let readingSettingsOpen = false; let readingFavoritesOpen = false; let readingChatSettingsOpen = false;
@@ -1865,9 +2170,9 @@ ${roundText}
     if (!panel || !chatSettingsOpen || panel.querySelector('[data-character-message-settings]')) return;
     const settings = chatSettingsFor(currentChat());
     settings.characterMultiMessage = Boolean(settings.characterMultiMessage);
-    const legacyCount = Math.min(4, Math.max(2, Number(settings.characterMessageCount) || 2));
-    settings.characterMessageMin = Math.min(4, Math.max(2, Number(settings.characterMessageMin) || (legacyCount > 2 ? 2 : legacyCount)));
-    settings.characterMessageMax = Math.min(4, Math.max(settings.characterMessageMin, Number(settings.characterMessageMax) || legacyCount));
+    const legacyCount = Math.max(2, Number(settings.characterMessageCount) || 2);
+    settings.characterMessageMin = Math.max(2, Number(settings.characterMessageMin) || (legacyCount > 2 ? 2 : legacyCount));
+    settings.characterMessageMax = Math.max(settings.characterMessageMin, Number(settings.characterMessageMax) || legacyCount);
     settings.characterEmojiIds = Array.isArray(settings.characterEmojiIds) ? settings.characterEmojiIds : [];
     const legacyEmojiGroups = [...new Set(characterEmojiItems().filter(item => settings.characterEmojiIds.includes(item.id)).map(item => item.groupId))];
     if (!Array.isArray(settings.characterEmojiGroupIds) || (!settings.characterEmojiGroupIds.length && settings.characterEmojiConfigured !== true)) {
@@ -1887,6 +2192,11 @@ ${roundText}
     anchor.insertAdjacentElement('afterend', category);
     if (tap) category.appendChild(tap);
     category.insertAdjacentHTML('beforeend', `<div class="character-setting-item" data-character-message-settings><button class="character-setting-head" data-character-message-toggle type="button"><span><b>角色连续消息</b><small>${settings.characterMultiMessage ? `已开启 · 目标 ${settings.characterMessageMin}～${settings.characterMessageMax} 条` : '默认 1 条短消息'}</small></span><i>${characterMessageSettingsOpen ? '⌃' : '⌄'}</i></button>${characterMessageSettingsOpen ? `<div class="character-setting-body"><label class="character-message-toggle"><input type="checkbox" data-character-multi ${settings.characterMultiMessage ? 'checked' : ''}><span><b>允许角色连续发送多条消息</b><small>默认只发一条；开启后角色会根据内容自然拆分，普通闲聊最多 3 条，避免连续刷屏。</small></span></label><div class="character-message-range"><label>最少<input type="number" min="2" max="4" step="1" data-character-message-min value="${settings.characterMessageMin}"></label><span>至</span><label>最多<input type="number" min="2" max="4" step="1" data-character-message-max value="${settings.characterMessageMax}"></label><em>条消息</em><button type="button" data-character-message-range-save>确定</button></div></div>` : ''}</div><div class="character-setting-item" data-character-emoji-settings><button class="character-setting-head" data-character-emoji-toggle type="button"><span><b>角色可用表情包</b><small>${settings.characterEmojiGroupIds.length ? `已选择 ${settings.characterEmojiGroupIds.length} 个分组` : '默认未分配'}</small></span><i>${characterEmojiSettingsOpen ? '⌃' : '⌄'}</i></button>${characterEmojiSettingsOpen ? `<div class="character-setting-body"><div class="character-emoji-title"><b>选择角色可发送的分组表情包</b><small>勾选后，角色可以使用该分组中的表情包。</small></div><div class="character-emoji-list">${emojiOptions}</div></div>` : ''}</div>`);
+    category.querySelectorAll('[data-character-message-min], [data-character-message-max]').forEach(input => { input.removeAttribute('max'); });
+    const messageHint = category.querySelector('.character-message-toggle small');
+    if (messageHint) messageHint.textContent = '默认只发一条；开启后按你设置的数量自然拆分。';
+    const messageNote = category.querySelector('[data-character-message-settings] small');
+    if (messageNote) messageNote.textContent = settings.characterMultiMessage ? `已开启 · 目标 ${settings.characterMessageMin}～${settings.characterMessageMax} 条` : '默认 1 条短消息';
   };
 
   document.addEventListener('click', event => {
@@ -1895,8 +2205,8 @@ ${roundText}
     event.preventDefault();
     event.stopImmediatePropagation();
     const settings = chatSettingsFor(currentChat());
-    const min = Math.min(4, Math.max(2, Number(document.querySelector('[data-character-message-min]')?.value) || 2));
-    const max = Math.min(4, Math.max(min, Number(document.querySelector('[data-character-message-max]')?.value) || min));
+    const min = Math.max(2, Number(document.querySelector('[data-character-message-min]')?.value) || 2);
+    const max = Math.max(min, Number(document.querySelector('[data-character-message-max]')?.value) || min);
     settings.characterMessageMin = min;
     settings.characterMessageMax = max;
     settings.characterMultiMessage = document.querySelector('[data-character-multi]')?.checked || false;
@@ -1924,8 +2234,8 @@ ${roundText}
     if (input.matches('[data-character-multi]')) {
       settings.characterMultiMessage = input.checked;
     } else if (input.matches('[data-character-message-min], [data-character-message-max]')) {
-      const min = Math.min(4, Math.max(2, Number(document.querySelector('[data-character-message-min]')?.value) || settings.characterMessageMin || 2));
-      const max = Math.min(4, Math.max(min, Number(document.querySelector('[data-character-message-max]')?.value) || settings.characterMessageMax || min));
+      const min = Math.max(2, Number(document.querySelector('[data-character-message-min]')?.value) || settings.characterMessageMin || 2);
+      const max = Math.max(min, Number(document.querySelector('[data-character-message-max]')?.value) || settings.characterMessageMax || min);
       settings.characterMessageMin = min;
       settings.characterMessageMax = max;
     } else if (input.matches('[data-character-emoji-group]')) {
@@ -2002,12 +2312,11 @@ ${roundText}
   }
 
   function characterReplyBounds(chat, multi) {
-    const legacyCount = Math.min(4, Math.max(2, Number(chatSettingsFor(chat).characterMessageCount) || 2));
-    const configuredMin = Math.min(4, Math.max(2, Number(chatSettingsFor(chat).characterMessageMin) || (legacyCount > 2 ? 2 : legacyCount)));
-    const configuredMax = Math.min(4, Math.max(configuredMin, Number(chatSettingsFor(chat).characterMessageMax) || legacyCount));
-    // 普通闲聊即使旧设置保存过 6 条，也不再一次刷出很多气泡。
+    const legacyCount = Math.max(2, Number(chatSettingsFor(chat).characterMessageCount) || 2);
+    const configuredMin = Math.max(2, Number(chatSettingsFor(chat).characterMessageMin) || (legacyCount > 2 ? 2 : legacyCount));
+    const configuredMax = Math.max(configuredMin, Number(chatSettingsFor(chat).characterMessageMax) || legacyCount);
     const ordinary = !characterReplyIsElaborate(chat);
-    const maxMessages = ordinary ? Math.min(3, configuredMax) : configuredMax;
+    const maxMessages = configuredMax;
     const minMessages = Math.min(maxMessages, configuredMin);
     return {
       min: multi ? minMessages : 1,
@@ -2085,8 +2394,9 @@ ${roundText}
       // 图片等非文字消息不能改写 data URL；文字消息在最终入库前清理残缺控制标记。
       const value = type === 'image' ? String(content || '').trim() : cleanCharacterVisibleText(content);
       if (!value) return;
-      // 参考小手机：每条消息分别保存、分别渲染，中间模拟真人的发送间隔。
-      await new Promise(resolve => setTimeout(resolve, visualMessageCount ? 520 + Math.random() * 780 : 220));
+      // 每条消息分别保存、分别渲染，中间模拟真人的发送间隔。
+      // 连续消息保留一点停顿，但不要让一轮回复因为气泡过多等待太久。
+      await new Promise(resolve => setTimeout(resolve, visualMessageCount ? 180 + Math.random() * 320 : 120));
       baseCharacterAddMessage(value, 'character', type, meta);
       visualMessageCount += 1;
     };
@@ -2166,8 +2476,11 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         const system = payload.messages?.find(item => item.role === 'system');
         if (system) {
           system.content += instruction;
+          // 这里的上限完全来自当前聊天设置，不能再被旧的“最多 3 条”提示覆盖。
+          system.content = system.content.replace(/普通闲聊最多发送 3 条/g, `普通闲聊最多发送 ${rangeMax} 条`)
+            .replace(/普通闲聊通常每条控制在 2—18 个汉字，本轮角色文字总量尽量不超过 42 个汉字/g, '每条消息保持自然完整，不按固定总字数截断');
           // 短回复靠提示词控制，不靠过小的 token 上限硬截断；否则长一点的完整句子会被 API 从末尾截掉。
-          if (!payload.max_tokens) payload.max_tokens = replyBounds.chunkLimit ? 512 : 768;
+          if (!payload.max_tokens) payload.max_tokens = replyBounds.chunkLimit ? 1024 : 1536;
           init = { ...init, body: JSON.stringify(payload) };
         }
       } catch {}
@@ -2229,11 +2542,40 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const chat = currentChat();
     const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId);
     if (!session) return;
+    if (event.target.closest('[data-offline-style-new]')) {
+      const editor = document.querySelector('[data-chat-offline-modal] [data-offline-style-editor]');
+      if (editor) { editor.hidden = false; editor.querySelector('[data-offline-style-name]')?.focus(); }
+      return;
+    }
+    if (event.target.closest('[data-offline-style-save]')) {
+      const panel = document.querySelector('[data-chat-offline-modal] [data-offline-settings-panel]');
+      const name = panel?.querySelector('[data-offline-style-name]')?.value.trim();
+      const prompt = panel?.querySelector('[data-offline-style-prompt]')?.value.trim();
+      if (!name || !prompt) return window.alert('请填写文风名称和具体写作要求。');
+      const item = { id:`custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name, prompt };
+      const list = readOfflineWritingStyles(); list.push(item); localStorage.setItem(offlineWritingStyleKey, JSON.stringify(list));
+      const select = panel.querySelector('[data-offline-style]');
+      if (select) { select.insertAdjacentHTML('beforeend', `<option value="${esc(item.id)}">${esc(item.name)} · 自定义</option>`); select.value = item.id; }
+      const detail = panel.querySelector('[data-offline-style-detail]'); if (detail) detail.value = prompt;
+      const editor = panel.querySelector('[data-offline-style-editor]'); if (editor) editor.hidden = true;
+      return;
+    }
+    if (event.target.matches('[data-offline-style]')) {
+      const style = offlineWritingStyle({ writingStyleId:event.target.value });
+      const detail = document.querySelector('[data-chat-offline-modal] [data-offline-style-detail]'); if (detail) detail.value = style.prompt;
+      return;
+    }
     if (event.target.closest('[data-offline-settings-save]')) {
       saveOfflineSettings(session);
       return;
     }
     if (event.target.closest('[data-offline-settings]')) openOfflineSettings(session);
+  });
+  document.addEventListener('change', event => {
+    if (!event.target.matches('[data-offline-style]')) return;
+    const style = offlineWritingStyle({ writingStyleId:event.target.value });
+    const detail = document.querySelector('[data-chat-offline-modal] [data-offline-style-detail]');
+    if (detail) detail.value = style.prompt;
   });
   document.addEventListener('click', event => {
     if (event.target.closest('[data-offline-reroll]')) rerollOfflineReply();
@@ -2884,7 +3226,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   let chatScrollMainTop = 0;
   render = function() {
     const messageBox = document.querySelector('#chatMessages');
-    const messageCount = currentChat()?.messages?.length || 0;
+    const messageCount = state.chats?.[activeContact]?.messages?.length || 0;
     const renderedCount = messageBox?.querySelectorAll('[data-chat-message-id]').length || 0;
     const chatVisible = app.classList.contains('is-open') && activeTab === 'chat' && Boolean(activeContact);
     const hasNewMessages = chatVisible && Boolean(messageBox) && messageCount > renderedCount;
@@ -2898,7 +3240,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     // been appended, all redraws in that reply/transfer cycle stay pinned to the latest item.
     const shouldRestore = chatVisible && Boolean(messageBox) && !chatScrollToLatestPending;
     const snapshot = shouldRestore ? captureChatPanelScroll() : null;
-    if (shouldRestore && replying) {
+    if (shouldRestore && isContactReplying(activeContact)) {
       const contact = state.contacts.find(item => item.id === activeContact);
       const topName = document.querySelector('.chat-top-name');
       const replyButton = document.querySelector('[data-chat-reply]');
@@ -2906,7 +3248,8 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       if (replyButton) replyButton.disabled = true;
       return;
     }
-    renderWithChatScrollRestore();
+    chatViewRendering = true;
+    try { renderWithChatScrollRestore(); } finally { chatViewRendering = false; }
     if (chatScrollToLatestPending) {
       const scrollLatest = () => {
         if (!app.classList.contains('is-open') || activeTab !== 'chat' || !activeContact) return;
@@ -2929,7 +3272,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     }
     if (snapshot) {
       const restore = () => {
-        if ((currentChat()?.messages?.length || 0) !== messageCount) return;
+        if ((state.chats?.[activeContact]?.messages?.length || 0) !== messageCount) return;
         restoreChatPanelScroll(snapshot);
         if (document.scrollingElement) document.scrollingElement.scrollTop = snapshot.pageTop;
       };
@@ -3081,17 +3424,40 @@ ${recentConversation}`
     const html = renderMomentPostWithCommentReplies(post);
     const comments = Array.isArray(post.comments) ? post.comments : [];
     if (!comments.length) return html;
-    let commentIndex = 0;
-    return html.replace(/<div><b>[\s\S]*?<\/b><span>[\s\S]*?<\/span><\/div>/g, match => {
-      const comment = comments[commentIndex++];
-      if (!comment) return match;
-      const replyable = comment.authorType === 'character' || comment.authorType === 'role';
-      const replies = Array.isArray(comment.replies) ? comment.replies : [];
-      const replyHtml = replies.length
-        ? `<div class="chat-moment-comment-replies">${replies.map(reply => `<div><b>${esc(reply.author || '我')}</b><span>${esc(reply.text || '')}</span></div>`).join('')}</div>`
-        : '';
-      return `<div class="chat-moment-comment${replyable ? ' is-replyable' : ''}" ${replyable ? `data-chat-comment-reply="${esc(post.id)}" data-chat-comment-index="${commentIndex - 1}" role="button" tabindex="0" title="点击回复这条角色评论"` : ''}><b>${esc(comment.author || '我')}</b><span>${esc(comment.text || '')}</span>${replyHtml}</div>`;
+    const children = new Map();
+    const roots = [];
+    comments.forEach((comment, index) => {
+      const parentId = String(comment.replyTo || '');
+      if (parentId && comments.some(parent => String(parent.id || '') === parentId)) {
+        const list = children.get(parentId) || [];
+        list.push({ comment, index });
+        children.set(parentId, list);
+      } else {
+        roots.push({ comment, index });
+      }
     });
+    const replyMarkup = (reply, parentName = '') => `<div><b>${esc(reply.author || '我')}</b><span>${parentName ? `<small>回复 @${esc(parentName)}</small>` : ''}${esc(reply.text || '')}</span></div>`;
+    const renderComment = ({ comment, index }) => {
+      const replyable = comment.authorType === 'character' || comment.authorType === 'role';
+      const replies = [
+        ...(children.get(String(comment.id || '')) || []).map(item => ({ ...item.comment, replyToName: item.comment.replyToName || comment.author || '' })),
+        ...(Array.isArray(comment.replies) ? comment.replies : [])
+      ];
+      const replyHtml = replies.length
+        ? `<div class="chat-moment-comment-replies">${replies.map(reply => replyMarkup(reply, reply.replyToName || comment.author || '')).join('')}</div>`
+        : '';
+      const replyLabel = comment.replyToName ? `<small>回复 @${esc(comment.replyToName)}</small>` : '';
+      return `<div class="chat-moment-comment${replyable ? ' is-replyable' : ''}" ${replyable ? `data-chat-comment-reply="${esc(post.id)}" data-chat-comment-index="${index}" role="button" tabindex="0" title="点击回复这条角色评论"` : ''}><b>${esc(comment.author || '我')}</b><span>${replyLabel}${esc(comment.text || '')}</span>${replyHtml}</div>`;
+    };
+    // 旧版本可能保存了不完整的 replyTo 关系；这种情况下不能让所有评论
+    // 都变成“无根节点”，至少要按普通评论展示出来。
+    const renderItems = roots.length ? roots : comments.map((comment, index) => ({ comment, index }));
+    if (!roots.length) children.clear();
+    const rendered = renderItems.map(renderComment).join('');
+    const commentsStart = html.indexOf('<div class="chat-moment-comments">');
+    const articleEnd = commentsStart >= 0 ? html.indexOf('</article>', commentsStart) : -1;
+    if (commentsStart < 0 || articleEnd < 0) return html;
+    return `${html.slice(0, commentsStart)}<div class="chat-moment-comments">${rendered}</div>${html.slice(articleEnd)}`;
   };
 
   window.addEventListener('click', event => {
@@ -3135,7 +3501,7 @@ ${recentConversation}`
     const wrap = document.querySelector('.chat-conversation .chat-compose-wrap');
     if (!wrap) return;
     const conversation = wrap.closest('.chat-conversation');
-    const message = chatQuote ? currentChat()?.messages.find(item => item.id === chatQuote.id) : null;
+    const message = chatQuote ? state.chats?.[activeContact]?.messages.find(item => item.id === chatQuote.id) : null;
     conversation?.classList.toggle('has-chat-quote', Boolean(message));
     if (!message) { chatQuote = null; wrap.querySelector('[data-chat-quote-bar]')?.remove(); return; }
     wrap.querySelector('[data-chat-quote-bar]')?.remove();
@@ -3146,10 +3512,19 @@ ${recentConversation}`
     wrap.insertBefore(bar, wrap.querySelector('.chat-compose'));
   }
   function chooseChatQuote(id) {
-    const message = currentChat()?.messages.find(item => item.id === id);
+    const message = state.chats?.[activeContact]?.messages.find(item => item.id === id);
     if (!message || message.recalled) return;
     chatQuote = { id: message.id, role: message.role, text: quoteMessageText(message), speaker: quoteMessageSpeaker(message) };
     syncChatQuoteBar();
+    // Focus synchronously inside the swipe's trusted pointerup event so the
+    // mobile keyboard can open without a second tap.
+    const input = app.querySelector('.chat-conversation #chatInput');
+    if (input) {
+      input.focus({ preventScroll: true });
+      const end = input.value.length;
+      try { input.setSelectionRange(end, end); } catch {}
+      syncChatComposerControls(input);
+    }
   }
   const baseRenderWithQuote = render;
   render = function() { baseRenderWithQuote(); syncChatQuoteBar(); };
@@ -3168,6 +3543,7 @@ ${recentConversation}`
       const message = currentChat()?.messages.find(item => item.id === chatQuote.id);
       const quote = message ? { ...chatQuote, text: quoteMessageText(message), speaker: quoteMessageSpeaker(message) } : null;
       chatQuote = null;
+      syncChatQuoteBar();
       if (quote) {
         const prefix = `【引用${quote.speaker}：${quote.text}】\n`;
         return baseAddMessageWithQuote(prefix + String(text || ''), role, type, { ...meta, quote: { ...quote, prefix } });
@@ -3245,11 +3621,14 @@ ${recentConversation}`
     const targetContactId = activeContact;
     if (!targetContactId) return replyBeforeBackgroundDelivery();
     const previousTarget = backgroundReplyContactId;
+    const previousReplyExecution = replyExecution;
     backgroundReplyContactId = targetContactId;
+    replyExecution = true;
     try {
       return await replyBeforeBackgroundDelivery();
     } finally {
       if (backgroundReplyContactId === targetContactId) backgroundReplyContactId = previousTarget;
+      replyExecution = previousReplyExecution;
     }
   };
 
@@ -3257,7 +3636,7 @@ ${recentConversation}`
   // state object captured by memory, multi-message, or generated-image handlers.
   const readBeforeBackgroundReply = read;
   read = function() {
-    return backgroundReplyContactId ? state : readBeforeBackgroundReply();
+    return backgroundReplyContactId || replyingContacts.size ? state : readBeforeBackgroundReply();
   };
 
   // Handle real photo uploads before the legacy FileReader listener. Images are
@@ -3401,50 +3780,323 @@ ${recentConversation}`
     }
   };
 
-  // 线下模式增强：参考小手机的做法，把角色、人设、世界书和两段聊天上下文
+  // 线下模式增强：把角色、人设、世界书和两段聊天上下文
   // 一起交给模型，并明确禁止复述用户消息或替用户行动。
-  const originalOfflineReply = offlineReply;
-  offlineReply = async function(text) {
+  function offlineReplyCharCount(value) { return Array.from(String(value || '').replace(/[\s\u200b]+/g, '')).length; }
+  function cleanOfflineReply(value) { return String(value || '').replace(/^```(?:text|markdown)?/i, '').replace(/```$/i, '').trim(); }
+  function offlineNarrationRule(userName, roleName, userPerson, characterPerson, profile, contact) {
+    const form = (person, name, gender) => person === '他/她'
+      ? (gender === '男' ? `第三人称“他”（也可用${name}澄清）` : gender === '女' ? `第三人称“她”（也可用${name}澄清）` : `第三人称“${name}”（性别未明确，不猜他或她）`)
+      : person === '你' ? `第二人称“你”（指${name}）` : `第一人称“我”（指${name}）`;
+    return `【强制叙述人称】\n用户${userName}：${form(userPerson, userName, profile?.gender)}。角色${roleName}：${form(characterPerson, roleName, contact?.gender)}。这两项分别约束叙述正文中对应人物的视角，不是把用户和角色都改成模型自己的“我”。用户输入中的“我”永远先指用户${userName}；角色对白中的“我”仍按角色自身说话习惯指角色${roleName}，对白不机械套用叙述人称。若两人的人称在同一句中会产生歧义，改用人物真名澄清。不得替用户新增未明确给出的动作、心理、感觉、决定或对白；仅能按设定人称提及用户已经给出的事实。`;
+  }
+  function offlineReplyEndsCleanly(value) { return /[。.!！?？…][”"'’）】」』]*$/u.test(cleanOfflineReply(value)); }
+  function trimOfflineReply(value, maxLength, minLength = 0) {
+    const text = cleanOfflineReply(value);
+    if (offlineReplyCharCount(text) <= maxLength) return text;
+    const chars = Array.from(text);
+    const clipped = chars.slice(0, maxLength).join('').trim();
+    const boundaries = [...clipped.matchAll(/[。.!！?？…][”"'’）】」』]*/gu)].map(match => match.index + match[0].length);
+    const boundary = boundaries.reverse().find(index => offlineReplyCharCount(clipped.slice(0, index)) >= minLength);
+    return boundary ? clipped.slice(0, boundary).trim() : '';
+  }
+  offlineReply = async function(text, resumePending = false) {
     const chat = currentChat();
     const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId);
+    if (resumePending && session?.pendingOfflineReply) text = session.pendingOfflineReply.userInput;
     const contact = state.contacts.find(item => item.id === activeContact);
     const profile = state.profiles.find(item => item.id === chat?.profileId);
     const config = window.IdealMachineAPI?.getConfig?.() || {};
     const model = window.IdealMachineAPI?.getModel?.('chat');
-    if (!session || !contact || !config.endpoint || !config.key || !model) return originalOfflineReply(text);
+    if (!session || !contact) return;
+    if (!config.endpoint || !config.key || !model) {
+      session.messages.push({ role:'error', text:'请先在设置中配置聊天 API 和模型，再继续线下见面。' });
+      save();
+      openOfflineMode();
+      return;
+    }
     const roleName = contact.name || contact.nickname || '角色';
     const userName = profile?.realName || profile?.nickname || profile?.name || '用户';
     const userPerson = session.userPerson || '我';
     const characterPerson = session.characterPerson || '我';
-    const online = (chat.messages || []).slice(-20).map(item => `${item.role === 'user' ? userName : roleName}：${item.text || '[非文字消息]'}`).join('\n') || '暂无线上聊天记录。';
-    const meeting = (session.messages || []).filter(item => !item.contextPrompt).slice(-20).map(item => `${item.role === 'user' ? userName : roleName}：${item.text || ''}`).join('\n') || '这是刚见面的第一个瞬间。';
-    const worldbook = boundWorldbookContext(contact) || '当前没有绑定世界书。';
+    const narrationRule = offlineNarrationRule(userName, roleName, userPerson, characterPerson, profile, contact);
+    const online = (session.onlineContextMessages || session.contextMessages || []).map(item => `${item.role === 'user' ? userName : roleName}：${item.text || '[非文字消息]'}`).join('\n') || '暂无线上聊天记录。';
+    const meeting = (session.messages || []).filter(item => !item.contextPrompt && item.role !== 'error').slice(-20).map(item => `${item.role === 'user' ? userName : roleName}：${item.text || ''}`).join('\n') || '这是刚见面的第一个瞬间。';
+    const worldMaterial = offlineWorldMaterial(contact);
+    const style = offlineWritingStyle(session);
+    const worldbook = worldMaterial.raw;
+    const roleBackground = [contact.background && `角色背景：${contact.background}`, contact.description && `补充背景：${contact.description}`].filter(Boolean).join('\n') || '角色设定中没有单独填写背景，请根据角色设定中的时代、身份、经历和关系谨慎推断。';
     const length = Math.max(50, Math.min(3000, Number(session.replyLength) || 500));
-    const roleInfo = [contact.identity && `身份：${contact.identity}`, contact.gender && `性别：${contact.gender}`, contact.birthday && `生日：${contact.birthday}`, contact.details || contact.signature || '暂无角色设定', `线下设置中的用户叙述人称：${userPerson}`, `线下设置中的角色叙述人称：${characterPerson}`, `本次角色回复字数要求：${length}字以内`, `角色回复预设：${session.replyPreset || '自然、细腻、有现场感，贴合角色平时说话方式。'}`].filter(Boolean).join('\n');
-    const prompt = `你正在进行一次线下见面。你必须扮演角色“${contact.name}”，不是AI、客服、作者或旁白。\n\n【角色资料】\n${roleInfo}\n\n【用户资料】\n称呼：${userName}\n人设：${profile?.persona || '暂无用户设定'}\n\n【世界书】\n${worldbook}\n\n【现场】\n地点：${session.place}\n原因：${session.reason}\n角色状态：${session.mood}\n\n【线上聊天背景】\n${online}\n\n【线下已发生】\n${meeting}\n\n【用户最新输入】\n${String(text || '').trim() || '请从现场的第一个瞬间自然回应。'}\n\n【规则】\n1. 先理解用户输入，再推进现场；禁止逐字重复、改写或总结用户刚才说的话。\n2. 只能描写角色自己的动作、心理和台词，不能替用户补写动作、心理、决定或台词。\n3. 必须结合角色资料、用户人设、世界书、线上关系和现场状态，保持人设与关系连续。\n4. 不要重复已经发生的内容，不要反复介绍地点和背景；每次回复都让现场向前推进。\n5. 可以有少量现场描写，但重点是角色的具体反应；禁止空泛升华、八股套话和通用助手口吻。\n6. 回复完整但不要凑字，约${length}字以内；用户输入很短时优先短回应。\n7. 只输出角色回复正文，不要标题、解释、JSON、时间戳、提示词或“根据设定”等出戏内容。\n本次线下风格：${session.replyPreset || '自然、细腻、有现场感，贴合角色平时说话方式。'}`;
+    const roleInfo = [contact.identity && `身份：${contact.identity}`, contact.gender && `性别：${contact.gender}`, contact.birthday && `生日：${contact.birthday}`, roleBackground, contact.details || contact.signature || '暂无角色设定', `线下设置中的用户叙述人称：${userPerson}`, `线下设置中的角色叙述人称：${characterPerson}`].filter(Boolean).join('\n');
+    const preset = offlineReplyPreset(session, { char_name:roleName, user_name:userName, reply_length:length, user_person:userPerson, char_person:characterPerson, world_background:worldMaterial.background || '暂无世界书分析结果。', writing_style:`${style.name}\n${style.prompt}`, scene:`地点：${session.place}\n原因：${session.reason}\n角色状态：${session.mood}`, user_message:String(text || '').trim() || '请从见面的第一个瞬间自然回应。', online_chat:online, offline_history:meeting });
+    const lengthTolerance = Math.round(length * 0.2);
+    const minLength = Math.max(1, length - lengthTolerance);
+    const maxLength = length + lengthTolerance;
+    const prompt = `你正在进行一次线下见面。你必须扮演角色“${roleName}”，不是AI、客服、作者或旁白。\n\n【执行顺序，必须遵守】\n1. 先读取【世界书分析背景】并理解时代、地点、社会环境、规则和主要矛盾；本次有分析结果时，以它为世界背景的最高依据。\n2. 如果【世界书分析背景】为空，再读取【角色设定】并从角色的时代、身份、经历、关系和已知环境中谨慎分析背景；不得凭空补设定。\n3. 背景确定后，再读取【用户人设】、【角色设定】、回复字数、人称、文风、回复预设和现场记录。\n4. 在内部思考本轮剧情应该如何自然向前发展，检查角色是否会这样做、用户是否被越权代写、结尾是否留有可回应空间；不要输出思考过程。\n\n【角色设定】\n${roleInfo}\n\n【用户人设】\n称呼：${userName}\n人设：${profile?.persona || '暂无用户设定'}\n\n【世界书分析背景】\n${worldMaterial.background || '暂无世界书分析结果。'}\n\n【世界书原始条目】\n${worldbook}\n\n【现场】\n地点：${session.place}\n原因：${session.reason}\n角色状态：${session.mood}\n\n【线上聊天背景】\n${online}\n\n【线下已发生】\n${meeting}\n\n【用户最新输入】\n${String(text || '').trim() || '请从见面的第一个瞬间自然回应。'}\n\n【本次实际使用的角色回复预设】\n${preset}\n\n${narrationRule}\n\n【共同执行的 if 时空规则】\n${offlineAntiClichePrompt}\n\n【输出规则】\n只输出角色回复正文，不要标题、解释、JSON、时间戳、提示词、“根据设定”等出戏内容。先理解用户输入，再用角色自己的动作、心理和台词推进现场；禁止逐字重复、改写或总结用户刚才说的话。只能描写角色自己的行动和心理，不能代替用户决定动作、心理、感受或台词。不要重复已经发生的内容。正文必须控制在 ${minLength}—${maxLength} 字（目标 ${length} 字，允许上下 20%，即目标字数的 0.8—1.2 倍），这是硬性范围，输出前自行数清；若不够就添加新的行动、信息、心理转折和对白，若超出就压缩，不能用重复句或无效环境描写灌水。`;
     offlineBusy = true;
     openOfflineMode();
+    let answer = resumePending ? cleanOfflineReply(session.pendingOfflineReply?.text || '') : '';
+    let finishReason = resumePending ? String(session.pendingOfflineReply?.finishReason || '') : '';
     try {
-      const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.82, max_tokens:Math.max(300, Math.min(1800, length * 2)), stream:false, messages:[{ role:'system', content:'你是理想机线下角色扮演引擎，只输出角色本人自然、完整的回复。' }, { role:'user', content:prompt }] }) });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      const answer = String(data.choices?.[0]?.message?.content || '').replace(/^```(?:text|markdown)?|```$/gi, '').trim();
+      const maxTokens = Math.max(600, Math.min(6000, Math.ceil(length * 1.8)));
+      // 线下提示词通常比普通聊天长，且可能需要续写。固定住请求入口，
+      // 避免其他角色回复临时替换 chatFetch 时串入本次请求，并给它独立的
+      // 较长超时；否则慢一点的接口会被浏览器显示成 Failed to fetch。
+      const request = window.IdealMachineFetch || nativeChatFetch;
+      const requestCompletion = async (messages, tokenBudget = maxTokens) => {
+        let lastError;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, timeout:180000, idealScope:'chat-offline', body:JSON.stringify({ model, temperature:.82, max_tokens:tokenBudget, stream:false, messages }) });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response;
+          } catch (error) {
+            lastError = error;
+            const retryable = error?.name === 'TypeError' || error?.name === 'TimeoutError' || /failed to fetch|network|网络|超时/i.test(String(error?.message || ''));
+            if (!retryable || attempt === 1) throw error;
+            await new Promise(resolve => setTimeout(resolve, 900));
+          }
+        }
+        throw lastError || new Error('线下请求失败');
+      };
+      if (!answer) {
+        const baseMessages = [{ role:'system', content:'你是理想机线下角色扮演引擎，只输出角色本人自然、完整的回复。' }, { role:'user', content:prompt }];
+        const response = await requestCompletion(baseMessages);
+        const data = await response.json();
+        answer = cleanOfflineReply(data.choices?.[0]?.message?.content || '');
+        finishReason = String(data.choices?.[0]?.finish_reason || '');
+      }
       if (!answer) throw new Error('API 没有返回线下回复');
+      let continuationError = null;
+      // 续写只带必要的现场资料和上一段正文。重复发送整份世界书及
+      // 预设会挤占接口上下文，也容易让模型重新开始写一条短回复。
+      for (let round = 0; round < 8 && offlineReplyCharCount(answer) < maxLength && (offlineReplyCharCount(answer) < minLength || !offlineReplyEndsCleanly(answer) || finishReason === 'length'); round += 1) {
+        const currentLength = offlineReplyCharCount(answer);
+        const needed = Math.max(0, minLength - currentLength);
+        const available = maxLength - currentLength;
+        const chunkTarget = Math.min(available, 450, Math.max(35, needed + 25));
+        const continuationMessages = [
+          { role:'system', content:`你只续写角色“${roleName}”同一条线下回复。角色设定：${String(roleInfo).slice(0, 2400)}\n用户设定：${String(profile?.persona || '').slice(0, 900)}\n世界背景：${String(worldMaterial.background || '').slice(0, 1200)}\n文风：${style.name}，${String(style.prompt).slice(0, 900)}\n${narrationRule}\n只能写角色自己的行为、心理和台词，不得代写用户。只输出要接在上一段后面的新正文，不得重述、收尾或解释。` },
+          { role:'user', content:`现场：${session.place}；${session.reason}。用户刚才：${String(text || '').trim().slice(0, 500) || '请自然继续'}。\n当前回复已有 ${currentLength} 字：\n${answer.slice(-3200)}\n\n${finishReason === 'length' ? '接口上一段因输出上限中断了，请从断点接好。' : '请从现有正文之后继续。'}${needed ? `这次写约 ${chunkTarget} 字，至少补足 ${needed} 字。` : `这次只补写不超过 ${chunkTarget} 字，把最后一句完整写完。`}整条回复必须在 ${minLength}—${maxLength} 字之间，并以完整句子结束。只返回需要接在末尾的正文。` }
+        ];
+        try {
+          const continuationResponse = await requestCompletion(continuationMessages, Math.max(900, Math.min(2400, chunkTarget * 3)));
+          const continuationData = await continuationResponse.json();
+          let addition = cleanOfflineReply(continuationData.choices?.[0]?.message?.content || '');
+          if (addition.startsWith(answer)) addition = addition.slice(answer.length).trim();
+          else if (addition.startsWith(answer.slice(-80))) addition = addition.slice(Math.min(80, answer.length)).trim();
+          if (!addition || offlineReplyCharCount(addition) < 3) continue;
+          const separator = /[。！？；：.!?…）」』”"’]$/.test(answer) ? '\n\n' : '';
+          answer += `${separator}${addition}`;
+          finishReason = String(continuationData.choices?.[0]?.finish_reason || '');
+        } catch (error) {
+          continuationError = error;
+          break;
+        }
+      }
+      if (offlineReplyCharCount(answer) > maxLength || (finishReason === 'length' && offlineReplyCharCount(answer) >= maxLength)) {
+        try {
+          const compactResponse = await requestCompletion([{ role:'system', content:'你是理想机线下角色扮演引擎，只输出角色本人自然、完整的回复。' }, { role:'user', content:prompt }, { role:'assistant', content:answer }, { role:'user', content:`请压缩并重写上一条回复，保留关键行动、信息、情绪和对白，不要改变剧情或替用户行动。最终正文必须严格控制在 ${minLength}—${maxLength} 字，目标 ${length} 字。只输出完整正文，不要解释。` }], Math.max(600, Math.min(5000, Math.ceil(length * 1.7))));
+          const compactData = await compactResponse.json();
+          const compactAnswer = cleanOfflineReply(compactData.choices?.[0]?.message?.content || '');
+          if (offlineReplyCharCount(compactAnswer) >= minLength && offlineReplyCharCount(compactAnswer) <= maxLength && offlineReplyEndsCleanly(compactAnswer) && compactData.choices?.[0]?.finish_reason !== 'length') {
+            answer = compactAnswer;
+            finishReason = String(compactData.choices?.[0]?.finish_reason || '');
+          }
+        } catch {}
+      }
+      if (offlineReplyCharCount(answer) > maxLength) {
+        const trimmed = trimOfflineReply(answer, maxLength, minLength);
+        if (trimmed) { answer = trimmed; finishReason = 'stop'; }
+      }
+      if (offlineReplyCharCount(answer) < minLength || offlineReplyCharCount(answer) > maxLength || !offlineReplyEndsCleanly(answer) || finishReason === 'length') {
+        throw new Error(`回复尚未完整生成（${offlineReplyCharCount(answer)} 字，目标 ${minLength}—${maxLength} 字）${continuationError ? `：${continuationError.message}` : ''}`);
+      }
+      delete session.pendingOfflineReply;
+      session.messages = session.messages.filter(item => !item.retryable);
       session.messages.push({ role:'character', text:answer });
+      session.scrollToNewReply = true;
       save();
     } catch (error) {
-      session.messages.push({ role:'character', text:`这次见面暂时无法继续：${error.message}` });
+      session.messages = session.messages.filter(item => !item.retryable);
+      if (answer && (offlineReplyCharCount(answer) < minLength || offlineReplyCharCount(answer) > maxLength || !offlineReplyEndsCleanly(answer) || finishReason === 'length')) {
+        session.pendingOfflineReply = { text:answer, userInput:text, targetLength:length, finishReason };
+        const issue = offlineReplyCharCount(answer) < minLength ? `还差 ${minLength - offlineReplyCharCount(answer)} 字` : offlineReplyCharCount(answer) > maxLength ? `超出上限 ${offlineReplyCharCount(answer) - maxLength} 字` : '结尾还没有写完整';
+        session.messages.push({ role:'error', retryable:true, text:`已生成 ${offlineReplyCharCount(answer)} 字，但${issue}。正文已保留，点击下方按钮继续完成。` });
+      } else {
+        session.messages.push({ role:'error', text:`这次见面暂时无法继续：${error.message}` });
+      }
       save();
-    } finally { offlineBusy = false; openOfflineMode(); }
+    } finally {
+      offlineBusy = false;
+      openOfflineMode();
+      if (session.scrollToNewReply) {
+        delete session.scrollToNewReply;
+        const box = document.querySelector('[data-chat-offline-modal] .chat-offline-messages');
+        const bubble = Array.from(box?.querySelectorAll('article.is-character') || []).at(-1);
+        if (bubble) {
+          box.style.paddingBottom = `${Math.max(0, box.clientHeight - 50)}px`;
+          box.scrollTop = bubble.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8;
+        }
+      }
+    }
   };
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.('[data-offline-complete]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const session = currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId);
+    if (!offlineBusy && session?.pendingOfflineReply) offlineReply(session.pendingOfflineReply.userInput, true);
+  }, true);
 
   // 线下见面：返回只是离开当前页面，不代表结束见面。未保存的会话下次继续打开。
   const renderOfflineMeetingPage = openOfflineMode;
+  let offlineSelectionSessionId = '';
+  let offlineSelecting = false;
+  const offlineSelectedMessages = new Set();
+  let offlinePressTimer = 0;
+  let offlinePressStart = null;
+  let offlineSuppressNextClick = false;
+  function syncOfflineSelection() {
+    const modal = document.querySelector('[data-chat-offline-modal]');
+    if (!modal) return;
+    modal.classList.toggle('is-selecting-messages', offlineSelecting);
+    modal.querySelectorAll('[data-offline-message-index]').forEach(article => {
+      const selected = offlineSelectedMessages.has(Number(article.dataset.offlineMessageIndex));
+      article.classList.toggle('is-selected', selected);
+      article.setAttribute('aria-selected', String(selected));
+    });
+    const count = modal.querySelector('[data-offline-selected-count]');
+    if (count) count.textContent = `已选 ${offlineSelectedMessages.size} 条`;
+    const remove = modal.querySelector('[data-offline-delete-selected]');
+    if (remove) remove.disabled = !offlineSelectedMessages.size || offlineBusy;
+  }
+  function stopOfflinePress() { window.clearTimeout(offlinePressTimer); offlinePressTimer = 0; offlinePressStart = null; }
   openOfflineMode = function() {
     renderOfflineMeetingPage();
+    if (offlineSelectionSessionId !== offlineSessionId) {
+      offlineSelectionSessionId = offlineSessionId;
+      offlineSelecting = false;
+      offlineSelectedMessages.clear();
+    }
+    const messageBox = document.querySelector('[data-chat-offline-modal] .offline-meeting-v2 .chat-offline-messages');
+    if (messageBox) {
+      messageBox.insertAdjacentHTML('beforebegin', '<div class="chat-offline-selection-toolbar" data-offline-selection-toolbar hidden><span data-offline-selected-count>已选 0 条</span><button type="button" data-offline-selection-cancel>取消</button><button type="button" data-offline-delete-selected disabled>删除所选</button></div>');
+      const toolbar = messageBox.previousElementSibling;
+      toolbar.hidden = !offlineSelecting;
+      syncOfflineSelection();
+    }
     const saveButton = document.querySelector('[data-chat-offline-modal] [data-offline-finish] span');
     if (saveButton) saveButton.textContent = offlineBusy ? '正在保存见面' : '保存这次见面';
+    const presetInput = document.querySelector('[data-chat-offline-modal] [data-offline-preset]');
+    if (presetInput) {
+      const controls = document.createElement('div');
+      controls.className = 'chat-offline-preset-controls';
+      controls.innerHTML = `<label>选择回复预设<select data-offline-preset-select>${offlineReplyPresetOptions(currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId)?.replyPresetId || 'default')}</select></label><button type="button" data-offline-preset-new>＋ 新建预设</button><button type="button" data-offline-preset-save>保存当前预设</button><small>可用变量：{{char_name}}、{{user_name}}、{{reply_length}}、{{user_person}}、{{char_person}}、{{world_background}}、{{writing_style}}、{{scene}}、{{user_message}}、{{online_chat}}、{{offline_history}}</small>`;
+      presetInput.before(controls);
+    }
   };
+  document.addEventListener('pointerdown', event => {
+    const article = event.target.closest?.('[data-chat-offline-modal] .offline-meeting-v2 [data-offline-message-index]');
+    stopOfflinePress();
+    if (!article || offlineSelecting || event.target.closest('button')) return;
+    const index = Number(article.dataset.offlineMessageIndex);
+    offlinePressStart = { x:event.clientX, y:event.clientY };
+    offlinePressTimer = window.setTimeout(() => {
+      offlineSelecting = true;
+      offlineSelectedMessages.add(index);
+      offlineSuppressNextClick = true;
+      window.setTimeout(() => { offlineSuppressNextClick = false; }, 800);
+      const toolbar = article.closest('.offline-meeting-v2')?.querySelector('[data-offline-selection-toolbar]');
+      if (toolbar) toolbar.hidden = false;
+      syncOfflineSelection();
+      window.getSelection()?.removeAllRanges();
+      offlinePressTimer = 0;
+    }, 550);
+  });
+  document.addEventListener('pointermove', event => {
+    if (offlinePressStart && Math.hypot(event.clientX - offlinePressStart.x, event.clientY - offlinePressStart.y) > 12) stopOfflinePress();
+  });
+  document.addEventListener('pointerup', stopOfflinePress);
+  document.addEventListener('pointercancel', stopOfflinePress);
+  document.addEventListener('contextmenu', event => {
+    const article = event.target.closest?.('[data-chat-offline-modal] .offline-meeting-v2 [data-offline-message-index]');
+    if (!article) return;
+    event.preventDefault();
+    stopOfflinePress();
+    offlineSelecting = true;
+    offlineSelectedMessages.add(Number(article.dataset.offlineMessageIndex));
+    offlineSuppressNextClick = true;
+    window.setTimeout(() => { offlineSuppressNextClick = false; }, 800);
+    const toolbar = article.closest('.offline-meeting-v2')?.querySelector('[data-offline-selection-toolbar]');
+    if (toolbar) toolbar.hidden = false;
+    syncOfflineSelection();
+  });
+  document.addEventListener('click', event => {
+    if (event.target.closest?.('[data-chat-offline-modal] [data-offline-close]')) {
+      offlineSelecting = false;
+      offlineSelectedMessages.clear();
+      offlineSelectionSessionId = '';
+      stopOfflinePress();
+      return;
+    }
+    const article = event.target.closest?.('[data-chat-offline-modal] .offline-meeting-v2 [data-offline-message-index]');
+    const cancel = event.target.closest?.('[data-offline-selection-cancel]');
+    const remove = event.target.closest?.('[data-offline-delete-selected]');
+    if (!article && !cancel && !remove) return;
+    if (article && (!offlineSelecting || event.target.closest('button'))) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (article && offlineSuppressNextClick) { offlineSuppressNextClick = false; return; }
+    if (cancel) { offlineSelecting = false; offlineSelectedMessages.clear(); document.querySelector('[data-offline-selection-toolbar]')?.setAttribute('hidden', ''); syncOfflineSelection(); return; }
+    if (article) {
+      const index = Number(article.dataset.offlineMessageIndex);
+      if (offlineSelectedMessages.has(index)) offlineSelectedMessages.delete(index);
+      else offlineSelectedMessages.add(index);
+      syncOfflineSelection();
+      return;
+    }
+    if (!offlineSelectedMessages.size || offlineBusy) return;
+    const session = currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId);
+    if (!session || !window.confirm(`删除选中的 ${offlineSelectedMessages.size} 条线下消息？删除后无法恢复。`)) return;
+    session.messages = session.messages.filter((item, index) => !offlineSelectedMessages.has(index));
+    if (!session.messages.some(item => item.retryable)) delete session.pendingOfflineReply;
+    offlineSelecting = false;
+    offlineSelectedMessages.clear();
+    save();
+    openOfflineMode();
+  }, true);
+  document.addEventListener('change', event => {
+    if (!event.target.matches('[data-offline-preset-select]')) return;
+    const panel = event.target.closest('[data-offline-settings-panel]');
+    const item = readOfflineReplyPresets().find(preset => preset.id === event.target.value);
+    const input = panel?.querySelector('[data-offline-preset]');
+    if (input) input.value = item?.prompt || offlineDefaultReplyPreset;
+  });
+  document.addEventListener('click', event => {
+    const create = event.target.closest('[data-offline-preset-new]');
+    const savePreset = event.target.closest('[data-offline-preset-save]');
+    if (!create && !savePreset) return;
+    const panel = event.target.closest('[data-offline-settings-panel]');
+    const input = panel?.querySelector('[data-offline-preset]');
+    const select = panel?.querySelector('[data-offline-preset-select]');
+    if (!input || !select) return;
+    const existing = readOfflineReplyPresets();
+    const selected = existing.find(item => item.id === select.value);
+    const name = create || !selected ? window.prompt('给这份回复预设起个名字：', '')?.trim() : selected.name;
+    if (!name) return;
+    const prompt = create ? offlineDefaultReplyPreset : input.value.trim();
+    if (!prompt) return window.alert('请先填写回复预设。');
+    const item = create || !selected ? { id:`preset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name, prompt } : selected;
+    if (item === selected) item.prompt = prompt;
+    else existing.push(item);
+    localStorage.setItem(offlineReplyPresetsKey, JSON.stringify(existing));
+    select.innerHTML = offlineReplyPresetOptions(item.id);
+    select.value = item.id;
+    input.value = item.prompt;
+    if (create) input.focus();
+  });
   document.addEventListener('click', event => {
     if (event.target.closest('[data-offline-close]')) {
       const chat = currentChat();
@@ -3527,21 +4179,22 @@ ${recentConversation}`
     if(message.type==='transfer')return `【转账：${message.amount||message.text||'0'}】`;
     return message.text||message.content||'等待开始聊天';
   }
-  const contactPreviewObserver = new MutationObserver(() => {
+  const contactPreviewObserver = new MutationObserver(() => scheduleChatObserverJob(() => {
     if (!app.classList.contains('is-open')) return;
     if (activeTab === 'contacts') app.querySelectorAll('.chat-contact-real-name').forEach(name => { const p = name.closest('b')?.nextElementSibling; if (p) p.textContent = name.textContent; name.remove(); });
     if (activeTab === 'chat' && !activeContact) app.querySelectorAll('.chat-launch-contact').forEach(button => { const contact=state.contacts.find(item=>item.id===button.dataset.chatOpen); const last = state.chats?.[button.dataset.chatOpen]?.messages?.slice(-1)[0]; const b = button.querySelector('b'); const small = button.querySelector('small'); if (b&&contact) { const nickname=contact.nickname||contact.name||'未命名'; const realName=contact.name&&contact.name!==nickname?contact.name:''; if(b.dataset.contactName!==`${nickname}|${realName}`){b.dataset.contactName=`${nickname}|${realName}`;b.textContent=nickname;if(realName){const real=document.createElement('em');real.className='chat-contact-real-name';real.textContent=realName;b.append(real);}} } const preview = chatListMessagePreview(last); if (small && small.textContent !== preview) small.textContent = preview; });
-  });
+  }));
   contactPreviewObserver.observe(app, { childList: true, subtree: true });
 
-  const takeoverDraftObserver = new MutationObserver(() => {
+  const takeoverDraftObserver = new MutationObserver(() => scheduleChatObserverJob(() => {
     if(!app.classList.contains('is-open')||!activeContact)return;
     const chat=state.chats?.[activeContact];const input=app.querySelector('#chatInput');
     if(input&&chat?.draft&&input.value!==chat.draft&&!input.dataset.draftRestored){input.value=chat.draft;input.dataset.draftRestored='true';}
-  });
+  }));
   takeoverDraftObserver.observe(app,{childList:true,subtree:true});
-  document.addEventListener('input',event=>{if(event.target?.id!=='chatInput'||!activeContact)return;const chat=state.chats?.[activeContact];if(!chat)return;chat.draft=event.target.value;delete chat.takeoverDraftByRoleId;save();});
-  document.addEventListener('click',event=>{if(!event.target.closest?.('[data-chat-send]')||!activeContact)return;const chat=state.chats?.[activeContact];if(chat){chat.draft='';delete chat.takeoverDraftByRoleId;save();}},true);
+  document.addEventListener('input',event=>{if(event.target?.id!=='chatInput'||!activeContact)return;const chat=state.chats?.[activeContact];if(!chat)return;chat.draft=event.target.value;delete chat.takeoverDraftByRoleId;scheduleChatDraftSave();});
+  document.addEventListener('click',event=>{if(!event.target.closest?.('[data-chat-send]')||!activeContact)return;const chat=state.chats?.[activeContact];if(chat){chat.draft='';delete chat.takeoverDraftByRoleId;cancelChatDraftSave();}},true);
+  window.addEventListener('pagehide', flushChatDraftSave);
 
   function cleanGeneratedMomentText(value, contact) {
     const names=[contact?.nickname,contact?.name].filter(Boolean).map(name=>String(name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
@@ -3553,14 +4206,108 @@ ${recentConversation}`
   }
   const generatedMomentBeforeStable = generateRoleMoment;
   generateRoleMoment = async function(contactId, targetPost=null) {
-    if(targetPost){if(targetPost.visibility==='private')return window.alert('仅自己可见的动态，其他角色看不见也不能互动。');return generatedMomentBeforeStable(contactId,targetPost);}
-    const before=new Set(state.moments.map(post=>post.id));
-    await generatedMomentBeforeStable(contactId,targetPost);
-    state.moments.filter(post=>!before.has(post.id)).forEach(post=>{const contact=state.contacts.find(item=>item.id===post.authorId);post.text=cleanGeneratedMomentText(post.text,contact);});
-    save();render();
+    momentGenerationDepth += 1;
+    momentBusy = true;
+    render();
+    try {
+      if(targetPost){if(targetPost.visibility==='private')return window.alert('仅自己可见的动态，其他角色看不见也不能互动。');return await generatedMomentBeforeStable(contactId,targetPost);}
+      const before=new Set(state.moments.map(post=>post.id));
+      await generatedMomentBeforeStable(contactId,targetPost);
+      state.moments.filter(post=>!before.has(post.id)).forEach(post=>{const contact=state.contacts.find(item=>item.id===post.authorId);post.text=cleanGeneratedMomentText(post.text,contact);});
+      save();
+    } finally {
+      momentGenerationDepth = Math.max(0, momentGenerationDepth - 1);
+      if (!momentGenerationDepth) { momentBusy = false; render(); }
+    }
   };
   const generateRoleInteractionBeforePrivate = generateRoleInteraction;
   generateRoleInteraction = function(post) { if(post?.visibility==='private')return window.alert('仅自己可见的动态，其他角色看不见也不能互动。');return generateRoleInteractionBeforePrivate(post); };
+  function parseMomentInteractionResults(value) {
+    const source = String(value || '').replace(/```(?:json|text|markdown)?|```/gi, '').trim();
+    if (!source) return [];
+    try {
+      const parsed = JSON.parse(source.match(/\[[\s\S]*\]/)?.[0] || source);
+      const list = Array.isArray(parsed) ? parsed : [parsed];
+      return list.filter(item => item && typeof item === 'object');
+    } catch {}
+    // 某些模型会在评论正文中输出未转义的引号，或在最后一个对象处
+    // 提前结束。不要因此丢掉前面已经完整返回的互动项。
+    const starts = [...source.matchAll(/\{\s*["']?actorId["']?\s*:/gi)].map(match => match.index).filter(index => Number.isFinite(index));
+    return starts.map((start, index) => {
+      const end = starts[index + 1] ?? source.length;
+      const chunk = source.slice(start, end);
+      const field = (name, fallback = '') => {
+        const match = chunk.match(new RegExp(`["']?${name}["']?\\s*:\\s*["']([^"'\\n]*)`, 'i'));
+        return match ? match[1].replace(/\\(["'\\\\])/g, '$1').trim() : fallback;
+      };
+      const textStart = chunk.search(/["']?text["']?\s*:\s*/i);
+      let text = '';
+      if (textStart >= 0) {
+        text = chunk.slice(textStart).replace(/^[\s\S]*?["']?text["']?\s*:\s*["']?/i, '').replace(/["']?\s*[,}]\s*$/g, '').trim();
+        text = text.replace(/\\(["'\\\\])/g, '$1').replace(/\\n/g, '\n').replace(/["']?\s*[,}]\s*$/g, '').trim();
+      }
+      return { actorId:field('actorId'), action:field('action', 'reply'), targetId:field('targetId', 'post'), text };
+    }).filter(item => item.actorId);
+  }
+  generateRoleInteraction = async function(post) {
+    if (!post || post.visibility === 'private') return window.alert('仅自己可见的动态，其他角色看不见也不能互动。');
+    if (momentBusy) return;
+    const targetId = post.id;
+    const actors = state.contacts.filter(item => item.id !== post.authorId && (post.visibility !== 'groups' || (item.groupIds || []).some(id => (post.visibleGroups || []).includes(id))));
+    if (!actors.length) return window.alert('请先添加其他角色，才能参与朋友圈互动。');
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API 模型。');
+    const originalText = String(post.text || '');
+    const existingComments = Array.isArray(post.comments) ? post.comments : [];
+    const commentContext = existingComments.slice(-20).map(comment => `评论ID：${comment.id}\n评论者：${comment.author || '用户'}\n评论内容：${comment.text || ''}`).join('\n\n') || '暂无评论。';
+    const roster = actors.slice(0, 16).map(actor => `角色ID：${actor.id}\n角色姓名：${actor.nickname || actor.name}\n身份：${actor.identity || '未填写'}\n人设：${String(actor.details || actor.signature || '暂无').slice(0, 1200)}\n背景：${String(actor.background || actor.description || '暂无').slice(0, 500)}`).join('\n\n');
+    const prompt = `请让 1—3 位合适的角色参与这条朋友圈互动。先阅读每个角色自己的完整资料，再根据角色和动态作者的关系决定是否点赞、评论，或回复已有评论。角色只能依据当前可见的动态、评论、自己的设定和真实聊天背景行动，不得凭空知道幕后信息。动态有具体内容时，通常至少安排 1 位合适角色写一条具体评论，不要让所有角色都只点赞；只有确实没有合适话题时才纯点赞。\n\n【目标动态】\n动态ID：${targetId}\n作者：${post.author || '用户'}\n正文：${originalText || '[图片动态]'}\n\n【现有评论】\n${commentContext}\n\n【可参与角色】\n${roster}\n\n只返回合法 JSON 数组，不要 Markdown、解释或其他字段。每项格式：{"actorId":"角色ID","action":"reply|like|both","targetId":"post或真实评论ID","text":"评论正文；纯点赞时为空"}。回复动态时 targetId 填 post；回复评论时必须填写现有评论的真实评论ID。禁止角色回复自己已有的评论，禁止删除、改写或覆盖动态正文；互动只能追加评论或增加点赞。评论要具体回应动态或评论内容，符合角色本人身份、关系、语气和当前情境，不要每个人都使用相同口吻。JSON 必须完整闭合；评论正文不要使用未转义的双引号。`;
+    momentBusy = true;
+    render();
+    try {
+      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.82, max_tokens:1200, stream:false, messages:[{ role:'system', content:'你是朋友圈互动调度器，只输出合法 JSON 数组。' }, { role:'user', content:prompt }] }) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim();
+      const results = parseMomentInteractionResults(raw);
+      if (!results.length) throw new Error('API 返回的互动内容不完整，请重新点击互动。');
+      const target = state.moments.find(item => item.id === targetId);
+      if (!target) throw new Error('这条动态已经不存在。');
+      target.comments = Array.isArray(target.comments) ? target.comments : [];
+      let interactions = 0;
+      results.slice(0, 3).forEach(result => {
+        const actor = actors.find(item => item.id === String(result?.actorId || ''));
+        if (!actor) return;
+        const action = ['reply', 'like', 'both'].includes(result?.action) ? result.action : 'reply';
+        const text = String(result?.text || '').trim();
+        const requestedTarget = String(result?.targetId || 'post');
+        const parent = requestedTarget === 'post' ? null : target.comments.find(comment => comment.id === requestedTarget);
+        const alreadyOwn = target.comments.some(comment => comment.authorId === actor.id && (!parent || comment.replyTo === parent.id));
+        if (!alreadyOwn && (action === 'reply' || action === 'both') && text) {
+          target.comments.push({ id:uid('comment'), author:actor.nickname || actor.name, text, authorType:'character', authorId:actor.id, time:time(), replyTo:parent?.id || '', replyToName:parent?.author || '' });
+          interactions += 1;
+        }
+        if (action === 'like' || action === 'both') {
+          target.roleLikeIds = Array.isArray(target.roleLikeIds) ? target.roleLikeIds : [];
+          if (!target.roleLikeIds.includes(actor.id)) {
+            target.roleLikeIds.push(actor.id);
+            target.likes = Number(target.likes || 0) + 1;
+            target.roleLikes = Number(target.roleLikes || 0) + 1;
+            interactions += 1;
+          }
+        }
+      });
+      if (!interactions) throw new Error('API 没有返回有效互动。');
+      if (target.text !== originalText) target.text = originalText;
+      save();
+    } catch (error) {
+      window.alert(`生成互动失败：${error.message || '未知错误'}`);
+    } finally {
+      momentBusy = false;
+      render();
+    }
+  };
   const renderMomentPostBeforePrivate = renderMomentPost;
   renderMomentPost = function(post) {
     const contact=post?.authorType==='character'?state.contacts.find(item=>item.id===post.authorId):null;
@@ -3569,4 +4316,280 @@ ${recentConversation}`
     const privatePost={...displayPost,likes:Math.max(0,Number(displayPost.likes||0)-Number(displayPost.roleLikes||0)),comments:(displayPost.comments||[]).filter(comment=>comment.authorType!=='character'&&comment.authorType!=='role')};
     return renderMomentPostBeforePrivate(privatePost).replace(/<button data-moment-interact="[^"]*" type="button">✦ 互动<\/button>/,'');
   };
+  const renderMomentPostBeforeLikeNames = renderMomentPost;
+  renderMomentPost = function(post) { return renderMomentPostBeforeLikeNames(post); };
+
+  function momentNpcActors() {
+    try {
+      const cache = JSON.parse(localStorage.getItem('ideal-machine-ta-npcs') || '{}');
+      return Object.entries(cache).flatMap(([sourceRoleId, list]) => (Array.isArray(list) ? list : []).map(npc => {
+        const name = String(npc?.name || '').trim(); if (!name) return null;
+        const id = String(npc.id || `npc:${sourceRoleId}:${name}`);
+        const sourceRole = state.contacts.find(item => item.id === sourceRoleId);
+        return { ...npc, id, actorType:'npc', displayName:name, sourceRoleId, groupIds:sourceRole?.groupIds || [], identity:npc.identity || 'NPC', persona:[npc.personality, npc.motivation, npc.reason, npc.relationDescription].filter(Boolean).join('；') || '暂无 NPC 设定' };
+      }).filter(Boolean));
+    } catch { return []; }
+  }
+  function momentInteractionActors(post) {
+    const roles = state.contacts.map(contact => ({ ...contact, actorType:'role', displayName:contact.nickname || contact.name || '角色', persona:contact.details || contact.signature || '暂无角色设定', groupIds:Array.isArray(contact.groupIds) ? contact.groupIds : [] }));
+    const actors = [...roles, ...momentNpcActors()].filter(actor => actor.id !== post.authorId);
+    if (post.visibility !== 'groups') return actors;
+    const visibleGroups = new Set(Array.isArray(post.visibleGroups) ? post.visibleGroups : []);
+    return actors.filter(actor => actor.groupIds.some(id => visibleGroups.has(id)));
+  }
+  function momentActorName(id) {
+    const contact = state.contacts.find(item => item.id === id); if (contact) return contact.nickname || contact.name || '';
+    return momentNpcActors().find(item => item.id === id)?.displayName || '';
+  }
+  generateRoleInteraction = async function(post) {
+    if (!post || post.visibility === 'private' || post.userOnly) return window.alert('仅用户可见的动态，其他角色和 NPC 看不见也不能互动。');
+    if (momentBusy) return;
+    const actors = momentInteractionActors(post);
+    if (!actors.length) return window.alert(post.visibility === 'groups' ? '当前可见分组里没有其他角色或 NPC，暂时无法互动。' : '请先添加其他角色，或先在世界书中分析并同步 NPC。');
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API 模型。');
+    const targetId = post.id;
+    const originalText = String(post.text || '');
+    const visibility = post.visibility === 'groups' ? `指定分组可见：${(post.visibleGroups || []).map(id => state.contactGroups.find(group => group.id === id)?.name || id).join('、') || '未指定分组'}` : post.visibility === 'character' ? '仅角色可见' : '所有人可见';
+    const existingComments = Array.isArray(post.comments) ? post.comments : [];
+    const commentContext = existingComments.slice(-20).map(comment => `评论ID：${comment.id}\n评论者：${comment.author || '用户'}\n评论内容：${comment.text || ''}`).join('\n\n') || '暂无评论。';
+    const roster = actors.slice(0, 24).map(actor => `${actor.actorType === 'npc' ? 'NPC' : '角色'}ID：${actor.id}\n姓名：${actor.displayName}\n身份：${actor.identity || '未填写'}\n人设：${String(actor.persona || '暂无').slice(0, 1400)}\n${actor.actorType === 'npc' ? `所属角色：${state.contacts.find(item => item.id === actor.sourceRoleId)?.nickname || state.contacts.find(item => item.id === actor.sourceRoleId)?.name || '未知'}` : ''}`).join('\n\n');
+    const minimum = actors.length > 1 ? 2 : 1;
+    const prompt = `请为这条朋友圈安排自然的角色/NPC互动。必须严格按以下顺序执行：
+第一步，先读取【可见范围】。仅自己可见时禁止返回任何互动；指定分组可见时，只能从已经筛选出的可见角色和 NPC 中选择；所有人可见或仅角色可见时，只能使用下方候选名单。
+第二步，再根据动态内容、评论、每个角色/NPC的人设、身份、关系和背景控制互动数量。一次互动至少安排 ${minimum} 个独立互动单位；如果候选名单只有 1 人，可以让该人物同时点赞并评论，但不能只返回一个孤立点赞。候选人数超过 1 人时，至少安排 2 个不同角色/NPC，其中至少 1 个应该在动态有具体内容时发表评论，其他人可以点赞或评论。不要让所有人使用相同语气，也不要为了凑数量强行让不合适的人互动。
+只返回合法 JSON 数组，不要 Markdown、解释或其他字段。每项格式：{"actorId":"候选名单中的真实ID","action":"reply|like|both","targetId":"post或现有评论ID","text":"评论正文；纯点赞时为空"}。回复动态时 targetId 填 post；回复评论时必须填写现有评论的真实评论ID。禁止回复自己已有的评论、禁止互动不可见的人物、禁止删除或改写动态正文。评论必须符合该角色/NPC本人，不得捏造没有提供的背景。\n\n【可见范围】\n${visibility}\n\n【目标动态】\n动态ID：${targetId}\n作者：${post.author || '用户'}\n正文：${originalText || '[图片动态]'}\n\n【现有评论】\n${commentContext}\n\n【已按可见范围筛选的候选名单】\n${roster}`;
+    momentBusy = true;
+    render();
+    try {
+      const request = window.IdealMachineFetch || window.fetch.bind(window);
+      const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'chat-background', timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:1800, stream:false, messages:[{ role:'system', content:'你是朋友圈可见性与互动调度器。先执行可见范围过滤，再控制互动数量。只输出合法 JSON 数组。' }, { role:'user', content:prompt }] }) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const results = parseMomentInteractionResults(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim());
+      if (!results.length) throw new Error('API 返回的互动内容不完整，请重新点击互动。');
+      const target = state.moments.find(item => item.id === targetId);
+      if (!target || target.visibility === 'private') throw new Error('这条动态当前不可互动。');
+      target.comments = Array.isArray(target.comments) ? target.comments : [];
+      const allowed = new Map(actors.map(actor => [String(actor.id), actor]));
+      const newActorIds = new Set(); let addedLikes = 0; let addedComments = 0;
+      const addLike = actor => { target.roleLikeIds = Array.isArray(target.roleLikeIds) ? target.roleLikeIds : []; if (target.roleLikeIds.includes(actor.id)) return false; target.roleLikeIds.push(actor.id); target.likes = Number(target.likes || 0) + 1; target.roleLikes = Number(target.roleLikes || 0) + 1; newActorIds.add(actor.id); addedLikes += 1; return true; };
+      results.slice(0, 8).forEach(result => {
+        const actor = allowed.get(String(result?.actorId || '')); if (!actor) return;
+        const action = ['reply', 'like', 'both'].includes(result?.action) ? result.action : 'reply';
+        const text = String(result?.text || '').trim();
+        const requestedTarget = String(result?.targetId || 'post');
+        const parent = requestedTarget === 'post' ? null : target.comments.find(comment => comment.id === requestedTarget);
+        const alreadyOwn = target.comments.some(comment => comment.authorId === actor.id && (!parent || comment.replyTo === parent.id));
+        if (!alreadyOwn && (action === 'reply' || action === 'both') && text) { target.comments.push({ id:uid('comment'), author:actor.displayName, text, authorType:actor.actorType === 'npc' ? 'npc' : 'character', authorId:actor.id, npcSourceRoleId:actor.sourceRoleId || '', time:time(), replyTo:parent?.id || '', replyToName:parent?.author || '' }); newActorIds.add(actor.id); addedComments += 1; }
+        if (action === 'like' || action === 'both') addLike(actor);
+      });
+      const unusedActors = actors.filter(actor => !newActorIds.has(actor.id) && !(target.roleLikeIds || []).includes(actor.id) && !target.comments.some(comment => comment.authorId === actor.id));
+      if (actors.length > 1 && newActorIds.size < 2 && unusedActors.length) addLike(unusedActors[0]);
+      if (actors.length > 1 && addedLikes === 1 && addedComments === 0 && unusedActors.length > 1) addLike(unusedActors[1]);
+      if (!newActorIds.size) throw new Error('没有生成新的角色或 NPC 互动，请重新点击互动。');
+      if (target.text !== originalText) target.text = originalText;
+      save();
+    } catch (error) { window.alert(`生成互动失败：${error.message || '未知错误'}`); } finally { momentBusy = false; render(); }
+  };
+  const renderMomentPostWithNpcLikeNames = renderMomentPost;
+  renderMomentPost = function(post) {
+    let html = renderMomentPostWithNpcLikeNames(post).replace(/<div class="chat-moment-liked-by">[\s\S]*?<\/div>(?=<\/article>)/, '');
+    // 兼容旧版本或异常数据：评论数量存在时，始终补出评论容器。
+    if (Array.isArray(post.comments) && post.comments.length && !html.includes('class="chat-moment-comments"')) {
+      const fallbackComments = post.comments.map(comment => `<div class="chat-moment-comment"><b>${esc(comment.author || '我')}</b><span>${comment.replyToName ? `<small>回复 @${esc(comment.replyToName)}</small>` : ''}${esc(comment.text || '')}</span></div>`).join('');
+      html = html.replace(/<\/article>$/, `<div class="chat-moment-comments">${fallbackComments}</div></article>`);
+    }
+    // 角色动态不展示“仅谁可见”的范围文案，避免把可见对象暴露在卡片上。
+    if (post.authorType !== 'user') html = html.replace(/<small class="chat-moment-visibility-label">[\s\S]*?<\/small>/, '');
+    if (post.userOnly) html = html.replace(/<button data-moment-interact="[^"]*" type="button">✦ 互动<\/button>/, '');
+    if (post.liked) html = html.replace(/(<button class="is-liked" data-moment-like="[^"]*" type="button">)♡/, '$1♥');
+    const ids = post.visibility === 'private' || post.userOnly ? [] : [...new Set(Array.isArray(post.roleLikeIds) ? post.roleLikeIds : [])];
+    const names = ids.map(momentActorName).filter(Boolean);
+    if (post.liked) names.unshift(momentProfile().nickname || momentProfile().realName || '我');
+    const likeCount = Math.max(0, Number(post.likes || 0));
+    if (!likeCount) return html;
+    while (names.length < likeCount) names.push(`匿名用户${names.length + 1}`);
+    names.length = likeCount;
+    const likeLine = `<div class="chat-moment-liked-by"><span aria-hidden="true">♥</span><span>${names.map(esc).join('、')}赞过</span></div>`;
+    return html.includes('class="chat-moment-comments"')
+      ? html.replace(/<div class="chat-moment-comments">/, `${likeLine}<div class="chat-moment-comments">`)
+      : html.replace(/<\/article>$/, `${likeLine}</article>`);
+  };
+
+  // The legacy reply pipeline temporarily replaces shared fetch handlers. Keep
+  // one request on that pipeline; other contacts use a pinned, independent one.
+  async function replyForAnotherContact(contactId) {
+    const chat = state.chats?.[contactId];
+    const contact = state.contacts.find(item => item.id === contactId);
+    const profile = state.profiles.find(item => item.id === chat?.profileId);
+    if (!chat || !contact || !profile) { window.alert('请先绑定用户设定。'); return; }
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    if (!config?.endpoint || !config.key || !model) { window.alert('请先在设置中为聊天配置 API 模型。'); return; }
+    let systemText = buildChatSystemPrompt(contact, profile, chat);
+    if (window.IdealMachineRoleUserContext && !systemText.includes('【第一优先：角色本人')) {
+      systemText = `${window.IdealMachineRoleUserContext(contact, profile)}\n\n${systemText}`;
+    }
+    let history = (chat.messages || []).filter(item => item.type !== 'image').map(item => ({
+      role: item.role === 'user' ? 'user' : 'assistant',
+      content: chatMessageContentForApi(item)
+    }));
+    const memory = window.IdealMachineMemory;
+    if (memory) {
+      try {
+        const latestUser = [...chat.messages].reverse().find(item => item.role === 'user');
+        const context = await memory.prepareContext({ roleId: contactId, chat, query: latestUser?.text || '' });
+        const memoryText = context.systemPrompt || '暂无可用的长期记忆。';
+        if (systemText.includes('{{memory_summaries}}')) systemText = systemText.replace(/\{\{memory_summaries\}\}/g, memoryText);
+        else systemText += `\n\n【长期记忆上下文】\n${memoryText}`;
+        if (context.shortMessages?.length) history = context.shortMessages;
+      } catch (error) { console.warn('并发聊天记忆准备失败：', error); }
+    }
+    const settings = chatSettingsFor(chat);
+    const bounds = characterReplyBounds(chat, settings.characterMultiMessage);
+    systemText += `\n\n本轮直接以角色口吻回复。${settings.characterMultiMessage ? `可用 [[MSG]] 分隔 ${bounds.min} 至 ${bounds.max} 条自然、完整的聊天消息；不要拆断句子。` : '只发一条完整的聊天消息。'}不要在消息结尾留下逗号或残缺句子。`;
+    const request = window.IdealMachineFetch || nativeChatFetch;
+    const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` },
+      body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: systemText }, ...history] }),
+      idealScope: 'chat-background'
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const answer = String(data.choices?.[0]?.message?.content || '……');
+    let chunks = answer.split(/\[\[MSG\]\]/i).map(cleanCharacterVisibleText).filter(Boolean);
+    if (!settings.characterMultiMessage) chunks = [cleanCharacterVisibleText(chunks.join(' '))];
+    else if (chunks.length < bounds.min) chunks = splitCharacterReplyFallback(answer, bounds.min);
+    chunks = mergeUnsafeCharacterChunks(chunks).filter(Boolean);
+    for (const chunk of chunks) {
+      if (!state.chats?.[contactId] || !state.contacts.some(item => item.id === contactId)) break;
+      chat.messages.push({ id: uid('message'), text: chunk, role: 'character', type: '', time: time(), unread: activeContact !== contactId || !app.classList.contains('is-open') });
+      save();
+      if (activeContact === contactId && app.classList.contains('is-open')) render();
+      await new Promise(resolve => setTimeout(resolve, 220));
+    }
+  }
+
+  const replyBeforeConcurrentContacts = reply;
+  let legacyReplyBusy = false;
+  reply = async function() {
+    const contactId = activeContact;
+    if (!contactId || replyingContacts.has(contactId)) return;
+    replyingContacts.add(contactId);
+    if (app.classList.contains('is-open')) render();
+    const useIndependentRequest = legacyReplyBusy || replying;
+    if (!useIndependentRequest) legacyReplyBusy = true;
+    try {
+      if (useIndependentRequest) await replyForAnotherContact(contactId);
+      else await replyBeforeConcurrentContacts();
+    } catch (error) {
+      console.warn('角色回复失败：', error);
+      const chat = state.chats?.[contactId];
+      if (chat) {
+        chat.messages.push({ id: uid('message'), text: `回复失败：${error.message}`, role: 'character', type: '', time: time() });
+        save();
+      }
+    } finally {
+      if (!useIndependentRequest) legacyReplyBusy = false;
+      replyingContacts.delete(contactId);
+      if (app.classList.contains('is-open')) render();
+    }
+  };
+
+  const renderChatBeforeConcurrentContacts = renderChat;
+  renderChat = function() {
+    return renderChatBeforeConcurrentContacts().replace(/(<button class="chat-reply" data-chat-reply type="button")(?:\s+disabled)?(?=>)/, (_, opening) => `${opening}${isContactReplying(activeContact) ? ' disabled' : ''}`);
+  };
+
+  let chatThoughtSettingsOpen = false;
+  const renderChatSettingsBeforeThoughtOptions = renderChatSettings;
+  renderChatSettings = function() {
+    renderChatSettingsBeforeThoughtOptions();
+    const main = document.querySelector('#chatSettings .chat-settings-page main');
+    if (!chatSettingsOpen || !main || main.querySelector('[data-chat-thought-options]')) return;
+    const chat = activeContact ? state.chats?.[activeContact] : null;
+    if (!chat) return;
+    const settings = chatSettingsFor(chat);
+    const models = thoughtModelsFor(chat);
+    const section = document.createElement('section');
+    section.className = 'chat-memory-settings chat-thought-settings';
+    section.dataset.chatThoughtOptions = '';
+    section.innerHTML = `<button class="chat-memory-settings-head" data-chat-thought-settings-toggle type="button" aria-expanded="${chatThoughtSettingsOpen}"><span><b>心声设置</b><small>${settings.thoughtEnabled === false ? '已关闭' : '已开启 · 点击角色名字查看心声'}</small></span><i>${chatThoughtSettingsOpen ? '⌃' : '⌄'}</i></button>${chatThoughtSettingsOpen ? `<div class="chat-memory-settings-body"><label class="chat-memory-switch"><input type="checkbox" data-chat-thought-enabled ${settings.thoughtEnabled === false ? '' : 'checked'}><span><b>开启心声</b><small>点击聊天顶栏的角色名字查看这一轮心声</small></span></label><label class="chat-thought-api-setting"><span>心声模型<small>仅显示“设置 → 保留模型”中勾选并保存的模型</small></span><select data-chat-thought-model ${settings.thoughtEnabled === false || !models.length ? 'disabled' : ''}><option value="">${models.length ? '跟随“聊天心声”功能分配' : '暂无保留模型，请先到设置中保存'}</option>${models.map(model => `<option value="${esc(model)}" ${settings.thoughtModel === model ? 'selected' : ''}>${esc(model)}</option>`).join('')}</select></label></div>` : ''}`;
+    const memory = main.querySelector('[data-chat-memory-settings]');
+    const display = main.querySelector('.chat-display-settings');
+    if (memory) memory.insertAdjacentElement('afterend', section);
+    else if (display) display.insertAdjacentElement('afterend', section);
+    else main.insertBefore(section, main.children[1] || null);
+  };
+  document.addEventListener('click', event => {
+    if (!event.target.closest?.('[data-chat-thought-settings-toggle]')) return;
+    chatThoughtSettingsOpen = !chatThoughtSettingsOpen;
+    renderChatSettings();
+  });
+  document.addEventListener('click', event => {
+    if (event.target.closest?.('[data-chat-settings], [data-chat-settings-close]')) chatThoughtSettingsOpen = false;
+  }, true);
+  document.addEventListener('change', event => {
+    const enabled = event.target.closest?.('[data-chat-thought-enabled]');
+    const model = event.target.closest?.('[data-chat-thought-model]');
+    if ((!enabled && !model) || !app.classList.contains('is-open')) return;
+    const chat = activeContact ? state.chats?.[activeContact] : null;
+    if (!chat) return;
+    const settings = chatSettingsFor(chat);
+    if (enabled) {
+      settings.thoughtEnabled = enabled.checked;
+      if (!enabled.checked) {
+        thoughtRequestId += 1;
+        thoughtLoading = false;
+        thoughtOpen = false;
+        renderThought();
+      }
+      const select = document.querySelector('[data-chat-thought-model]');
+      if (select) select.disabled = !enabled.checked || !thoughtModelsFor(chat).length;
+      const summary = document.querySelector('[data-chat-thought-options] .chat-memory-settings-head small');
+      if (summary) summary.textContent = enabled.checked ? '已开启 · 点击角色名字查看心声' : '已关闭';
+    } else if (!model.value || thoughtModelsFor(chat).includes(model.value)) settings.thoughtModel = model.value;
+    save();
+  });
+  document.addEventListener('click', event => {
+    if (!event.target.closest?.('[data-chat-thought]') || chatSettingsFor(activeContact ? state.chats?.[activeContact] : null).thoughtEnabled !== false) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+
+  // On touch devices the input blurs before click. Keep the airplane visible
+  // for the duration of the gesture, then handle sending with a pinned view.
+  document.addEventListener('pointerdown', event => {
+    const button = event.target.closest?.('[data-chat-send]');
+    if (!button || !app.contains(button)) return;
+    const wrap = button.closest('.chat-compose-wrap');
+    wrap?.classList.add('is-send-press');
+    if (wrap?.querySelector('#chatInput')?.value.trim()) wrap.classList.add('has-text');
+  }, true);
+  document.addEventListener('pointercancel', event => {
+    event.target.closest?.('.chat-compose-wrap')?.classList.remove('is-send-press');
+  }, true);
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.('[data-chat-send]');
+    if (!button || !app.contains(button) || !app.classList.contains('is-open') || !activeContact) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const input = button.closest('.chat-compose')?.querySelector('#chatInput');
+    const value = input?.value.trim();
+    const contactId = activeContact;
+    const chat = state.chats?.[contactId];
+    if (!value || !chat) { button.closest('.chat-compose-wrap')?.classList.remove('is-send-press'); return; }
+    input.value = '';
+    chat.draft = '';
+    delete chat.takeoverDraftByRoleId;
+    cancelChatDraftSave();
+    const previousChatViewRendering = chatViewRendering;
+    chatViewRendering = true;
+    try { addMessage(value); }
+    finally { chatViewRendering = previousChatViewRendering; }
+    button.closest('.chat-compose-wrap')?.classList.remove('is-send-press', 'has-text');
+  }, true);
 })();

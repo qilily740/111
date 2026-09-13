@@ -13,6 +13,11 @@
   let query = '';
   let busy = false;
   let themePickerOpen = false;
+  let memorySelecting = false;
+  let memoryPressTimer = 0;
+  let memoryPressStart = null;
+  let memorySuppressClick = false;
+  const selectedMemoryIds = new Set();
   const themeKey = 'ideal-machine-memory-theme';
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
@@ -105,8 +110,21 @@
     });
   }
 
+  function resetMemorySelection() {
+    window.clearTimeout(memoryPressTimer);
+    memoryPressTimer = 0;
+    memoryPressStart = null;
+    memorySelecting = false;
+    memorySuppressClick = false;
+    selectedMemoryIds.clear();
+  }
+
+  function selectionToolbar() {
+    return `<div class="memory-selection-toolbar" data-memory-selection-toolbar ${memorySelecting ? '' : 'hidden'}><span data-memory-selected-count>已选 ${selectedMemoryIds.size} 条</span><button type="button" data-memory-selection-cancel>取消</button><button type="button" data-memory-delete-selected ${selectedMemoryIds.size ? '' : 'disabled'}>删除所选</button></div>`;
+  }
+
   function entryCard(item) {
-    return `<button class="memory-entry" type="button" data-memory-entry="${esc(item.id)}"><i class="is-${item.type}">${icon(item.type === 'offline' ? 'offline' : 'chat')}</i><span><small>${item.type === 'offline' ? '线下记忆' : '聊天记忆'} · ${dateText(item.createdAt)}</small><b>${esc(item.title || '未命名记忆')}</b><p>${esc(item.summary)}</p><em>${esc(item.importance || '日常')}</em></span></button>`;
+    return `<button class="memory-entry${selectedMemoryIds.has(item.id) ? ' is-selected' : ''}" type="button" data-memory-entry="${esc(item.id)}" aria-selected="${selectedMemoryIds.has(item.id)}"><i class="is-${item.type}">${icon(item.type === 'offline' ? 'offline' : 'chat')}</i><span><small>${item.type === 'offline' ? '线下记忆' : '聊天记忆'} · ${dateText(item.createdAt)}</small><b>${esc(item.title || '未命名记忆')}</b><p>${esc(item.summary)}</p><em>${esc(item.importance || '日常')}</em></span></button>`;
   }
 
   function home() {
@@ -123,7 +141,7 @@
     const entries = filteredEntries(activeRoleId);
     const core = roleCore(activeRoleId);
     const coreMarkup = core?.content ? `<section class="memory-core-card"><header><span>CORE MEMORY</span><b>核心记忆 · 第 ${Number(core.version || 1)} 版</b></header><p>${esc(core.content)}</p><small>更新于 ${dateText(core.updatedAt)} · 每次聊天都会全量注入当前版本</small></section>` : `<section class="memory-core-card is-empty"><header><span>CORE MEMORY</span><b>核心记忆尚未建立</b></header><p>长期记忆达到聊天设置中的更新频率后，会自动整理成稳定的关系档案。</p></section>`;
-    return `<section class="memory-page"><header class="memory-subheader"><button type="button" data-memory-home>${icon('back')}</button><div><span>PERSONAL ARCHIVE</span><h1>${esc(roleName(role))}的记忆</h1></div><button type="button" data-memory-theme-toggle>◐</button><button type="button" data-memory-refresh ${busy ? 'disabled' : ''}>${icon('refresh')}</button></header>${themePanel()}<main class="memory-main memory-role-page"><section class="memory-role-hero"><i>${avatar(role)}</i><div><b>${esc(roleName(role))}</b><p>${roleEntries(activeRoleId).length} 段共同记忆</p></div></section>${coreMarkup}<label class="memory-search">${icon('search')}<input data-memory-search value="${esc(query)}" placeholder="搜索记忆内容…"></label><nav class="memory-filters"><button class="${filter === 'all' ? 'is-active' : ''}" data-memory-filter="all" type="button">全部</button><button class="${filter === 'chat' ? 'is-active' : ''}" data-memory-filter="chat" type="button">长期聊天</button><button class="${filter === 'offline' ? 'is-active' : ''}" data-memory-filter="offline" type="button">线下</button></nav><section class="memory-timeline">${entries.length ? entries.map(entryCard).join('') : '<div class="memory-empty"><i>✦</i><p>这里还没有符合条件的记忆。</p></div>'}</section></main></section>`;
+    return `<section class="memory-page"><header class="memory-subheader"><button type="button" data-memory-home>${icon('back')}</button><div><span>PERSONAL ARCHIVE</span><h1>${esc(roleName(role))}的记忆</h1></div><button type="button" data-memory-theme-toggle>◐</button><button type="button" data-memory-refresh ${busy ? 'disabled' : ''}>${icon('refresh')}</button></header>${themePanel()}<main class="memory-main memory-role-page"><section class="memory-role-hero"><i>${avatar(role)}</i><div><b>${esc(roleName(role))}</b><p>${roleEntries(activeRoleId).length} 段共同记忆</p></div></section>${coreMarkup}<label class="memory-search">${icon('search')}<input data-memory-search value="${esc(query)}" placeholder="搜索记忆内容…"></label><nav class="memory-filters"><button class="${filter === 'all' ? 'is-active' : ''}" data-memory-filter="all" type="button">全部</button><button class="${filter === 'chat' ? 'is-active' : ''}" data-memory-filter="chat" type="button">长期聊天</button><button class="${filter === 'offline' ? 'is-active' : ''}" data-memory-filter="offline" type="button">线下</button></nav>${selectionToolbar()}<section class="memory-timeline">${entries.length ? entries.map(entryCard).join('') : '<div class="memory-empty"><i>✦</i><p>这里还没有符合条件的记忆。</p></div>'}</section></main></section>`;
   }
 
   function detailPage() {
@@ -159,24 +177,158 @@
     }
   }
 
+  function enterMemorySelection(id) {
+    memorySelecting = true;
+    selectedMemoryIds.add(id);
+    memorySuppressClick = true;
+    window.setTimeout(() => { memorySuppressClick = false; }, 900);
+    const toolbar = app.querySelector('[data-memory-selection-toolbar]');
+    if (toolbar) toolbar.hidden = false;
+    app.querySelectorAll('[data-memory-entry]').forEach(entry => {
+      const selected = selectedMemoryIds.has(entry.dataset.memoryEntry);
+      entry.classList.toggle('is-selected', selected);
+      entry.setAttribute('aria-selected', String(selected));
+    });
+    const count = app.querySelector('[data-memory-selected-count]');
+    if (count) count.textContent = `已选 ${selectedMemoryIds.size} 条`;
+    const remove = app.querySelector('[data-memory-delete-selected]');
+    if (remove) remove.disabled = !selectedMemoryIds.size;
+    window.getSelection()?.removeAllRanges();
+  }
+
+  function toggleMemorySelection(id) {
+    if (selectedMemoryIds.has(id)) selectedMemoryIds.delete(id);
+    else selectedMemoryIds.add(id);
+    app.querySelectorAll('[data-memory-entry]').forEach(entry => {
+      const selected = selectedMemoryIds.has(entry.dataset.memoryEntry);
+      entry.classList.toggle('is-selected', selected);
+      entry.setAttribute('aria-selected', String(selected));
+    });
+    const count = app.querySelector('[data-memory-selected-count]');
+    if (count) count.textContent = `已选 ${selectedMemoryIds.size} 条`;
+    const remove = app.querySelector('[data-memory-delete-selected]');
+    if (remove) remove.disabled = !selectedMemoryIds.size;
+    if (!selectedMemoryIds.size) { memorySelecting = false; if (app.querySelector('[data-memory-selection-toolbar]')) app.querySelector('[data-memory-selection-toolbar]').hidden = true; }
+  }
+
+  async function deleteSelectedMemories() {
+    if (busy || !selectedMemoryIds.size) return;
+    if (!window.confirm(`确定删除选中的 ${selectedMemoryIds.size} 条记忆吗？删除后无法恢复。`)) return;
+    const ids = [...selectedMemoryIds];
+    const data = readChat();
+    const items = state.entries.filter(item => ids.includes(item.id));
+    state.entries = state.entries.filter(item => !ids.includes(item.id));
+    busy = true;
+    resetMemorySelection();
+    render();
+    try {
+      if (window.IdealMachineMemory?.deleteEntry) {
+        for (const item of items) {
+          const role = data.contacts.find(entry => entry.id === item.roleId);
+          const chat = data.chats?.[item.roleId];
+          const profile = data.profiles.find(entry => entry.id === (item.profileId || chat?.profileId));
+          await window.IdealMachineMemory.deleteEntry(item.id, { role, profile, chat });
+        }
+      } else {
+        state.entries = state.entries.filter(item => !ids.includes(item.id));
+        save();
+      }
+    } finally {
+      busy = false;
+      state = readState();
+      render();
+    }
+  }
+
+  document.addEventListener('pointerdown', event => {
+    const entry = event.target.closest?.('.memory-library-app.is-open [data-memory-entry]');
+    if (!entry || page !== 'role' || memorySelecting) return;
+    window.clearTimeout(memoryPressTimer);
+    memoryPressStart = { x:event.clientX, y:event.clientY };
+    memoryPressTimer = window.setTimeout(() => {
+      enterMemorySelection(entry.dataset.memoryEntry);
+      memoryPressTimer = 0;
+    }, 550);
+  });
+  document.addEventListener('pointermove', event => {
+    if (memoryPressStart && Math.hypot(event.clientX - memoryPressStart.x, event.clientY - memoryPressStart.y) > 12) {
+      window.clearTimeout(memoryPressTimer);
+      memoryPressTimer = 0;
+      memoryPressStart = null;
+    }
+  });
+  document.addEventListener('pointerup', () => { window.clearTimeout(memoryPressTimer); memoryPressTimer = 0; memoryPressStart = null; });
+  document.addEventListener('pointercancel', () => { window.clearTimeout(memoryPressTimer); memoryPressTimer = 0; memoryPressStart = null; });
+  document.addEventListener('contextmenu', event => {
+    const entry = event.target.closest?.('.memory-library-app.is-open [data-memory-entry]');
+    if (!entry || page !== 'role') return;
+    event.preventDefault();
+    enterMemorySelection(entry.dataset.memoryEntry);
+  });
+
+  document.addEventListener('click', event => {
+    const entry = event.target.closest?.('.memory-library-app.is-open [data-memory-entry]');
+    const cancel = event.target.closest?.('[data-memory-selection-cancel]');
+    const remove = event.target.closest?.('[data-memory-delete-selected]');
+    if (!entry && !cancel && !remove) return;
+    if (entry && event.target.closest('button') && !memorySelecting) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (entry) {
+      if (memorySuppressClick) { memorySuppressClick = false; return; }
+      if (!memorySelecting) return;
+      toggleMemorySelection(entry.dataset.memoryEntry);
+      return;
+    }
+    if (cancel) { resetMemorySelection(); render(); return; }
+    deleteSelectedMemories();
+  }, true);
+
   document.addEventListener('click', event => {
     if (event.target.closest('[data-app-key="jiyiku"]')) {
-      state = readState(); syncSourceMemories(); page = 'home'; activeRoleId = ''; activeEntryId = ''; filter = 'all'; query = ''; render(); app.classList.add('is-open'); return;
+      resetMemorySelection(); state = readState(); syncSourceMemories(); page = 'home'; activeRoleId = ''; activeEntryId = ''; filter = 'all'; query = ''; render(); app.classList.add('is-open'); return;
     }
     if (!app.classList.contains('is-open')) return;
     if (event.target.closest('[data-memory-close]')) { app.classList.remove('is-open'); return; }
     if (event.target.closest('[data-memory-theme-choice]')) { localStorage.setItem(themeKey, event.target.closest('[data-memory-theme-choice]').dataset.memoryThemeChoice); themePickerOpen = false; render(); return; }
     if (event.target.closest('[data-memory-theme-toggle]')) { themePickerOpen = !themePickerOpen; render(); return; }
-    if (event.target.closest('[data-memory-home]')) { page = 'home'; activeRoleId = ''; query = ''; filter = 'all'; render(); return; }
-    if (event.target.closest('[data-memory-role-back]')) { page = 'role'; activeEntryId = ''; render(); return; }
+    if (event.target.closest('[data-memory-home]')) { resetMemorySelection(); page = 'home'; activeRoleId = ''; query = ''; filter = 'all'; render(); return; }
+    if (event.target.closest('[data-memory-role-back]')) { resetMemorySelection(); page = 'role'; activeEntryId = ''; render(); return; }
     if (event.target.closest('[data-memory-refresh]')) { refreshMemories(); return; }
     const role = event.target.closest('[data-memory-role]');
-    if (role) { activeRoleId = role.dataset.memoryRole; page = 'role'; query = ''; filter = 'all'; render(); return; }
+    if (role) { resetMemorySelection(); activeRoleId = role.dataset.memoryRole; page = 'role'; query = ''; filter = 'all'; render(); return; }
     const entry = event.target.closest('[data-memory-entry]');
-    if (entry) { activeEntryId = entry.dataset.memoryEntry; page = 'detail'; render(); return; }
+    if (entry) { activeEntryId = entry.dataset.memoryEntry; page = 'detail'; resetMemorySelection(); render(); return; }
     const filterButton = event.target.closest('[data-memory-filter]');
-    if (filterButton) { filter = filterButton.dataset.memoryFilter; render(); return; }
+    if (filterButton) { resetMemorySelection(); filter = filterButton.dataset.memoryFilter; render(); return; }
     const deleted = event.target.closest('[data-memory-delete]');
+    if (deleted) {
+      if (!window.confirm('确定删除这段记忆吗？')) return;
+      const entryId = deleted.dataset.memoryDelete;
+      const item = state.entries.find(entry => entry.id === entryId);
+      const data = readChat();
+      const role = data.contacts.find(entry => entry.id === item?.roleId);
+      const chat = data.chats?.[item?.roleId];
+      const profile = data.profiles.find(entry => entry.id === (item?.profileId || chat?.profileId));
+      state.entries = state.entries.filter(entry => entry.id !== entryId);
+      page = 'role';
+      activeEntryId = '';
+      render();
+      (async () => {
+        busy = true;
+        try {
+          if (window.IdealMachineMemory?.deleteEntry) await window.IdealMachineMemory.deleteEntry(entryId, { role, profile, chat });
+          else save();
+        } catch (error) {
+          console.warn('删除记忆失败：', error);
+        } finally {
+          busy = false;
+          state = readState();
+          render();
+        }
+      })();
+      return;
+    }
     if (deleted && window.confirm('确定删除这段记忆吗？')) { const item = state.entries.find(entry => entry.id === deleted.dataset.memoryDelete); const data = readChat(); const role = data.contacts.find(entry => entry.id === item?.roleId); const chat = data.chats?.[item?.roleId]; const profile = data.profiles.find(entry => entry.id === (item?.profileId || chat?.profileId)); if (window.IdealMachineMemory?.deleteEntry) window.IdealMachineMemory.deleteEntry(deleted.dataset.memoryDelete, { role, profile, chat }).finally(() => { state = readState(); render(); }); else { state.entries = state.entries.filter(entry => entry.id !== deleted.dataset.memoryDelete); save(); } page = 'role'; activeEntryId = ''; render(); }
   });
 

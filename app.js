@@ -164,12 +164,6 @@
       if (wasCurrent) couple.contactId = '';
       return couple;
     });
-    updateStoredObject('ideal-machine-home', {}, data => { if (data.roleId === roleId) data.roleId = ''; return data; });
-    updateStoredObject('ideal-machine-town', {}, data => {
-      if (data.roleId === roleId) data.roleId = '';
-      if (data.towns && typeof data.towns === 'object') Object.keys(data.towns).forEach(key => { if (key.endsWith(`::${roleId}`)) delete data.towns[key]; });
-      return data;
-    });
     updateStoredObject('ideal-machine-shopping', {}, data => {
       if (data.companion && typeof data.companion === 'object') Object.keys(data.companion).forEach(key => { if (data.companion[key] === roleId) delete data.companion[key]; });
       ['gifts', 'orders', 'wishes'].forEach(group => { if (data[group] && typeof data[group] === 'object') Object.keys(data[group]).forEach(key => { if (Array.isArray(data[group][key])) data[group][key] = data[group][key].filter(item => item?.roleId !== roleId && item?.contactId !== roleId); }); });
@@ -184,12 +178,6 @@
   function removeProfileData(profileId) {
     if (!profileId) return;
     window.IdealMachineMemory?.forgetProfile?.(profileId);
-    updateStoredObject('ideal-machine-home', {}, data => { if (data.profileId === profileId) data.profileId = ''; if (data.homes) delete data.homes[profileId]; return data; });
-    updateStoredObject('ideal-machine-town', {}, data => {
-      if (data.profileId === profileId) data.profileId = '';
-      if (data.towns && typeof data.towns === 'object') Object.keys(data.towns).forEach(key => { if (key.startsWith(`${profileId}::`)) delete data.towns[key]; });
-      return data;
-    });
     updateStoredObject('ideal-machine-shopping', {}, data => {
       if (data.profileId === profileId) data.profileId = '';
       ['carts', 'orders', 'wishes', 'gifts', 'companion'].forEach(group => { if (data[group]) delete data[group][profileId]; });
