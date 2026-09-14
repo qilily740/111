@@ -1,7 +1,4 @@
-const ALLOWED_PATHS = new Set([
-  '/auth/qr/key', '/auth/qr/create', '/auth/qr/check', '/auth/qr/image', '/auth/logout', '/user/sync', '/user/profile',
-  '/user/account', '/user/playlist', '/user/vip', '/search', '/lyric', '/song'
-]);
+const NETEASE_ORIGIN = 'https://interface.music.163.com';
 const IMAGE_TYPES = new Map([
   ['image/jpeg', 'jpg'], ['image/png', 'png'], ['image/gif', 'gif'], ['image/webp', 'webp'],
   ['image/avif', 'avif'], ['image/bmp', 'bmp'], ['image/heic', 'heic'], ['image/heif', 'heic']
@@ -15,83 +12,42 @@ function corsHeaders(request, env) {
   const allowOrigin = allowed.includes(origin) ? origin : (allowed.includes('*') ? origin : allowed[0] || origin);
   return { 'Access-Control-Allow-Origin':allowOrigin, 'Access-Control-Allow-Credentials':'true', 'Access-Control-Allow-Headers':'Authorization, Content-Type', 'Access-Control-Allow-Methods':'GET, HEAD, POST, OPTIONS', 'Access-Control-Expose-Headers':'ETag, Content-Type', 'Vary':'Origin' };
 }
-
-function json(data, status, request, env) {
-  return new Response(JSON.stringify(data), { status, headers:{ 'Content-Type':'application/json; charset=utf-8', ...corsHeaders(request, env) } });
+function json(data, status, request, env) { return new Response(JSON.stringify(data), { status, headers:{ 'Content-Type':'application/json; charset=utf-8', ...corsHeaders(request, env) } }); }
+function encodeToken(value) { const bytes = new TextEncoder().encode(String(value || '')); let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte); return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, ''); }
+function decodeToken(value) { try { const raw = String(value || ''), normalized = raw.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(raw.length / 4) * 4, '='); const binary = atob(normalized); return new TextDecoder().decode(Uint8Array.from(binary, char => char.charCodeAt(0))); } catch { return ''; } }
+function requestCookie(request) { const authorization = request.headers.get('Authorization') || ''; if (/^Bearer\s+/i.test(authorization)) return decodeToken(authorization.replace(/^Bearer\s+/i, '').trim()); return request.headers.get('Cookie') || ''; }
+function responseCookies(response) { const values = typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : (response.headers.get('Set-Cookie') ? [response.headers.get('Set-Cookie')] : []); return values.map(value => value.split(';', 1)[0]).filter(Boolean).join('; '); }
+function bodyCookie(body) { const value = body?.cookie || body?.cookies || ''; return Array.isArray(value) ? value.join('; ') : String(value || ''); }
+function mergeCookies(...values) { const map = new Map(); values.join('; ').split(';').forEach(part => { const [key, ...rest] = part.trim().split('='); if (key && rest.length) map.set(key, `${key}=${rest.join('=')}`); }); return [...map.values()].join('; '); }
+async function neteasePost(path, values = {}, cookie = '') {
+  const headers = { 'Accept':'application/json', 'Content-Type':'application/x-www-form-urlencoded', 'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/124 Safari/537.36', 'Referer':'https://music.163.com/' };
+  if (cookie) headers.Cookie = cookie;
+  const response = await fetch(`${NETEASE_ORIGIN}${path}`, { method:'POST', headers, body:new URLSearchParams(Object.entries(values).map(([key, value]) => [key, String(value ?? '')])) });
+  let body = null; try { body = await response.json(); } catch { body = {}; }
+  if (!response.ok) throw new Error(`网易云上游 HTTP ${response.status}`);
+  return { body, cookie:mergeCookies(cookie, responseCookies(response), bodyCookie(body)) };
 }
-
-function upstreamUrl(request, env) {
-  const base = String(env.UPSTREAM_BASE_URL || '').replace(/\/$/, '');
-  if (!base) throw new Error('UPSTREAM_BASE_URL is not configured');
-  const incoming = new URL(request.url);
-  const path = incoming.pathname.replace(/^\/api/, '') || '/';
-  if (![...ALLOWED_PATHS].some(allowed => path === allowed || path.startsWith(`${allowed}/`))) throw new Error('Path is not allowed');
-  const target = new URL(`${base}${path}`); target.search = incoming.search; return target;
+async function authQrKey(request, env) { const result = await neteasePost('/api/login/qrcode/unikey', { type:3 }); if (!result.body?.unikey) throw new Error('网易云没有返回二维码 key'); return json({ code:200, data:{ unikey:result.body.unikey } }, 200, request, env); }
+async function authQrCreate(request, env) { const key = new URL(request.url).searchParams.get('key') || ''; if (!key) return json({ error:'缺少二维码 key' }, 400, request, env); const qrurl = `https://music.163.com/login?codekey=${encodeURIComponent(key)}`; return json({ code:200, data:{ qrurl, qrimg:'worker-generated' } }, 200, request, env); }
+async function authQrCheck(request, env) { const key = new URL(request.url).searchParams.get('key') || ''; if (!key) return json({ error:'缺少二维码 key' }, 400, request, env); const result = await neteasePost('/api/login/qrcode/client/login', { key, type:3 }, requestCookie(request)); const response = { ...result.body }; if (Number(response.code) === 803 && result.cookie) response.sessionToken = encodeToken(result.cookie); return json(response, 200, request, env); }
+async function authQrImage(request, env) { const key = new URL(request.url).searchParams.get('key') || ''; if (!key) return json({ error:'缺少二维码 key' }, 400, request, env); const qrurl = `https://music.163.com/login?codekey=${encodeURIComponent(key)}`; const image = await fetch(`https://quickchart.io/qr?size=220&margin=1&text=${encodeURIComponent(qrurl)}`); if (!image.ok) throw new Error('二维码图片生成失败'); const headers = new Headers(corsHeaders(request, env)); headers.set('Content-Type', image.headers.get('Content-Type') || 'image/png'); headers.set('Cache-Control', 'no-store'); return new Response(image.body, { status:200, headers }); }
+async function syncNetease(request, env) {
+  const cookie = requestCookie(request); if (!cookie) return json({ error:'网易云登录会话不存在，请重新扫码' }, 401, request, env);
+  const accountResult = await neteasePost('/api/user/account', {}, cookie); const account = accountResult.body?.account || {}; const uid = String(account.id || account.userId || account.uid || ''); let profile = accountResult.body?.profile || {};
+  if (uid) { try { profile = (await neteasePost(`/api/w/v1/user/detail/${encodeURIComponent(uid)}`, {}, cookie)).body?.profile || profile; } catch {} }
+  let playlists = []; if (uid) { try { playlists = (await neteasePost('/api/user/playlist', { uid, limit:20, offset:0 }, cookie)).body?.playlist || []; } catch {} }
+  return json({ userId:uid, profile:{ ...profile, userId:profile.userId || uid }, account:accountResult.body, vip:{ vipType:profile.vipType || account.vipType || 0 }, playlists }, 200, request, env);
 }
-
-async function proxy(request, env) {
-  const target = upstreamUrl(request, env);
-  const headers = new Headers();
-  const authorization = request.headers.get('Authorization'); const cookie = request.headers.get('Cookie');
-  if (authorization) headers.set('Authorization', authorization); if (cookie) headers.set('Cookie', cookie); headers.set('Accept', 'application/json');
-  const options = { method:request.method, headers, redirect:'manual' };
-  if (request.method !== 'GET' && request.method !== 'HEAD') options.body = request.body;
-  const upstream = await fetch(target, options);
-  const responseHeaders = new Headers(corsHeaders(request, env));
-  responseHeaders.set('Content-Type', upstream.headers.get('Content-Type') || 'application/json; charset=utf-8');
-  const setCookies = typeof upstream.headers.getSetCookie === 'function' ? upstream.headers.getSetCookie() : (upstream.headers.get('Set-Cookie') ? [upstream.headers.get('Set-Cookie')] : []);
-  for (const value of setCookies) responseHeaders.append('Set-Cookie', value);
-  return new Response(upstream.body, { status:upstream.status, headers:responseHeaders });
+async function proxyNetease(request, env, path) {
+  const url = new URL(request.url); const cookie = requestCookie(request);
+  if (path === '/search') { const result = await neteasePost('/api/search/get', { s:url.searchParams.get('keywords') || '', type:url.searchParams.get('type') || 1, limit:url.searchParams.get('limit') || 24, offset:url.searchParams.get('offset') || 0 }, cookie); return json(result.body, 200, request, env); }
+  const lyric = path.match(/^\/lyric\/([^/]+)$/); if (lyric) { const result = await neteasePost('/api/song/lyric', { id:decodeURIComponent(lyric[1]), tv:-1, lv:-1, rv:-1, kv:-1, _nmclfl:1 }, cookie); return json(result.body, 200, request, env); }
+  const song = path.match(/^\/song\/([^/]+)\/url$/); if (song) { const result = await neteasePost('/api/song/enhance/player/url', { ids:JSON.stringify([decodeURIComponent(song[1])]), br:url.searchParams.get('br') || 320000 }, cookie); return json(result.body, 200, request, env); }
+  return null;
 }
-
-function imagePublicUrl(request, env, key) {
-  const base = String(env.PUBLIC_IMAGE_BASE_URL || new URL(request.url).origin).replace(/\/$/, '');
-  return `${base}/images/${key.split('/').map(encodeURIComponent).join('/')}`;
-}
-function imageKeyFromRequest(request) {
-  const key = decodeURIComponent(new URL(request.url).pathname.slice('/images/'.length));
-  return IMAGE_KEY.test(key) ? key : '';
-}
-function imageUploadAllowed(request, env) {
-  const expected = String(env.IMAGE_UPLOAD_TOKEN || '');
-  return Boolean(expected) && request.headers.get('Authorization') === `Bearer ${expected}`;
-}
-async function uploadImage(request, env) {
-  if (!imageUploadAllowed(request, env)) return json({ error:'图床上传未授权' }, 401, request, env);
-  const contentType = String(request.headers.get('Content-Type') || '').split(';', 1)[0].trim().toLowerCase();
-  const extension = IMAGE_TYPES.get(contentType);
-  if (!extension) return json({ error:'只支持 JPEG、PNG、GIF、WebP、AVIF、BMP、HEIC 图片' }, 415, request, env);
-  if (Number(request.headers.get('Content-Length') || 0) > MAX_IMAGE_BYTES) return json({ error:'图片不能超过 12 MB' }, 413, request, env);
-  const body = await request.arrayBuffer();
-  if (!body.byteLength) return json({ error:'图片内容为空' }, 400, request, env);
-  if (body.byteLength > MAX_IMAGE_BYTES) return json({ error:'图片不能超过 12 MB' }, 413, request, env);
-  const now = new Date();
-  const key = `album/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${crypto.randomUUID().toLowerCase()}.${extension}`;
-  const object = await env.IMAGE_BUCKET.put(key, body, { httpMetadata:{ contentType, cacheControl:'public, max-age=31536000, immutable' }, customMetadata:{ uploadedAt:now.toISOString() } });
-  return json({ key:object.key, url:imagePublicUrl(request, env, object.key), size:object.size }, 201, request, env);
-}
-async function serveImage(request, env) {
-  const key = imageKeyFromRequest(request);
-  if (!key) return json({ error:'图片地址无效' }, 400, request, env);
-  const object = await env.IMAGE_BUCKET.get(key);
-  if (!object) return json({ error:'图片不存在' }, 404, request, env);
-  const headers = new Headers(corsHeaders(request, env)); object.writeHttpMetadata(headers);
-  headers.set('ETag', object.httpEtag); headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-  return new Response(request.method === 'HEAD' ? null : object.body, { status:200, headers });
-}
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (request.method === 'OPTIONS') return new Response(null, { headers:corsHeaders(request, env) });
-    try {
-      if (url.pathname === '/images' && request.method === 'POST') return await uploadImage(request, env);
-      if (url.pathname.startsWith('/images/') && (request.method === 'GET' || request.method === 'HEAD')) return await serveImage(request, env);
-      if (!['GET', 'HEAD', 'POST'].includes(request.method)) return json({ error:'只允许 GET、HEAD 或 POST 请求' }, 405, request, env);
-      return await proxy(request, env);
-    } catch (error) {
-      console.error(JSON.stringify({ event:'worker_error', message:error.message }));
-      return json({ error:error.message || '服务暂时不可用' }, 502, request, env);
-    }
-  }
-};
+function imagePublicUrl(request, env, key) { const base = String(env.PUBLIC_IMAGE_BASE_URL || new URL(request.url).origin).replace(/\/$/, ''); return `${base}/images/${key.split('/').map(encodeURIComponent).join('/')}`; }
+function imageKeyFromRequest(request) { const key = decodeURIComponent(new URL(request.url).pathname.slice('/images/'.length)); return IMAGE_KEY.test(key) ? key : ''; }
+function imageUploadAllowed(request, env) { const expected = String(env.IMAGE_UPLOAD_TOKEN || ''); return Boolean(expected) && request.headers.get('Authorization') === `Bearer ${expected}`; }
+async function uploadImage(request, env) { if (!imageUploadAllowed(request, env)) return json({ error:'图床上传未授权' }, 401, request, env); const contentType = String(request.headers.get('Content-Type') || '').split(';', 1)[0].trim().toLowerCase(); const extension = IMAGE_TYPES.get(contentType); if (!extension) return json({ error:'只支持 JPEG、PNG、GIF、WebP、AVIF、BMP、HEIC 图片' }, 415, request, env); if (Number(request.headers.get('Content-Length') || 0) > MAX_IMAGE_BYTES) return json({ error:'图片不能超过 12 MB' }, 413, request, env); const body = await request.arrayBuffer(); if (!body.byteLength) return json({ error:'图片内容为空' }, 400, request, env); if (body.byteLength > MAX_IMAGE_BYTES) return json({ error:'图片不能超过 12 MB' }, 413, request, env); const now = new Date(); const key = `album/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${crypto.randomUUID().toLowerCase()}.${extension}`; const object = await env.IMAGE_BUCKET.put(key, body, { httpMetadata:{ contentType, cacheControl:'public, max-age=31536000, immutable' }, customMetadata:{ uploadedAt:now.toISOString() } }); return json({ key:object.key, url:imagePublicUrl(request, env, object.key), size:object.size }, 201, request, env); }
+async function serveImage(request, env) { const key = imageKeyFromRequest(request); if (!key) return json({ error:'图片地址无效' }, 400, request, env); const object = await env.IMAGE_BUCKET.get(key); if (!object) return json({ error:'图片不存在' }, 404, request, env); const headers = new Headers(corsHeaders(request, env)); object.writeHttpMetadata(headers); headers.set('ETag', object.httpEtag); headers.set('Cache-Control', 'public, max-age=31536000, immutable'); return new Response(request.method === 'HEAD' ? null : object.body, { status:200, headers }); }
+export default { async fetch(request, env) { const url = new URL(request.url); if (request.method === 'OPTIONS') return new Response(null, { headers:corsHeaders(request, env) }); try { if (url.pathname === '/images' && request.method === 'POST') return await uploadImage(request, env); if (url.pathname.startsWith('/images/') && (request.method === 'GET' || request.method === 'HEAD')) return await serveImage(request, env); if (!['GET', 'HEAD', 'POST'].includes(request.method)) return json({ error:'只允许 GET、HEAD 或 POST 请求' }, 405, request, env); const path = url.pathname.replace(/^\/api/, '') || '/'; if (path === '/auth/qr/key') return await authQrKey(request, env); if (path === '/auth/qr/create') return await authQrCreate(request, env); if (path === '/auth/qr/check') return await authQrCheck(request, env); if (path === '/auth/qr/image') return await authQrImage(request, env); if (path === '/auth/logout') { try { if (requestCookie(request)) await neteasePost('/api/logout', {}, requestCookie(request)); } catch {} return json({ code:200, message:'已退出' }, 200, request, env); } if (path === '/user/sync') return await syncNetease(request, env); const proxyResponse = await proxyNetease(request, env, path); if (proxyResponse) return proxyResponse; return json({ error:'不支持的网易云接口路径' }, 404, request, env); } catch (error) { console.error(JSON.stringify({ event:'worker_error', message:error.message })); return json({ error:error.message || '服务暂时不可用' }, 502, request, env); } } };

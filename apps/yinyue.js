@@ -2,7 +2,7 @@
   const key='ideal-machine-music', chatKey='ideal-machine-chat', dbName='ideal-machine-music-files', sessionKey='ideal-machine-netease-session';
   // 与理想机同域部署时保持 '/api'；如果 Worker 是独立域名，可在页面初始化前配置：
   // window.IdealMachineConfig={neteaseApiBase:'https://music-api.example.com'}
-  const neteaseApiBase=String(window.IdealMachineConfig?.neteaseApiBase||'https://ideal-music-netease-api.pages.dev/api').replace(/\/$/,'');
+  const neteaseApiBase=String(window.IdealMachineConfig?.neteaseApiBase||'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/,'');
   const app=document.createElement('div');app.className='music-app';document.body.appendChild(app);
   const audio=new Audio();audio.preload='auto';audio.playsInline=true;audio.className='music-global-audio';document.body.appendChild(audio);
   let state, page='player', query='', results=[], loading=false, inviteOpen=false, sourceInput='', playing=false, publicLoading=false, loginQr='', loginLoading=false, loginPollToken=0, neteaseProfile=null, selectedPlaylistId='', lyricsFullOpen=false;

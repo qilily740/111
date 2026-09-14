@@ -4,12 +4,6 @@
   "main": "src/index.js",
   "compatibility_date": "2026-08-22",
   "vars": {
-    "ALLOWED_ORIGIN": "http://localhost:8787"
-  },
-  "r2_buckets": [
-    {
-      "binding": "IMAGE_BUCKET",
-      "bucket_name": "ideal-machine-images"
-    }
-  ]
+    "ALLOWED_ORIGIN": "http://localhost:8787,https://qilily740.github.io"
+  }
 }
