@@ -82,8 +82,8 @@
           if(token!==loginPollToken)return;
           failures=0;
           const code=Number(status?.code??status?.data?.code);
-          if(status?.sessionToken){
-            localStorage.setItem(sessionKey,status.sessionToken);
+          if(status?.sessionToken||status?.data?.sessionToken){
+            localStorage.setItem(sessionKey,status.sessionToken||status.data.sessionToken);
             loginQr='';loginLoading=false;loginStatus='';
             try{await syncNeteaseProfile();lyricRequested.clear();lyricLoading.clear();loadLyrics(current());window.alert('网易云音乐登录成功，个人页面已同步。');}
             catch(error){window.alert(`登录成功，但个人页面同步失败：${error.message}`);}
