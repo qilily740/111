@@ -69,6 +69,7 @@
   let pickerMode = false;
   let pickerCallback = null;
   let pickerMultiMode = false;
+  let pickerChatMode = false;
   let pickerMultiMax = 1;
   let pickerMultiSelected = new Set();
   let toastTimer = null;
@@ -269,7 +270,7 @@
     const importAction = selecting
       ? '<button class="album-import album-finish-button" data-album-finish type="button">完成</button>'
       : `<button class="album-import ${importing ? 'is-busy' : ''}" data-album-transfer-open type="button" ${importing ? 'disabled' : ''}>${importing ? '导入中…' : '导入/导出'}</button>`;
-    app.innerHTML = `<div class="album-page"><header class="album-header"><button data-album-close type="button" aria-label="关闭相册">‹</button><div><span>${pickerMode ? 'SELECT FROM ALBUM' : 'PHOTO HOSTING LIBRARY'}</span><h1>${pickerMode ? '选择图片' : '相册'}</h1></div><div class="album-header-actions">${headerActions}${importAction}</div></header><section class="album-hero"><div><small>全部照片</small><strong>${state.items.length}</strong><span>${pickerMode ? '点击一张图片返回小组件' : '张图片保存在这台设备'}</span></div><div class="album-hero-mark" aria-hidden="true"><i></i><i></i><i></i></div></section><div class="album-search"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="21" cy="21" r="11"/><path d="m30 30 10 10"/></svg><input data-album-search value="${esc(query)}" placeholder="搜索图片名称或来源…"><button data-album-clear type="button" ${query ? '' : 'hidden'}>×</button></div><main class="album-main">${items.length ? `<div class="album-grid">${items.map(photoMarkup).join('')}</div>` : `<div class="album-empty"><div>▧</div><h2>${query ? '没有找到图片' : '相册还是空的'}</h2><p>${query ? '换个关键词试试。' : '先导入一张图片，再返回这里选择。'}</p>${query ? '' : '<label>选择第一张图片<input data-album-file type="file" accept="image/*" multiple></label>'}</div>`}</main><footer class="album-footnote"><i></i><span>${esc(storageNote)}</span></footer></div>${detailMarkup(detail)}<div class="album-toast" data-album-toast role="status"></div>`;
+    app.innerHTML = `<div class="album-page"><header class="album-header"><button data-album-close type="button" aria-label="关闭相册">‹</button><div><span>${pickerMode ? 'SELECT FROM ALBUM' : 'PHOTO HOSTING LIBRARY'}</span><h1>${pickerMode ? '选择图片' : '相册'}</h1></div><div class="album-header-actions">${headerActions}${importAction}</div></header><section class="album-hero"><div><small>全部照片</small><strong>${state.items.length}</strong><span>${pickerMode ? '点击一张图片发送到聊天' : '张图片保存在这台设备'}</span></div><div class="album-hero-mark" aria-hidden="true"><i></i><i></i><i></i></div></section><div class="album-search"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="21" cy="21" r="11"/><path d="m30 30 10 10"/></svg><input data-album-search value="${esc(query)}" placeholder="搜索图片名称或来源…"><button data-album-clear type="button" ${query ? '' : 'hidden'}>×</button></div><main class="album-main">${items.length ? `<div class="album-grid">${items.map(photoMarkup).join('')}</div>` : `<div class="album-empty"><div>▧</div><h2>${query ? '没有找到图片' : '相册还是空的'}</h2><p>${query ? '换个关键词试试。' : '先导入一张图片，再返回这里选择。'}</p>${query ? '' : '<label>选择第一张图片<input data-album-file type="file" accept="image/*" multiple></label>'}</div>`}</main><footer class="album-footnote"><i></i><span>${esc(storageNote)}</span></footer></div>${detailMarkup(detail)}<div class="album-toast" data-album-toast role="status"></div>`;
     const privacyNote = document.createElement('p');
     privacyNote.className = 'album-privacy-note';
     privacyNote.textContent = '隐私提醒：请勿上传身份证、银行卡、证件或其他敏感隐私照片。';
@@ -310,7 +311,7 @@
     const items = state.items;
     const grid = pickerSheet.querySelector('.album-picker-multi-panel > .album-picker-grid');
     const scrollTop = grid?.scrollTop || 0;
-    pickerSheet.innerHTML = `<button class="album-picker-backdrop" data-album-picker-close type="button" aria-label="关闭相册选择"></button><section class="album-picker-panel album-picker-multi-panel" role="dialog" aria-modal="true" aria-labelledby="albumPickerMultiTitle"><header><div><span>PHOTO LIBRARY</span><h2 id="albumPickerMultiTitle">批量选择图标</h2></div><button type="button" data-album-picker-close aria-label="关闭">×</button></header><p class="album-picker-hint">最多选择 ${pickerMultiMax} 张图片，按选择顺序替换 App 图标。</p><main class="album-picker-grid">${items.length ? items.map(item => { const selected = pickerMultiSelected.has(item.id); const order = [...pickerMultiSelected].indexOf(item.id) + 1; return `<button class="album-picker-photo ${selected ? 'is-selected' : ''}" data-album-picker-multi-item="${esc(item.id)}" type="button" aria-pressed="${selected}"><span><img data-album-picker-src="${esc(item.url)}" alt="${esc(item.name)}">${selected ? `<i aria-hidden="true">${order}</i>` : ''}</span><b>${esc(item.name)}</b><small>${esc(item.source)}</small></button>`; }).join('') : '<div class="album-picker-empty"><b>相册还是空的</b><span>请先在相册 App 中导入图片</span></div>'}</main><footer><button type="button" data-album-picker-close>取消</button><button class="is-primary" type="button" data-album-picker-multi-done ${pickerMultiSelected.size ? '' : 'disabled'}>完成${pickerMultiSelected.size ? `（${pickerMultiSelected.size}）` : ''}</button></footer></section>`;
+    pickerSheet.innerHTML = `<button class="album-picker-backdrop" data-album-picker-close type="button" aria-label="关闭相册选择"></button><section class="album-picker-panel album-picker-multi-panel ${pickerChatMode ? 'album-chat-picker-panel' : ''}" role="dialog" aria-modal="true" aria-labelledby="albumPickerMultiTitle"><header><div><span>PHOTO LIBRARY</span><h2 id="albumPickerMultiTitle">${pickerChatMode ? '从理想机相册选择' : '批量选择图标'}</h2></div><button type="button" data-album-picker-close aria-label="关闭">×</button></header><p class="album-picker-hint">${pickerChatMode ? '可多选图片，勾选后点击发送。' : `最多选择 ${pickerMultiMax} 张图片，按选择顺序替换 App 图标。`}</p><main class="album-picker-grid">${items.length ? items.map(item => { const selected = pickerMultiSelected.has(item.id); const order = [...pickerMultiSelected].indexOf(item.id) + 1; return `<button class="album-picker-photo ${selected ? 'is-selected' : ''}" data-album-picker-multi-item="${esc(item.id)}" type="button" aria-pressed="${selected}"><span><img data-album-picker-src="${esc(item.url)}" alt="${esc(item.name)}">${selected ? `<i aria-hidden="true">${order}</i>` : ''}</span><b>${esc(item.name)}</b><small>${esc(item.source)}</small></button>`; }).join('') : '<div class="album-picker-empty"><b>相册还是空的</b><span>请先在相册 App 中导入图片</span></div>'}</main><footer><button type="button" data-album-picker-close>取消</button><button class="is-primary" type="button" data-album-picker-multi-done ${pickerMultiSelected.size ? '' : 'disabled'}>${pickerChatMode ? '发送' : '完成'}${pickerMultiSelected.size ? `（${pickerMultiSelected.size}）` : ''}</button></footer></section>`;
     pickerSheet.classList.add('is-open');
     pickerSheet.setAttribute('aria-hidden', 'false');
     const nextGrid = pickerSheet.querySelector('.album-picker-multi-panel > .album-picker-grid');
@@ -327,6 +328,8 @@
 
   function closePickerSheet() {
     pickerCallback = null;
+    pickerChatMode = false;
+    pickerMultiMode = false;
     pickerSheet.classList.remove('is-open');
     pickerSheet.setAttribute('aria-hidden', 'true');
     pickerSheet.replaceChildren();
@@ -618,10 +621,27 @@
     syncStoredImages();
     renderPickerSheet();
   }
+  function pickFromApp(callback) {
+    if (typeof callback !== 'function') return;
+    state = readState();
+    syncStoredImages();
+    closePickerSheet();
+    pickerMode = true;
+    pickerCallback = callback;
+    selecting = false;
+    exportSelection = false;
+    selectedIds.clear();
+    activeId = '';
+    query = '';
+    app.classList.add('is-open');
+    app.setAttribute('aria-hidden', 'false');
+    render();
+  }
   function pickMany(maxCount, callback) {
     if (typeof callback !== 'function') return;
     pickerMode = false;
     pickerMultiMode = true;
+    pickerChatMode = false;
     pickerMultiMax = Math.max(1, Number(maxCount) || 1);
     pickerMultiSelected.clear();
     pickerCallback = callback;
@@ -630,5 +650,17 @@
     syncStoredImages();
     renderMultiPickerSheet();
   }
-  window.IdealMachineAlbum = { archiveFile, archiveUrl, pick, pickMany, open:() => document.querySelector('[data-app-key="xiangce"]')?.click(), items:() => [...state.items] };
+  function pickForChat(callback) {
+    if (typeof callback !== 'function') return;
+    state = readState();
+    syncStoredImages();
+    closePickerSheet();
+    pickerMultiMode = true;
+    pickerChatMode = true;
+    pickerMultiMax = state.items.length;
+    pickerMultiSelected.clear();
+    pickerCallback = callback;
+    renderMultiPickerSheet();
+  }
+  window.IdealMachineAlbum = { archiveFile, archiveUrl, pick, pickFromApp, pickForChat, pickMany, open:() => document.querySelector('[data-app-key="xiangce"]')?.click(), items:() => [...state.items] };
 })();

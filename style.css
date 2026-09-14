@@ -76,9 +76,11 @@ body .chat-reading-modal.is-night .chat-reading-mini-messages p, body .chat-read
 .chat-reading-background-album { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid rgba(0,0,0,.1); border-radius: 10px; background: #fff; color: #444; font: inherit; font-size: 11px; cursor: pointer; }
 .chat-reading-background-file { display: inline-flex !important; align-items: center; justify-content: center; width: calc(50% - 5px); min-height: 40px; padding: 0; vertical-align: middle; background: #fff; color: #444; font: inherit; font-size: 11px; cursor: pointer; }
 .chat-reading-background-album { display: inline-block; width: calc(50% - 5px); margin-top: 8px; margin-left: 6px; vertical-align: middle; }
+.chat-reading-background-file,
+.chat-reading-background-album { height: 40px !important; min-height: 40px !important; max-height: 40px !important; padding: 0 !important; margin-top: 8px; }
 .chat-reading-background-file > span { display: none !important; }
-.chat-reading-background-file b { display: block; min-height: 0; padding: 0; border-radius: 0; background: transparent; color: inherit; font-size: 0; font-weight: 400; }
-.chat-reading-background-file b::after { content: '从本地选择'; font-size: 11px; }
+.chat-reading-background-file b { display: block; width: 100%; min-height: 0; padding: 0; border-radius: 0; background: transparent; color: inherit; font-size: 11px; font-weight: 400; text-align: center; }
+.chat-reading-background-file b::after { content: none; }
 .chat-reading-chat-settings [hidden] { display: none !important; }
 .chat-reading-mini { font-size: var(--reading-chat-font-size, 11px) !important; }
 .chat-reading-mini .chat-reading-mini-messages p { font-size: var(--reading-chat-font-size, 11px) !important; }
@@ -88,6 +90,7 @@ body .chat-reading-modal.is-night .chat-reading-mini-messages p, body .chat-read
 .chat-reading-chat-settings footer button,
 .chat-reading-chat-settings footer button:last-child,
 .chat-reading-chat-settings footer button[data-chat-reading-background-reset] { background: #222 !important; color: #fff !important; }
+.chat-reading-chat-settings footer button[data-chat-reading-background-reset] { min-width: 78px !important; }
 .chat-reading-manage { min-width: 44px; height: 31px; padding: 0 9px; border: 0; border-radius: 9px; background: #efefed; color: #444; font: inherit; font-size: 11px; }
 .chat-reading-book-item { display: flex; align-items: center; gap: 7px; }
 .chat-reading-book-item > button[data-chat-reading-book] { flex: 1; min-width: 0; }
@@ -1291,7 +1294,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
   .world-editor-save { background: #eee; color: #111; }
 }
 
-/* 日历 App：月视图、纪念日详情与角色关联 */
+/* 日历 App：月视图、用户行程与角色日程 */
 .calendar-app { position:fixed; inset:0; z-index:30; display:none; background:#f5f5f7; color:#202124; }
 .calendar-app.is-open { display:block; }
 .calendar-page { height:100%; overflow-y:auto; }
@@ -1324,8 +1327,63 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .calendar-event-card > div:nth-child(2) { display:grid; flex:1; gap:4px; min-width:0; }
 .calendar-event-card b { overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
 .calendar-event-card small { overflow:hidden; color:#999; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.calendar-event-card p { margin:0; overflow:hidden; color:#777; font-size:10px; line-height:1.4; text-overflow:ellipsis; white-space:nowrap; }
 .calendar-event-card > button { width:24px; height:24px; border-radius:50%; background:rgba(0,0,0,.06); color:#888; font-size:16px; }
 .calendar-upcoming { padding-top:3px; }
+.calendar-role-group { margin-top:16px; }
+.calendar-role-group h3 { margin:0 0 8px; font-size:13px; font-weight:700; }
+.calendar-role-heading { display:flex; align-items:end; justify-content:space-between; gap:12px; }
+.calendar-role-heading > div > span { color:#999; font-size:9px; font-weight:700; letter-spacing:.16em; }
+.calendar-role-heading button { padding:7px 12px; border:0; border-radius:9px; background:#222; color:#fff; font:inherit; font-size:11px; cursor:pointer; }
+.calendar-role-heading button:disabled { opacity:.55; cursor:wait; }
+.calendar-time-group { margin-top:12px; overflow:hidden; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:rgba(255,255,255,.62); }
+.calendar-time-group > header { padding:10px 12px 8px; border-bottom:1px solid rgba(0,0,0,.07); }
+.calendar-time-group time { color:#8d5b3c; font-size:11px; font-weight:700; letter-spacing:.04em; }
+.calendar-role-row { display:grid; grid-template-columns:74px minmax(0,1fr) 24px; align-items:center; gap:8px; min-height:48px; padding:8px 10px 8px 12px; border-bottom:1px solid rgba(0,0,0,.055); }
+.calendar-role-row:last-child { border-bottom:0; }
+.calendar-role-row > b { overflow:hidden; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.calendar-role-row > div { min-width:0; }
+.calendar-role-row strong { display:block; overflow:hidden; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.calendar-role-row p { margin:3px 0 0; overflow:hidden; color:#777; font-size:10px; line-height:1.4; text-overflow:ellipsis; white-space:nowrap; }
+.calendar-role-row > button { width:22px; height:22px; border:0; border-radius:50%; background:rgba(0,0,0,.06); color:#888; font-size:14px; cursor:pointer; }
+.calendar-daypart { margin-top:16px; }
+.calendar-daypart > header { display:flex; align-items:baseline; justify-content:space-between; padding:0 2px 7px; }
+.calendar-daypart > header h3 { margin:0; font-size:14px; }
+.calendar-daypart > header small { color:#aaa; font-size:9px; }
+.calendar-daypart .calendar-time-group { margin-top:7px; }
+.calendar-daypart .calendar-time-group > header { padding:7px 10px 6px; }
+.calendar-daypart .calendar-role-row { min-height:42px; padding-top:6px; padding-bottom:6px; }
+.calendar-time-block { margin-top:7px; overflow:hidden; border:1px solid rgba(0,0,0,.08); border-radius:13px; background:rgba(255,255,255,.62); }
+.calendar-time-block > summary { display:grid; grid-template-columns:auto minmax(0,1fr) 16px; align-items:center; gap:10px; padding:10px 11px; cursor:pointer; list-style:none; }
+.calendar-time-block > summary::-webkit-details-marker { display:none; }
+.calendar-time-block > summary time { color:#8d5b3c; font-size:11px; font-weight:700; white-space:nowrap; }
+.calendar-time-block > summary span { overflow:hidden; color:#666; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.calendar-time-block > summary b { color:#999; font-size:16px; font-weight:400; transform:rotate(0deg); transition:transform .15s ease; }
+.calendar-time-block[open] > summary { border-bottom:1px solid rgba(0,0,0,.07); }
+.calendar-time-block[open] > summary b { transform:rotate(90deg); }
+.calendar-time-block-details .calendar-role-row { grid-template-columns:74px 78px minmax(0,1fr) 22px; min-height:40px; padding-top:6px; padding-bottom:6px; }
+.calendar-role-row > small { color:#999; font-size:9px; white-space:nowrap; }
+.calendar-timeline { padding:0 10px 10px 0; }
+.calendar-timeline-scale { display:grid; grid-template-columns:repeat(var(--calendar-tick-count),1fr); margin:0 0 4px 34px; color:#aaa; font-size:8px; }
+.calendar-timeline-scale span { text-align:left; }
+.calendar-timeline-lanes { display:grid; gap:3px; }
+.calendar-timeline-row { display:grid; grid-template-columns:30px minmax(0,1fr); align-items:center; gap:4px; min-height:32px; }
+.calendar-role-label { display:flex; align-items:center; min-width:0; gap:4px; padding:0 0 0 2px; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.calendar-role-label > img, .calendar-role-label > span { display:grid; flex:0 0 22px; place-items:center; width:22px; height:22px; overflow:hidden; border-radius:50%; background:var(--role-color); color:#fff; font-size:10px; font-weight:700; object-fit:cover; }
+.calendar-role-label > span { background:var(--role-color); }
+.calendar-role-track { position:relative; height:24px; border-radius:7px; background:repeating-linear-gradient(to right, transparent 0, transparent calc(100% / var(--calendar-tick-count) - 1px), rgba(0,0,0,.1) calc(100% / var(--calendar-tick-count) - 1px), rgba(0,0,0,.1) calc(100% / var(--calendar-tick-count))); box-shadow:inset 0 0 0 1px rgba(0,0,0,.06); }
+.calendar-role-segment { position:absolute; top:4px; height:16px; min-width:5px; overflow:hidden; padding:0 4px; border:0; border-radius:5px; background:var(--role-color); color:#fff; font:inherit; font-size:8px; line-height:16px; text-align:left; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+.calendar-role-detail { position:fixed; inset:0; z-index:10; display:grid; align-items:end; }
+.calendar-role-detail-backdrop { position:absolute; inset:0; width:100%; height:100%; border:0; background:rgba(0,0,0,.26); cursor:pointer; }
+.calendar-role-detail > section { position:relative; max-height:min(72vh,560px); overflow:auto; padding:16px; border-radius:22px 22px 0 0; background:rgba(250,250,250,.97); box-shadow:0 -12px 40px rgba(0,0,0,.18); }
+.calendar-role-detail header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid rgba(0,0,0,.08); }
+.calendar-role-detail header > div { display:flex; align-items:center; gap:9px; min-width:0; }
+.calendar-role-detail header img, .calendar-role-detail header > div > span { display:grid; place-items:center; width:34px; height:34px; overflow:hidden; border-radius:50%; background:#ddd; object-fit:cover; }
+.calendar-role-detail header small { color:#999; font-size:9px; }
+.calendar-role-detail header h2 { margin-top:2px; font-size:17px; }
+.calendar-role-detail header > button { width:28px; height:28px; border:0; border-radius:50%; background:rgba(0,0,0,.07); color:#666; font-size:18px; cursor:pointer; }
+.calendar-role-detail main { padding-top:4px; }
+.calendar-role-detail .calendar-event-card { margin-top:8px; }
 .calendar-empty { padding:16px 0; color:#aaa; font-size:11px; }
 .calendar-editor { position:fixed; inset:0; z-index:8; display:grid; place-items:center; padding:20px; }
 .calendar-editor-backdrop { position:absolute; inset:0; background:rgba(0,0,0,.25); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
@@ -1335,6 +1393,9 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .calendar-editor header button { width:28px; height:28px; border-radius:50%; background:rgba(0,0,0,.07); color:#666; font-size:18px; }
 .calendar-editor label { display:grid; gap:7px; margin-top:15px; color:#777; font-size:11px; }
 .calendar-editor input, .calendar-editor select { width:100%; height:39px; padding:0 10px; border:1px solid rgba(0,0,0,.11); border-radius:10px; outline:0; background:#fff; color:#222; font:inherit; font-size:12px; }
+.calendar-editor-time { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
+.calendar-editor-time label { min-width:0; }
+.calendar-editor textarea { width:100%; min-height:72px; padding:10px; border:1px solid rgba(0,0,0,.11); border-radius:10px; outline:0; resize:vertical; background:#fff; color:#222; font:inherit; font-size:12px; line-height:1.5; }
 .calendar-editor footer { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
 .calendar-editor footer button { min-height:35px; padding:0 14px; border:0; border-radius:10px; background:#eee; color:#555; font:inherit; font-size:11px; cursor:pointer; }
 .calendar-editor footer button:last-child { background:#222; color:#fff; }
@@ -1346,11 +1407,12 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
   .calendar-date-cell:hover { background:rgba(255,255,255,.08); }
   .calendar-date-cell.is-selected, .calendar-day-title button, .calendar-editor footer button:last-child { background:#eee; color:#111; }
   .calendar-event-card { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }
+  .calendar-event-card p { color:#aaa; }
   .calendar-event-mark { background:rgba(255,255,255,.12); color:#ddd; }
   .calendar-event-mark.is-role { background:#eee; color:#111; }
   .calendar-event-card > button, .calendar-editor header button { background:rgba(255,255,255,.1); color:#ddd; }
   .calendar-editor > section { border-color:rgba(255,255,255,.14); background:rgba(35,35,35,.97); }
-  .calendar-editor input, .calendar-editor select { border-color:rgba(255,255,255,.14); background:rgba(0,0,0,.22); color:#eee; }
+  .calendar-editor input, .calendar-editor select, .calendar-editor textarea { border-color:rgba(255,255,255,.14); background:rgba(0,0,0,.22); color:#eee; }
   .calendar-editor footer button { background:rgba(255,255,255,.1); color:#ddd; }
 }
 
@@ -1850,7 +1912,39 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .edit-actions { flex: 0 0 auto; margin: 0; padding: 14px 20px 20px; background: inherit; }
 .chat-call-rejected { display: inline-flex; align-items: center; gap: 7px; color: #777; font-size: 11px; }.chat-call-rejected i { position: relative; display: inline-block; width: 17px; height: 17px; border: 1.6px solid currentColor; border-radius: 50%; }.chat-call-rejected i::before { position: absolute; top: 7px; left: 2px; width: 11px; height: 1.5px; transform: rotate(-45deg); background: currentColor; content: ''; }.chat-call-rejected i::after { position: absolute; top: 3px; left: 7px; width: 3px; height: 7px; border-left: 1.5px solid currentColor; border-radius: 3px; content: ''; }
 .chat-call-rejected svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.chat-video-call-stage > div { transform: translateY(-12vh); text-align: center; }
+.chat-video-call-stage > div { display: flex; width: 100%; flex-direction: column; align-items: center; transform: translateY(0); text-align: center; }
+.chat-video-call-stage .chat-video-call-avatar { flex: 0 0 94px !important; width: 94px !important; min-width: 94px !important; height: 94px !important; min-height: 94px !important; aspect-ratio: 1 / 1; }
+.chat-video-call-head small { display: block; margin-top: 4px; color: #aaa; font-size: 10px; }
+.chat-video-call-live-stage { position: relative; }
+.chat-video-call-online { position: absolute; top: 18px; right: 18px; padding: 4px 8px; border-radius: 999px; background: rgba(211,62,62,.8); color: #fff; font-size: 9px; letter-spacing: .08em; }
+.chat-video-call-context { padding: 7px 14px; border-top: 1px solid rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.08); color: #999; font-size: 10px; text-align: center; }
+.chat-video-call-ending-time { display: block; margin-top: 8px; color: #ddd; font-size: 16px; font-weight: 500; letter-spacing: .08em; }
+.chat-video-call-timer { display: block; margin-top: 8px; color: #fff; font-size: 22px; font-weight: 500; letter-spacing: .08em; }
+.chat-video-call-stage .chat-video-call-hangup { display: block; min-width: 112px; min-height: 38px; margin: 18px auto 0; border: 0; border-radius: 20px; background: #b64242; color: #fff; font: inherit; font-size: 12px; cursor: pointer; }
+.chat-video-call-log { min-height: 0; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.chat-video-call-voice { display: inline-flex; align-items: center; margin-left: 4px; padding: 5px 9px; border-radius: 999px; background: rgba(255,255,255,.12); color: #eee; font-size: 11px; }
+.chat-video-call-voice-text { display: block; margin-top: 5px; color: #aaa; font-size: 10px; line-height: 1.5; }
+.chat-video-call-empty { color: #888 !important; text-align: center !important; }
+.chat-video-record-message { width: 100%; max-width: none; margin: 5px 0 13px; }
+.chat-video-record-bubble { display: flex; align-items: center; gap: 10px; width: min(310px, 88%); margin: 0 auto; padding: 11px 13px; border: 1px solid rgba(0,0,0,.08); border-radius: 14px; background: rgba(255,255,255,.7); color: #333; text-align: left; box-shadow: 0 7px 18px rgba(0,0,0,.08); cursor: pointer; }
+.chat-video-record-icon { display: grid; flex: 0 0 32px; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: #222; color: #fff; font-size: 14px; }
+.chat-video-record-bubble > span:nth-child(2) { display: grid; flex: 1; gap: 4px; min-width: 0; }
+.chat-video-record-bubble b { font-size: 12px; }
+.chat-video-record-bubble small { color: #999; font-size: 10px; }
+.chat-video-record-bubble i { color: #999; font-size: 20px; font-style: normal; }
+.chat-video-record-message.is-selected .chat-video-record-bubble { outline: 2px solid #222; outline-offset: 3px; }
+.chat-video-incoming-bubble { display: inline-flex; align-items: center; gap: 8px; }
+.chat-video-incoming-bubble svg { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.chat-video-call-record-modal { background: #151515; }
+.chat-video-record-detail { flex: 1; overflow-y: auto; padding: 18px 16px 30px; }
+.chat-video-call-record-modal { overflow: hidden; }
+.chat-video-call-record-modal .chat-video-record-detail { display: block; flex: 1 1 auto; width: 100%; height: auto; min-height: 0; max-height: none; padding: 0; overflow: hidden !important; }
+.chat-video-record-detail-scroll { display: block; width: 100%; height: 100%; max-height: 100%; box-sizing: border-box; overflow-y: auto !important; padding: 18px 16px 30px; overscroll-behavior: contain; touch-action: none; -webkit-overflow-scrolling: touch; scrollbar-width: thin; cursor: grab; }
+.chat-video-record-detail-scroll.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+.chat-video-record-detail-scroll > section { margin-bottom: 14px; padding: 14px; border: 1px solid rgba(255,255,255,.1); border-radius: 15px; background: rgba(255,255,255,.06); }
+.chat-video-record-detail-scroll > section > span { display: block; margin-bottom: 8px; color: #aaa; font-size: 10px; letter-spacing: .08em; }
+.chat-video-record-detail-scroll > section > p { color: #eee; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+.chat-video-record-detail .chat-video-call-log { max-height: none; overflow: visible; padding: 0; }
 .chat-video-call-modal[data-video-status="rejected"] .chat-video-call-head { position: absolute; inset: 0 0 auto; z-index: 2; justify-content: center; padding-top: max(22px, env(safe-area-inset-top)); }.chat-video-call-modal[data-video-status="rejected"] .chat-video-call-head b { display: none; }.chat-video-call-modal[data-video-status="rejected"] .chat-video-call-head button { display: none; }.chat-video-call-modal[data-video-status="rejected"] .chat-video-call-actions { justify-content: center; }.chat-video-call-modal[data-video-status="rejected"] .chat-video-call-stage > div { transform: translateY(-20vh); }
 .chat-tools button { justify-items: center; align-content: center; gap: 3px; line-height: 1; }
 .chat-tools button span { margin-top: -2px; text-align: center; }
@@ -2294,6 +2388,11 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .chat-app.is-chatting.chat-wallpaper-dark .chat-header .chat-top-name { color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,.58); }
 .chat-app.is-chatting.chat-wallpaper-dark .chat-header .chat-top-back,
 .chat-app.is-chatting.chat-wallpaper-dark .chat-header .chat-top-settings { background: rgba(0,0,0,.3) !important; color: #fff !important; border-color: rgba(255,255,255,.34) !important; }
+.chat-app.is-chatting.chat-wallpaper-dark .chat-person,
+.chat-app.is-chatting.chat-wallpaper-dark .chat-person b,
+.chat-app.is-chatting.chat-wallpaper-dark .chat-person small,
+.chat-app.is-chatting.chat-wallpaper-dark .chat-compose-wrap .chat-compose input { color: #fff !important; caret-color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.45); }
+.chat-app.is-chatting.chat-wallpaper-dark .chat-compose-wrap .chat-compose input::placeholder { color: rgba(255,255,255,.72) !important; }
 .forum-app { position: fixed; inset: 0; z-index: 52; display: none; overflow: hidden; background: #f5f5f3; color: #171717; font-family: var(--forum-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif); }
 .forum-app.is-open { display: block; }
 .forum-page { display: flex; flex-direction: column; width: 100%; height: 100%; }
@@ -2897,6 +2996,9 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .chat-contact-group-panel header button { padding:6px 9px; border:0; border-radius:8px; background:#222; color:#fff; font:inherit; font-size:10px; cursor:pointer; }
 .chat-group-editor-row { padding:10px 0; border-top:1px solid rgba(0,0,0,.07); }
 .chat-group-editor-row > b { display:block; margin-bottom:8px; font-size:11px; }
+.chat-group-editor-row .chat-group-editor-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.chat-group-editor-title b { font-size:11px; }
+.chat-group-editor-title button { padding:5px 9px; border:1px solid rgba(180,55,55,.2); border-radius:8px; background:rgba(180,55,55,.07); color:#a33; font:inherit; font-size:10px; cursor:pointer; }
 .chat-group-editor-row > div { display:flex; flex-wrap:wrap; gap:7px; }
 .chat-group-editor-row label { display:flex; align-items:center; gap:4px; padding:5px 7px; border-radius:8px; background:rgba(0,0,0,.045); color:#666; font-size:10px; }
 .chat-group-contacts-scroll { display:flex !important; flex-wrap:nowrap !important; gap:12px !important; overflow-x:auto; padding:3px 2px 8px; scrollbar-width:none; }
@@ -2931,6 +3033,11 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .chat-moment-owner { margin-left:auto; color:#aaa; font-size:9px; }
 .chat-moment-footer { display:flex; align-items:center; gap:14px; margin:13px 0 0 43px; }
 .chat-moment-footer button { padding:0; border:0; background:none; color:#999; font:inherit; font-size:10px; cursor:pointer; }
+.chat-moment-footer .chat-moment-comment-button { display:inline-flex; align-items:center; gap:4px; color:#888; }
+.chat-moment-comment-button svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.65; }
+.chat-moment-comment-button:hover { color:#333; }
+.chat-moment-comment-button:active { transform:scale(.94); }
+.chat-moment-footer button.is-moment-busy { color:#aaa; cursor:wait; }
 .chat-moment-footer button.is-liked { color:#222; font-weight:700; }
 .chat-moment-footer .chat-moment-delete { margin-left:auto; color:#aaa; }
 .chat-moment-comments { display:grid; gap:5px; margin:10px 0 0 43px; padding:9px 11px; border-radius:10px; background:rgba(0,0,0,.035); font-size:10px; }
@@ -2939,9 +3046,11 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 @media (prefers-color-scheme:dark) { .chat-moment-liked-by { background:rgba(255,255,255,.08); color:#bbb; } }
 .chat-moment-comments div { display:flex; gap:6px; line-height:1.45; }
 .chat-moment-comments b { flex:0 0 auto; color:#555; }
-.chat-moment-comment.is-replyable { cursor:pointer; }
+.chat-moment-comment.is-replyable,
+.chat-moment-comment-reply-item { cursor:pointer; border-radius:6px; transition:background .15s ease; }
 .chat-moment-comments .chat-moment-comment { display:grid; grid-template-columns:auto minmax(0,1fr); }
-.chat-moment-comment.is-replyable:hover { background:rgba(0,0,0,.045); }
+.chat-moment-comment.is-replyable:hover,
+.chat-moment-comment-reply-item:hover { background:rgba(0,0,0,.045); }
 .chat-moment-comments .chat-moment-comment-replies { display:grid; grid-column:1 / -1; gap:4px; margin:5px 0 0 12px; padding-left:8px; border-left:1px solid rgba(0,0,0,.1); }
 .chat-moment-comment-replies div { font-size:9px; }
 .chat-moment-location { margin:10px 0 0 43px; color:#777; font-size:10px; }
@@ -2955,7 +3064,8 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
   .chat-moment-footer button.is-liked { color:#fff; }
   .chat-moment-comments { background:rgba(255,255,255,.08); }
   .chat-moment-comments b { color:#ddd; }
-  .chat-moment-comment.is-replyable:hover { background:rgba(255,255,255,.08); }
+  .chat-moment-comment.is-replyable:hover,
+  .chat-moment-comment-reply-item:hover { background:rgba(255,255,255,.08); }
   .chat-moment-comment-replies { border-color:rgba(255,255,255,.16); }
 }
 .chat-moment-visibility > label { border:0 !important; border-radius:0 !important; background:transparent !important; }
@@ -5289,6 +5399,30 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .chat-conversation.has-chat-quote .chat-messages { padding-bottom:0; }
 .chat-conversation.has-chat-quote .chat-messages::after { content:none; display:none; height:0; min-height:0; }
 .chat-message.is-quote-tracking .chat-message-line { will-change:transform; }
+.chat-contact-card { position:relative; display:block; overflow:hidden; padding:0; touch-action:pan-y; }
+.chat-contact-swipe-action { position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-end; background:transparent; }
+.chat-contact-pin { width:38px; height:38px; margin-right:12px; padding:0; border:0; border-radius:50%; background:#222; color:#fff; font:inherit; font-size:21px; line-height:1; opacity:0; pointer-events:none; box-shadow:0 5px 13px rgba(0,0,0,.18); cursor:pointer; transition:opacity .12s ease; }
+.chat-contact-card.is-swipe-open .chat-contact-pin,
+.chat-contact-card.is-swipe-revealing .chat-contact-pin { opacity:1; pointer-events:auto; }
+.chat-contact-card-content { position:relative; z-index:1; display:flex !important; align-items:center; width:100%; min-height:69px; box-sizing:border-box; gap:11px; padding:13px; border-radius:inherit; background:rgba(255,255,255,.48); transition:transform .18s cubic-bezier(.22,.61,.36,1); will-change:transform; }
+.chat-contact-card-content.is-swipe-tracking { transition:none; }
+.chat-contact-card.is-pinned .chat-contact-card-content { border-color:rgba(34,34,34,.24); background:rgba(34,34,34,.13); }
+.chat-contact-card-content > div:nth-child(2) { display:grid; flex:1; min-width:0; gap:5px; }
+.chat-contact-card-content > div:nth-child(2) b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat-contact-card-content > div:nth-child(2) p { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat-launch-contact-swipe { position:relative; overflow:hidden; margin-bottom:9px; border-radius:16px; background:rgba(255,255,255,.48); touch-action:pan-y; }
+.chat-launch-contact-swipe > .chat-launch-contact { position:relative; z-index:1; margin:0; transition:transform .18s cubic-bezier(.22,.61,.36,1); will-change:transform; }
+.chat-launch-contact-swipe > .chat-launch-contact.is-swipe-tracking { transition:none; }
+.chat-launch-contact-swipe > .chat-launch-contact.is-pinned { border-color:rgba(34,34,34,.24); background:rgba(34,34,34,.13); }
+.chat-launch-contact-pin { position:absolute; top:50%; right:12px; z-index:0; width:38px; height:38px; padding:0; transform:translateY(-50%); border:0; border-radius:50%; background:#222; color:#fff; font:inherit; font-size:21px; line-height:1; opacity:0; pointer-events:none; box-shadow:0 5px 13px rgba(0,0,0,.18); cursor:pointer; transition:opacity .12s ease; }
+.chat-launch-contact-swipe.is-swipe-open .chat-launch-contact-pin,
+.chat-launch-contact-swipe.is-swipe-revealing .chat-launch-contact-pin { opacity:1; pointer-events:auto; }
+@media (prefers-color-scheme:dark) {
+  .chat-contact-card-content { background:rgba(255,255,255,.07); }
+  .chat-contact-card.is-pinned .chat-contact-card-content { border-color:rgba(255,255,255,.24); background:rgba(255,255,255,.16); }
+  .chat-launch-contact-swipe { background:rgba(255,255,255,.07); }
+  .chat-launch-contact-swipe > .chat-launch-contact.is-pinned { border-color:rgba(255,255,255,.24); background:rgba(255,255,255,.16); }
+}
 @media (prefers-color-scheme: dark) {
   .chat-quote-bar { border-left-color: #eee; background: rgba(255,255,255,.1); color: #ddd; }
   .chat-quote-bar small { color: #ccc; }
@@ -5380,8 +5514,22 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
   font-weight:700;
   line-height:1;
 }
+.chat-back-unread-badge {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 50%;
+  background: #222;
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+}
 @media (prefers-color-scheme: dark) {
-  .chat-launch-contact .chat-unread-badge { background:#f2f2f2; color:#222; }
+  .chat-launch-contact .chat-unread-badge,
+  .chat-back-unread-badge { background:#f2f2f2; color:#222; }
 }
 
 /* Ta 手机：全天日程、最近歌单与订单页面。 */
@@ -7194,3 +7342,31 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   .magazine-page-controls button { border-color:rgba(203,162,126,.3); background:rgba(255,255,255,.08); color:#e0b898; }
   .magazine-page-controls span,.magazine-reader-tip { color:#b9aaa0; }
 }
+
+/* 聊天中的实际图片只显示紧凑预览；点开仍使用原图。 */
+.chat-app.is-chatting .chat-message .chat-bubble.image:not(.sticker) img {
+  width:auto !important;
+  height:auto !important;
+  max-width:min(170px, calc(100vw - 132px)) !important;
+  max-height:190px !important;
+  object-fit:contain;
+}
+
+.album-chat-picker-panel { height:66.67dvh; max-height:66.67dvh; }
+.album-chat-picker-panel .album-picker-grid { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.chat-bubble.image-stack { padding:0 !important; border:0 !important; background:transparent !important; box-shadow:none !important; }
+.chat-image-stack { display:flex; align-items:center; gap:10px; width:min(224px, calc(100vw - 132px)); min-height:106px; padding:8px; border:0; border-radius:14px; background:rgba(255,255,255,.74); color:#222; cursor:pointer; }
+.chat-image-stack-layers { position:relative; flex:0 0 108px; height:90px; }
+.chat-image-stack-photo { position:absolute; top:2px; left:12px; width:78px !important; height:78px !important; max-width:78px !important; max-height:78px !important; border:2px solid #fff; border-radius:10px; object-fit:cover !important; box-shadow:0 5px 14px rgba(0,0,0,.18); }
+.chat-image-stack-photo.is-layer-0 { z-index:3; transform:rotate(-5deg); }
+.chat-image-stack-photo.is-layer-1 { z-index:2; left:21px; transform:rotate(4deg); }
+.chat-image-stack-photo.is-layer-2 { z-index:1; left:29px; transform:rotate(11deg); }
+.chat-image-stack-expand { flex:1; padding:8px 4px; border-radius:20px; background:#fff; color:#222; font-size:12px; white-space:nowrap; }
+.chat-image-stack-viewer { position:fixed; inset:0; z-index:95; display:grid; align-items:end; }
+.chat-image-stack-backdrop { position:absolute; inset:0; width:100%; height:100%; border:0; background:rgba(0,0,0,.4); }
+.chat-image-stack-viewer > section { position:relative; display:flex; flex-direction:column; height:min(76dvh,720px); border-radius:22px 22px 0 0; background:#f7f7f7; }
+.chat-image-stack-viewer header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid rgba(0,0,0,.08); }
+.chat-image-stack-viewer header b { font-size:15px; }
+.chat-image-stack-viewer header button { width:28px; height:28px; border:0; border-radius:50%; background:#e9e9e9; font-size:18px; }
+.chat-image-stack-viewer main { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; gap:8px; min-height:0; padding:12px; overflow:auto; }
+.chat-image-stack-viewer main img { display:block; width:100%; aspect-ratio:1; border-radius:11px; object-fit:cover; }

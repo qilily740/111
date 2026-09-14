@@ -18,12 +18,33 @@
   const imageChoicePortal = document.createElement('div'); imageChoicePortal.id = 'chatImageChoicePortal'; app.appendChild(imageChoicePortal);
   const transferPortal = document.createElement('div'); transferPortal.id = 'chatTransferPortal'; app.appendChild(transferPortal);
   const userHomePortal = document.createElement('div'); userHomePortal.id = 'chatUserHome'; app.appendChild(userHomePortal);
+  const momentCommentComposerPortal = document.createElement('div'); momentCommentComposerPortal.id = 'chatMomentCommentComposer'; momentCommentComposerPortal.className = 'chat-moment-composer'; momentCommentComposerPortal.setAttribute('aria-hidden', 'true'); app.appendChild(momentCommentComposerPortal);
+  document.addEventListener('click', event => {
+    const commentButton = event.target.closest?.('[data-moment-comment]');
+    if (commentButton && app.classList.contains('is-open')) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      openMomentCommentComposer(commentButton.dataset.momentComment);
+      return;
+    }
+    const replyButton = event.target.closest?.('[data-chat-comment-reply]');
+    if (replyButton && app.classList.contains('is-open')) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      openMomentCommentComposer(replyButton.dataset.chatCommentReply, replyButton.dataset.chatCommentId || '');
+      return;
+    }
+    const close = event.target.closest?.('[data-chat-comment-compose-close]');
+    const send = event.target.closest?.('[data-chat-comment-compose-save]');
+    if (!close && !send) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    if (close) return closeMomentCommentComposer();
+    saveMomentComment();
+  }, true);
   function tabIcon(type) { const paths = { chat: '<path d="M8 10h32v21H19l-9 7v-7H8z"/><path d="M15 17h18M15 23h12"/>', contacts: '<circle cx="24" cy="16" r="7"/><path d="M11 38c1-7 5-10 13-10s12 3 13 10"/>', moments: '<path d="M24 7 28 20 41 24 28 28 24 41 20 28 7 24 20 20z"/><circle cx="35" cy="13" r="2"/><circle cx="13" cy="35" r="2"/>', me: '<circle cx="24" cy="16" r="6"/><path d="M12 38c1-7 5-10 12-10s11 3 12 10"/>' }; return `<svg class="chat-tab-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; }
   function actionIcon(type) { const paths = { back: '<path d="M30 10 16 24l14 14"/>', settings: '<path d="M12 24h.01M24 24h.01M36 24h.01" stroke-width="5"/>', emoji: '<circle cx="24" cy="24" r="16"/><path d="M17 27c2 4 12 4 14 0M18 20h.01M30 20h.01"/>', plus: '<path d="M24 12v24M12 24h24"/>', send: '<path d="m8 23 31-13-9 29-7-13zM8 23l15 3"/>', reply: '<path d="M24 39S8 29 8 18a8 8 0 0 1 15-4 8 8 0 0 1 15 4c0 11-14 21-14 21z"/>' }; return `<svg class="chat-action-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; }
   function readingIcon(type) { const paths = { chapters: '<path d="M10 12h28M10 24h28M10 36h17"/><circle cx="35" cy="36" r="4"/>', night: '<path d="M34 30c-8 1-15-5-15-13 0-3 1-6 3-8-8 1-14 8-14 16 0 9 7 16 16 16 5 0 9-2 12-5 1-2 1-4-2-6z"/>', day: '<circle cx="24" cy="24" r="7"/><path d="M24 6v5M24 37v5M6 24h5M37 24h5M11 11l4 4M33 33l4 4M37 11l-4 4M15 33l-4 4"/>', favorites: '<path d="m24 8 4.9 10 11.1 1.6-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8L19.1 18z"/>', settings: '<path d="M10 13h28M10 24h28M10 35h28"/><circle cx="18" cy="13" r="3"/><circle cx="31" cy="24" r="3"/><circle cx="21" cy="35" r="3"/>' }; return `<svg class="chat-reading-action-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; }
-  function read() { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); const profiles = Array.isArray(value.profiles) ? value.profiles.filter(item => !(item.id === 'profile-default' && item.name === '我的设定' && item.persona === '请在这里写下你的性格、身份和说话方式。')) : []; const storedEmojis = Array.isArray(value.emojis) ? { groups: value.emojis } : value.emojis; const emojis = storedEmojis && Array.isArray(storedEmojis.groups) ? storedEmojis : JSON.parse(JSON.stringify(initial.emojis)); return normalizeChatState({ ...initial, ...value, profiles, emojis }); } catch { return normalizeChatState(JSON.parse(JSON.stringify(initial))); } }
+  function read() { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); const profiles = Array.isArray(value.profiles) ? value.profiles.filter(item => !(item.id === 'profile-default' && item.name === '我的设定' && item.persona === '请在这里写下你的性格、身份和说话方式。')) : []; const storedEmojis = Array.isArray(value.emojis) ? { groups: value.emojis } : value.emojis; const emojis = storedEmojis && Array.isArray(storedEmojis.groups) ? storedEmojis : JSON.parse(JSON.stringify(initial.emojis)); return normalizeChatState({ ...initial, ...value, profiles, emojis, contactGroupManageOpen: false }); } catch { return normalizeChatState(JSON.parse(JSON.stringify(initial))); } }
   function normalizeChatState(value) { const result = value && typeof value === 'object' ? value : {}; result.contacts = Array.isArray(result.contacts) ? result.contacts : []; result.contacts.forEach(contact => { contact.groupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; }); result.contactGroups = Array.isArray(result.contactGroups) ? result.contactGroups : []; result.profiles = Array.isArray(result.profiles) ? result.profiles : []; result.chats = result.chats && typeof result.chats === 'object' && !Array.isArray(result.chats) ? result.chats : {}; result.moments = Array.isArray(result.moments) ? result.moments : []; result.moments = result.moments.map(post => ({ ...post, authorType: post.authorType || (post.author === '我' ? 'user' : 'character'), likes: Number(post.likes || 0), roleLikeIds: Array.isArray(post.roleLikeIds) ? post.roleLikeIds : [], comments: Array.isArray(post.comments) ? post.comments : [], visibleGroups: Array.isArray(post.visibleGroups) ? post.visibleGroups : [] })); result.moments.forEach(post => { if (post.authorType !== 'user' && post.visibility === 'private') post.userOnly = true; if (post.authorType !== 'user' && !['all', 'private'].includes(post.visibility)) post.visibility = 'all'; if (post.authorType !== 'user' && post.userOnly) post.visibility = 'all'; }); result.emojis = result.emojis && typeof result.emojis === 'object' ? result.emojis : {}; result.emojis.groups = Array.isArray(result.emojis.groups) ? result.emojis.groups : [{ id: 'emoji-default', name: '默认', items: [] }]; result.emojis.groups.forEach(group => { group.items = (Array.isArray(group.items) ? group.items : []).map(item => ({ ...item, url: cleanEmojiUrl(item?.url) })).filter(item => item.url); }); return result; }
-  function save() { localStorage.setItem(key, JSON.stringify(state)); window.dispatchEvent(new CustomEvent('ideal-machine-chat-updated')); }
+  function save() { localStorage.setItem(key, JSON.stringify({ ...state, contactGroupManageOpen: false })); window.dispatchEvent(new CustomEvent('ideal-machine-chat-updated')); }
   function cancelChatDraftSave() { if (!chatDraftSaveTimer) return; window.clearTimeout(chatDraftSaveTimer); chatDraftSaveTimer = 0; }
   function scheduleChatDraftSave() {
     cancelChatDraftSave();
@@ -80,6 +101,10 @@
   function chatUnreadCount(contactId) {
     return (state.chats?.[contactId]?.messages || []).filter(message => message?.role === 'character' && message.unread === true).length;
   }
+  function chatTotalUnreadCount() {
+    return state.contacts.reduce((total, contact) => total + chatUnreadCount(contact.id), 0);
+  }
+  function chatUnreadCountText(count) { return count > 99 ? '99+' : String(count); }
   function markChatRead(contactId) {
     const messages = state.chats?.[contactId]?.messages;
     if (!Array.isArray(messages)) return false;
@@ -174,7 +199,7 @@
     return true;
   }
   function createEmojiGroup() { const name = window.prompt('新分组名称'); if (name?.trim()) { const item = { id: uid('emoji-group'), name: name.trim(), items: [] }; state.emojis.groups.push(item); activeEmojiGroup = item.id; save(); render(); } }
-  function render() { document.querySelectorAll('[data-chat-tab]').forEach(button => button.classList.toggle('is-active', button.dataset.chatTab === activeTab)); const contact = state.contacts.find(item => item.id === activeContact); const chatting = activeTab === 'chat' && Boolean(contact); const topName = contact ? `${contact.nickname || contact.name}${isContactReplying(activeContact) ? ' 回复中' : ''}` : ''; document.querySelector('.chat-header').innerHTML = chatting ? `<button class="chat-top-back" data-chat-back type="button">${actionIcon('back')}</button><button class="chat-top-name" data-chat-thought type="button">${esc(topName)}</button><button class="chat-top-settings" data-chat-settings type="button">${actionIcon('settings')}</button>` : `<div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">${({ chat: '聊天', contacts: '联系人', moments: '朋友圈', me: '我' })[activeTab]}</h1></div><button class="chat-close" data-chat-close type="button">×</button>`; app.classList.toggle('is-chatting', chatting); app.classList.toggle('is-emoji-open', emojiOpen); app.classList.toggle('is-menu-open', menuOpen); document.querySelector('#chatMain').innerHTML = ({ chat: renderChat, contacts: renderContacts, moments: renderMoments, me: renderMe })[activeTab](); document.querySelector('[data-emoji-create-group]')?.addEventListener('click', createEmojiGroup); renderEditor(); renderProfileEditor(); renderThought(); renderChatSettings(); renderMomentComposer(); renderGroupComposer(); renderRoleMomentComposer(); }
+  function render() { document.querySelectorAll('[data-chat-tab]').forEach(button => button.classList.toggle('is-active', button.dataset.chatTab === activeTab)); const contact = state.contacts.find(item => item.id === activeContact); const chatting = activeTab === 'chat' && Boolean(contact); const topName = contact ? `${contact.nickname || contact.name}${isContactReplying(activeContact) ? ' 回复中' : ''}` : ''; const totalUnread = Math.max(0, chatTotalUnreadCount() - (chatting ? chatUnreadCount(activeContact) : 0)); const pageTitle = ({ chat: '聊天', contacts: '联系人', moments: '朋友圈', me: '我' })[activeTab]; const backMarkup = totalUnread ? `<span class="chat-back-unread-badge" aria-label="${totalUnread} 条未读消息">${chatUnreadCountText(totalUnread)}</span>` : actionIcon('back'); document.querySelector('.chat-header').innerHTML = chatting ? `<button class="chat-top-back" data-chat-back type="button" aria-label="返回消息主页，${totalUnread} 条未读消息">${backMarkup}</button><button class="chat-top-name" data-chat-thought type="button">${esc(topName)}</button><button class="chat-top-settings" data-chat-settings type="button">${actionIcon('settings')}</button>` : `<div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">${pageTitle}</h1></div><button class="chat-close" data-chat-close type="button">×</button>`; app.classList.toggle('is-chatting', chatting); app.classList.toggle('is-emoji-open', emojiOpen); app.classList.toggle('is-menu-open', menuOpen); document.querySelector('#chatMain').innerHTML = ({ chat: renderChat, contacts: renderContacts, moments: renderMoments, me: renderMe })[activeTab](); document.querySelector('[data-emoji-create-group]')?.addEventListener('click', createEmojiGroup); renderEditor(); renderProfileEditor(); renderThought(); renderChatSettings(); renderMomentComposer(); renderGroupComposer(); renderRoleMomentComposer(); }
   function worldbookOptions(selected) { try { const data = JSON.parse(localStorage.getItem('ideal-machine-worldbooks') || '{}'); const books = data.local || []; return books.map(book => `<option value="${esc(book.id)}" ${book.id === selected ? 'selected' : ''}>${esc(book.name)}</option>`).join(''); } catch { return ''; } }
   function decodeBase64Text(value) { try { const binary = atob(String(value || '').replace(/\s/g, '')); const bytes = Uint8Array.from(binary, char => char.charCodeAt(0)); return new TextDecoder().decode(bytes); } catch { return ''; } }
   function pngTextChunks(bytes) {
@@ -415,9 +440,13 @@
       profile?.gender ? `性别：${profile.gender}` : '',
       profile?.birthday ? `生日：${profile.birthday}` : ''
     ].filter(Boolean).join('\n');
+    const builtinPrompt = interpolatePrompt(window.IdealMachineBuiltinChatPrompt || '', contact, profile, chat);
     const customPrompt = interpolatePrompt(readCustomChatPrompt(), contact, profile, chat);
     const now = new Date().toLocaleString('zh-CN', { dateStyle: 'full', timeStyle: 'short' });
-    return `# 理想机角色扮演协议
+    return `【理想机内置聊天提示词｜每次回复前必须完整阅读】
+${builtinPrompt}
+
+# 理想机角色扮演协议
 
 ## 1. 核心身份（最高优先级）
 
@@ -473,7 +502,7 @@ ${boundWorldbookContext(contact)}
 6. 不要凭空增加转账、通话、图片、定位等特殊动作。只有情境确实需要时才触发。
 7. 默认只回复一条自然、口语化的短消息。日常寒暄、玩笑、追问、撒娇、吃醋或简单回应时，几个字就可以；具体可以是轻快的“来啦”“真的嘛”“给我看看嘛”，也可以是克制的短句，但必须由角色设定决定，不能统一套用某一种语气。不要为了显得丰富而强行展开。
 8. 只有当内容中确实有两个或以上自然分开的想法、情绪或动作时，才使用连续消息。连续消息的条数和格式以本次系统追加的要求为准；没有追加要求时不要主动拆分。
-9. 每条连续消息都应像单独发出的聊天气泡，而且长短必须自然错落：一轮里至少要有明显的短回应，优先使用 2—10 个汉字；普通回应控制在 11—25 个汉字；只有确实需要解释、安慰或推进情节时才使用 26—60 个汉字，极少数情况下才更长。不要让每条长度相近，不要把一段长文平均切开，也不要为了凑字数补充空话。短反应必须有语境意义，不要用无意义的“嗯”“……”凑数。
+9. 每条连续消息都应像单独发出的聊天气泡，而且长短必须自然错落：一轮里至少要有明显的短回应，优先使用 2—10 个汉字；普通回应控制在 11—25 个汉字；只有确实需要解释、安慰或推进情节时才使用 26—60 个汉字，极少数情况下才更长。不要让每条长度相近，不要把一段长文平均切开，也不要为了凑数量补充空话。短反应必须有语境意义，不要用无意义的“嗯”“……”凑数。
 10. 回复要优先贴合角色当前的情绪、关系、说话风格和上下文，短不等于敷衍；每条都要有具体回应或自然反应。
 11. 控制标记是给理想机的内部指令，不要解释、复述或展示给用户。
 12. 禁止八股、悬浮、过度升华的情绪表达。不要把用户一句普通的话擅自解释成“多年坚持被打破”“人生信念崩塌”“从未有人让我这样”等重大转折，也不要动辄总结角色十几年的人生、关系或心理变化。
@@ -518,7 +547,7 @@ ${boundWorldbookContext(contact)}
 角色确实主动发起视频通话时单独使用：
 [[VIDEO_CALL]]
 
-不要因为普通寒暄或用户提到“视频”就自动发起，必须有明确的情境依据。
+角色可以在确实想见用户、需要当面确认重要事情、情绪适合面对面表达、正在发生需要看见对方反应的事情，或此前已经约好视频时主动发起。不要因为普通寒暄、撒娇一句或用户提到“视频”就自动发起，必须有明确的情境依据，并且要符合角色的主动性和当前关系。发起后只输出这个标记，不要再附带普通文字回复。
 
 ### 主动转账
 
@@ -1330,12 +1359,27 @@ ${roundText}
     if (input && document.activeElement === input) input.blur();
   }, true);
   window.IdealMachineApps = window.IdealMachineApps || {}; window.IdealMachineApps.liaotian = { name: '聊天' };
-  function renderContacts() { const groups = state.contactGroups; const manage = state.contactGroupManageOpen; const groupPanel = manage ? `<section class="chat-contact-group-panel"><header><div><span class="chat-kicker">MOMENTS GROUPS</span><h2>管理朋友圈分组</h2><p>点击角色头像即可加入或移出分组。分组只用于朋友圈可见范围。</p></div><button data-chat-group-manage type="button">完成</button></header>${groups.length ? groups.map(group => `<div class="chat-group-editor-row"><b>${esc(group.name)}</b><div class="chat-group-contacts-scroll">${state.contacts.length ? state.contacts.map(contact => `<label class="chat-group-contact-choice"><input type="checkbox" data-chat-group-toggle="${esc(group.id)}" data-chat-group-contact="${esc(contact.id)}" ${(contact.groupIds || []).includes(group.id) ? 'checked' : ''}><span>${avatarMarkup(contact, 'chat-group-avatar')}<small>${esc(contact.name || '未命名')}</small></span></label>`).join('') : '<small>还没有联系人</small>'}</div></div>`).join('') : '<p class="chat-group-empty">还没有分组，请先添加一个。</p>'}</section>` : ''; return `<div class="chat-subhead"><div><span>CHARACTERS</span></div><div class="chat-contact-head-actions"><button data-chat-group-add type="button">＋ 添加分组</button><button data-chat-group-manage type="button">${manage ? '完成' : '管理分组'}</button><button data-chat-add-contact type="button">＋ 添加角色</button></div></div>${groups.length ? `<div class="chat-contact-groups">${groups.map(group => `<span>${esc(group.name)}</span>`).join('')}</div>` : ''}${groupPanel}<div class="chat-contact-list">${state.contacts.length ? state.contacts.map(contact => { const contactGroupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; const lastMessage = state.chats?.[contact.id]?.messages?.slice(-1)[0]; const preview = lastMessage?.text || (lastMessage?.type === 'image' ? '[图片]' : '还没有聊天记录'); return `<article class="chat-contact-card">${avatarMarkup(contact)}<div><b>${esc(contact.nickname || contact.name)} <span class="chat-contact-real-name">${esc(contact.name || '未设置真实姓名')}</span></b><p>${esc(preview)}${contactGroupIds.length ? ` · ${contactGroupIds.map(id => esc(groups.find(group => group.id === id)?.name || '')).filter(Boolean).join('、')}` : ''}</p></div><div class="chat-contact-actions"><button data-chat-open="${contact.id}" type="button">聊天</button><button data-chat-edit-contact="${contact.id}" type="button">编辑</button><button data-chat-delete-contact="${contact.id}" type="button">删除</button></div></article>`; }).join('') : '<div class="chat-empty small"><div class="chat-empty-mark">◎</div><h2>还没有角色</h2><p>添加角色后，就可以为每段关系绑定不同的用户设定。</p></div>'}</div>`; }
+  function renderContacts() { const groups = state.contactGroups; const manage = state.contactGroupManageOpen; const contactList = [...state.contacts].sort((first, second) => Number(Boolean(second.pinned)) - Number(Boolean(first.pinned))); const groupPanel = manage ? `<section class="chat-contact-group-panel"><header><div><span class="chat-kicker">MOMENTS GROUPS</span><h2>管理朋友圈分组</h2><p>点击角色头像即可加入或移出分组。分组只用于朋友圈可见范围。</p></div><button data-chat-group-manage type="button">完成</button></header>${groups.length ? groups.map(group => `<div class="chat-group-editor-row"><b>${esc(group.name)}</b><div class="chat-group-contacts-scroll">${state.contacts.length ? state.contacts.map(contact => `<label class="chat-group-contact-choice"><input type="checkbox" data-chat-group-toggle="${esc(group.id)}" data-chat-group-contact="${esc(contact.id)}" ${(contact.groupIds || []).includes(group.id) ? 'checked' : ''}><span>${avatarMarkup(contact, 'chat-group-avatar')}<small>${esc(contact.name || '未命名')}</small></span></label>`).join('') : '<small>还没有联系人</small>'}</div></div>`).join('') : '<p class="chat-group-empty">还没有分组，请先添加一个。</p>'}</section>` : ''; return `<div class="chat-subhead"><div><span>CHARACTERS</span></div><div class="chat-contact-head-actions"><button data-chat-group-add type="button">＋ 添加分组</button><button data-chat-group-manage type="button">${manage ? '完成' : '管理分组'}</button><button data-chat-add-contact type="button">＋ 添加角色</button></div></div>${groups.length ? `<div class="chat-contact-groups">${groups.map(group => `<span>${esc(group.name)}</span>`).join('')}</div>` : ''}${groupPanel}<div class="chat-contact-list">${contactList.length ? contactList.map(contact => { const contactGroupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; const lastMessage = state.chats?.[contact.id]?.messages?.slice(-1)[0]; const preview = lastMessage?.text || (lastMessage?.type === 'image' ? '[图片]' : '还没有聊天记录'); const pinLabel = contact.pinned ? '取消置顶' : '置顶聊天'; return `<article class="chat-contact-card${contact.pinned ? ' is-pinned' : ''}"><div class="chat-contact-swipe-action"><button class="chat-contact-pin" data-chat-pin-contact="${esc(contact.id)}" type="button" aria-label="${pinLabel}" title="${pinLabel}">↑</button></div><div class="chat-contact-card-content">${avatarMarkup(contact)}<div><b>${esc(contact.nickname || contact.name)} <span class="chat-contact-real-name">${esc(contact.name || '未设置真实姓名')}</span></b><p>${esc(preview)}${contactGroupIds.length ? ` · ${contactGroupIds.map(id => esc(groups.find(group => group.id === id)?.name || '')).filter(Boolean).join('、')}` : ''}</p></div><div class="chat-contact-actions"><button data-chat-open="${contact.id}" type="button">聊天</button><button data-chat-edit-contact="${contact.id}" type="button">编辑</button><button data-chat-delete-contact="${contact.id}" type="button">删除</button></div></div></article>`; }).join('') : '<div class="chat-empty small"><div class="chat-empty-mark">◎</div><h2>还没有角色</h2><p>添加角色后，就可以为每段关系绑定不同的用户设定。</p></div>'}</div>`; }
   const renderContactsBeforeGroupFilter = renderContacts;
   renderContacts = function() {
     if (!state.contactGroups.some(group => group.id === activeContactGroupId)) activeContactGroupId = '';
     const template = document.createElement('template');
     template.innerHTML = renderContactsBeforeGroupFilter();
+    template.content.querySelectorAll('.chat-group-editor-row').forEach((row, index) => {
+      const group = state.contactGroups[index];
+      if (!group) return;
+      const heading = row.querySelector('b');
+      if (!heading) return;
+      const title = document.createElement('div');
+      title.className = 'chat-group-editor-title';
+      heading.replaceWith(title);
+      title.append(heading);
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.textContent = '删除分组';
+      deleteButton.dataset.chatGroupDelete = group.id;
+      title.append(deleteButton);
+    });
     const chips = template.content.querySelector('.chat-contact-groups');
     if (chips) {
       chips.innerHTML = `<button type="button" data-chat-contact-group="" class="${activeContactGroupId ? '' : 'is-active'}">全部</button>${state.contactGroups.map(group => `<button type="button" data-chat-contact-group="${esc(group.id)}" class="${activeContactGroupId === group.id ? 'is-active' : ''}">${esc(group.name)} <small>${state.contacts.filter(contact => (contact.groupIds || []).includes(group.id)).length}</small></button>`).join('')}`;
@@ -1350,6 +1394,132 @@ ${roundText}
     }
     return template.innerHTML;
   };
+  const contactSwipeOffset = 50;
+  function setContactSwipeOpen(card, open, animate = true) {
+    const content = card?.querySelector('.chat-contact-card-content, .chat-launch-contact');
+    if (!card || !content) return;
+    if (!animate) content.classList.add('is-swipe-tracking');
+    content.style.transform = open ? `translate3d(-${contactSwipeOffset}px, 0, 0)` : 'translate3d(0, 0, 0)';
+    card.classList.toggle('is-swipe-open', open);
+    if (!animate) requestAnimationFrame(() => content.classList.remove('is-swipe-tracking'));
+  }
+  function closeContactSwipes(except = null) {
+    document.querySelectorAll('.chat-contact-card.is-swipe-open, .chat-launch-contact-swipe.is-swipe-open').forEach(card => {
+      if (card !== except) setContactSwipeOpen(card, false);
+    });
+  }
+  let contactSwipeGesture = null;
+  document.addEventListener('pointerdown', event => {
+    const card = event.target.closest?.('.chat-contact-card, .chat-launch-contact-swipe');
+    if (!card || !app.classList.contains('is-open') || app.classList.contains('is-chatting')) return;
+    if (event.target.closest('.chat-contact-actions, .chat-contact-pin, .chat-launch-contact-pin')) return;
+    closeContactSwipes(card);
+    const content = card.querySelector('.chat-contact-card-content, .chat-launch-contact');
+    if (!content) return;
+    const opened = card.classList.contains('is-swipe-open');
+    contactSwipeGesture = { card, content, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, opened, direction: '', horizontal: false, cancelled: false, frame: 0, nextX: opened ? -contactSwipeOffset : 0 };
+    content.classList.add('is-swipe-tracking');
+  }, true);
+  document.addEventListener('pointermove', event => {
+    const gesture = contactSwipeGesture;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const dx = event.clientX - gesture.startX;
+    const dy = event.clientY - gesture.startY;
+    if (!gesture.direction && Math.max(Math.abs(dx), Math.abs(dy)) >= 9) {
+      gesture.direction = Math.abs(dx) > Math.abs(dy) * 1.25 ? 'horizontal' : 'vertical';
+      if (gesture.direction === 'horizontal') {
+        gesture.horizontal = true;
+        try { gesture.card.setPointerCapture(gesture.pointerId); } catch {}
+      } else {
+        gesture.cancelled = true;
+        gesture.content.classList.remove('is-swipe-tracking');
+      }
+    }
+    if (gesture.direction !== 'horizontal') return;
+    event.preventDefault();
+    const base = gesture.opened ? -contactSwipeOffset : 0;
+    gesture.nextX = Math.max(-contactSwipeOffset, Math.min(0, base + dx * .86));
+    gesture.card.classList.toggle('is-swipe-revealing', gesture.nextX <= -contactSwipeOffset);
+    if (!gesture.frame) gesture.frame = requestAnimationFrame(() => {
+      if (!contactSwipeGesture) return;
+      gesture.content.style.transform = `translate3d(${gesture.nextX}px, 0, 0)`;
+      gesture.frame = 0;
+    });
+  }, { capture: true, passive: false });
+  function clearContactSwipeGesture(restore = true) {
+    if (!contactSwipeGesture) return;
+    const gesture = contactSwipeGesture;
+    if (gesture.frame) cancelAnimationFrame(gesture.frame);
+    try { gesture.card.releasePointerCapture(gesture.pointerId); } catch {}
+    if (restore) setContactSwipeOpen(gesture.card, gesture.opened);
+    gesture.content.classList.remove('is-swipe-tracking');
+    gesture.card.classList.remove('is-swipe-revealing');
+    contactSwipeGesture = null;
+  }
+  document.addEventListener('pointerup', event => {
+    const gesture = contactSwipeGesture;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const dx = event.clientX - gesture.startX;
+    const didSwipe = !gesture.cancelled && gesture.horizontal && Math.abs(dx) >= 28;
+    if (didSwipe) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const open = gesture.opened ? dx < 28 : dx <= -contactSwipeOffset;
+      setContactSwipeOpen(gesture.card, open);
+      gesture.card.dataset.chatSwipeSuppressClick = 'true';
+      window.setTimeout(() => delete gesture.card.dataset.chatSwipeSuppressClick, 120);
+      clearContactSwipeGesture(false);
+      return;
+    }
+    clearContactSwipeGesture();
+  }, true);
+  document.addEventListener('pointercancel', clearContactSwipeGesture, true);
+  document.addEventListener('click', event => {
+    const pin = event.target.closest?.('[data-chat-pin-contact]');
+    if (pin && app.classList.contains('is-open') && !app.classList.contains('is-chatting')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const contact = state.contacts.find(item => item.id === pin.dataset.chatPinContact);
+      if (!contact) return;
+      contact.pinned = !Boolean(contact.pinned);
+      save();
+      render();
+      return;
+    }
+    const card = event.target.closest?.('.chat-contact-card, .chat-launch-contact-swipe');
+    if (!card) return;
+    if (card.dataset.chatSwipeSuppressClick) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    if (card.classList.contains('is-swipe-open') && !event.target.closest('button')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setContactSwipeOpen(card, false);
+    }
+  }, true);
+  document.addEventListener('click', event => {
+    const deleteButton = event.target.closest?.('[data-chat-group-delete]');
+    if (!deleteButton || !app.classList.contains('is-open')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const group = state.contactGroups.find(item => item.id === deleteButton.dataset.chatGroupDelete);
+    if (!group || !window.confirm(`确定删除分组“${group.name}”吗？角色和聊天记录不会删除。`)) return;
+    state.contactGroups = state.contactGroups.filter(item => item.id !== group.id);
+    state.contacts.forEach(contact => {
+      if (Array.isArray(contact.groupIds)) contact.groupIds = contact.groupIds.filter(id => id !== group.id);
+    });
+    state.moments.forEach(post => {
+      if (!Array.isArray(post.visibleGroups)) return;
+      post.visibleGroups = post.visibleGroups.filter(id => id !== group.id);
+      if (post.visibility === 'groups' && !post.visibleGroups.length) post.visibility = 'private';
+    });
+    momentVisibility = momentVisibility.filter(id => id !== group.id);
+    if (activeContactGroupId === group.id) activeContactGroupId = '';
+    save();
+    render();
+  }, true);
   document.addEventListener('click', event => {
     const chip = event.target.closest?.('[data-chat-contact-group]');
     if (!chip || !app.classList.contains('is-open') || activeTab !== 'contacts') return;
@@ -1357,6 +1527,11 @@ ${roundText}
     event.stopImmediatePropagation();
     activeContactGroupId = chip.dataset.chatContactGroup || '';
     render();
+  }, true);
+  document.addEventListener('click', event => {
+    if (event.target.closest?.('[data-chat-close]')) state.contactGroupManageOpen = false;
+    const tab = event.target.closest?.('[data-chat-tab]');
+    if (tab && tab.dataset.chatTab !== 'contacts') state.contactGroupManageOpen = false;
   }, true);
   function renderChat() { const contact = state.contacts.find(item => item.id === activeContact); if (!contact) return `<div class="chat-launch-list"><div class="chat-launch-head"><span>YOUR CONTACTS</span><p>选择一个角色进入聊天</p></div>${state.contacts.length ? state.contacts.map(item => `<button class="chat-launch-contact" data-chat-open="${item.id}" type="button">${avatarMarkup(item)}<span><b>${esc(item.nickname || item.name)}</b><small>${esc(item.name || '未设置真实姓名')}</small></span><i>›</i></button>`).join('') : '<div class="chat-empty"><div class="chat-empty-mark">✦</div><h2>还没有角色</h2><p>添加一个角色，绑定你的用户设定后开始聊天。</p><button data-chat-go="contacts" type="button">添加角色</button></div>'}</div>`; const chat = currentChat(); const profile = state.profiles.find(item => item.id === chat.profileId); return `<div class="chat-conversation"><div class="chat-person">${avatarMarkup(contact)}<div><b>${esc(contact.name)}</b><small>${profile ? `使用设定：${esc(profile.name)}` : '尚未绑定用户设定'}</small></div><button data-chat-bind type="button">${profile ? '更换设定' : '绑定设定'}</button></div>${profilePickerOpen ? profilePicker() : ''}<div class="chat-messages" id="chatMessages">${chat.messages.length ? chat.messages.map(message => messageHtml(message)).join('') : '<div class="chat-hint">你可以从一句问候开始。</div>'}</div><div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${replying ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div></div>`; }
   function toolIcon(type) { const paths = { transfer: '<rect x="9" y="13" width="30" height="22" rx="4"/><path d="M9 19h30M16 27h8"/>', 'image-desc': '<rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="19" r="3"/><path d="m12 33 8-8 6 6 4-4 6 6M35 8v7M31.5 11.5h7"/>', 'image-file': '<rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="19" r="3"/><path d="m12 33 8-8 6 6 4-4 6 6"/>', voice: '<path d="M16 22a8 8 0 0 0 16 0V14a8 8 0 0 0-16 0zM12 22a12 12 0 0 0 24 0M24 36v6M18 42h12"/>', video: '<rect x="7" y="14" width="25" height="20" rx="4"/><path d="m32 21 9-5v16l-9-5z"/>', location: '<path d="M24 42s12-10 12-21a12 12 0 1 0-24 0c0 11 12 21 12 21z"/><circle cx="24" cy="21" r="4"/>', music: '<path d="M31 11v22.5a5.5 5.5 0 1 1-3-5V15l13-3v17.5a5.5 5.5 0 1 1-3-5V9z"/>', together: '<path d="M9 10h13a5 5 0 0 1 5 5v23H14a5 5 0 0 0-5 0zM39 10H26a5 5 0 0 0-5 5v23h13a5 5 0 0 1 5 0zM14 17h8M14 23h8M34 17h-5M34 23h-5"/>', reroll: '<path d="M38 17a15 15 0 0 0-26-3l-3 4M10 14v6h6M10 31a15 15 0 0 0 26 3l3-4M38 34v-6h-6"/>' }; return `<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type] || ''}</svg>`; }
@@ -1369,7 +1544,7 @@ ${roundText}
   function toolIcon(type) { if (type === 'image-desc') return '<span class="chat-tool-text-icon" aria-hidden="true">字</span>'; const paths = { transfer: '<rect x="7" y="12" width="34" height="24" rx="5"/><path d="M7 19h34M15 28h11"/>', 'image-file': '<rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="19" r="3"/><path d="m12 33 8-8 6 6 4-4 6 6"/>', voice: '<path d="M16 22a8 8 0 0 0 16 0V14a8 8 0 0 0-16 0zM12 22a12 12 0 0 0 24 0M24 36v6M18 42h12"/>', video: '<rect x="7" y="14" width="25" height="20" rx="4"/><path d="m32 21 9-5v16l-9-5z"/>', location: '<path d="M24 42s12-10 12-21a12 12 0 1 0-24 0c0 11 12 21 12 21z"/><circle cx="24" cy="21" r="4"/>', music: '<path d="M31 10v23M31 10l10-2v20M31 29a6 6 0 1 0 0 8 6 6 0 0 0 0-8zM41 25a6 6 0 1 0 0 8 6 6 0 0 0 0-8z"/>', together: '<path d="M13 8h19a4 4 0 0 1 4 4v28H17a4 4 0 0 0-4 0z"/><path d="M13 8a4 4 0 0 0-4 4v28h4a4 4 0 0 1 4 0M18 15h12M18 21h12M18 27h9"/>' }; return `<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type] || ''}</svg>`; }
   function toolIcon(type) { if (type === 'image-desc') return '<span class="chat-tool-text-icon" aria-hidden="true">字</span>'; const paths = { transfer: '<rect x="7" y="12" width="34" height="24" rx="5"/><path d="M7 19h34M15 28h11"/>', 'image-file': '<rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="19" r="3"/><path d="m12 33 8-8 6 6 4-4 6 6"/>', voice: '<path d="M16 22a8 8 0 0 0 16 0V14a8 8 0 0 0-16 0zM12 22a12 12 0 0 0 24 0M24 36v6M18 42h12"/>', video: '<rect x="7" y="14" width="25" height="20" rx="4"/><path d="m32 21 9-5v16l-9-5z"/>', location: '<path d="M24 42s12-10 12-21a12 12 0 1 0-24 0c0 11 12 21 12 21z"/><circle cx="24" cy="21" r="4"/>', music: '<path d="M30 9v24a6 6 0 1 1-3-5V15l13-3v13"/>', together: '<path d="M13 8h19a4 4 0 0 1 4 4v28H17a4 4 0 0 0-4 0z"/><path d="M13 8a4 4 0 0 0-4 4v28h4a4 4 0 0 1 4 0M18 15h12M18 21h12M18 27h9"/>' }; return `<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type] || ''}</svg>`; }
   function toolIcon(type) { const paths = { 'image-desc': '<rect x="6" y="8" width="25" height="21" rx="4"/><circle cx="14" cy="15" r="2.5"/><path d="m10 25 6-6 4 4 4-4 5 6M34 17h8M34 23h8M34 29h5"/>', music: '<circle cx="19" cy="28" r="7"/><circle cx="19" cy="28" r="3"/><path d="M24 28V10l17-4v17M24 14l17-4"/>' }; if (paths[type]) return `<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; const fallback = { transfer: '<rect x="7" y="12" width="34" height="24" rx="5"/><path d="M7 19h34M15 28h11"/>', 'image-file': '<rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="19" r="3"/><path d="m12 33 8-8 6 6 4-4 6 6"/>', voice: '<path d="M16 22a8 8 0 0 0 16 0V14a8 8 0 0 0-16 0zM12 22a12 12 0 0 0 24 0M24 36v6M18 42h12"/>', video: '<rect x="7" y="14" width="25" height="20" rx="4"/><path d="m32 21 9-5v16l-9-5z"/>', location: '<path d="M24 42s12-10 12-21a12 12 0 1 0-24 0c0 11 12 21 12 21z"/><circle cx="24" cy="21" r="4"/>', together: '<path d="M13 8h19a4 4 0 0 1 4 4v28H17a4 4 0 0 0-4 0z"/><path d="M13 8a4 4 0 0 0-4 4v28h4a4 4 0 0 1 4 0M18 15h12M18 21h12M18 27h9"/>', offline: '<circle cx="24" cy="24" r="15"/><path d="M24 9v15l10 8M24 24H14"/>' }; return `<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true">${fallback[type] || ''}</svg>`; }
-  document.addEventListener('click', event => { const choice = event.target.closest('[data-chat-image-choice]'); const close = event.target.closest('[data-chat-image-description-cancel]'); const send = event.target.closest('[data-chat-image-description-send]'); if (!choice && !close && !send) return; event.stopImmediatePropagation(); if (close) { imageDescriptionOpen = false; renderImageChoice(); return; } if (send) { const value = document.querySelector('#chatImageDescription')?.value.trim(); if (!value) return window.alert('请填写图片描述。'); imageDescriptionOpen = false; imageChoiceOpen = false; menuOpen = false; renderImageChoice(); addMessage(value, 'user', 'image-desc'); return; } if (choice.dataset.chatImageChoice === 'text') { imageDescriptionOpen = true; renderImageChoice(); return; } imageDescriptionOpen = false; imageChoiceOpen = false; menuOpen = false; renderImageChoice(); document.querySelector('#chatImageFile')?.click(); }, true);
+  document.addEventListener('click', event => { const choice = event.target.closest('[data-chat-image-choice]'); const close = event.target.closest('[data-chat-image-description-cancel]'); const send = event.target.closest('[data-chat-image-description-send]'); if (!choice && !close && !send) return; if (choice?.dataset.chatImageChoice === 'album') return; event.stopImmediatePropagation(); if (close) { imageDescriptionOpen = false; renderImageChoice(); return; } if (send) { const value = document.querySelector('#chatImageDescription')?.value.trim(); if (!value) return window.alert('请填写图片描述。'); imageDescriptionOpen = false; imageChoiceOpen = false; menuOpen = false; renderImageChoice(); addMessage(value, 'user', 'image-desc'); return; } if (choice.dataset.chatImageChoice === 'text') { imageDescriptionOpen = true; renderImageChoice(); return; } imageDescriptionOpen = false; imageChoiceOpen = false; menuOpen = false; renderImageChoice(); document.querySelector('#chatImageFile')?.click(); }, true);
   function toolMenu() { if (imageChoiceOpen) return imageDescriptionOpen ? '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>图片文字描述</h3><textarea id="chatImageDescription" placeholder="输入这张图片的内容描述…"></textarea><div><button data-chat-image-description-cancel type="button">取消</button><button data-chat-image-description-send type="button">发送</button></div></div></div>' : '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>发送图片</h3><button data-chat-image-choice="text" type="button">文字描述</button><button data-chat-image-choice="file" type="button">本地相册</button></div></div>'; const tools = [['transfer', '转账'], ['image-file', '发送图片'], ['voice', '发送语音'], ['video', '视频通话'], ['location', '发送定位'], ['together', '一起看书'], ['offline', '线下'], ['reroll', '重roll']]; const rerollIcon = '<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M38 17a15 15 0 0 0-26-3l-3 4M10 14v6h6M10 31a15 15 0 0 0 26 3l3-4M38 34v-6h-6"/></svg>'; return `<div class="chat-tools">${tools.map(([type, label]) => `<button data-chat-tool="${type}" type="button" ${type === 'reroll' && replying ? 'disabled' : ''}>${type === 'reroll' ? rerollIcon : toolIcon(type)}<span>${label}</span></button>`).join('')}</div>`; }
   function openOfflineMode() { let modal = document.querySelector('[data-chat-offline-modal]'); if (!modal) { modal = document.createElement('div'); modal.dataset.chatOfflineModal = ''; document.body.appendChild(modal); } const chat = currentChat(); const sessions = chat?.offlineSessions || []; const session = sessions.find(item => item.id === offlineSessionId); const contact = state.contacts.find(item => item.id === activeContact) || {}; if (!session) { modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card"><header><div><span class="chat-kicker">OFFLINE MODE</span><h2>线下见面</h2></div><button type="button" data-offline-close>×</button></header><p class="chat-offline-note">这是一次独立的见面经历，不会混入普通聊天记录。</p><label>见面地点<input data-offline-place placeholder="例如：街角咖啡店"></label><label>见面原因<input data-offline-reason placeholder="例如：一起庆祝生日"></label><label>角色此刻的状态<input data-offline-mood placeholder="例如：有点紧张，但很期待"></label><footer><button type="button" data-offline-close>取消</button><button type="button" data-offline-start>开始见面</button></footer></section>`; } else { modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-session"><header><div><span class="chat-kicker">${esc(session.place)}</span><h2>${esc(contact.nickname || contact.name)} · 线下</h2></div><button type="button" data-offline-close>×</button></header><div class="chat-offline-scene"><b>${esc(session.reason)}</b><small>${esc(session.mood)}</small></div><main class="chat-offline-messages">${session.messages.length ? session.messages.map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><p>${esc(item.text)}</p></article>`).join('') : '<div class="chat-offline-empty">见面开始了。和角色说第一句话吧。</div>'}</main><form data-offline-form><input data-offline-input placeholder="在现场说点什么…"><button type="submit">发送</button></form></section>`; const box = modal.querySelector('.chat-offline-messages'); if (box) box.scrollTop = box.scrollHeight; } modal.classList.add('is-open'); }
   async function offlineReply(text) { const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); const contact = state.contacts.find(item => item.id === activeContact); if (!session || !contact) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) { session.messages.push({ role:'character', text:'（请先配置聊天 API，才能让角色回应这次见面。）' }); save(); openOfflineMode(); return; } offlineBusy = true; openOfflineMode(); try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.85, messages:[{role:'system',content:`你正在扮演角色“${contact.name}”，和用户在线下见面。地点：${session.place}。见面原因：${session.reason}。角色状态：${session.mood}。这次经历独立于普通聊天记录，请用现场感自然回应，不要提及 AI。`}, ...session.messages.map(item => ({ role:item.role === 'user' ? 'user' : 'assistant', content:item.text }))]}) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); session.messages.push({ role:'character', text:data.choices?.[0]?.message?.content || '……' }); save(); } catch (error) { session.messages.push({ role:'character', text:`（这次见面暂时无法继续：${error.message}）` }); save(); } finally { offlineBusy = false; openOfflineMode(); } }
@@ -1406,7 +1581,8 @@ ${roundText}
     if (!card) return;
     const session = currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId);
     applyOfflineFontSize(modal, session?.fontSize || 11);
-    modal.dataset.offlineContrast = 'light';
+    modal.dataset.offlineContrast = session?.wallpaperContrast || 'light';
+    const wallpaperSource = String(source || '');
     const paint = value => {
       if (!card.isConnected) return;
       const image = String(value || '');
@@ -1420,16 +1596,25 @@ ${roundText}
       // iOS Safari 无法正常读取像素，导致对比度一直停留在默认的浅色状态。
       if (/^https?:\/\//i.test(image)) probe.crossOrigin = 'anonymous';
       probe.onload = () => {
-        if (!card.isConnected) return;
         try {
           const canvas = document.createElement('canvas');
           canvas.width = canvas.height = 8;
-          const context = canvas.getContext('2d', { willReadFrequently:true });
+          const context = canvas.getContext('2d', { willReadFrequently:true }) || canvas.getContext('2d');
+          if (!context) return;
           context.drawImage(probe, 0, 0, 8, 8);
           const pixels = context.getImageData(0, 0, 8, 8).data;
           let luminance = 0;
           for (let index = 0; index < pixels.length; index += 4) luminance += (pixels[index] * 299 + pixels[index + 1] * 587 + pixels[index + 2] * 114) / 1000;
-          modal.dataset.offlineContrast = luminance / 64 < 145 ? 'dark' : 'light';
+          const contrast = luminance / 64 < 145 ? 'dark' : 'light';
+          if (session?.wallpaper !== wallpaperSource) return;
+          const currentModal = document.querySelector('[data-chat-offline-modal]');
+          if (currentModal) currentModal.dataset.offlineContrast = contrast;
+          if (session.wallpaperContrast !== contrast) {
+            session.wallpaperContrast = contrast;
+            const chat = currentChat();
+            if (chat?.offlineWallpaper === wallpaperSource) chat.offlineWallpaperContrast = contrast;
+            save();
+          }
         } catch { /* Cross-origin images without CORS stay on the readable default. */ }
       };
       probe.src = image;
@@ -1652,6 +1837,7 @@ ${roundText}
     });
     if (!data) return window.alert('壁纸读取失败，请换一张图片重试。');
     session.wallpaper = window.IdealMachinePutImage ? await window.IdealMachinePutImage(data) : data;
+    session.wallpaperContrast = '';
     chat.offlineWallpaper = session.wallpaper;
     save();
     openOfflineMode();
@@ -1669,6 +1855,7 @@ ${roundText}
       window.IdealMachineAlbum?.pick?.(value => {
         if (!value) return;
         session.wallpaper = value;
+        session.wallpaperContrast = '';
         chat.offlineWallpaper = value;
         window.IdealMachineAlbum?.archiveUrl?.(value, '线下聊天壁纸');
         save();
@@ -1680,6 +1867,7 @@ ${roundText}
     if (!url) return window.alert('请粘贴图片 URL。');
     if (!/^https?:\/\//i.test(url) && !/^data:image\//i.test(url) && !/^idb:image:/i.test(url)) return window.alert('请输入有效的图片 URL。');
     session.wallpaper = url;
+    session.wallpaperContrast = '';
     chat.offlineWallpaper = url;
     window.IdealMachineAlbum?.archiveUrl?.(url, '线下聊天壁纸');
     save();
@@ -1691,6 +1879,7 @@ ${roundText}
     const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId);
     if (!session) return;
     session.wallpaper = '';
+    session.wallpaperContrast = '';
     chat.offlineWallpaper = '';
     save();
     openOfflineMode();
@@ -1723,7 +1912,29 @@ ${roundText}
     offlineReply('请基于当前现场和此前互动重新给出一次不同但符合角色人设的回应，不要提及重试或重写。');
   }
   async function finishOfflineSession() { const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); if (!session || offlineBusy || offlineFinishing) return; offlineFinishing = true; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('chat'); const contact = state.contacts.find(item => item.id === activeContact) || {}; const contextText = (session.contextMessages || []).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); const meetingText = session.messages.filter(item => !item.contextPrompt).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); offlineBusy = true; openOfflineMode(); try { if (!config.endpoint || !config.key || !model) throw new Error('未配置 API'); const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:.45, messages:[{ role:'system', content:'请用中文简洁总结这次线下见面。概括见面经过、双方情绪变化、重要动作或承诺，以及关系产生的变化。只输出一段自然摘要，不要列表，不要提及AI，控制在200字左右。' }, { role:'user', content:`角色：${contact.name || '角色'}\n见面前背景：\n${contextText || '无'}\n线下经过：\n${meetingText || '刚刚见面，尚未发生更多互动。'}` }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); session.summary = data.choices?.[0]?.message?.content || '这次见面已经结束，彼此的情绪与互动被保留下来。'; } catch { const last = session.messages.filter(item => !item.contextPrompt).slice(-3).map(item => item.text).join('；'); session.summary = last ? `这次见面中，你们经历了：${last}` : '这次见面刚刚开始便结束了，彼此的情绪仍停留在见面前的聊天里。'; } finally { session.endedAt = Date.now(); session.ended = true; session.savedAt = Date.now(); if (chat.activeOfflineSessionId === session.id) chat.activeOfflineSessionId = ''; offlineFinishing = false; offlineBusy = false; save(); renderOfflineSummary(session); const profile = state.profiles.find(item => item.id === chat.profileId); window.IdealMachineMemory?.ingestOffline?.({ roleId: activeContact, profileId: chat.profileId || '', role: contact, profile, chat, session }).catch(error => console.warn('线下记忆入库失败：', error)); } }
-  function renderImageChoice() { const portal = document.querySelector('#chatImageChoicePortal'); if (!portal) return; portal.innerHTML = imageChoiceOpen ? (imageDescriptionOpen ? '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>图片文字描述</h3><textarea id="chatImageDescription" placeholder="输入这张图片的内容描述…"></textarea><div><button data-chat-image-description-cancel type="button">取消</button><button data-chat-image-description-send type="button">发送</button></div></div></div>' : '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>发送图片</h3><button data-chat-image-choice="text" type="button">文字描述</button><button data-chat-image-choice="file" type="button">本地相册</button></div></div>') : ''; }
+  function renderImageChoice() { const portal = document.querySelector('#chatImageChoicePortal'); if (!portal) return; portal.innerHTML = imageChoiceOpen ? (imageDescriptionOpen ? '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>图片文字描述</h3><textarea id="chatImageDescription" placeholder="输入这张图片的内容描述…"></textarea><div><button data-chat-image-description-cancel type="button">取消</button><button data-chat-image-description-send type="button">发送</button></div></div></div>' : '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>发送图片</h3><button data-chat-image-choice="text" type="button">文字描述</button><button data-chat-image-choice="file" type="button">从本地选择</button><button data-chat-image-choice="album" type="button">从理想机相册选择</button></div></div>') : ''; }
+  document.addEventListener('click', event => {
+    const albumChoice = event.target.closest?.('[data-chat-image-choice="album"]');
+    if (!albumChoice || !app.classList.contains('is-open')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!window.IdealMachineAlbum?.pickForChat) return window.alert('相册 App 还没有准备好。');
+    const targetContactId = currentContactId();
+    imageChoiceOpen = false;
+    imageDescriptionOpen = false;
+    menuOpen = false;
+    renderImageChoice();
+    window.IdealMachineAlbum.pickForChat(sources => {
+      const photos = (Array.isArray(sources) ? sources : [sources]).filter(Boolean);
+      if (!photos.length) return;
+      if (currentContactId() !== targetContactId) return window.alert('当前聊天已切换，请重新选择图片。');
+      const batchId = photos.length >= 3 ? uid('image-batch') : '';
+      photos.forEach((source, index) => addMessage(source, 'user', 'image', {
+        realImage:true, visionReadAt:0,
+        ...(batchId ? { imageBatchId:batchId, imageBatchIndex:index, imageBatchSources:index === 0 ? photos : undefined } : {})
+      }));
+    });
+  }, true);
   function scrollChatToLatest() { const messages = document.querySelector('#chatMessages'); if (messages) messages.scrollTop = messages.scrollHeight; }
   document.addEventListener('click', event => { if (event.target.closest('[data-chat-open]')) window.setTimeout(scrollChatToLatest, 0); }, true);
   function messageHtml(message) { const body = message.type === 'image' ? `<img src="${message.text}" alt="图片">` : message.type === 'image-desc' ? `<div class="chat-image-description"><strong>文字图片</strong><p>${esc(message.text)}</p></div>` : message.type === 'voice' ? `<span class="chat-voice">◖ ${esc(message.text)}</span>` : message.type === 'video' ? `▣ ${esc(message.text)}` : message.type === 'location' ? `⌖ ${esc(message.text)}` : message.type === 'transfer' ? `￥ ${esc(message.text)}` : message.type === 'share' ? `♫ ${esc(message.text)}` : message.type === 'together' ? `▤ ${esc(message.text)}` : esc(message.text); return `<div class="chat-message ${message.role === 'user' ? 'is-user' : 'is-character'}"><div class="chat-bubble ${message.type || ''}">${body}</div><small>${message.time || ''}</small></div>`; }
@@ -1854,8 +2065,45 @@ ${roundText}
   function renderChatSettings() { const panel = document.querySelector('#chatSettings'); if (!panel) return; panel.classList.toggle('is-open', chatSettingsOpen); panel.setAttribute('aria-hidden', String(!chatSettingsOpen)); if (!chatSettingsOpen) { panel.innerHTML = ''; return; } const contact = state.contacts.find(item => item.id === activeContact); const chat = currentChat(); const settings = chatSettingsFor(chat); const profile = state.profiles.find(item => item.id === chat?.profileId); const colorInput = (label, key, fallback, placeholder) => `<label>${label}<div class="chat-color-control"><input type="text" data-chat-color="${key}" value="${esc(settings[key])}" placeholder="${placeholder}"><input type="color" data-chat-color-picker="${key}" value="${/^#[0-9a-f]{6}$/i.test(settings[key]) ? settings[key] : fallback}"></div></label>`; panel.innerHTML = `<div class="chat-settings-page"><header><button data-chat-settings-close type="button">${actionIcon('back')}</button><h1>聊天设置</h1><span></span></header><main><section><span class="chat-kicker">CONVERSATION</span><h2>${esc(contact?.nickname || contact?.name || '')}</h2><p>管理这段关系的聊天显示与气泡样式。</p></section><button class="chat-settings-row" data-chat-bind type="button"><span>${profile ? '换绑用户设定' : '绑定用户设定'}</span><b>${esc(profile?.nickname || profile?.realName || '未绑定')}</b></button>${settingsProfilePickerOpen ? profilePicker() : ''}<section class="chat-display-settings"><label class="chat-setting-toggle"><span>隐藏头像<small>隐藏聊天内容旁的双方头像</small></span><input type="checkbox" data-chat-setting-toggle="hideAvatar" ${settings.hideAvatar ? 'checked' : ''}></label><label class="chat-setting-toggle"><span>隐藏时间戳<small>隐藏每条消息下方的发送时间</small></span><input type="checkbox" data-chat-setting-toggle="hideTimestamp" ${settings.hideTimestamp ? 'checked' : ''}></label></section><section class="chat-wallpaper-settings"><h3>聊天壁纸</h3><div class="chat-wallpaper-preview" style="${settings.wallpaper ? `background-image:url("${esc(settings.wallpaper)}")` : ''}"></div><input class="chat-wallpaper-url" data-chat-wallpaper-url type="url" value="${esc(settings.wallpaper?.startsWith('data:') ? '' : settings.wallpaper)}" placeholder="粘贴图片 URL"><div class="chat-wallpaper-actions"><label class="chat-file-button">选择本地图片<input type="file" accept="image/*" data-chat-wallpaper-file></label><button type="button" data-chat-wallpaper-reset>恢复默认</button></div></section><section class="chat-color-settings"><h3>气泡设置</h3><div class="chat-bubble-preview"><span>聊天预览</span><div class="chat-preview-row is-character"><div class="chat-preview-bubble" style="background:${esc(settings.characterBubbleColor)};color:${esc(settings.characterBubbleTextColor)}">${esc(contact?.nickname || '角色')}：你好</div></div><div class="chat-preview-row is-user"><div class="chat-preview-bubble" style="background:${esc(settings.userBubbleColor)};color:${esc(settings.userBubbleTextColor)}">${esc(profile?.nickname || profile?.realName || '我')}：收到</div></div></div>${colorInput('用户气泡', 'userBubbleColor', '#222222', '#222222 或 rgba(...)')}${colorInput('用户文字', 'userBubbleTextColor', '#ffffff', '#ffffff 或 rgba(...)')}${colorInput('角色气泡', 'characterBubbleColor', '#ffffff', '#ffffff 或 rgba(...)')}${colorInput('角色文字', 'characterBubbleTextColor', '#111111', '#111111 或 rgba(...)')}<small>可分别设置双方气泡与气泡内文字颜色，预览会同步更新。</small></section><button class="chat-settings-row danger" data-chat-block-contact type="button"><span>拉黑角色</span><b>拉黑</b></button><button class="chat-settings-row danger" data-chat-delete-contact type="button"><span>删除角色</span><b>删除</b></button><button class="chat-settings-row danger" data-chat-clear type="button"><span>清空聊天记录</span><b>清空</b></button></main></div>`; }
   document.addEventListener('change', event => { const file = event.target.closest('[data-chat-wallpaper-file]'); const url = event.target.closest('[data-chat-wallpaper-url]'); if (!file && !url) return; const chat = currentChat(); if (!chat) return; const settings = chatSettingsFor(chat); if (url) { settings.wallpaper = url.value.trim(); window.IdealMachineAlbum?.archiveUrl?.(settings.wallpaper, '聊天壁纸'); save(); render(); chatSettingsOpen = true; renderChatSettings(); return; } const image = file.files?.[0]; if (!image) return; const read = window.IdealMachineReadImage ? window.IdealMachineReadImage(image, 900, .68) : new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(image); }); read.then(value => { settings.wallpaper = value; save(); render(); chatSettingsOpen = true; renderChatSettings(); }); });
   document.addEventListener('click', event => { if (!event.target.closest('[data-chat-wallpaper-reset]')) return; const chat = currentChat(); if (!chat) return; chatSettingsFor(chat).wallpaper = ''; save(); render(); chatSettingsOpen = true; renderChatSettings(); });
-  function applyChatWallpaper() { const chat = activeContact ? state.chats?.[activeContact] : null; const conversation = document.querySelector('.chat-conversation'); const wallpaper = conversation ? (chatSettingsFor(chat).wallpaper || '') : ''; [app, conversation].forEach(element => { if (!element) return; element.style.backgroundImage = wallpaper ? `url("${wallpaper.replace(/"/g, '\\"')}")` : ''; element.style.backgroundSize = wallpaper ? 'cover' : ''; element.style.backgroundPosition = wallpaper ? 'center' : ''; element.style.backgroundRepeat = wallpaper ? 'no-repeat' : ''; }); }
-  function applyChatWallpaperPreview() { const preview = document.querySelector('.chat-wallpaper-preview'); if (!preview) return; const chat = activeContact ? state.chats?.[activeContact] : null; const wallpaper = chatSettingsFor(chat).wallpaper || ''; preview.style.backgroundImage = wallpaper ? `url("${wallpaper.replace(/"/g, '\\"')}")` : ''; preview.style.backgroundSize = wallpaper ? 'cover' : ''; preview.style.backgroundPosition = wallpaper ? 'center' : ''; preview.style.backgroundRepeat = wallpaper ? 'no-repeat' : ''; }
+  function resolveChatWallpaperSource(source) {
+    const value = String(source || '').trim();
+    if (/^idb:image:/i.test(value) && typeof window.IdealMachineGetImage === 'function') {
+      return window.IdealMachineGetImage(value).then(result => String(result || '')).catch(() => '');
+    }
+    return Promise.resolve(value);
+  }
+  function applyChatWallpaper() {
+    const chat = activeContact ? state.chats?.[activeContact] : null;
+    const conversation = document.querySelector('.chat-conversation');
+    const wallpaper = conversation ? String(chatSettingsFor(chat).wallpaper || '').trim() : '';
+    const paint = imageSource => {
+      if (activeContact && String(chatSettingsFor(state.chats?.[activeContact]).wallpaper || '').trim() !== wallpaper) return;
+      [app, conversation].forEach(element => {
+        if (!element) return;
+        element.style.backgroundImage = imageSource ? `url("${imageSource.replace(/"/g, '\\"')}")` : '';
+        element.style.backgroundSize = imageSource ? 'cover' : '';
+        element.style.backgroundPosition = imageSource ? 'center' : '';
+        element.style.backgroundRepeat = imageSource ? 'no-repeat' : '';
+      });
+    };
+    paint('');
+    if (wallpaper) resolveChatWallpaperSource(wallpaper).then(paint);
+  }
+  function applyChatWallpaperPreview() {
+    const preview = document.querySelector('.chat-wallpaper-preview');
+    if (!preview) return;
+    const chat = activeContact ? state.chats?.[activeContact] : null;
+    const wallpaper = String(chatSettingsFor(chat).wallpaper || '').trim();
+    const paint = imageSource => {
+      if (String(chatSettingsFor(state.chats?.[activeContact]).wallpaper || '').trim() !== wallpaper) return;
+      preview.style.backgroundImage = imageSource ? `url("${imageSource.replace(/"/g, '\\"')}")` : '';
+      preview.style.backgroundSize = imageSource ? 'cover' : '';
+      preview.style.backgroundPosition = imageSource ? 'center' : '';
+      preview.style.backgroundRepeat = imageSource ? 'no-repeat' : '';
+    };
+    paint('');
+    if (wallpaper) resolveChatWallpaperSource(wallpaper).then(paint);
+  }
   function previewChatWallpaper(value) { const wallpaper = String(value || ''); const conversation = document.querySelector('.chat-conversation'); const preview = document.querySelector('.chat-wallpaper-preview'); [conversation, preview].forEach(element => { if (!element) return; element.style.backgroundImage = wallpaper ? `url("${wallpaper.replace(/"/g, '\\"')}")` : ''; element.style.backgroundSize = wallpaper ? 'cover' : ''; element.style.backgroundPosition = wallpaper ? 'center' : ''; element.style.backgroundRepeat = wallpaper ? 'no-repeat' : ''; }); }
   document.addEventListener('input', event => { const url = event.target.closest('[data-chat-wallpaper-url]'); if (url) previewChatWallpaper(url.value.trim()); });
   function syncChatComposerControls(input) { const wrap = input?.closest('.chat-compose-wrap'); if (!wrap) return; const focused = document.activeElement === input; wrap.classList.toggle('is-input-focused', focused); wrap.classList.toggle('has-text', (focused || wrap.classList.contains('is-send-press')) && Boolean(input.value.trim())); }
@@ -1905,7 +2153,7 @@ ${roundText}
   function renderVideoCallModal(status = 'connecting') { const modal = document.querySelector('[data-chat-video-call]'); if (!modal) return; modal.dataset.videoStatus = status; const contact = videoCallContact || state.contacts.find(item => item.id === activeContact) || {}; const log = videoCallMessages.map(item => '<p class="' + (item.role === 'user' ? 'is-user' : '') + '"><b>' + (item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')) + '：</b>' + esc(item.text) + '</p>').join(''); const avatar = avatarMarkup(contact, 'chat-video-call-avatar'); if (status === 'connecting' || status === 'rejected') { modal.innerHTML = '<div class="chat-video-call-head"><b>视频通话</b><button data-video-call-close type="button">×</button></div><div class="chat-video-call-stage"><div>' + avatar + '<p class="chat-video-call-status">' + (status === 'connecting' ? '正在连接……' : '已拒绝通话') + '</p>' + (status === 'rejected' ? '<div class="chat-video-call-actions"><button data-video-call-close type="button">关闭</button></div>' : '') + '</div></div>'; return; } modal.innerHTML = '<div class="chat-video-call-head"><b>' + esc(contact.nickname || contact.name || '角色') + '</b><button data-video-call-close type="button">×</button></div><div class="chat-video-call-stage"><div>' + avatar + '<p class="chat-video-call-status">通话中</p></div></div><div class="chat-video-call-log">' + log + '</div><div class="chat-video-call-bottom"><input data-video-call-input placeholder="输入通话内容…" autocomplete="off"><button data-video-call-send type="button">发送</button><button data-video-reply type="button">回复</button></div>'; }
   function openVideoCallModal() { videoCallContact = state.contacts.find(item => item.id === activeContact); videoCallMessages = []; const modal = document.createElement('div'); modal.dataset.chatVideoCall = ''; modal.className = 'chat-video-call-modal'; document.body.appendChild(modal); renderVideoCallModal('connecting'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) { addMessage('已拒绝通话', 'character', 'video'); renderVideoCallModal('rejected'); return; } fetch(config.endpoint.replace(/\/$/, '') + '/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + config.key }, body: JSON.stringify({ model, temperature: 1, messages: [{ role: 'system', content: '你正在决定是否接通一次视频通话。只回复 ACCEPT 或 DECLINE，不要解释。' }, { role: 'user', content: '请根据角色性格决定是否接通视频通话。' }] }) }).then(response => response.json()).then(data => { const answer = String(data.choices?.[0]?.message?.content || '').toUpperCase(); if (answer.includes('DECLINE') || answer.includes('拒绝') || Math.random() < .2) { addMessage('已拒绝通话', 'character', 'video'); renderVideoCallModal('rejected'); } else renderVideoCallModal('connected'); }).catch(() => { addMessage('已拒绝通话', 'character', 'video'); renderVideoCallModal('rejected'); }); }
   async function videoCallReply() { const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。'); const contact = videoCallContact || {}; const response = await fetch(config.endpoint.replace(/\/$/, '') + '/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + config.key }, body: JSON.stringify({ model, temperature: .85, messages: [{ role: 'system', content: '你正在和用户进行视频通话，请用自然、简短的口吻回复。角色：' + (contact.name || '角色') }, ...videoCallMessages.map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text }))] }) }); if (!response.ok) throw new Error('HTTP ' + response.status); const data = await response.json(); videoCallMessages.push({ role: 'character', text: data.choices?.[0]?.message?.content || '……' }); renderVideoCallModal('connected'); }
-  document.addEventListener('click', event => { const tool = event.target.closest('[data-chat-tool="video"]'); if (!tool || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); menuOpen = false; emojiOpen = false; render(); openVideoCallModal(); }, true);
+  document.addEventListener('click', event => { const tool = event.target.closest('[data-chat-tool="video"]'); if (!tool || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); menuOpen = false; emojiOpen = false; render(); videoCallDirection = 'outgoing'; openVideoCallModal(); }, true);
   document.addEventListener('click', event => { if (event.target.closest('[data-video-call-close]')) { document.querySelector('[data-chat-video-call]')?.remove(); render(); requestAnimationFrame(() => { const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = box.scrollHeight; }); return; } const send = event.target.closest('[data-video-call-send]'); if (send) { const modal = send.closest('[data-chat-video-call]'); const input = modal?.querySelector('[data-video-call-input]'); const text = input?.value.trim(); if (!text) return; videoCallMessages.push({ role: 'user', text }); input.value = ''; renderVideoCallModal('connected'); return; } if (event.target.closest('[data-video-reply]')) { videoCallReply().catch(error => window.alert('回复失败：' + error.message)); } });
   document.addEventListener('click', event => { const plus = event.target.closest('[data-chat-plus]'); const emoji = event.target.closest('[data-chat-emoji]'); if ((!plus && !emoji) || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); if (plus) { menuOpen = !menuOpen; emojiOpen = false; } else { emojiOpen = !emojiOpen; menuOpen = false; } syncChatPanelDOM(); }, true);
   document.addEventListener('click', event => {
@@ -2410,7 +2658,7 @@ ${roundText}
       const previousEndsNaturally = /[。！？!?；;…]$/.test(previous);
       // [[MSG]] 不是“必须换气泡”的命令。没有自然断句且片段明显过短时，
       // 合并相邻内容，避免“看见了就 / 烂在肚子里”或“觉悟 / 倒”这类半句气泡。
-      const unsafeBreak = previous && !hasControlMarker && !previousEndsNaturally && (previous.length <= 4 || current.length <= 2);
+      const unsafeBreak = previous && !hasControlMarker && !previousEndsNaturally && (/[，,、：:]$/.test(previous) || previous.length <= 4 || current.length <= 2);
       if (unsafeBreak) {
         const needsSpace = /[A-Za-z0-9]$/.test(previous) && /^[A-Za-z0-9]/.test(current);
         result[result.length - 1] = `${previous}${needsSpace ? ' ' : ''}${current}`;
@@ -2475,12 +2723,43 @@ ${roundText}
   }
   cleanupStoredCharacterControlMarkers();
 
+  function chatReplyTailIncomplete(value) {
+    const tail = String(value || '').replace(/\[\[MSG\]\]/gi, ' ').replace(/\[\[STICKER:[^\]]+\]\]/gi, '').trim();
+    return /(?:是不是|能不能|要不要|可不可以|会不会|因为|所以|但是|如果|不过|或者|虽然|然后|到底|难道|只要|除非|应该|打算|准备|让我|让你|给我|给你|把你|把我|你这声|我这声|买个好|一个好|给你买个|下次给你|下次哥给你|还没|还要|想要个|想给你)$/.test(tail)
+      || /[，,、：:]$/.test(tail)
+      || ((tail.match(/[“「『（(]/g) || []).length > (tail.match(/[”」』）)]/g) || []).length && /[，,：:]$/.test(tail));
+  }
+  async function completeChatReplyTail(value, chat) {
+    let answer = String(value || '');
+    if (!chatReplyTailIncomplete(answer)) return answer;
+    const trailingSticker = answer.match(/((?:\s*\[\[STICKER\s*:\s*[^\]]+\]\]\s*)+)$/i)?.[1] || '';
+    if (trailingSticker) answer = answer.slice(0, -trailingSticker.length).trimEnd();
+    const config = window.IdealMachineAPI?.getConfig?.() || {};
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    if (!config.endpoint || !config.key || !model) return answer;
+    const contact = state.contacts.find(item => item.id === currentContactId()) || {};
+    for (let attempt = 0; attempt < 2 && chatReplyTailIncomplete(answer); attempt += 1) {
+      try {
+        const response = await (window.IdealMachineFetch || window.fetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:.55, max_tokens:256, messages:[{ role:'system', content:`你正在扮演${contact.name || '角色'}。上一条聊天回复在句子中间断掉了。只续写尚未完成的最后半句，直到意思完整。不要重写开头，不要解释，不要另起话题，不要输出 [[MSG]] 或表情包标记。` }, { role:'user', content:`未完成的回复：${answer.slice(-240)}\n请只输出从断点接下去的文字。` }] }) });
+        if (!response.ok) break;
+        const data = await response.json();
+        let continuation = String(data.choices?.[0]?.message?.content || '').trim().replace(/^\[\[MSG\]\]/i, '').trim();
+        if (!continuation) break;
+        for (let overlap = Math.min(24, answer.length, continuation.length); overlap > 0; overlap -= 1) {
+          if (answer.endsWith(continuation.slice(0, overlap))) { continuation = continuation.slice(overlap); break; }
+        }
+        answer += continuation;
+      } catch { break; }
+    }
+    return trailingSticker ? `${answer} ${trailingSticker.trim()}` : answer;
+  }
+
   async function sendCharacterReplyContent(text, chat) {
     const settings = chatSettingsFor(chat);
     const selectedGroups = new Set(settings.characterEmojiGroupIds || []);
     const items = characterEmojiItems().filter(item => selectedGroups.has(item.groupId));
     const byId = new Map(items.map(item => [item.id, item]));
-    const raw = String(text || '');
+    const raw = await completeChatReplyTail(text, chat);
     if (isSingleChatSystemNotice(raw)) {
       baseCharacterAddMessage(cleanCharacterVisibleText(raw), 'character');
       return;
@@ -2573,14 +2852,14 @@ ${roundText}
 【本次聊天回复要求】
 直接输出角色要发送的内容，不要输出 JSON、Markdown 代码块、规则解释或客服式说明。
 【本轮角色风格锚点】\n角色：${contact.nickname || contact.name || '角色'}\n${personaAnchor}\n以上角色设定是本轮语气和行为的首要依据。先在心里判断角色的语速、亲和度、主动性、口癖与亲密表达方式，再组织回复，但不要输出分析过程。不要把“活泼”误写成“凶”，也不要把“短句”误写成命令句。
-默认只发送 1 条短消息。${settings.characterMultiMessage ? `用户已允许连续消息，但普通闲聊最多发送 3 条，本次最多发送 ${characterReplyTargetCount} 条，使用 [[MSG]] 分隔。条数是上限而不是必须凑满：自然说完就停，绝对不要为了凑条数重复或补充废话。普通闲聊通常每条控制在 2—18 个汉字，本轮角色文字总量尽量不超过 42 个汉字；只有复杂问题、用户明确要求解释或认真安慰时才可以展开。` : '当前未开启连续消息，不要使用 [[MSG]]，不要主动拆成多条；普通闲聊通常控制在 2—28 个汉字，除非用户明确要求解释或当前确实需要认真安慰。'}
+默认只发送 1 条自然消息。${settings.characterMultiMessage ? `用户已允许连续消息，本次最多发送 ${characterReplyTargetCount} 条，使用 [[MSG]] 分隔。条数是上限而不是必须凑满：自然说完就停。每条按想表达的意思自然决定长短，不能为了短而停在半句；整轮回复也没有固定字数上限。` : '当前未开启连续消息，不要使用 [[MSG]]，不要主动拆成多条；按想表达的意思自然决定长短，不要为了短而截断句子。'}
 长度只是建议，不是截断规则。每条消息必须是完整、自然、能独立表达意思的语义单位；不要只输出半个短语或半句话，不要为了符合字数在句子中间切开，也不要在不自然的位置插入 [[MSG]]。如果完整表达超过建议长度，优先保留完整表达。
 短小不代表敷衍或冷淡。短句也必须保留角色原本的情绪温度：活泼、犬系、开朗、黏人或直球型角色应当轻快、柔和、有亲近感，可以主动接话、好奇追问、撒娇、逗人或表达期待，但不要用命令、训斥、逼问或过多感叹号制造热情。冷淡克制或强势的表达只适用于角色设定和当前情节确实如此。保持角色的性格、关系、口癖和情绪连续。普通闲聊必须优先短回，绝大多数情况下不要连续输出大段文字；只有解释复杂事情、认真安慰、争执或推进重要情节时才展开。每一轮都要根据语境改变长度，不能把一段小作文平均切成几段或为了满足数量破坏自然对话。
 根据用户刚刚那句话决定长度：用户说得很短或只是普通闲聊时，通常也短回；不要复述对方的话，不要补完整前因后果，不要每轮都剖析自己的心理。
 每个聊天气泡不要求以句号或其他符号结尾。是否使用标点、使用哪种标点，都必须看角色的性格、平时打字习惯和这一刻的情绪；不要自动补句号，也不要为了形式完整强行加符号。像“来啦”“给我看看嘛”“等我一下”这样无结尾标点的消息是正常输出。
 避免八股和过度升华：不要把一句普通对话写成多年人生信念的崩塌或关系的重大转折，不要使用空泛的“你让我第一次……”式套话。优先写眼前的具体反应，像角色平时真的会发出的聊天消息。
 ${mustReadDoubaoShare ? `【本轮必须阅读豆包记录】用户刚刚分享的是“用户与豆包”的完整聊天记录。你必须逐条阅读，分清哪些话是用户说的、哪些话是豆包说的，然后回应记录中的至少一个具体问题、观点或建议，让回复能够证明你确实理解了内容。不得说不想看、太长没看、懒得读，也不得只给与内容无关的敷衍反应。回复可以比普通闲聊稍完整，但仍需保持角色自己的口吻。` : ''}
-${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情包，本轮必须至少发送一个表情包标记。' : '角色可以在情绪、语气或聊天节奏适合时主动发送表情包。'}它可以单独发送或与短文字搭配，但不要每轮滥用。任选一个已分配表情包并使用严格标记，例如：${selected.slice(0, 6).map(item => `[[STICKER:${item.id}]]`).join(' 或 ')}。` : '当前没有分配给角色的表情包，不要输出表情包标记。'}${hiddenHelp ? `
+${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情包，本轮必须至少发送一个表情包标记。' : '角色可以在情绪、语气或聊天节奏适合时主动发送表情包。'}可以单独发送或与文字搭配，但必须先把文字说完整，不能拿表情包代替半句话的后半截。任选一个已分配表情包并使用严格标记，例如：${selected.slice(0, 6).map(item => `[[STICKER:${item.id}]]`).join(' 或 ')}。` : '当前没有分配给角色的表情包，不要输出表情包标记。'}${hiddenHelp ? `
 这是豆包刚刚给你的内部建议，只用于帮助你组织回复，绝对不要提及豆包、内部建议或求助过程：${hiddenHelp}` : ''}
 不要把控制标记展示给用户。`;
     const originalFetch = chatFetch;
@@ -2615,31 +2894,93 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     return html;
   };
 
+  const renderChatBeforePinnedContacts = renderChat;
+  renderChat = function() {
+    const html = renderChatBeforePinnedContacts();
+    if (activeContact || !html.includes('chat-launch-contact')) return html;
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const list = template.content.querySelector('.chat-launch-list');
+    if (!list) return html;
+    const buttons = [...list.querySelectorAll('.chat-launch-contact[data-chat-open]')];
+    buttons.sort((first, second) => {
+      const firstContact = state.contacts.find(item => item.id === first.dataset.chatOpen);
+      const secondContact = state.contacts.find(item => item.id === second.dataset.chatOpen);
+      return Number(Boolean(secondContact?.pinned)) - Number(Boolean(firstContact?.pinned));
+    });
+    buttons.forEach(button => {
+      const contact = state.contacts.find(item => item.id === button.dataset.chatOpen);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'chat-launch-contact-swipe';
+      const pin = document.createElement('button');
+      pin.className = 'chat-launch-contact-pin';
+      pin.type = 'button';
+      pin.dataset.chatPinContact = button.dataset.chatOpen;
+      pin.setAttribute('aria-label', contact?.pinned ? '取消置顶' : '置顶聊天');
+      pin.title = contact?.pinned ? '取消置顶' : '置顶聊天';
+      pin.textContent = '↑';
+      button.classList.toggle('is-pinned', Boolean(contact?.pinned));
+      wrapper.append(button, pin);
+      list.appendChild(wrapper);
+    });
+    return template.innerHTML;
+  };
+
   function updateChatDockContrast() {
     const conversation = document.querySelector('.chat-conversation');
-    if (!conversation) return;
-    const source = chatSettingsFor(currentChat()).wallpaper || '';
-    conversation.classList.remove('chat-wallpaper-dark');
     app.classList.remove('chat-wallpaper-dark');
+    conversation?.classList.remove('chat-wallpaper-dark');
+    if (!conversation || !activeContact) return;
+
+    // 视觉适配必须读取当前正在查看的联系人。后台角色回复时
+    // currentChat() 可能暂时指向另一个联系人，手机上尤其容易出现错色。
+    const visibleChat = state.chats?.[activeContact];
+    const source = String(chatSettingsFor(visibleChat).wallpaper || '').trim();
     if (!source) return;
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1;
-        canvas.height = 1;
-        const context = canvas.getContext('2d', { willReadFrequently: true });
-        context.drawImage(image, 0, 0, 1, 1);
-        const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
-        const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
-        if (luminance < 145) {
-          conversation.classList.add('chat-wallpaper-dark');
-          app.classList.add('chat-wallpaper-dark');
-        }
-      } catch {}
+
+    const currentVisibleSource = () => String(
+      chatSettingsFor(state.chats?.[activeContact]).wallpaper || '',
+    ).trim();
+    const applyContrast = (imageSource) => {
+      if (!imageSource || !conversation.isConnected || currentVisibleSource() !== source) return;
+      const image = new Image();
+      image.decoding = 'async';
+      // data/blob 图片不要设置 crossOrigin，否则 iOS Safari 可能直接阻止加载。
+      // 仅对远程图片尝试 CORS，避免 canvas 取色时污染。
+      if (/^https?:\/\//i.test(imageSource)) image.crossOrigin = 'anonymous';
+      image.onload = () => {
+        if (!conversation.isConnected || currentVisibleSource() !== source) return;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 8;
+          canvas.height = 8;
+          const context = canvas.getContext('2d', { willReadFrequently: true });
+          if (!context) return;
+          context.drawImage(image, 0, 0, 8, 8);
+          const pixels = context.getImageData(0, 0, 8, 8).data;
+          let luminanceTotal = 0;
+          let pixelCount = 0;
+          for (let index = 0; index < pixels.length; index += 4) {
+            if (pixels[index + 3] === 0) continue;
+            luminanceTotal += (pixels[index] * 299 + pixels[index + 1] * 587 + pixels[index + 2] * 114) / 1000;
+            pixelCount += 1;
+          }
+          const luminance = pixelCount ? luminanceTotal / pixelCount : 255;
+          const isDark = luminance < 145;
+          conversation.classList.toggle('chat-wallpaper-dark', isDark);
+          app.classList.toggle('chat-wallpaper-dark', isDark);
+        } catch {}
+      };
+      image.src = imageSource;
     };
-    image.src = source;
+
+    if (/^idb:image:/i.test(source) && typeof window.IdealMachineGetImage === 'function') {
+      window.IdealMachineGetImage(source)
+        .then((imageSource) => applyContrast(imageSource))
+        .catch(() => {});
+    } else {
+      applyContrast(source);
+    }
   }
   const baseRenderWithChatContrast = render;
   render = function() {
@@ -3534,6 +3875,60 @@ ${recentConversation}`
     }
   };
 
+  let momentCommentComposerOpen = false;
+  let momentCommentPostId = '';
+  let momentCommentTargetId = '';
+  function locateMomentComment(post, commentId, list = post?.comments, root = null) {
+    for (const comment of Array.isArray(list) ? list : []) {
+      if (String(comment?.id || '') === String(commentId || '')) return { comment, root: root || comment };
+      const nested = locateMomentComment(post, commentId, comment?.replies, root || comment);
+      if (nested) return nested;
+    }
+    return null;
+  }
+  function openMomentCommentComposer(postId, targetId = '') {
+    momentCommentComposerOpen = true;
+    momentCommentPostId = String(postId || '');
+    momentCommentTargetId = String(targetId || '');
+    renderMomentCommentComposer();
+  }
+  function closeMomentCommentComposer() {
+    momentCommentComposerOpen = false;
+    momentCommentPostId = '';
+    momentCommentTargetId = '';
+    renderMomentCommentComposer();
+  }
+  function renderMomentCommentComposer() {
+    const panel = document.querySelector('#chatMomentCommentComposer');
+    if (!panel) return;
+    panel.classList.toggle('is-open', momentCommentComposerOpen);
+    panel.setAttribute('aria-hidden', String(!momentCommentComposerOpen));
+    if (!momentCommentComposerOpen) { panel.innerHTML = ''; return; }
+    const post = state.moments.find(item => item.id === momentCommentPostId);
+    if (!post) return closeMomentCommentComposer();
+    const target = momentCommentTargetId ? locateMomentComment(post, momentCommentTargetId)?.comment : null;
+    panel.innerHTML = `<div class="chat-moment-composer-backdrop" data-chat-comment-compose-close></div><section class="chat-moment-composer-card chat-moment-comment-composer-card"><header><div><span class="chat-kicker">MOMENTS</span><h2>${target ? `回复 ${esc(target.author || '这条评论')}` : '发表评论'}</h2><small>${target ? '你的回复会显示在这条评论下面。' : '写下你想说的话。'}</small></div><button data-chat-comment-compose-close type="button">×</button></header><main><textarea id="chatMomentCommentText" maxlength="500" placeholder="${target ? `回复 ${esc(target.author || '这条评论')}…` : '输入评论…'}"></textarea></main><footer><button data-chat-comment-compose-close type="button">取消</button><button data-chat-comment-compose-save type="button">发送</button></footer></section>`;
+    requestAnimationFrame(() => document.querySelector('#chatMomentCommentText')?.focus());
+  }
+  function saveMomentComment() {
+    const post = state.moments.find(item => item.id === momentCommentPostId);
+    const text = document.querySelector('#chatMomentCommentText')?.value.trim();
+    if (!post || !text) return;
+    const profile = momentProfile();
+    const author = profile.nickname || profile.realName || '我';
+    const located = locateMomentComment(post, momentCommentTargetId);
+    if (located?.comment) {
+      const bucket = located.root !== located.comment ? (located.root.replies ||= []) : (located.comment.replies ||= []);
+      bucket.push({ id: uid('comment-reply'), author, text, authorType: 'user', authorId: profile.id || '', replyTo: located.comment.id || located.comment.author || '评论', replyToName: located.comment.author || '评论', time: time() });
+    } else {
+      post.comments ||= [];
+      post.comments.push({ id: uid('comment'), author, text, authorType: 'user', authorId: profile.id || '', time: time() });
+    }
+    save();
+    closeMomentCommentComposer();
+    render();
+  }
+
   const renderMomentPostWithCommentReplies = renderMomentPost;
   renderMomentPost = function(post) {
     const html = renderMomentPostWithCommentReplies(post);
@@ -3551,18 +3946,17 @@ ${recentConversation}`
         roots.push({ comment, index });
       }
     });
-    const replyMarkup = (reply, parentName = '') => `<div><b>${esc(reply.author || '我')}</b><span>${parentName ? `<small>回复 @${esc(parentName)}</small>` : ''}${esc(reply.text || '')}</span></div>`;
+    const replyMarkup = (reply, parentName = '', rootIndex = 0) => `<div class="chat-moment-comment-reply-item" data-chat-comment-reply="${esc(post.id)}" data-chat-comment-id="${esc(reply.id || '')}" data-chat-comment-index="${rootIndex}" role="button" tabindex="0" title="点击回复这条评论"><b>${esc(reply.author || '我')}</b><span>${parentName ? `<small>回复 @${esc(parentName)}</small>` : ''}${esc(reply.text || '')}</span></div>`;
     const renderComment = ({ comment, index }) => {
-      const replyable = comment.authorType === 'character' || comment.authorType === 'role';
       const replies = [
         ...(children.get(String(comment.id || '')) || []).map(item => ({ ...item.comment, replyToName: item.comment.replyToName || comment.author || '' })),
         ...(Array.isArray(comment.replies) ? comment.replies : [])
       ];
       const replyHtml = replies.length
-        ? `<div class="chat-moment-comment-replies">${replies.map(reply => replyMarkup(reply, reply.replyToName || comment.author || '')).join('')}</div>`
+        ? `<div class="chat-moment-comment-replies">${replies.map(reply => replyMarkup(reply, reply.replyToName || comment.author || '', index)).join('')}</div>`
         : '';
       const replyLabel = comment.replyToName ? `<small>回复 @${esc(comment.replyToName)}</small>` : '';
-      return `<div class="chat-moment-comment${replyable ? ' is-replyable' : ''}" ${replyable ? `data-chat-comment-reply="${esc(post.id)}" data-chat-comment-index="${index}" role="button" tabindex="0" title="点击回复这条角色评论"` : ''}><b>${esc(comment.author || '我')}</b><span>${replyLabel}${esc(comment.text || '')}</span>${replyHtml}</div>`;
+      return `<div class="chat-moment-comment is-replyable" data-chat-comment-reply="${esc(post.id)}" data-chat-comment-id="${esc(comment.id || '')}" data-chat-comment-index="${index}" role="button" tabindex="0" title="点击回复这条评论"><b>${esc(comment.author || '我')}</b><span>${replyLabel}${esc(comment.text || '')}</span>${replyHtml}</div>`;
     };
     // 旧版本可能保存了不完整的 replyTo 关系；这种情况下不能让所有评论
     // 都变成“无根节点”，至少要按普通评论展示出来。
@@ -3574,32 +3968,6 @@ ${recentConversation}`
     if (commentsStart < 0 || articleEnd < 0) return html;
     return `${html.slice(0, commentsStart)}<div class="chat-moment-comments">${rendered}</div>${html.slice(articleEnd)}`;
   };
-
-  window.addEventListener('click', event => {
-    const target = event.target.closest?.('[data-chat-comment-reply]');
-    if (!target || !app.classList.contains('is-open')) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    const post = state.moments.find(item => item.id === target.dataset.chatCommentReply);
-    const commentIndex = Number(target.dataset.chatCommentIndex);
-    const comment = post?.comments?.[commentIndex];
-    if (!post || !comment || (comment.authorType !== 'character' && comment.authorType !== 'role')) return;
-    const profile = momentProfile();
-    const text = window.prompt(`回复 ${comment.author || '角色'}：`);
-    if (!text?.trim()) return;
-    comment.replies ||= [];
-    comment.replies.push({
-      id: uid('comment-reply'),
-      author: profile.nickname || profile.realName || '我',
-      text: text.trim(),
-      authorType: 'user',
-      authorId: profile.id || '',
-      replyTo: comment.author || '角色',
-      time: time()
-    });
-    save();
-    render();
-  }, true);
 
   function quoteMessageText(message) {
     if (!message) return '';
@@ -3855,7 +4223,7 @@ ${recentConversation}`
       if (!count) return;
       const badge = document.createElement('em');
       badge.className = 'chat-unread-badge';
-      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.textContent = chatUnreadCountText(count);
       badge.setAttribute('aria-label', `${count} 条未读消息`);
       const arrow = [...button.children].find(child => child.tagName === 'I');
       if (arrow) button.insertBefore(badge, arrow);
@@ -4512,6 +4880,20 @@ ${recentConversation}`
     const contact = state.contacts.find(item => item.id === id); if (contact) return contact.nickname || contact.name || '';
     return momentNpcActors().find(item => item.id === id)?.displayName || '';
   }
+  function momentCommentThreadEntries(post) {
+    const entries = [];
+    const seen = new Set();
+    const visit = (list, parentId = '') => {
+      (Array.isArray(list) ? list : []).forEach(comment => {
+        if (!comment || (comment.id && seen.has(String(comment.id)))) return;
+        if (comment.id) seen.add(String(comment.id));
+        entries.push({ comment, parentId: String(parentId || comment.replyTo || '') });
+        visit(comment.replies, comment.id || parentId);
+      });
+    };
+    visit(post?.comments);
+    return entries;
+  }
   generateRoleInteraction = async function(post) {
     if (!post || post.visibility === 'private' || post.userOnly) return window.alert('仅用户可见的动态，其他角色和 NPC 看不见也不能互动。');
     if (momentBusy) return;
@@ -4523,8 +4905,9 @@ ${recentConversation}`
     const targetId = post.id;
     const originalText = String(post.text || '');
     const visibility = post.visibility === 'groups' ? `指定分组可见：${(post.visibleGroups || []).map(id => state.contactGroups.find(group => group.id === id)?.name || id).join('、') || '未指定分组'}` : post.visibility === 'character' ? '仅角色可见' : '所有人可见';
-    const existingComments = Array.isArray(post.comments) ? post.comments : [];
-    const commentContext = existingComments.slice(-20).map(comment => `评论ID：${comment.id}\n评论者：${comment.author || '用户'}\n评论内容：${comment.text || ''}`).join('\n\n') || '暂无评论。';
+    const existingComments = momentCommentThreadEntries(post);
+    const userReply = [...existingComments].reverse().find(entry => entry.comment.authorType === 'user' && entry.parentId);
+    const commentContext = ((existingComments.slice(-30).map(({ comment, parentId }) => `评论ID：${comment.id}\n${parentId ? `回复评论ID：${parentId}\n` : ''}评论者：${comment.author || '用户'}\n评论内容：${comment.text || ''}`).join('\n\n') || '暂无评论。') + (userReply ? `\n\n【必须优先回复】用户刚刚回复了角色评论，目标评论ID为 ${userReply.comment.id}。请让至少一位合适的角色或 NPC 使用 reply 或 both 直接回复这条用户评论，targetId 必须填写该 ID，不能只点赞或另起无关评论。` : '')) + `\n\n【本次批量互动要求】一次点击要产生多条互动：候选人数超过 1 人时，至少新增 1 条评论和 1 个点赞，优先安排 2—4 个不同角色或 NPC；某个角色或 NPC 可以同时评论和点赞。候选人数只有 1 人时，让其使用 both，同时完成评论和点赞。`;
     const roster = actors.slice(0, 24).map(actor => `${actor.actorType === 'npc' ? 'NPC' : '角色'}ID：${actor.id}\n姓名：${actor.displayName}\n身份：${actor.identity || '未填写'}\n人设：${String(actor.persona || '暂无').slice(0, 1400)}\n${actor.actorType === 'npc' ? `所属角色：${state.contacts.find(item => item.id === actor.sourceRoleId)?.nickname || state.contacts.find(item => item.id === actor.sourceRoleId)?.name || '未知'}` : ''}`).join('\n\n');
     const minimum = actors.length > 1 ? 2 : 1;
     const prompt = `请为这条朋友圈安排自然的角色/NPC互动。必须严格按以下顺序执行：
@@ -4535,15 +4918,25 @@ ${recentConversation}`
     render();
     try {
       const request = window.IdealMachineFetch || window.fetch.bind(window);
-      const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'chat-background', timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:1800, stream:false, messages:[{ role:'system', content:'你是朋友圈可见性与互动调度器。先执行可见范围过滤，再控制互动数量。只输出合法 JSON 数组。' }, { role:'user', content:prompt }] }) });
+      const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'chat-background', timeout:45000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:1800, stream:false, messages:[{ role:'system', content:'你是朋友圈可见性与互动调度器。先执行可见范围过滤，再控制互动数量。只输出合法 JSON 数组。' }, { role:'user', content:prompt }] }) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const results = parseMomentInteractionResults(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim());
       if (!results.length) throw new Error('API 返回的互动内容不完整，请重新点击互动。');
+      // 如果模型把用户回复误判成了普通动态评论，优先把一条已有文字回复
+      // 改挂到用户刚刚回复的那条评论下，确保线程能得到角色/NPC回应。
+      if (userReply?.comment?.id) {
+        const directReply = results.find(result => {
+          const actor = actors.find(item => item.id === String(result?.actorId || ''));
+          return actor && String(result?.text || '').trim() && ['reply', 'both'].includes(result?.action);
+        });
+        if (directReply) { directReply.targetId = userReply.comment.id; directReply.action = 'reply'; }
+      }
       const target = state.moments.find(item => item.id === targetId);
       if (!target || target.visibility === 'private') throw new Error('这条动态当前不可互动。');
       target.comments = Array.isArray(target.comments) ? target.comments : [];
       const allowed = new Map(actors.map(actor => [String(actor.id), actor]));
+      const threadEntries = momentCommentThreadEntries(target);
       const newActorIds = new Set(); let addedLikes = 0; let addedComments = 0;
       const addLike = actor => { target.roleLikeIds = Array.isArray(target.roleLikeIds) ? target.roleLikeIds : []; if (target.roleLikeIds.includes(actor.id)) return false; target.roleLikeIds.push(actor.id); target.likes = Number(target.likes || 0) + 1; target.roleLikes = Number(target.roleLikes || 0) + 1; newActorIds.add(actor.id); addedLikes += 1; return true; };
       results.slice(0, 8).forEach(result => {
@@ -4551,12 +4944,21 @@ ${recentConversation}`
         const action = ['reply', 'like', 'both'].includes(result?.action) ? result.action : 'reply';
         const text = String(result?.text || '').trim();
         const requestedTarget = String(result?.targetId || 'post');
-        const parent = requestedTarget === 'post' ? null : target.comments.find(comment => comment.id === requestedTarget);
-        const alreadyOwn = target.comments.some(comment => comment.authorId === actor.id && (!parent || comment.replyTo === parent.id));
-        if (!alreadyOwn && (action === 'reply' || action === 'both') && text) { target.comments.push({ id:uid('comment'), author:actor.displayName, text, authorType:actor.actorType === 'npc' ? 'npc' : 'character', authorId:actor.id, npcSourceRoleId:actor.sourceRoleId || '', time:time(), replyTo:parent?.id || '', replyToName:parent?.author || '' }); newActorIds.add(actor.id); addedComments += 1; }
+        const locatedParent = requestedTarget === 'post' ? null : locateMomentComment(target, requestedTarget);
+        const parent = locatedParent?.comment || threadEntries.find(entry => String(entry.comment.id || '') === requestedTarget)?.comment || null;
+        const alreadyOwn = threadEntries.some(entry => entry.comment.authorId === actor.id && (!parent || String(entry.comment.replyTo || '') === String(parent.id || '')));
+        if (!alreadyOwn && (action === 'reply' || action === 'both') && text) {
+          const flatRoot = parent ? target.comments.find(comment => String(comment.id || '') === String(parent.replyTo || '')) : null;
+          const root = flatRoot || locatedParent?.root || parent;
+          const bucket = parent ? (root !== parent ? (root.replies ||= []) : (parent.replies ||= [])) : target.comments;
+          bucket.push({ id:uid('comment'), author:actor.displayName, text, authorType:actor.actorType === 'npc' ? 'npc' : 'character', authorId:actor.id, npcSourceRoleId:actor.sourceRoleId || '', time:time(), replyTo:parent?.id || '', replyToName:parent?.author || '' });
+          newActorIds.add(actor.id); addedComments += 1;
+        }
         if (action === 'like' || action === 'both') addLike(actor);
       });
-      const unusedActors = actors.filter(actor => !newActorIds.has(actor.id) && !(target.roleLikeIds || []).includes(actor.id) && !target.comments.some(comment => comment.authorId === actor.id));
+      const unusedActors = actors.filter(actor => !newActorIds.has(actor.id) && !(target.roleLikeIds || []).includes(actor.id) && !threadEntries.some(entry => entry.comment.authorId === actor.id));
+      const likeCandidate = actors.find(actor => !(target.roleLikeIds || []).includes(actor.id));
+      if (actors.length > 1 && addedLikes === 0 && likeCandidate) addLike(likeCandidate);
       if (actors.length > 1 && newActorIds.size < 2 && unusedActors.length) addLike(unusedActors[0]);
       if (actors.length > 1 && addedLikes === 1 && addedComments === 0 && unusedActors.length > 1) addLike(unusedActors[1]);
       if (!newActorIds.size) throw new Error('没有生成新的角色或 NPC 互动，请重新点击互动。');
@@ -4762,5 +5164,327 @@ ${recentConversation}`
     try { addMessage(value); }
     finally { chatViewRendering = previousChatViewRendering; }
     button.closest('.chat-compose-wrap')?.classList.remove('is-send-press', 'has-text');
+  }, true);
+  const normalizeReadingChatLocalButton = () => {
+    document.querySelectorAll('.chat-reading-background-file b').forEach(button => {
+      if (button.textContent !== '从本地选择') button.textContent = '从本地选择';
+    });
+  };
+  normalizeReadingChatLocalButton();
+  new MutationObserver(normalizeReadingChatLocalButton).observe(document.body, { childList: true, subtree: true });
+  let videoCallSession = null;
+  let videoCallTimerId = 0;
+  let videoCallDirection = 'incoming';
+  let videoCallGenerating = false;
+  function videoCallName(contact = videoCallContact) { return contact?.nickname || contact?.name || '角色'; }
+  function videoCallDuration(session = videoCallSession) { return session?.startedAt ? Math.max(0, Math.floor((Date.now() - session.startedAt) / 1000)) : 0; }
+  function videoCallDurationText(seconds = 0) { const value = Math.max(0, Number(seconds) || 0); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`; }
+  function videoCallContext(contactId) {
+    const chat = state.chats?.[contactId] || {};
+    return (chat.messages || []).filter(item => item && item.type !== 'video' && !item.offline && !item.videoCallRecordId).slice(-8).map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: chatMessageContentForApi(item) })).filter(item => item.content);
+  }
+  function videoCallModal() { return document.querySelector('[data-chat-video-call]'); }
+  function videoCallRenderTick() { const timer = videoCallModal()?.querySelector('[data-video-call-time]'); if (timer) timer.textContent = videoCallDurationText(videoCallDuration()); }
+  renderVideoCallModal = function(status = 'connecting') {
+    const modal = videoCallModal();
+    if (!modal) return;
+    modal.dataset.videoStatus = status;
+    const contact = videoCallContact || state.contacts.find(item => item.id === activeContact) || {};
+    const name = videoCallName(contact);
+    const avatar = avatarMarkup(contact, 'chat-video-call-avatar');
+    const log = videoCallMessages.map(item => `<p class="${item.role === 'user' ? 'is-user' : ''}"><b>${item.role === 'user' ? '你' : esc(name)}：</b>${esc(item.text)}</p>`).join('');
+    if (status === 'incoming' || status === 'outgoing' || status === 'connecting') {
+      const label = status === 'incoming' ? `${esc(name)}正在呼叫你` : status === 'outgoing' ? `正在呼叫${esc(name)}…` : '正在接通…';
+      const actions = status === 'incoming' ? '<div class="chat-video-call-actions"><button data-video-call-reject type="button">挂断</button><button data-video-call-accept type="button">接听</button></div>' : '<div class="chat-video-call-actions"><button data-video-call-cancel type="button">取消</button></div>';
+      modal.innerHTML = `<div class="chat-video-call-head"><b>视频通话</b><button data-video-call-close type="button">×</button></div><div class="chat-video-call-stage"><div>${avatar}<p class="chat-video-call-status">${label}</p>${actions}</div></div>`;
+      return;
+    }
+    if (status === 'ending') {
+      modal.innerHTML = `<div class="chat-video-call-head"><b>视频通话</b></div><div class="chat-video-call-stage"><div>${avatar}<p class="chat-video-call-status">正在整理通话记录…</p><strong class="chat-video-call-ending-time">${videoCallDurationText(videoCallDuration(videoCallSession))}</strong></div></div>`;
+      return;
+    }
+    modal.innerHTML = `<div class="chat-video-call-head"><div><b>${esc(name)}</b><small>视频通话</small></div><button data-video-call-close type="button">×</button></div><div class="chat-video-call-stage chat-video-call-live-stage"><div>${avatar}<p class="chat-video-call-status">正在通话</p><strong class="chat-video-call-timer" data-video-call-time>${videoCallDurationText(videoCallDuration())}</strong><button class="chat-video-call-hangup" data-video-call-hangup type="button">挂断</button></div><span class="chat-video-call-online">LIVE</span></div><div class="chat-video-call-log">${log || '<p class="chat-video-call-empty">通话已经接通，可以开始说话。</p>'}</div><div class="chat-video-call-bottom"><input data-video-call-input placeholder="输入通话内容…" autocomplete="off"><button data-video-call-send type="button">发送</button><button data-video-reply type="button" ${videoCallGenerating ? 'disabled' : ''}>${videoCallGenerating ? '回复中…' : '回复'}</button></div>`;
+    const logBox = modal.querySelector('.chat-video-call-log');
+    if (logBox) requestAnimationFrame(() => { logBox.scrollTop = logBox.scrollHeight; });
+    videoCallRenderTick();
+  };
+  function videoCallClearTimer() { if (videoCallTimerId) { clearInterval(videoCallTimerId); videoCallTimerId = 0; } }
+  function videoCallStartTimer() { videoCallClearTimer(); videoCallTimerId = setInterval(videoCallRenderTick, 1000); }
+  openVideoCallModal = function(direction = videoCallDirection || 'incoming') {
+    videoCallDirection = 'incoming';
+    videoCallClearTimer();
+    videoCallContact = state.contacts.find(item => item.id === activeContact) || {};
+    videoCallMessages = [];
+    videoCallSession = { id: uid('video-call'), contactId: activeContact, direction, status: direction === 'outgoing' ? 'outgoing' : 'incoming', contextMessages: videoCallContext(activeContact), createdAt: Date.now() };
+    let modal = videoCallModal();
+    if (!modal) { modal = document.createElement('div'); modal.dataset.chatVideoCall = ''; modal.className = 'chat-video-call-modal'; document.body.appendChild(modal); }
+    renderVideoCallModal(videoCallSession.status);
+    if (direction === 'outgoing') setTimeout(() => beginVideoCall(), 650);
+  };
+  async function beginVideoCall() {
+    const session = videoCallSession;
+    if (!session || !videoCallModal() || !['incoming', 'outgoing'].includes(session.status)) return;
+    session.status = 'connected';
+    session.startedAt = Date.now();
+    videoCallStartTimer();
+    renderVideoCallModal('connected');
+    await requestVideoCallReply('opening');
+  }
+  function normalizeVideoCallPart(value) {
+    let text = String(value || '').trim();
+    text = text.replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').replace(/["“”'‘’]/g, '');
+    text = text.replace(/\*([^*\n]+)\*/g, '（$1）').trim();
+    return text;
+  }
+  function appendVideoCallCharacterAnswer(raw) {
+    let source = String(raw || '').replace(/\[\[VIDEO_CALL\]\]/ig, '').trim();
+    const hangup = /\[\[VIDEO_HANGUP\]\]/i.test(source);
+    source = source.replace(/\[\[VIDEO_HANGUP\]\]/ig, '').trim();
+    const voicePattern = /\[\[VOICE\s+seconds\s*=\s*(\d+)\s+text\s*=\s*(?:"([\s\S]*?)"|'([\s\S]*?)'|([\s\S]*?))\s*\]\]/ig;
+    const parts = [];
+    let cursor = 0;
+    let match;
+    while ((match = voicePattern.exec(source))) {
+      const before = source.slice(cursor, match.index).replace(/\[\[MSG\]\]/ig, '\n').trim();
+      if (before) before.split(/\n+/).map(item => normalizeVideoCallPart(item)).filter(Boolean).forEach(text => parts.push({ role: 'character', text, at: Date.now() }));
+      const voiceText = normalizeVideoCallPart(match[2] ?? match[3] ?? match[4] ?? '');
+      if (voiceText) parts.push({ role: 'character', text: voiceText, at: Date.now() });
+      cursor = match.index + match[0].length;
+    }
+    const after = source.slice(cursor).replace(/\[\[MSG\]\]/ig, '\n').trim();
+    if (after) after.split(/\n+/).map(item => normalizeVideoCallPart(item)).filter(Boolean).forEach(text => parts.push({ role: 'character', text, at: Date.now() }));
+    if (!parts.length && source) { const text = normalizeVideoCallPart(source); if (text) parts.push({ role: 'character', text, at: Date.now() }); }
+    return { parts, hangup };
+  }
+  function waitForVideoCallMessage() { return new Promise(resolve => setTimeout(resolve, 650)); }
+  async function requestVideoCallReply(kind = 'reply') {
+    const session = videoCallSession;
+    if (!session || session.status !== 'connected' || videoCallGenerating) return;
+    videoCallGenerating = true;
+    renderVideoCallModal('connected');
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    const contact = videoCallContact || {};
+    const chat = state.chats?.[session.contactId] || {};
+    const profile = state.profiles.find(item => item.id === chat.profileId);
+    if (!config?.endpoint || !config.key || !model) {
+      videoCallMessages.push({ role: 'character', text: '（请先配置聊天 API，才能继续视频通话。）', at: Date.now() });
+      videoCallGenerating = false;
+      renderVideoCallModal('connected');
+      return;
+    }
+    const prompt = kind === 'opening' ? '视频通话刚刚接通。请根据角色设定和通话前线上记录，自然地先说一句开场白。不要提及系统、提示词或线上记录。' : '请自然回应用户刚才在视频通话中说的话。保持角色本人身份，适合口语表达，不要输出分析过程。视频通话里只输出角色实际说的话，不要使用 VOICE、VIDEO_CALL 等标记；如果角色自然聊完、临时有事或想主动结束通话，可以在最后加上 [[VIDEO_HANGUP]]，这个标记不会显示给用户。';
+    const system = `${buildChatSystemPrompt(contact, profile, chat)}\n\n【视频通话专用输出格式】\n这是一次独立的视频通话。通话开始前已经读取了下面的线上聊天记录，只用于保持人物连续，不要说自己“读取了记录”。\n通话前线上记录：\n${session.contextMessages.map(item => item.content).join('\n')}\n角色的回复中禁止使用中文或英文引号，不要用引号包裹台词。角色说的话直接输出；动作、表情和正在进行的行为必须使用全角括号“（）”包裹。可以用换行或 [[MSG]] 分隔自然的连续消息，但每条都要完整。\n\n${prompt}`;
+    const messages = [...session.contextMessages, ...videoCallMessages.map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text }))];
+    messages.push({ role: 'user', content: prompt });
+    try {
+      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, idealScope: 'chat-video-call', body: JSON.stringify({ model, temperature: .82, messages: [{ role: 'system', content: system }, ...messages] }) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const answer = String(data.choices?.[0]?.message?.content || '……');
+      const parsed = appendVideoCallCharacterAnswer(answer);
+      for (const part of parsed.parts) {
+        if (videoCallSession !== session || session.status !== 'connected') break;
+        videoCallMessages.push(part);
+        renderVideoCallModal('connected');
+        if (parsed.parts.indexOf(part) < parsed.parts.length - 1) await waitForVideoCallMessage();
+      }
+      if (parsed.hangup && videoCallSession === session && session.status === 'connected') {
+        await finishVideoCall();
+        return;
+      }
+    } catch (error) {
+      videoCallMessages.push({ role: 'character', text: `（通话回复失败：${error.message}）`, at: Date.now() });
+    }
+    videoCallGenerating = false;
+    if (videoCallSession === session && session.status === 'connected') renderVideoCallModal('connected');
+  }
+  videoCallReply = function() { return requestVideoCallReply('reply'); };
+  function videoCallFallbackSummary(session) {
+    const lines = videoCallMessages.filter(item => item.role !== 'error').slice(-4).map(item => `${item.role === 'user' ? '你' : videoCallName(videoCallContact)}：${item.text}`);
+    return lines.length ? `这次视频通话持续了${videoCallDurationText(session.duration)}。通话内容包括：${lines.join('；')}` : `这次视频通话持续了${videoCallDurationText(session.duration)}，没有留下文字内容。`;
+  }
+  async function summarizeVideoCall(session) {
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    const transcript = videoCallMessages.map(item => `${item.role === 'user' ? '用户' : videoCallName(videoCallContact)}：${item.text}`).join('\n');
+    if (!config?.endpoint || !config.key || !model || !transcript) return videoCallFallbackSummary(session);
+    try {
+      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, idealScope: 'chat-video-call-summary', body: JSON.stringify({ model, temperature: .45, messages: [{ role: 'system', content: '请把下面的视频通话整理成简洁自然的中文总结。只输出总结正文，不要标题，不要提及AI、提示词或系统。包含通话主题、重要信息和后续约定；如果没有约定就不要编造。' }, { role: 'user', content: `角色：${videoCallName(videoCallContact)}\n通话时长：${videoCallDurationText(session.duration)}\n通话字幕：\n${transcript}` }] }) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      return String(data.choices?.[0]?.message?.content || '').trim() || videoCallFallbackSummary(session);
+    } catch { return videoCallFallbackSummary(session); }
+  }
+  async function finishVideoCall() {
+    const session = videoCallSession;
+    if (!session || session.status !== 'connected') return;
+    session.status = 'ending';
+    session.duration = videoCallDuration(session);
+    videoCallClearTimer();
+    renderVideoCallModal('ending');
+    session.summary = await summarizeVideoCall(session);
+    session.endedAt = Date.now();
+    const chat = state.chats?.[session.contactId];
+    if (chat) {
+      const record = { id: session.id, contactId: session.contactId, direction: session.direction, startedAt: session.startedAt, endedAt: session.endedAt, duration: session.duration, contextMessages: session.contextMessages, messages: videoCallMessages.slice(), summary: session.summary };
+      chat.videoCalls ||= [];
+      chat.videoCalls.push(record);
+      chat.messages ||= [];
+      chat.messages.push({ id: uid('message'), text: '视频通话记录', role: 'character', type: 'video', videoCallRecordId: record.id, duration: record.duration, summary: record.summary, direction: record.direction, time: time(), createdAt: Date.now() });
+      save();
+    }
+    videoCallSession = null;
+    videoCallMessages = [];
+    videoCallModal()?.remove();
+    render();
+    requestAnimationFrame(() => { const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = box.scrollHeight; });
+  }
+  function cancelVideoCall() {
+    const session = videoCallSession;
+    videoCallClearTimer();
+    if (session?.status === 'incoming') {
+      const chat = state.chats?.[session.contactId];
+      if (chat) { chat.messages ||= []; chat.messages.push({ id: uid('message'), text: '未接听视频通话', role: 'character', type: 'video', videoCallMissed: true, time: time(), createdAt: Date.now() }); save(); }
+    }
+    videoCallSession = null;
+    videoCallMessages = [];
+    videoCallModal()?.remove();
+    render();
+  }
+  const baseVideoRecordMessageHtml = messageHtml;
+  messageHtml = function(message) {
+    if (message?.type === 'video' && message.videoCallRecordId) return `<div class="chat-message chat-video-record-message" data-chat-message-id="${esc(message.id)}"><button class="chat-video-record-bubble" data-video-call-record="${esc(message.videoCallRecordId)}" type="button"><span class="chat-video-record-icon">▣</span><span><b>视频通话记录</b><small>${videoCallDurationText(message.duration)} · 点击查看通话总结</small></span><i>›</i></button></div>`;
+    return baseVideoRecordMessageHtml(message);
+  };
+  function openVideoCallRecord(record) {
+    const modal = document.createElement('div');
+    modal.dataset.chatVideoCall = '';
+    modal.className = 'chat-video-call-modal chat-video-call-record-modal';
+    document.body.appendChild(modal);
+    const contact = state.contacts.find(item => item.id === record.contactId) || videoCallContact || {};
+    const name = videoCallName(contact);
+    const transcript = (record.messages || []).map(item => `<p class="${item.role === 'user' ? 'is-user' : ''}"><b>${item.role === 'user' ? '你' : esc(name)}：</b>${esc(item.text)}</p>`).join('');
+    modal.dataset.videoStatus = 'record';
+    modal.innerHTML = `<div class="chat-video-call-head"><div><b>视频通话记录</b><small>${esc(name)} · ${videoCallDurationText(record.duration)}</small></div><button data-video-call-close type="button">×</button></div><main class="chat-video-record-detail"><div class="chat-video-record-detail-scroll" data-video-record-scroll><section><span>通话总结</span><p>${esc(record.summary || '暂无总结')}</p></section><section><span>通话内容</span><div class="chat-video-call-log">${transcript || '<p class="chat-video-call-empty">没有文字内容。</p>'}</div></section></div></main>`;
+    const scroller = modal.querySelector('[data-video-record-scroll]');
+    let drag = null;
+    scroller.addEventListener('pointerdown', event => {
+      if (event.button !== 0 && event.pointerType === 'mouse') return;
+      drag = { id:event.pointerId, y:event.clientY };
+      scroller.setPointerCapture(event.pointerId);
+      scroller.classList.add('is-dragging');
+    });
+    scroller.addEventListener('pointermove', event => {
+      if (!drag || drag.id !== event.pointerId) return;
+      const delta = drag.y - event.clientY;
+      drag.y = event.clientY;
+      scroller.scrollTop += delta;
+      event.preventDefault();
+    });
+    const endDrag = event => {
+      if (!drag || drag.id !== event.pointerId) return;
+      drag = null;
+      scroller.classList.remove('is-dragging');
+      if (scroller.hasPointerCapture(event.pointerId)) scroller.releasePointerCapture(event.pointerId);
+    };
+    scroller.addEventListener('pointerup', endDrag);
+    scroller.addEventListener('pointercancel', endDrag);
+  }
+  document.addEventListener('click', event => {
+    const recordButton = event.target.closest('[data-video-call-record]');
+    if (!recordButton) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const record = state.chats?.[activeContact]?.videoCalls?.find(item => item.id === recordButton.dataset.videoCallRecord);
+    if (record) openVideoCallRecord(record);
+  }, true);
+  document.addEventListener('click', event => {
+    if (!event.target.closest('[data-chat-video-call]')) return;
+    const accept = event.target.closest('[data-video-call-accept]');
+    const reject = event.target.closest('[data-video-call-reject], [data-video-call-cancel]');
+    const close = event.target.closest('[data-video-call-close]');
+    const hangup = event.target.closest('[data-video-call-hangup]');
+    const send = event.target.closest('[data-video-call-send]');
+    const replyButton = event.target.closest('[data-video-reply]');
+    if (!accept && !reject && !close && !hangup && !send && !replyButton) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (accept) return beginVideoCall();
+    if (hangup) return finishVideoCall();
+    if (close && videoCallSession?.status === 'connected') return finishVideoCall();
+    if (reject || close) return cancelVideoCall();
+    const modal = event.target.closest('[data-chat-video-call]');
+    const input = modal?.querySelector('[data-video-call-input]');
+    if (send) { const text = input?.value.trim(); if (!text || videoCallSession?.status !== 'connected') return; videoCallMessages.push({ role: 'user', text, at: Date.now() }); input.value = ''; renderVideoCallModal('connected'); requestAnimationFrame(() => document.querySelector('[data-chat-video-call] [data-video-call-input]')?.focus()); return; }
+    if (replyButton) return requestVideoCallReply('reply');
+  }, true);
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+    const input = event.target.closest?.('[data-video-call-input]');
+    if (!input || !videoCallSession || videoCallSession.status !== 'connected') return;
+    event.preventDefault();
+    input.closest('[data-chat-video-call]')?.querySelector('[data-video-call-send]')?.click();
+  }, true);
+  const baseVideoIncomingMessageHtml = messageHtml;
+  messageHtml = function(message) {
+    if (message?.videoCallIncoming) {
+      const chat = currentChat();
+      const contact = state.contacts.find(item => item.id === activeContact) || {};
+      const profile = state.profiles.find(item => item.id === chat?.profileId);
+      const settings = chatSettingsFor(chat);
+      const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile);
+      const stamp = settings.hideTimestamp ? '' : `<small>${esc(message.time || '')}</small>`;
+      return `<div class="chat-message is-character chat-video-incoming-message" data-chat-message-id="${esc(message.id)}"><div class="chat-message-line">${avatar}<div class="chat-bubble video chat-video-incoming-bubble"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 7.5h7a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/><path d="m15.5 11 4-2v6l-4-2z"/></svg><span>${esc(message.text)}</span></div>${stamp}</div></div>`;
+    }
+    return baseVideoIncomingMessageHtml(message);
+  };
+  const baseVideoNoticeAddMessage = addMessage;
+  addMessage = function(text, role = 'user', type = '', meta = {}) {
+    if (role === 'character' && type === 'video' && String(text || '') === '角色发起了视频通话') {
+      const contact = state.contacts.find(item => item.id === activeContact) || {};
+      text = `${contact.nickname || contact.name || '角色'}发起视频通话`;
+      meta = { ...meta, videoCallIncoming: true };
+    }
+    return baseVideoNoticeAddMessage(text, role, type, meta);
+  };
+  const baseSaveWithVideoCalls = save;
+  save = function() {
+    Object.values(state.chats || {}).forEach(chat => {
+      if (!Array.isArray(chat.videoCalls)) return;
+      const messageIds = new Set((chat.messages || []).filter(item => item?.videoCallRecordId).map(item => item.videoCallRecordId));
+      chat.videoCalls = chat.videoCalls.filter(record => messageIds.has(record.id));
+    });
+    return baseSaveWithVideoCalls();
+  };
+  const renderMomentPostWithCommentButton = renderMomentPost;
+  renderMomentPost = function(post) {
+    let html = renderMomentPostWithCommentButton(post);
+    if (momentBusy) html = html.replace(/<button data-moment-interact="([^"]*)" type="button">✦ 互动<\/button>/, '<button class="is-moment-busy" data-moment-interact="$1" type="button" disabled>互动中…</button>');
+    return html.replace(/<button data-moment-comment="([^"]*)" type="button">◌\s*(\d+)<\/button>/, (_, id, count) => `<button class="chat-moment-comment-button" data-moment-comment="${id}" type="button" aria-label="评论"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-5 3v-3.2a2 2 0 0 1-3-1.8v-8a2 2 0 0 1 2-2z"/><path d="M7.5 10h9M7.5 13h6"/></svg><span>${count}</span></button>`);
+  };
+  const messageHtmlBeforeImageBatch = messageHtml;
+  messageHtml = function(message) {
+    if (message?.imageBatchId && message.imageBatchIndex > 0) return '';
+    const html = messageHtmlBeforeImageBatch(message);
+    if (!message?.imageBatchId || message.imageBatchIndex !== 0 || message.recalled) return html;
+    const sources = Array.isArray(message.imageBatchSources) ? message.imageBatchSources.filter(Boolean) : [];
+    if (sources.length < 3) return html;
+    const previews = sources.slice(0, 3).map((source, index) => `<img class="chat-image-stack-photo is-layer-${index}" src="${esc(source)}" alt="第${index + 1}张图片">`).join('');
+    const stack = `<button class="chat-image-stack" data-chat-image-stack-open="${esc(message.imageBatchId)}" type="button" aria-label="展开 ${sources.length} 张图片"><span class="chat-image-stack-layers">${previews}</span><span class="chat-image-stack-expand">展开 ${sources.length}</span></button>`;
+    return html.replace(/<div class="chat-bubble image[^\"]*">[\s\S]*?<\/div>/, `<div class="chat-bubble image-stack">${stack}</div>`);
+  };
+  document.addEventListener('click', event => {
+    const close = event.target.closest?.('[data-chat-image-stack-close]');
+    if (close) { app.querySelector('.chat-image-stack-viewer')?.remove(); return; }
+    const open = event.target.closest?.('[data-chat-image-stack-open]');
+    if (!open || !app.classList.contains('is-open')) return;
+    event.preventDefault();
+    const batch = currentChat()?.messages.find(item => item.imageBatchId === open.dataset.chatImageStackOpen && item.imageBatchIndex === 0);
+    const sources = Array.isArray(batch?.imageBatchSources) ? batch.imageBatchSources : [];
+    if (!sources.length) return;
+    app.querySelector('.chat-image-stack-viewer')?.remove();
+    app.insertAdjacentHTML('beforeend', `<div class="chat-image-stack-viewer"><button class="chat-image-stack-backdrop" data-chat-image-stack-close type="button" aria-label="关闭图片"></button><section><header><b>${sources.length} 张图片</b><button data-chat-image-stack-close type="button" aria-label="关闭">×</button></header><main>${sources.map((source, index) => `<img src="${esc(source)}" alt="第${index + 1}张图片">`).join('')}</main></section></div>`);
+    hydrateGeneratedImages();
   }, true);
 })();
