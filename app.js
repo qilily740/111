@@ -133,7 +133,7 @@
   window.fetch = (input, init = {}) => window.IdealMachineFetch(input, init);
   window.addEventListener('pagehide', () => window.IdealMachineCancelAllRequests());
   document.addEventListener('click', event => {
-    if (event.target.closest?.('[data-app-key]')) window.IdealMachineCancelAllRequests({ preserveScopes: ['chat-background'] });
+    if (event.target.closest?.('[data-app-key]')) window.IdealMachineCancelAllRequests({ preserveScopes: ['chat-background', 'ta'] });
   }, true);
   const assetDBPromise = typeof indexedDB === 'undefined' ? Promise.resolve(null) : new Promise(resolve => { const request = indexedDB.open('ideal-machine-assets', 1); request.onupgradeneeded = () => request.result.createObjectStore('images'); request.onsuccess = () => resolve(request.result); request.onerror = () => resolve(null); });
   function putImageAsset(value) { return assetDBPromise.then(db => new Promise(resolve => { if (!db) return resolve(value); const id = 'idb:image:' + Date.now() + ':' + Math.random().toString(36).slice(2); const transaction = db.transaction('images', 'readwrite'); transaction.objectStore('images').put(String(value || ''), id); transaction.oncomplete = () => resolve(id); transaction.onerror = () => resolve(value); })); }

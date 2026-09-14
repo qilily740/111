@@ -1,11 +1,12 @@
 (() => {
   const key = 'ideal-machine-chat';
   const initial = { contacts: [], profiles: [], chats: {}, moments: [], contactGroups: [], emojis: { groups: [{ id: 'emoji-default', name: '默认', items: [] }] } };
-  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let chatQuote = null; let chatDraftSaveTimer = 0;
+  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0;
   let activeContactGroupId = '';
   const app = document.createElement('div'); app.className = 'chat-app';
   app.innerHTML = `<div class="chat-page"><header class="chat-header"><div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">聊天</h1></div><button class="chat-close" data-chat-close type="button">×</button></header><main class="chat-main" id="chatMain"></main><nav class="chat-tabs"><button data-chat-tab="chat" class="is-active" type="button">${tabIcon('chat')}<small>聊天</small></button><button data-chat-tab="contacts" type="button">${tabIcon('contacts')}<small>联系人</small></button><button data-chat-tab="moments" type="button">${tabIcon('moments')}<small>朋友圈</small></button><button data-chat-tab="me" type="button">${tabIcon('me')}<small>我</small></button></nav></div><div class="chat-editor" id="chatEditor" aria-hidden="true"></div><div class="chat-profile-editor" id="chatProfileEditor" aria-hidden="true"></div><div class="chat-thought" id="chatThought" aria-hidden="true"></div><div class="chat-settings" id="chatSettings" aria-hidden="true"></div><div class="chat-moment-composer" id="chatMomentComposer" aria-hidden="true"></div><div class="chat-group-composer" id="chatGroupComposer" aria-hidden="true"></div><div class="chat-role-moment-composer" id="chatRoleMomentComposer" aria-hidden="true"></div><input id="chatImageFile" type="file" accept="image/*" hidden><input id="chatMomentImageFile" type="file" accept="image/*" hidden>`;
   document.body.appendChild(app);
+  document.addEventListener('click', event => { if (event.target.closest?.('[data-chat-tool="offline"]')) offlineExitRequested = false; }, true);
   document.addEventListener('click', event => { const offline = event.target.closest?.('[data-chat-tool="offline"]'); if (!offline || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); menuOpen = false; emojiOpen = false; openOfflineMode(); }, true);
   document.addEventListener('click', event => { const action = event.target.closest?.('.chat-role-action-choice'); if (!action || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); const target = action.dataset.chatRoleTarget; roleMomentMode = target === 'select' ? 'select' : 'random'; document.querySelectorAll('.chat-role-action-choice').forEach(button => button.classList.toggle('is-selected', button === action)); const list = document.querySelector('[data-chat-role-list]'); const count = document.querySelector('[data-chat-role-random-count]'); if (list) list.classList.toggle('hidden', target !== 'select'); if (count) count.classList.toggle('hidden', target !== 'random'); }, true);
   document.addEventListener('click', event => { const addGroup = event.target.closest?.('[data-chat-group-add]'); if (!addGroup || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); contactGroupComposerOpen = true; renderGroupComposer(); }, true);
@@ -1471,8 +1472,31 @@ ${roundText}
     save();
     openOfflineMode();
   }
-  function offlineMessageMarkup(value) {
-    const lines = String(value || '').split(/\r?\n/).filter(line => line.trim());
+  function offlineMessageMarkup(value, autoParagraph = false) {
+    const sourceLines = String(value || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    let lines = sourceLines;
+    if (autoParagraph && sourceLines.length === 1) {
+      const text = sourceLines[0];
+      const sentences = text.match(/[^。！？!?…]+[。！？!?…]+[”"’）】」』]*/gu) || [];
+      const tail = text.slice(sentences.join('').length).trim();
+      if (tail) sentences.push(tail);
+      if (sentences.length >= 2) {
+        const target = text.length < 100 ? 34 : text.length < 220 ? 58 : 88;
+        lines = [];
+        let paragraph = '';
+        sentences.forEach((sentence, index) => {
+          const next = `${paragraph}${sentence}`;
+          const canBreak = paragraph && (offlineReplyCharCount(next) > target || index === sentences.length - 1);
+          if (canBreak && lines.length < sentences.length - 1) {
+            lines.push(paragraph.trim());
+            paragraph = sentence;
+          } else {
+            paragraph = next;
+          }
+        });
+        if (paragraph.trim()) lines.push(paragraph.trim());
+      }
+    }
     return (lines.length ? lines : ['']).map(line => {
       const content = esc(line).replace(/\*\*([\s\S]+?)\*\*/g, (whole, inner) => inner.trim() ? `<em class="chat-offline-inner-voice">${inner}</em>` : whole);
       return `<p>${content || '&nbsp;'}</p>`;
@@ -1486,8 +1510,8 @@ ${roundText}
     const items = session.messages.map((item, index) => ({ item, index })).filter(({ item }) => !item.contextPrompt).map(({ item, index }) => {
       const isUser = item.role === 'user';
       const isError = item.role === 'error';
-      const speaker = isUser ? `<div class="chat-offline-v2-user-avatar">${esc(userName.slice(0, 1))}</div>` : avatarMarkup(contact, 'chat-offline-v2-avatar');
-      return `<article data-offline-message-index="${index}" class="${isUser ? 'is-user' : isError ? 'is-error' : 'is-character'}">${speaker}<div class="chat-offline-v2-message-body"><span>${isUser ? esc(userName) : isError ? '生成提醒' : esc(roleName)}</span><div class="chat-offline-v2-message-text">${offlineMessageMarkup(item.text)}</div>${item.retryable && session.pendingOfflineReply ? '<button type="button" class="chat-offline-complete" data-offline-complete>补足这条回复</button>' : ''}</div></article>`;
+      const speaker = isUser ? avatarMarkup({ name:userName, avatar:profile?.avatar }, 'chat-offline-v2-user-avatar') : avatarMarkup(contact, 'chat-offline-v2-avatar');
+      return `<article data-offline-message-index="${index}" class="${isUser ? 'is-user' : isError ? 'is-error' : 'is-character'}">${speaker}<div class="chat-offline-v2-message-body"><span>${isUser ? esc(userName) : isError ? '生成提醒' : esc(roleName)}</span><div class="chat-offline-v2-message-text">${offlineMessageMarkup(item.text, !isUser && !isError)}</div>${item.retryable && session.pendingOfflineReply ? '<button type="button" class="chat-offline-complete" data-offline-complete>补足这条回复</button>' : ''}</div></article>`;
     }).join('');
     const thinking = offlineBusy ? `<article class="is-character is-thinking">${avatarMarkup(contact, 'chat-offline-v2-avatar')}<div class="chat-offline-v2-message-body"><span>${esc(roleName)} · 正在回应</span><p><i></i><i></i><i></i></p></div></article>` : '';
     return items || thinking ? `${items}${thinking}` : '<div class="chat-offline-empty"><b>你们已经来到同一个现场</b><span>说一句话、描述一个动作，或让角色先回应。</span></div>';
@@ -1511,6 +1535,7 @@ ${roundText}
     const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId);
     const contact = state.contacts.find(item => item.id === activeContact) || {};
     if (!modal || !session) return;
+    if (!session.ended) chat.activeOfflineSessionId = session.id;
     if (!Array.isArray(session.onlineContextMessages)) {
       const source = existingSessionIds.has(session.id) ? session.contextMessages || [] : (chat.messages || []).slice(-20);
       session.onlineContextMessages = source.map(item => ({ role:item.role, text:item.text, type:item.type }));
@@ -1571,7 +1596,7 @@ ${roundText}
       const rerollButton = document.createElement('button');
       rerollButton.type = 'button';
       rerollButton.dataset.offlineReroll = '';
-      rerollButton.disabled = offlineBusy || !session.messages.some(item => item.role === 'character');
+      rerollButton.disabled = offlineBusy || !session.messages.some(item => item.role === 'character' || item.role === 'error');
       rerollButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 8.5A7 7 0 0 1 18.7 7M17.9 15.5A7 7 0 0 1 5.3 17"/></svg><span>重 Roll</span>';
       finishButton.before(rerollButton);
     }
@@ -1673,6 +1698,19 @@ ${roundText}
     const chat = currentChat();
     const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId);
     if (!session || offlineBusy) return;
+    let errorIndex = -1;
+    for (let index = session.messages.length - 1; index >= 0; index -= 1) {
+      if (session.messages[index].role === 'error') { errorIndex = index; break; }
+    }
+    if (errorIndex >= 0) {
+      const pendingInput = session.pendingOfflineReply?.userInput || session.messages.slice(0, errorIndex).reverse().find(item => item.role === 'user')?.text || '请根据当前现场和此前互动自然回应。';
+      session.messages.splice(errorIndex, 1);
+      delete session.pendingOfflineReply;
+      save();
+      openOfflineMode();
+      offlineReply(pendingInput);
+      return;
+    }
     let replyIndex = -1;
     for (let index = session.messages.length - 1; index >= 0; index -= 1) {
       if (session.messages[index].role === 'character') { replyIndex = index; break; }
@@ -1683,7 +1721,7 @@ ${roundText}
     openOfflineMode();
     offlineReply('请基于当前现场和此前互动重新给出一次不同但符合角色人设的回应，不要提及重试或重写。');
   }
-  async function finishOfflineSession() { const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); if (!session || offlineBusy) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('chat'); const contact = state.contacts.find(item => item.id === activeContact) || {}; const contextText = (session.contextMessages || []).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); const meetingText = session.messages.filter(item => !item.contextPrompt).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); offlineBusy = true; openOfflineMode(); try { if (!config.endpoint || !config.key || !model) throw new Error('未配置 API'); const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:.45, messages:[{ role:'system', content:'请用中文简洁总结这次线下见面。概括见面经过、双方情绪变化、重要动作或承诺，以及关系产生的变化。只输出一段自然摘要，不要列表，不要提及AI，控制在200字左右。' }, { role:'user', content:`角色：${contact.name || '角色'}\n见面前背景：\n${contextText || '无'}\n线下经过：\n${meetingText || '刚刚见面，尚未发生更多互动。'}` }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); session.summary = data.choices?.[0]?.message?.content || '这次见面已经结束，彼此的情绪与互动被保留下来。'; } catch { const last = session.messages.filter(item => !item.contextPrompt).slice(-3).map(item => item.text).join('；'); session.summary = last ? `这次见面中，你们经历了：${last}` : '这次见面刚刚开始便结束了，彼此的情绪仍停留在见面前的聊天里。'; } finally { session.endedAt = Date.now(); session.ended = true; session.savedAt = Date.now(); if (chat.activeOfflineSessionId === session.id) chat.activeOfflineSessionId = ''; offlineBusy = false; save(); renderOfflineSummary(session); const profile = state.profiles.find(item => item.id === chat.profileId); window.IdealMachineMemory?.ingestOffline?.({ roleId: activeContact, profileId: chat.profileId || '', role: contact, profile, chat, session }).catch(error => console.warn('线下记忆入库失败：', error)); } }
+  async function finishOfflineSession() { const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); if (!session || offlineBusy || offlineFinishing) return; offlineFinishing = true; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('chat'); const contact = state.contacts.find(item => item.id === activeContact) || {}; const contextText = (session.contextMessages || []).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); const meetingText = session.messages.filter(item => !item.contextPrompt).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); offlineBusy = true; openOfflineMode(); try { if (!config.endpoint || !config.key || !model) throw new Error('未配置 API'); const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:.45, messages:[{ role:'system', content:'请用中文简洁总结这次线下见面。概括见面经过、双方情绪变化、重要动作或承诺，以及关系产生的变化。只输出一段自然摘要，不要列表，不要提及AI，控制在200字左右。' }, { role:'user', content:`角色：${contact.name || '角色'}\n见面前背景：\n${contextText || '无'}\n线下经过：\n${meetingText || '刚刚见面，尚未发生更多互动。'}` }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); session.summary = data.choices?.[0]?.message?.content || '这次见面已经结束，彼此的情绪与互动被保留下来。'; } catch { const last = session.messages.filter(item => !item.contextPrompt).slice(-3).map(item => item.text).join('；'); session.summary = last ? `这次见面中，你们经历了：${last}` : '这次见面刚刚开始便结束了，彼此的情绪仍停留在见面前的聊天里。'; } finally { session.endedAt = Date.now(); session.ended = true; session.savedAt = Date.now(); if (chat.activeOfflineSessionId === session.id) chat.activeOfflineSessionId = ''; offlineFinishing = false; offlineBusy = false; save(); renderOfflineSummary(session); const profile = state.profiles.find(item => item.id === chat.profileId); window.IdealMachineMemory?.ingestOffline?.({ roleId: activeContact, profileId: chat.profileId || '', role: contact, profile, chat, session }).catch(error => console.warn('线下记忆入库失败：', error)); } }
   function renderImageChoice() { const portal = document.querySelector('#chatImageChoicePortal'); if (!portal) return; portal.innerHTML = imageChoiceOpen ? (imageDescriptionOpen ? '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>图片文字描述</h3><textarea id="chatImageDescription" placeholder="输入这张图片的内容描述…"></textarea><div><button data-chat-image-description-cancel type="button">取消</button><button data-chat-image-description-send type="button">发送</button></div></div></div>' : '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>发送图片</h3><button data-chat-image-choice="text" type="button">文字描述</button><button data-chat-image-choice="file" type="button">本地相册</button></div></div>') : ''; }
   function scrollChatToLatest() { const messages = document.querySelector('#chatMessages'); if (messages) messages.scrollTop = messages.scrollHeight; }
   document.addEventListener('click', event => { if (event.target.closest('[data-chat-open]')) window.setTimeout(scrollChatToLatest, 0); }, true);
@@ -2650,6 +2688,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   document.addEventListener('click', event => {
     if (event.target.closest('[data-offline-reroll]')) rerollOfflineReply();
   });
+  document.addEventListener('click', event => { if (event.target.closest?.('[data-offline-close]')) offlineExitRequested = true; }, true);
   document.addEventListener('click', event => { if (event.target.closest('[data-offline-finish]')) { finishOfflineSession(); return; } const reply = event.target.closest('[data-offline-reply]'); if (reply) { if (offlineBusy) return; offlineReply('请根据当前现场、角色状态和刚才的互动，自然继续回应。不要替用户做决定。'); return; } const action = event.target.closest('[data-offline-action]'); if (!action) return; const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); if (!session || offlineBusy) return; const prompt = action.dataset.offlineAction; const text = prompt === '结束见面' ? '我想和你道别，结束今天的见面。请给出有情绪的告别回应。' : `我选择${prompt}。请从现场细节开始描写，并让角色自然回应。`; session.messages.push({ role: 'user', text }); save(); openOfflineMode(); offlineReply(text); });
   document.addEventListener('click', event => { if (event.target.closest('[data-offline-close]')) { document.querySelector('[data-chat-offline-modal]')?.remove(); offlineSessionId = ''; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); return; } if (event.target.closest('[data-offline-start]')) { const chat = currentChat(); if (!chat) return; const place = document.querySelector('[data-offline-place]')?.value.trim(); const reason = document.querySelector('[data-offline-reason]')?.value.trim(); const mood = document.querySelector('[data-offline-mood]')?.value.trim(); if (!place || !reason) return window.alert('请填写见面地点和见面原因。'); const session = { id: uid('offline'), place, reason, mood: mood || '和往常一样', messages:[] }; chat.offlineSessions ||= []; chat.offlineSessions.push(session); save(); offlineSessionId = session.id; openOfflineMode(); offlineReply('请从见面开始的第一个瞬间自然回应。'); return; } });
   document.addEventListener('submit', event => { if (!event.target.matches('[data-offline-form]')) return; event.preventDefault(); const input = event.target.querySelector('[data-offline-input]'); const text = input?.value.trim(); if (!text || offlineBusy) return; const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); if (!session) return; session.messages.push({ role:'user', text }); input.value=''; save(); openOfflineMode(); offlineReply(text); });
@@ -3929,7 +3968,7 @@ ${recentConversation}`
     const lengthTolerance = Math.round(length * 0.2);
     const minLength = Math.max(1, length - lengthTolerance);
     const maxLength = length + lengthTolerance;
-    const prompt = `你正在进行一次线下见面。你必须扮演角色“${roleName}”，不是AI、客服、作者或旁白。\n\n【执行顺序，必须遵守】\n1. 先读取【世界书分析背景】并理解时代、地点、社会环境、规则和主要矛盾；本次有分析结果时，以它为世界背景的最高依据。\n2. 如果【世界书分析背景】为空，再读取【角色设定】并从角色的时代、身份、经历、关系和已知环境中谨慎分析背景；不得凭空补设定。\n3. 背景确定后，再读取【用户人设】、【角色设定】、回复字数、人称、文风、回复预设和现场记录。\n4. 在内部思考本轮剧情应该如何自然向前发展，检查角色是否会这样做、用户是否被越权代写、结尾是否留有可回应空间；不要输出思考过程。\n\n【角色设定】\n${roleInfo}\n\n【用户人设】\n称呼：${userName}\n人设：${profile?.persona || '暂无用户设定'}\n\n【世界书分析背景】\n${worldMaterial.background || '暂无世界书分析结果。'}\n\n【世界书原始条目】\n${worldbook}\n\n【现场】\n地点：${session.place}\n原因：${session.reason}\n角色状态：${session.mood}\n\n【线上聊天背景】\n${online}\n\n【线下已发生】\n${meeting}\n\n【用户最新输入】\n${String(text || '').trim() || '请从见面的第一个瞬间自然回应。'}\n\n【本次实际使用的角色回复预设】\n${preset}\n\n${narrationRule}\n\n【共同执行的 if 时空规则】\n${offlineAntiClichePrompt}\n\n【输出规则】\n只输出角色回复正文，不要标题、解释、JSON、时间戳、提示词、“根据设定”等出戏内容。先理解用户输入，再用角色自己的动作、心理和台词推进现场；禁止逐字重复、改写或总结用户刚才说的话。只能描写角色自己的行动和心理，不能代替用户决定动作、心理、感受或台词。不要重复已经发生的内容。正文必须控制在 ${minLength}—${maxLength} 字（目标 ${length} 字，允许上下 20%，即目标字数的 0.8—1.2 倍），这是硬性范围，输出前自行数清；若不够就添加新的行动、信息、心理转折和对白，若超出就压缩，不能用重复句或无效环境描写灌水。`;
+    const prompt = `你正在进行一次线下见面。你必须扮演角色“${roleName}”，不是AI、客服、作者或旁白。\n\n【执行顺序，必须遵守】\n1. 先读取【世界书分析背景】并理解时代、地点、社会环境、规则和主要矛盾；本次有分析结果时，以它为世界背景的最高依据。\n2. 如果【世界书分析背景】为空，再读取【角色设定】并从角色的时代、身份、经历、关系和已知环境中谨慎分析背景；不得凭空补设定。\n3. 背景确定后，再读取【用户人设】、【角色设定】、回复字数、人称、文风、回复预设和现场记录。\n4. 在内部思考本轮剧情应该如何自然向前发展，检查角色是否会这样做、用户是否被越权代写、结尾是否留有可回应空间；不要输出思考过程。\n\n【角色设定】\n${roleInfo}\n\n【用户人设】\n称呼：${userName}\n人设：${profile?.persona || '暂无用户设定'}\n\n【世界书分析背景】\n${worldMaterial.background || '暂无世界书分析结果。'}\n\n【世界书原始条目】\n${worldbook}\n\n【现场】\n地点：${session.place}\n原因：${session.reason}\n角色状态：${session.mood}\n\n【线上聊天背景】\n${online}\n\n【线下已发生】\n${meeting}\n\n【用户最新输入】\n${String(text || '').trim() || '请从见面的第一个瞬间自然回应。'}\n\n【本次实际使用的角色回复预设】\n${preset}\n\n${narrationRule}\n\n【共同执行的 if 时空规则】\n${offlineAntiClichePrompt}\n\n【输出规则】\n只输出角色回复正文，不要标题、解释、JSON、时间戳、提示词、“根据设定”等出戏内容。先理解用户输入，再用角色自己的动作、心理和台词推进现场；禁止逐字重复、改写或总结用户刚才说的话。只能描写角色自己的行动和心理，不能代替用户决定动作、心理、感受或台词。不要重复已经发生的内容。无论回复字数长短，只要包含动作、心理、环境或对白等不同层次，就用换行分成至少两段，不要把整条回复挤成一段。正文必须控制在 ${minLength}—${maxLength} 字（目标 ${length} 字，允许上下 20%，即目标字数的 0.8—1.2 倍），这是硬性范围，输出前自行数清；若不够就添加新的行动、信息、心理转折和对白，若超出就压缩，不能用重复句或无效环境描写灌水。`;
     offlineBusy = true;
     openOfflineMode();
     let answer = resumePending ? cleanOfflineReply(session.pendingOfflineReply?.text || '') : '';
@@ -4026,7 +4065,7 @@ ${recentConversation}`
       save();
     } finally {
       offlineBusy = false;
-      openOfflineMode();
+      if (!offlineExitRequested) openOfflineMode();
       if (session.scrollToNewReply) {
         delete session.scrollToNewReply;
         const box = document.querySelector('[data-chat-offline-modal] .chat-offline-messages');
@@ -4085,7 +4124,7 @@ ${recentConversation}`
       syncOfflineSelection();
     }
     const saveButton = document.querySelector('[data-chat-offline-modal] [data-offline-finish] span');
-    if (saveButton) saveButton.textContent = offlineBusy ? '正在保存见面' : '保存这次见面';
+    if (saveButton) saveButton.textContent = offlineFinishing ? '正在保存见面' : '保存这次见面';
     const presetInput = document.querySelector('[data-chat-offline-modal] [data-offline-preset]');
     if (presetInput) {
       const controls = document.createElement('div');

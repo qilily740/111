@@ -131,9 +131,32 @@
   function formatRoleDoubaoText(value) { return esc(value).replace(/\n/g, '<br>'); }
   function parseApiJSON(value) { const clean = String(value || '').replace(/```json|```/gi, '').trim(); try { return JSON.parse(clean); } catch {} const match = clean.match(/\{[\s\S]*\}/); if (!match) throw new Error('API 返回的内容不是完整 JSON'); let text = ''; let quoted = false; let escaped = false; for (const char of match[0]) { if (escaped) { text += char; escaped = false; continue; } if (char === '\\' && quoted) { text += char; escaped = true; continue; } if (char === '"') { text += char; quoted = !quoted; continue; } if (quoted && char === '\n') { text += '\\n'; continue; } if (quoted && char === '\r') { continue; } if (quoted && char === '\t') { text += '\\t'; continue; } text += char; } try { return JSON.parse(text.replace(/,\s*([}\]])/g, '$1')); } catch { throw new Error('API 返回的 JSON 不完整或格式错误'); } }
   function chatTarget(owner, target) { const chat = read(chatKey, {}); const current = chat.chats?.[owner.id] || {}; const profile = (chat.profiles || []).find(item => item.id === current.profileId); if (target === 'user') return { id:'user', name:profile?.nickname || profile?.realName || '绑定用户', avatar:profile?.avatar || '', kind:'user', messages:current.messages || [] }; const npcs = npcCache(owner); const item = npcs[Number(target.replace('npc:', ''))]; return item ? { ...item, id:target, name:item.name || 'NPC', avatar:item.avatar || '', kind:'npc', identity:item.identity || 'NPC', reason:item.reason || '', messages:Array.isArray(item.messages) ? item.messages : [] } : null; }
+  function parseTaTransfer(message) {
+    const raw = String(message?.text || message?.content || '').trim();
+    const bracket = raw.match(/^\s*[【\[]\s*转账\s*(?:[|｜:：]\s*)?([¥￥]?\s*[\d,]+(?:\.\d{1,2})?)\s*(?:元|块|人民币)?\s*[】\]]\s*([\s\S]*)$/i);
+    const inline = raw.match(/^\s*(?:转账|transfer)\s*(?:[|｜:：]\s*)?([¥￥]?\s*[\d,]+(?:\.\d{1,2})?)\s*(?:元|块|人民币)?\s*(?:[|｜:：]\s*)?([\s\S]*)$/i);
+    const match = bracket || inline;
+    if (match) return { amount:String(match[1]).replace(/[¥￥\s]/g, ''), note:String(match[2] || '').trim() };
+    if (message?.type === 'transfer') {
+      const amount = String((message.amount ?? raw) || '0').replace(/[¥￥元人民币\s]/g, '').trim() || '0';
+      return { amount, note:String(message.note || '').trim() };
+    }
+    return null;
+  }
   function taChatBubbleBody(message) {
     if (message?.recalled) return `<span class="ta-chat-recalled">${esc(message.text || '撤回了一条消息')}</span>`;
     if (message?.type === 'image' && message.text) return `<img src="${esc(message.text)}" alt="图片">`;
+    const transfer = parseTaTransfer(message);
+    if (transfer) {
+      const status = message.status === 'accepted' ? '已收下' : message.status === 'returned' ? '已退回' : message.status === 'cancelled' ? '已取消' : '待处理';
+      return `<div class="ta-chat-transfer-card"><strong>转账</strong><b>¥ ${esc(transfer.amount)}</b><p>${esc(transfer.note || '无备注')}</p><small>${status}</small></div>`;
+    }
+    if (message?.type === 'location') {
+      const name = message.locationName || message.location?.name || message.text || '位置';
+      const detail = message.locationDetail || message.location?.detail || '具体地点未填写';
+      const distance = message.distance || message.locationDistance || '';
+      return `<div class="ta-chat-location-card"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.2"/></svg><div><b>${esc(name)}</b><p>${esc(detail)}</p>${distance ? `<small>距离 ${esc(distance)}</small>` : ''}</div></div>`;
+    }
     if (message?.type === 'voice') return `<span>◖ ${esc(message.text || '')}</span>`;
     return `<span>${esc(message?.text || message?.content || '')}</span>`;
   }
@@ -147,7 +170,8 @@
       const sender = ownerMessage ? owner : contact;
       const stamp = settings.hideTimestamp ? '' : `<small>${esc(item.time || '')}</small>`;
       const type = item.type === 'image' ? ' is-image' : '';
-      return `<article class="ta-chat-message ${ownerMessage ? 'is-owner' : 'is-other'}${type}"><div class="ta-chat-message-line"><i>${avatar(sender)}</i><div class="ta-chat-bubble">${taChatBubbleBody(item)}</div>${stamp}</div></article>`;
+      const bubbleType = parseTaTransfer(item) ? ' transfer' : ['image', 'location', 'voice'].includes(item.type) ? ` ${item.type}` : '';
+      return `<article class="ta-chat-message ${ownerMessage ? 'is-owner' : 'is-other'}${type}"><div class="ta-chat-message-line"><i>${avatar(sender)}</i><div class="ta-chat-bubble${bubbleType}">${taChatBubbleBody(item)}</div>${stamp}</div></article>`;
     }).join('');
     queueMicrotask(() => { const messageList = app.querySelector('[data-ta-chat-scroll]'); if (messageList) messageList.scrollTop = messageList.scrollHeight; });
     return `<section class="ta-role-conversation" style="${bubbleStyle}"><header class="ta-role-conversation-header"><button type="button" data-ta-chat-list>‹</button><div><b>${esc(contact.name)}</b><small>${esc(contact.kind === 'user' ? '绑定用户' : contact.identity || 'NPC')}</small></div><button class="ta-chat-refresh-button ${refreshing ? 'is-refreshing' : ''}" type="button" data-ta-chat-refresh aria-label="刷新聊天" ${refreshing ? 'disabled' : ''}>↻</button><i>${avatar(contact)}</i></header><main data-ta-chat-scroll>${rows || `<div class="ta-chat-empty"><i>${avatar(contact)}</i><h2>${esc(contact.name)}</h2><p>${contact.kind === 'npc' ? '刷新聊天后，会生成角色与这位联系人的对话。' : '还没有和这个联系人开始聊天。'}</p></div>`}</main><footer><span>角色视角 · 只读查看</span></footer></section>`;
