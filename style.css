@@ -74,10 +74,10 @@ body .chat-reading-modal.is-night .chat-reading-mini-messages p, body .chat-read
 .chat-reading-background-file input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); }
 .chat-reading-background-file b { display: inline-grid; place-items: center; min-height: 29px; padding: 0 10px; border-radius: 8px; background: #e8e8eb; color: #333; font-size: 11px; font-weight: 550; }
 .chat-reading-background-album { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid rgba(0,0,0,.1); border-radius: 10px; background: #fff; color: #444; font: inherit; font-size: 11px; cursor: pointer; }
-.chat-reading-background-file { display: inline-flex !important; width: calc(50% - 5px); vertical-align: middle; }
+.chat-reading-background-file { display: inline-flex !important; align-items: center; justify-content: center; width: calc(50% - 5px); min-height: 40px; padding: 0; vertical-align: middle; background: #fff; color: #444; font: inherit; font-size: 11px; cursor: pointer; }
 .chat-reading-background-album { display: inline-block; width: calc(50% - 5px); margin-top: 8px; margin-left: 6px; vertical-align: middle; }
 .chat-reading-background-file > span { display: none !important; }
-.chat-reading-background-file b { font-size: 0; }
+.chat-reading-background-file b { display: block; min-height: 0; padding: 0; border-radius: 0; background: transparent; color: inherit; font-size: 0; font-weight: 400; }
 .chat-reading-background-file b::after { content: '从本地选择'; font-size: 11px; }
 .chat-reading-chat-settings [hidden] { display: none !important; }
 .chat-reading-mini { font-size: var(--reading-chat-font-size, 11px) !important; }
