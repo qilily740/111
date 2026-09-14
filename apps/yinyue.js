@@ -73,7 +73,7 @@
       if(token!==loginPollToken)return;
       if(!(qr?.data?.qrimg||qr?.qrimg))throw new Error('无法生成登录二维码');
       const qrQuery=`key=${encodeURIComponent(key)}&qrSessionToken=${encodeURIComponent(qrSessionToken)}`;
-      loginQr=`${neteaseApiBase}/auth/qr/image?${qrQuery}&timestamp=${Date.now()}`;
+      loginQr=`${neteaseAuthApiBase}/auth/qr/image?${qrQuery}&timestamp=${Date.now()}`;
       loginStatus='请使用网易云音乐 App 扫码登录';render();
       let failures=0;
       const check=async()=>{
