@@ -74,12 +74,17 @@ body .chat-reading-modal.is-night .chat-reading-mini-messages p, body .chat-read
 .chat-reading-background-file input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); }
 .chat-reading-background-file b { display: inline-grid; place-items: center; min-height: 29px; padding: 0 10px; border-radius: 8px; background: #e8e8eb; color: #333; font-size: 11px; font-weight: 550; }
 .chat-reading-background-album { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid rgba(0,0,0,.1); border-radius: 10px; background: #fff; color: #444; font: inherit; font-size: 11px; cursor: pointer; }
+.chat-reading-background-file { display: inline-flex !important; width: calc(50% - 5px); vertical-align: middle; }
+.chat-reading-background-album { display: inline-block; width: calc(50% - 5px); margin-top: 8px; margin-left: 6px; vertical-align: middle; }
 .chat-reading-chat-settings [hidden] { display: none !important; }
 .chat-reading-mini { font-size: var(--reading-chat-font-size, 11px) !important; }
 .chat-reading-mini .chat-reading-mini-messages p { font-size: var(--reading-chat-font-size, 11px) !important; }
 .chat-reading-mini .chat-reading-mini-messages > small, .chat-reading-mini footer input, .chat-reading-mini footer button { font-size: calc(var(--reading-chat-font-size, 11px) * .92) !important; }
 .chat-reading-mini header b { font-size: calc(var(--reading-chat-font-size, 11px) * 1.15) !important; }
 .chat-reading-chat-settings footer button[data-chat-reading-background-reset] { background: #f0f0f2; color: #555; }
+.chat-reading-chat-settings footer button,
+.chat-reading-chat-settings footer button:last-child,
+.chat-reading-chat-settings footer button[data-chat-reading-background-reset] { background: #222 !important; color: #fff !important; }
 .chat-reading-manage { min-width: 44px; height: 31px; padding: 0 9px; border: 0; border-radius: 9px; background: #efefed; color: #444; font: inherit; font-size: 11px; }
 .chat-reading-book-item { display: flex; align-items: center; gap: 7px; }
 .chat-reading-book-item > button[data-chat-reading-book] { flex: 1; min-width: 0; }
