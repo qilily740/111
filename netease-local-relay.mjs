@@ -1,7 +1,11 @@
 import http from 'node:http';
+import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 const PORT = Number(process.env.IDEAL_NETEASE_RELAY_PORT || 3210);
 const ORIGIN = 'https://music.163.com';
+const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const headers = {
   Accept: 'application/json',
   'Content-Type': 'application/x-www-form-urlencoded',
@@ -50,6 +54,42 @@ function json(response, data, status = 200) {
   response.end(payload);
 }
 
+const mimeTypes = {
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.manifest': 'application/manifest+json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2'
+};
+
+async function serveApp(request, response, url) {
+  if (!['GET', 'HEAD'].includes(request.method)) return false;
+  let pathname;
+  try { pathname = decodeURIComponent(url.pathname); } catch { return false; }
+  const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  // The relay is bound to loopback. Still keep the static server limited to
+  // the app's public web files so .git and local config files are never exposed.
+  if (!(relative === 'index.html' || relative === 'app.js' || relative === 'style.css' || relative === 'icons.svg' || relative === 'sw.js' || relative === 'site.webmanifest' || relative.startsWith('apps/') || relative.startsWith('assets/'))) return false;
+  const filename = path.resolve(APP_ROOT, relative);
+  if (filename !== APP_ROOT && !filename.startsWith(`${APP_ROOT}${path.sep}`)) return false;
+  try {
+    const body = await readFile(filename);
+    response.writeHead(200, {
+      'Cache-Control': 'no-store',
+      'Content-Type': mimeTypes[path.extname(filename).toLowerCase()] || 'application/octet-stream'
+    });
+    if (request.method === 'HEAD') response.end(); else response.end(body);
+    return true;
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+    return false;
+  }
+}
+
 function qrUrl(key) {
   return `${ORIGIN}/login?codekey=${encodeURIComponent(key)}`;
 }
@@ -77,14 +117,16 @@ async function neteasePost(path, values, cookie = '') {
 
 async function handle(request, response) {
   if (request.method === 'OPTIONS') { response.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'GET, OPTIONS' }); response.end(); return; }
-  if (request.method !== 'GET') { json(response, { error: '本机扫码代理只允许 GET 或 OPTIONS' }, 405); return; }
+  if (!['GET', 'HEAD'].includes(request.method)) { json(response, { error: '本机扫码代理只允许 GET、HEAD 或 OPTIONS' }, 405); return; }
   const { url, key, qrSessionToken, cookie } = params(request);
+  if (url.pathname.startsWith('/api/auth/qr/')) console.log(`[qr-request] path=${url.pathname} key=${key ? key.slice(-6) : 'none'} token=${qrSessionToken ? qrSessionToken.length : 0}`);
   if (url.pathname === '/api/auth/qr/key') {
     const result = await neteasePost('/api/login/qrcode/unikey', { type: 3 });
     if (!result.body?.unikey) throw new Error('网易云没有返回二维码 key');
     json(response, { code: 200, data: { unikey: result.body.unikey, qrSessionToken: encodeToken(result.cookie) } });
     return;
   }
+  if (await serveApp(request, response, url)) return;
   if (!key || !qrSessionToken) { json(response, { error: '缺少二维码 key 或扫码会话' }, 400); return; }
   if (url.pathname === '/api/auth/qr/create') {
     json(response, { code: 200, data: { qrurl: qrUrl(key), qrimg: 'local-relay' } });
@@ -101,6 +143,7 @@ async function handle(request, response) {
     const result = await neteasePost('/api/login/qrcode/client/login', { key, type: 3 }, cookie);
     const payload = { ...result.body };
     const code = Number(result.body?.data?.code ?? result.body?.code);
+    console.log(`[qr-result] key=${key.slice(-6)} code=${code} message=${String(result.body?.data?.message ?? result.body?.message ?? '').slice(0, 40)}`);
     if (code === 803) {
       const loginCookie = mergeCookies(result.cookie, bodyCookie(result.body), bodyCookie(result.body?.data));
       if (/(?:^|;\s*)(?:MUSIC_U|MUSIC_A)=/i.test(loginCookie)) payload.sessionToken = encodeToken(loginCookie);
@@ -115,7 +158,10 @@ async function handle(request, response) {
 }
 
 http.createServer((request, response) => {
-  handle(request, response).catch(error => json(response, { error: error.message || '本机扫码代理失败' }, 502));
+  handle(request, response).catch(error => {
+    console.log(`[relay-error] path=${new URL(request.url, `http://127.0.0.1:${PORT}`).pathname} message=${String(error.message || '本机扫码代理失败').slice(0, 100)}`);
+    json(response, { error: error.message || '本机扫码代理失败' }, 502);
+  });
 }).listen(PORT, '127.0.0.1', () => {
   console.log(`网易云本机扫码代理已启动：http://127.0.0.1:${PORT}/api`);
 });
