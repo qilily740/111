@@ -76,6 +76,9 @@ body .chat-reading-modal.is-night .chat-reading-mini-messages p, body .chat-read
 .chat-reading-background-album { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid rgba(0,0,0,.1); border-radius: 10px; background: #fff; color: #444; font: inherit; font-size: 11px; cursor: pointer; }
 .chat-reading-background-file { display: inline-flex !important; width: calc(50% - 5px); vertical-align: middle; }
 .chat-reading-background-album { display: inline-block; width: calc(50% - 5px); margin-top: 8px; margin-left: 6px; vertical-align: middle; }
+.chat-reading-background-file > span { display: none !important; }
+.chat-reading-background-file b { font-size: 0; }
+.chat-reading-background-file b::after { content: '从本地选择'; font-size: 11px; }
 .chat-reading-chat-settings [hidden] { display: none !important; }
 .chat-reading-mini { font-size: var(--reading-chat-font-size, 11px) !important; }
 .chat-reading-mini .chat-reading-mini-messages p { font-size: var(--reading-chat-font-size, 11px) !important; }
