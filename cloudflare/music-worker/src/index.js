@@ -1,4 +1,5 @@
 const NETEASE_ORIGIN = 'https://interface.music.163.com';
+const NETEASE_AUTH_ORIGIN = 'https://music.163.com';
 const IMAGE_TYPES = new Map([
   ['image/jpeg', 'jpg'], ['image/png', 'png'], ['image/gif', 'gif'], ['image/webp', 'webp'],
   ['image/avif', 'avif'], ['image/bmp', 'bmp'], ['image/heic', 'heic'], ['image/heif', 'heic']
@@ -19,20 +20,20 @@ function requestCookie(request) { const authorization = request.headers.get('Aut
 function responseCookies(response) { const values = typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : (response.headers.get('Set-Cookie') ? [response.headers.get('Set-Cookie')] : []); return values.map(value => value.split(';', 1)[0]).filter(Boolean).join('; '); }
 function bodyCookie(body) { const value = body?.cookie || body?.cookies || ''; return Array.isArray(value) ? value.join('; ') : String(value || ''); }
 function mergeCookies(...values) { const map = new Map(); values.join('; ').split(';').forEach(part => { const [key, ...rest] = part.trim().split('='); if (key && rest.length) map.set(key, `${key}=${rest.join('=')}`); }); return [...map.values()].join('; '); }
-async function neteasePost(path, values = {}, cookie = '', extraHeaders = {}) {
+async function neteasePost(path, values = {}, cookie = '', extraHeaders = {}, origin = NETEASE_ORIGIN) {
   const headers = { 'Accept':'application/json', 'Content-Type':'application/x-www-form-urlencoded', 'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/124 Safari/537.36', 'Referer':'https://music.163.com/' };
   if (cookie) headers.Cookie = cookie;
   Object.assign(headers, extraHeaders);
-  const response = await fetch(`${NETEASE_ORIGIN}${path}`, { method:'POST', headers, body:new URLSearchParams(Object.entries(values).map(([key, value]) => [key, String(value ?? '')])) });
+  const response = await fetch(`${origin}${path}`, { method:'POST', headers, body:new URLSearchParams(Object.entries(values).map(([key, value]) => [key, String(value ?? '')])) });
   let body = null; try { body = await response.json(); } catch { body = {}; }
   if (!response.ok) throw new Error(`网易云上游 HTTP ${response.status}`);
   return { body, cookie:mergeCookies(cookie, responseCookies(response), bodyCookie(body)) };
 }
-async function authQrKey(request, env) { const result = await neteasePost('/api/login/qrcode/unikey', { type:3 }); if (!result.body?.unikey) throw new Error('网易云没有返回二维码 key'); return json({ code:200, data:{ unikey:result.body.unikey, qrSessionToken:encodeToken(result.cookie) } }, 200, request, env); }
+async function authQrKey(request, env) { const result = await neteasePost('/api/login/qrcode/unikey', { type:3 }, '', {}, NETEASE_AUTH_ORIGIN); if (!result.body?.unikey) throw new Error('网易云没有返回二维码 key'); return json({ code:200, data:{ unikey:result.body.unikey, qrSessionToken:encodeToken(result.cookie) } }, 200, request, env); }
 function qrParams(request) { const url = new URL(request.url); const key = url.searchParams.get('key') || ''; const qrSessionToken = url.searchParams.get('qrSessionToken') || ''; return { key, qrSessionToken, cookie:decodeToken(qrSessionToken) }; }
 function qrUrl(key) { return `https://music.163.com/login?codekey=${encodeURIComponent(key)}`; }
 async function authQrCreate(request, env) { const { key, qrSessionToken } = qrParams(request); if (!key || !qrSessionToken) return json({ error:'缺少二维码 key 或扫码会话' }, 400, request, env); return json({ code:200, data:{ qrurl:qrUrl(key), qrimg:'worker-generated' } }, 200, request, env); }
-async function authQrCheck(request, env) { const { key, qrSessionToken, cookie } = qrParams(request); if (!key || !qrSessionToken) return json({ error:'缺少二维码 key 或扫码会话' }, 400, request, env); const result = await neteasePost('/api/login/qrcode/client/login', { key, type:3 }, cookie); const response = { ...result.body }; const statusCode = Number(result.body?.data?.code ?? result.body?.code); if (statusCode === 803) { let loginCookie = mergeCookies(result.cookie, bodyCookie(result.body), bodyCookie(result.body?.data)); try { loginCookie = mergeCookies(loginCookie, decodeURIComponent(loginCookie)); } catch {} if (/(?:^|;\s*)(?:MUSIC_U|MUSIC_A)=/i.test(loginCookie)) response.sessionToken = encodeToken(loginCookie); else response.error = '手机已授权，但网易云未返回登录凭证。请重新扫码；如果持续出现，请检查音乐接口服务。'; delete response.cookie; delete response.cookies; } return json(response, 200, request, env); }
+async function authQrCheck(request, env) { const { key, qrSessionToken, cookie } = qrParams(request); if (!key || !qrSessionToken) return json({ error:'缺少二维码 key 或扫码会话' }, 400, request, env); const result = await neteasePost('/api/login/qrcode/client/login', { key, type:3 }, cookie, {}, NETEASE_AUTH_ORIGIN); const response = { ...result.body }; const statusCode = Number(result.body?.data?.code ?? result.body?.code); if (statusCode === 803) { let loginCookie = mergeCookies(result.cookie, bodyCookie(result.body), bodyCookie(result.body?.data)); try { loginCookie = mergeCookies(loginCookie, decodeURIComponent(loginCookie)); } catch {} if (/(?:^|;\s*)(?:MUSIC_U|MUSIC_A)=/i.test(loginCookie)) response.sessionToken = encodeToken(loginCookie); else response.error = '手机已授权，但网易云未返回登录凭证。请重新扫码；如果持续出现，请检查音乐接口服务。'; delete response.cookie; delete response.cookies; } return json(response, 200, request, env); }
 async function authQrImage(request, env) { const { key, qrSessionToken } = qrParams(request); if (!key || !qrSessionToken) return json({ error:'缺少二维码 key 或扫码会话' }, 400, request, env); const image = await fetch(`https://quickchart.io/qr?size=220&margin=1&text=${encodeURIComponent(qrUrl(key))}`); if (!image.ok) throw new Error('二维码图片生成失败'); const headers = new Headers(corsHeaders(request, env)); headers.set('Content-Type', image.headers.get('Content-Type') || 'image/png'); headers.set('Cache-Control', 'no-store'); return new Response(image.body, { status:200, headers }); }
 async function syncNetease(request, env) {
   const cookie = requestCookie(request); if (!cookie) return json({ error:'网易云登录会话不存在，请重新扫码' }, 401, request, env);
