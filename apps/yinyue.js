@@ -66,7 +66,7 @@
       if(!key)throw new Error('无法获取登录二维码');
       const qrSessionToken=keyData?.data?.qrSessionToken||keyData?.qrSessionToken;
       if(!qrSessionToken)throw new Error('音乐接口没有建立扫码会话，请稍后重试');
-      const qr=await api(`/auth/qr/create?key=${encodeURIComponent(key)}`);
+      const qr=await api(`/auth/qr/create?key=${encodeURIComponent(key)}&qrSessionToken=${encodeURIComponent(qrSessionToken)}`);
       if(token!==loginPollToken)return;
       if(!(qr?.data?.qrimg||qr?.qrimg))throw new Error('无法生成登录二维码');
       const chainId=qr?.data?.chainId||qr?.chainId;
