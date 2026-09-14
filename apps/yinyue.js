@@ -79,7 +79,7 @@
           const status=await api(`/auth/qr/check?${qrQuery}&timestamp=${Date.now()}`);
           if(token!==loginPollToken)return;
           failures=0;
-          const code=Number(status?.code??status?.data?.code);
+          const code=Number(status?.data?.code??status?.code);
           if(status?.sessionToken||status?.data?.sessionToken){
             localStorage.setItem(sessionKey,status.sessionToken||status.data.sessionToken);
             loginQr='';loginLoading=false;loginStatus='';
