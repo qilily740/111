@@ -5482,7 +5482,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .ta-item-detail-sheet > header span { color:#888; font-size:9px; }
 .ta-item-detail-sheet > header button { display:grid; place-items:center; width:30px; height:30px; border:0; border-radius:50%; background:#e9e9e9; color:#555; font:inherit; font-size:20px; cursor:pointer; }
 .ta-item-detail-sheet > main { margin-top:16px; padding:16px; border-radius:16px; background:#eee; }
-.ta-item-detail-sheet > main p { margin-top:8px; color:#333; font-size:13px; line-height:1.7; white-space:pre-wrap; overflow:visible; overflow-wrap:anywhere; word-break:break-word; }
+.ta-item-detail-sheet > main p { display:block; max-height:none; margin-top:8px; color:#333; font-size:13px; line-height:1.7; white-space:pre-wrap; overflow:visible; overflow-wrap:anywhere; word-break:break-word; }
 @keyframes taItemDetailIn { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
 @media (prefers-color-scheme:dark) {
   .ta-day-plan > header h2,.ta-recent-playlist > header h2,.ta-order-list > header h2 { color:#f1f1f1; }
