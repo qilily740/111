@@ -64,12 +64,14 @@
       if(token!==loginPollToken)return;
       const key=keyData?.data?.unikey||keyData?.unikey;
       if(!key)throw new Error('无法获取登录二维码');
+      const qrSessionToken=keyData?.data?.qrSessionToken||keyData?.qrSessionToken;
+      if(!qrSessionToken)throw new Error('音乐接口没有建立扫码会话，请稍后重试');
       const qr=await api(`/auth/qr/create?key=${encodeURIComponent(key)}`);
       if(token!==loginPollToken)return;
       if(!(qr?.data?.qrimg||qr?.qrimg))throw new Error('无法生成登录二维码');
       const chainId=qr?.data?.chainId||qr?.chainId;
       if(!chainId)throw new Error('音乐接口版本过旧，请先更新音乐服务后重新扫码');
-      const qrQuery=`key=${encodeURIComponent(key)}&chainId=${encodeURIComponent(chainId)}`;
+      const qrQuery=`key=${encodeURIComponent(key)}&chainId=${encodeURIComponent(chainId)}&qrSessionToken=${encodeURIComponent(qrSessionToken)}`;
       loginQr=`${neteaseApiBase}/auth/qr/image?${qrQuery}&timestamp=${Date.now()}`;
       loginStatus='请使用网易云音乐 App 扫码登录';render();
       let failures=0;
