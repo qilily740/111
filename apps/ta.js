@@ -244,13 +244,19 @@
   }
   function parseTaListContent(key, value) {
     try { const parsed = parseApiJSON(value); if (Array.isArray(parsed?.[key]) && parsed[key].length) return parsed; } catch {}
-    const rows = [];
+    const rows = []; let lastRow = null;
     String(value || '').replace(/```(?:json)?|```/gi, '').split(/\r?\n/).forEach(line => {
-      const parts = protocolParts(line); if (parts.length < 4) return;
+      const cleanLine = String(line || '').replace(/^\s*(?:[-*•>]\s*)?/, '').trim();
+      const parts = protocolParts(cleanLine);
+      if (parts.length < 4) {
+        // 模型偶尔会把较长的购买原因单独换行；把没有协议分隔符的续行接回上一条购物记录。
+        if (key === 'shopping' && lastRow && cleanLine && !/[｜|]/.test(cleanLine)) lastRow.text += cleanLine;
+        return;
+      }
       const label = parts.shift().toUpperCase();
       if (key === 'calendar' && /^(?:CALENDAR|CALENDAR_UPDATE|日历|行程|日程更新)$/.test(label)) { const [start, end, rawStatus, title, ...text] = parts; if (title) rows.push({ start, end, date:`${start}—${end}`, status:calendarStatus(rawStatus), title, text:text.join('｜') }); }
       if (key === 'music' && /^(?:MUSIC|音乐|歌曲)$/.test(label)) { const [artist, title, playCount, ...mood] = parts; if (title) rows.push({ artist, title, playCount, text:mood.join('｜') }); }
-      if (key === 'shopping' && /^(?:SHOPPING|SHOP|购物|商品)$/.test(label)) { const typed=!/^[¥￥\d]/.test(parts[0]);const type=typed?parts.shift():'普通购物';const [price, title, status, ...purpose] = parts; if (title) rows.push({ type, price, title, status, text:purpose.join('｜') }); }
+      if (key === 'shopping' && /^(?:SHOPPING|SHOP|购物|商品)$/.test(label)) { const typed=!/^[¥￥\d]/.test(parts[0]);const type=typed?parts.shift():'普通购物';const [price, title, status, ...purpose] = parts; if (title) { lastRow = { type, price, title, status, text:purpose.join('｜') }; rows.push(lastRow); } }
       if (key === 'wallet' && /^(?:WALLET|钱包|账单)$/.test(label)) { const [type, amount, title, time, ...note] = parts; if (title) rows.push({ type:/收入|income|in/i.test(type)?'income':'expense', amount, title, time, text:note.join('｜') }); }
     });
     if (!rows.length && key === 'calendar' && /(?:NO_CHANGE|没有变化|无变化)/i.test(String(value || ''))) return { calendar:[], noChange:true };
@@ -364,7 +370,7 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
     const lineRules = {
       calendar:calendarNeedsCompletion ? `现有日程没有覆盖完整一整天，本次刷新必须先补齐，不能只做状态更新。保留所有原有项目，不得删除或整体改写；补充缺少的早晨、白天、晚间时段以及明显空档，使合并后的日程至少有 7—10 项，从合理起床时间一直覆盖到晚上 21:00 以后，并包含三餐、通勤或休息。新增项目及需要修正的项目都严格使用“CALENDAR_UPDATE｜开始时间｜结束时间｜PLANNED、DONE或CHANGED｜事件标题｜具体做什么”。当前时间之前用 DONE，未来用 PLANNED，偏离原计划用 CHANGED。绝对不能输出 NO_CHANGE。现有不完整日程如下：\n${calendarContext}` : existingCalendar.length ? `这是当天第 ${Number(existingCalendarDay?.refreshCount || 1) + 1} 次刷新，现有日程已经覆盖完整一整天，绝对禁止重写整份日程。根据当前时间、角色近期聊天和世界书判断原计划的实际进展，只输出确实需要修改的项目：已经到结束时间的预计事项改为实际完成内容；如果角色临时改变计划或实际行为偏离预计，写明真正发生的事。尚未到时间且没有变化的预计事项禁止输出、必须原样保留。每个变更严格使用“CALENDAR_UPDATE｜原开始时间｜原结束时间｜DONE或CHANGED｜更新后的事件标题｜实际发生或改变后的具体事情”。若完全无需改变，只输出 NO_CHANGE。原日程如下：\n${calendarContext}` : '这是今天第一次生成，只允许建立这一份完整全天计划。不要返回 JSON。每行严格使用“CALENDAR｜开始时间｜结束时间｜PLANNED或DONE｜行程标题｜具体做什么”。开始和结束都必须使用 HH:MM。生成从合理起床时间到睡觉、覆盖角色当天一整天的 7—10 段连续或基本连续行程，最晚必须覆盖到晚上 21:00 以后，按时间顺序排列；当前时间之前已经发生的项目用 DONE，未来项目用 PLANNED；必须包含三餐、必要通勤或休息，不能只写三四件大事。',
       music:'不要返回 JSON。每行严格使用“MUSIC｜真实歌手｜真实歌曲名｜听过次数｜听这首歌时的具体心情”。生成 6—10 首最近播放歌单；歌曲和歌手必须是真实存在且对应正确，听过次数写成“12次”这种格式，歌曲选择符合角色身份、性格与近况。',
-      shopping:'不要返回 JSON。每行严格使用“SHOPPING｜普通购物、花市或外卖｜价格｜商品完整名称｜订单状态｜角色买它的具体用途”。一次生成 5—8 件不同记录，价格写成“¥39.90”。是否出现花市、外卖以及各自数量，必须由角色的成年人身份、人设、生活习惯和近况自行决定；不适合就完全不要出现。花市仅限明确成年的角色，只写合法非露骨的成人情趣用品；不得涉及未成年人。普通商品要像真实商城订单，外卖要像真实餐饮订单。',
+      shopping:'不要返回 JSON。每行严格使用“SHOPPING｜普通购物、花市或外卖｜价格｜商品完整名称｜订单状态｜角色买它的具体用途”。一次生成 5—8 件不同记录，价格写成“¥39.90”。“具体用途”必须是至少 20 个汉字的完整自然句，说明角色为什么买、准备给谁使用或在什么场景使用；不能只写几个词，不能在逗号、连接词或半个词处结束，不能换行拆开一条记录。是否出现花市、外卖以及各自数量，必须由角色的成年人身份、人设、生活习惯和近况自行决定；不适合就完全不要出现。花市仅限明确成年的角色，只写合法非露骨的成人情趣用品；不得涉及未成年人。普通商品要像真实商城订单，外卖要像真实餐饮订单。',
       wallet:'不要返回 JSON。每行严格使用“WALLET｜收入或支出｜金额｜流水名称｜时间｜具体说明”。必须生成 10—16 条彼此独立的近期钱包流水，不能只写一笔总账；至少包含 2 笔合理收入和 6 笔不同支出，每笔都要有独立金额、名称和时间。金额写成“¥39.90”；收入来源和消费内容必须符合角色职业、经济状况、普通购物、花市与外卖记录，收支要合理。'
     };
     const outputRule = key === 'doubao' ? `不要返回 JSON。第一行必须是“TITLE｜内容概括”。标题字数可根据内容需要适当增加，使用一句简洁的主题短语，必须让人一眼看出角色和豆包具体聊了什么人、什么事或什么需求，不能只写“日常问题解答、聊天话题、情绪疏导”等空泛分类，也不能照抄角色整句原话；禁止以“咨询、询问、查找、寻找、推荐、关于”开头。例如聊周杰伦的歌写“TITLE｜适合深夜听的周杰伦经典歌单”，聊考试复习写“TITLE｜下周考试的复习时间安排”，聊和朋友吵架写“TITLE｜和朋友吵架后的和好办法”。之后每条消息单独一行，只能使用“CHARACTER｜消息”或“DOUBAO｜消息”格式，不要编号、解释、代码块和其他文字。CHARACTER 只能是角色“${owner.nickname || owner.name}”本人，DOUBAO 是豆包；现实用户绝不能作为发言者出现。必须连续生成 4—6 个完整来回，共 8—12 条消息；严格由 CHARACTER 开始并交替回复，后一轮自然承接前一轮。角色消息保持口语化和相对简短；豆包每次回复写 2—4 句，内容比角色消息更长、更具体，但不要写成大段论文。绝对不能少于 4 轮。豆包的每次回复都必须保持温和、聪明、克制、有陪伴感：先理解角色真正的问题，再给清晰且实际的回应；不端着，不使用夸张网络套话。` : `${lineRules[key]}每条记录单独一行，只能使用指定格式，不要编号、解释、Markdown、代码块或其他文字。`;
