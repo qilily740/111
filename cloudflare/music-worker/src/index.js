@@ -1,5 +1,5 @@
 const ALLOWED_PATHS = new Set([
-  '/auth/qr/key', '/auth/qr/create', '/auth/qr/check', '/user/profile',
+  '/auth/qr/key', '/auth/qr/create', '/auth/qr/check', '/auth/qr/image', '/auth/logout', '/user/sync', '/user/profile',
   '/user/account', '/user/playlist', '/user/vip', '/search', '/lyric', '/song'
 ]);
 const IMAGE_TYPES = new Map([
@@ -34,7 +34,9 @@ async function proxy(request, env) {
   const headers = new Headers();
   const authorization = request.headers.get('Authorization'); const cookie = request.headers.get('Cookie');
   if (authorization) headers.set('Authorization', authorization); if (cookie) headers.set('Cookie', cookie); headers.set('Accept', 'application/json');
-  const upstream = await fetch(target, { method:'GET', headers, redirect:'manual' });
+  const options = { method:request.method, headers, redirect:'manual' };
+  if (request.method !== 'GET' && request.method !== 'HEAD') options.body = request.body;
+  const upstream = await fetch(target, options);
   const responseHeaders = new Headers(corsHeaders(request, env));
   responseHeaders.set('Content-Type', upstream.headers.get('Content-Type') || 'application/json; charset=utf-8');
   const setCookies = typeof upstream.headers.getSetCookie === 'function' ? upstream.headers.getSetCookie() : (upstream.headers.get('Set-Cookie') ? [upstream.headers.get('Set-Cookie')] : []);
@@ -85,7 +87,7 @@ export default {
     try {
       if (url.pathname === '/images' && request.method === 'POST') return await uploadImage(request, env);
       if (url.pathname.startsWith('/images/') && (request.method === 'GET' || request.method === 'HEAD')) return await serveImage(request, env);
-      if (request.method !== 'GET') return json({ error:'只允许 GET、HEAD 或 POST 请求' }, 405, request, env);
+      if (!['GET', 'HEAD', 'POST'].includes(request.method)) return json({ error:'只允许 GET、HEAD 或 POST 请求' }, 405, request, env);
       return await proxy(request, env);
     } catch (error) {
       console.error(JSON.stringify({ event:'worker_error', message:error.message }));
