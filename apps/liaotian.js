@@ -3,6 +3,7 @@
   const initial = { contacts: [], profiles: [], chats: {}, moments: [], contactGroups: [], emojis: { groups: [{ id: 'emoji-default', name: '默认', items: [] }] } };
   let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0;
   let activeContactGroupId = '';
+  let momentBusyPostId = '';
   const app = document.createElement('div'); app.className = 'chat-app';
   app.innerHTML = `<div class="chat-page"><header class="chat-header"><div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">聊天</h1></div><button class="chat-close" data-chat-close type="button">×</button></header><main class="chat-main" id="chatMain"></main><nav class="chat-tabs"><button data-chat-tab="chat" class="is-active" type="button">${tabIcon('chat')}<small>聊天</small></button><button data-chat-tab="contacts" type="button">${tabIcon('contacts')}<small>联系人</small></button><button data-chat-tab="moments" type="button">${tabIcon('moments')}<small>朋友圈</small></button><button data-chat-tab="me" type="button">${tabIcon('me')}<small>我</small></button></nav></div><div class="chat-editor" id="chatEditor" aria-hidden="true"></div><div class="chat-profile-editor" id="chatProfileEditor" aria-hidden="true"></div><div class="chat-thought" id="chatThought" aria-hidden="true"></div><div class="chat-settings" id="chatSettings" aria-hidden="true"></div><div class="chat-moment-composer" id="chatMomentComposer" aria-hidden="true"></div><div class="chat-group-composer" id="chatGroupComposer" aria-hidden="true"></div><div class="chat-role-moment-composer" id="chatRoleMomentComposer" aria-hidden="true"></div><input id="chatImageFile" type="file" accept="image/*" hidden><input id="chatMomentImageFile" type="file" accept="image/*" hidden>`;
   document.body.appendChild(app);
@@ -502,15 +503,15 @@ ${boundWorldbookContext(contact)}
 6. 不要凭空增加转账、通话、图片、定位等特殊动作。只有情境确实需要时才触发。
 7. 默认只回复一条自然、口语化的短消息。日常寒暄、玩笑、追问、撒娇、吃醋或简单回应时，几个字就可以；具体可以是轻快的“来啦”“真的嘛”“给我看看嘛”，也可以是克制的短句，但必须由角色设定决定，不能统一套用某一种语气。不要为了显得丰富而强行展开。
 8. 只有当内容中确实有两个或以上自然分开的想法、情绪或动作时，才使用连续消息。连续消息的条数和格式以本次系统追加的要求为准；没有追加要求时不要主动拆分。
-9. 每条连续消息都应像单独发出的聊天气泡，而且长短必须自然错落：一轮里至少要有明显的短回应，优先使用 2—10 个汉字；普通回应控制在 11—25 个汉字；只有确实需要解释、安慰或推进情节时才使用 26—60 个汉字，极少数情况下才更长。不要让每条长度相近，不要把一段长文平均切开，也不要为了凑数量补充空话。短反应必须有语境意义，不要用无意义的“嗯”“……”凑数。
+9. 每条连续消息都应像单独发出的聊天气泡，长短由当前表达内容、角色性格和聊天节奏自然决定。不要把一段长文平均切开，也不要为了凑数量补充空话。每条消息都必须有语境意义。
 10. 回复要优先贴合角色当前的情绪、关系、说话风格和上下文，短不等于敷衍；每条都要有具体回应或自然反应。
 11. 控制标记是给理想机的内部指令，不要解释、复述或展示给用户。
 12. 禁止八股、悬浮、过度升华的情绪表达。不要把用户一句普通的话擅自解释成“多年坚持被打破”“人生信念崩塌”“从未有人让我这样”等重大转折，也不要动辄总结角色十几年的人生、关系或心理变化。
 13. 除非角色设定或当前情节明确支持，否则不要使用“但因为你那句话，我多年来建立的……出现裂痕”这类整齐、煽情、总结式句型。优先回应眼前这句话，用角色平时会说的具体、朴素、带个人口癖的话表达情绪。
 14. 回复长度跟随当下语境，而不是每轮固定。用户只说了很短的一句、普通闲聊或情绪反应时，优先只回几个字或一句短句；不要因为每次都要“有内容”就自动写成长段。认真倾诉、复杂问题、争执或剧情确实需要时才展开。不要复述用户的话后再解释一遍，也不要每次都交代完整心理过程。
-15. 长短变化必须体现在实际输出中：连续几轮不能都写成完整、工整、长度接近的段落。根据角色自身语气自然交替使用短回应和偶尔较完整的一句；短回应也要保留其活泼、温柔、毒舌、冷淡或其他鲜明特征。除非当前问题确实复杂，否则单条消息尽量不超过 25 个汉字。
+15. 长短变化必须体现在实际输出中：连续几轮不能都写成完整、工整、长度接近的段落。根据角色自身语气自然交替使用简短回应和较完整的表达；每种长度都要保留角色原本的活泼、温柔、毒舌、冷淡或其他鲜明特征。
 16. 标点必须服从角色本人的说话习惯和当下情绪，不要机械地给每个气泡补句号。冷淡、随意、熟络、撒娇或简短回应时，可以自然地不加任何结尾符号；也可以按人设使用问号、感叹号、逗号、省略号或波浪号。只有角色此刻确实会这样打字时才使用标点，不要为了“句子完整”统一补全。
-17. “短消息”只限制字数，绝不代表冷淡，也不代表必须提高攻击性或情绪强度。回复前先从角色具体设定中确定其语速、温度、主动性、口癖和亲密表达方式，并让本轮措辞自然体现这些特征。若角色设定为活泼、开朗、犬系、黏人、直球或精力旺盛，应表现为明快、亲近、愿意接话和有生命力，而不是大喊、发火、命令、催促、咄咄逼人或连续使用感叹号。除非当前情节确实生气且符合人设，否则不要使用带责备、威胁、审问感的短句。
+17. 简短表达不代表冷淡，也不代表必须提高攻击性或情绪强度。回复前先从角色具体设定中确定其语速、温度、主动性、口癖和亲密表达方式，并让本轮措辞自然体现这些特征。若角色设定为活泼、开朗、犬系、黏人、直球或精力旺盛，应表现为明快、亲近、愿意接话和有生命力，而不是大喊、发火、命令、催促、咄咄逼人或连续使用感叹号。除非当前情节确实生气且符合人设，否则不要使用带责备、威胁、审问感的表达。
 18. 当用户分享“用户与豆包的聊天记录”时，这段记录属于必须阅读的用户消息。必须读完记录并理解用户问了什么、豆包回答了什么，再以角色自己的立场回应其中至少一个具体内容。禁止拒绝阅读、声称太长、懒得看、只看标题、假装没看到，或只回复“看完了”“嗯”“随便”这类无法体现理解的泛泛反应。不要误认为这是角色本人和豆包的聊天。
 
 ## 7. 理想机动作工具箱
@@ -1105,7 +1106,17 @@ ${roundText}
   function renderContacts() { return `<div class="chat-subhead"><div><span>CHARACTERS</span></div><button data-chat-add-contact type="button">＋ 添加角色</button></div><div class="chat-contact-list">${state.contacts.length ? state.contacts.map(contact => `<article class="chat-contact-card">${avatarMarkup(contact)}<div><b>${esc(contact.name)}</b><p>${esc(contact.nickname || contact.identity || '还没有角色简介')}</p></div><div class="chat-contact-actions"><button data-chat-open="${contact.id}" type="button">聊天</button><button data-chat-edit-contact="${contact.id}" type="button">编辑</button><button data-chat-delete-contact="${contact.id}" type="button">删除</button></div></article>`).join('') : '<div class="chat-empty small"><div class="chat-empty-mark">◎</div><h2>还没有角色</h2><p>添加角色后，就可以为每段关系绑定不同的用户设定。</p></div>'}</div>`; }
   function momentProfile() { return state.momentsProfile || {}; }
   function momentAvatar(post) { if (post.authorType === 'user') { const profile = momentProfile(); return avatarMarkup({ name: post.author || profile.nickname || profile.realName || '我', avatar: post.avatar || profile.avatar }, 'small-avatar'); } const contact = state.contacts.find(item => item.id === post.authorId); return avatarMarkup({ name: post.author || contact?.nickname || contact?.name || '角色', avatar: post.avatar || contact?.avatar }, 'small-avatar'); }
-  function renderMomentPost(post) { const own = post.authorType === 'user'; const liked = Boolean(post.liked); const comments = Array.isArray(post.comments) ? post.comments : []; const visibilityLabel = post.visibility === 'private' ? '仅自己可见' : post.visibility === 'groups' ? `分组可见${post.visibleGroups?.length ? ` · ${post.visibleGroups.map(id => esc(state.contactGroups.find(group => group.id === id)?.name || '')).filter(Boolean).join('、')}` : ''}` : own ? '所有人可见' : '仅角色可见'; return `<article class="chat-moment ${own ? 'is-user' : 'is-role'}" data-moment-id="${esc(post.id)}"><div class="chat-moment-head">${momentAvatar(post)}<div><b>${esc(post.author || '我')}</b><small>${esc(post.realName || (own ? '我的动态' : '角色动态'))} · ${esc(post.time || '')}</small></div>${own ? '<span class="chat-moment-owner">我的</span>' : '<span class="chat-moment-owner">角色</span>'}</div><p>${esc(post.text || '')}</p>${post.image ? `<img src="${esc(post.image)}" alt="动态图片">` : ''}${post.location ? `<div class="chat-moment-location">⌖ ${esc(post.location)}</div>` : ''}<small class="chat-moment-visibility-label">◉ ${visibilityLabel}</small><div class="chat-moment-footer"><button class="${liked ? 'is-liked' : ''}" data-moment-like="${esc(post.id)}" type="button">♡ ${Number(post.likes || 0)}</button><button data-moment-comment="${esc(post.id)}" type="button">◌ ${comments.length}</button><button data-moment-interact="${esc(post.id)}" type="button">✦ 互动</button>${own ? `<button class="chat-moment-delete" data-moment-delete="${esc(post.id)}" type="button">删除</button>` : ''}</div>${comments.length ? `<div class="chat-moment-comments">${comments.map(comment => `<div><b>${esc(comment.author || '我')}</b><span>${esc(comment.text)}</span></div>`).join('')}</div>` : ''}</article>`; }
+  function momentCommentCount(post) {
+    const seen = new Set();
+    const count = list => (Array.isArray(list) ? list : []).reduce((total, comment) => {
+      const id = String(comment?.id || '');
+      if (id && seen.has(id)) return total;
+      if (id) seen.add(id);
+      return total + 1 + count(comment?.replies);
+    }, 0);
+    return count(post?.comments);
+  }
+  function renderMomentPost(post) { const own = post.authorType === 'user'; const liked = Boolean(post.liked); const comments = Array.isArray(post.comments) ? post.comments : []; const commentCount = momentCommentCount(post); const visibilityLabel = post.visibility === 'private' ? '仅自己可见' : post.visibility === 'groups' ? `分组可见${post.visibleGroups?.length ? ` · ${post.visibleGroups.map(id => esc(state.contactGroups.find(group => group.id === id)?.name || '')).filter(Boolean).join('、')}` : ''}` : own ? '所有人可见' : '仅角色可见'; return `<article class="chat-moment ${own ? 'is-user' : 'is-role'}" data-moment-id="${esc(post.id)}"><div class="chat-moment-head">${momentAvatar(post)}<div><b>${esc(post.author || '我')}</b><small>${esc(post.realName || (own ? '我的动态' : '角色动态'))} · ${esc(post.time || '')}</small></div>${own ? '<span class="chat-moment-owner">我的</span>' : '<span class="chat-moment-owner">角色</span>'}</div><p>${esc(post.text || '')}</p>${post.image ? `<img src="${esc(post.image)}" alt="动态图片">` : ''}${post.location ? `<div class="chat-moment-location">⌖ ${esc(post.location)}</div>` : ''}<small class="chat-moment-visibility-label">◉ ${visibilityLabel}</small><div class="chat-moment-footer"><button class="${liked ? 'is-liked' : ''}" data-moment-like="${esc(post.id)}" type="button">♡ ${Number(post.likes || 0)}</button><button data-moment-comment="${esc(post.id)}" type="button">◌ ${commentCount}</button><button data-moment-interact="${esc(post.id)}" type="button">✦ 互动</button>${own ? `<button class="chat-moment-delete" data-moment-delete="${esc(post.id)}" type="button">删除</button>` : ''}</div>${comments.length ? `<div class="chat-moment-comments">${comments.map(comment => `<div><b>${esc(comment.author || '我')}</b><span>${esc(comment.text)}</span></div>`).join('')}</div>` : ''}</article>`; }
   function renderMomentComposer() { const panel = document.querySelector('#chatMomentComposer'); if (!panel) return; panel.classList.toggle('is-open', momentComposerOpen); panel.setAttribute('aria-hidden', String(!momentComposerOpen)); if (!momentComposerOpen) { panel.innerHTML = ''; return; } const profile = momentProfile(); const groups = state.contactGroups; const groupChoices = momentVisibilityMode === 'groups' && groups.length ? `<div class="chat-moment-group-choices" aria-label="选择可见分组">${groups.map(group => `<label><input type="checkbox" data-chat-moment-visibility="${esc(group.id)}" ${momentVisibility.includes(group.id) ? 'checked' : ''}>${esc(group.name)}</label>`).join('')}</div>` : ''; panel.innerHTML = `<div class="chat-moment-composer-backdrop" data-chat-moment-compose-close></div><section class="chat-moment-composer-card"><header><div><span class="chat-kicker">NEW MOMENT</span><h2>发布动态</h2><small>以 ${esc(profile.nickname || '朋友圈用户')} 的身份发布</small></div><button data-chat-moment-compose-close type="button">×</button></header><main><textarea id="chatMomentText" maxlength="500" placeholder="这一刻想分享什么？"></textarea><div class="chat-moment-image-picker">${momentImageData ? `<img src="${esc(momentImageData)}" alt="动态图片预览">` : '<div class="chat-moment-image-empty">还没有添加图片</div>'}<button data-chat-moment-image type="button">${momentImageData ? '更换图片' : '添加图片'}</button><input id="chatMomentImageFile" type="file" accept="image/*" hidden></div><input id="chatMomentLocation" maxlength="40" placeholder="添加地点（可选）"><div class="chat-moment-visibility"><b>谁可以看</b><div class="chat-moment-visibility-modes" role="radiogroup" aria-label="动态可见范围"><label><input type="radio" name="momentVisibilityMode" data-chat-moment-visibility-mode="all" ${momentVisibilityMode === 'all' ? 'checked' : ''}>所有人可见</label><label><input type="radio" name="momentVisibilityMode" data-chat-moment-visibility-mode="private" ${momentVisibilityMode === 'private' ? 'checked' : ''}>仅自己可见</label>${groups.length ? `<label><input type="radio" name="momentVisibilityMode" data-chat-moment-visibility-mode="groups" ${momentVisibilityMode === 'groups' ? 'checked' : ''}>指定分组可见</label>` : ''}</div>${groupChoices}<small>仅自己可见的动态不会出现在角色视角中。</small></div></main><footer><button data-chat-moment-compose-close type="button">取消</button><button data-chat-moment-compose-save type="button">发布</button></footer></section>`; }
   function renderGroupComposer() { const panel = document.querySelector('#chatGroupComposer'); if (!panel) return; panel.classList.toggle('is-open', contactGroupComposerOpen); panel.setAttribute('aria-hidden', String(!contactGroupComposerOpen)); if (!contactGroupComposerOpen) { panel.innerHTML = ''; return; } panel.innerHTML = `<div class="chat-moment-composer-backdrop" data-chat-group-compose-close></div><section class="chat-moment-composer-card chat-group-composer-card"><header><div><span class="chat-kicker">MOMENTS GROUP</span><h2>添加分组</h2><small>用于设置朋友圈的可见范围，不影响聊天。</small></div><button data-chat-group-compose-close type="button">×</button></header><main><label class="chat-group-name-field">分组名称<input id="chatGroupName" maxlength="20" placeholder="例如：朋友、家人、同事"></label></main><footer><button data-chat-group-compose-close type="button">取消</button><button data-chat-group-compose-save type="button">保存分组</button></footer></section>`; }
   function renderRoleMomentComposer() { const panel = document.querySelector('#chatRoleMomentComposer'); if (!panel) return; panel.classList.toggle('is-open', roleMomentComposerOpen); panel.setAttribute('aria-hidden', String(!roleMomentComposerOpen)); if (!roleMomentComposerOpen) { panel.innerHTML = ''; return; } const imageConfig = window.IdealMachineImageAPI?.getConfig?.() || {}; const imageReady = Boolean(imageConfig.endpoint && imageConfig.model); panel.innerHTML = `<div class="chat-moment-composer-backdrop" data-chat-role-moment-close></div><section class="chat-moment-composer-card"><header><div><span class="chat-kicker">ROLE MOMENTS</span><h2>生成角色动态</h2><small>由角色自己决定动态内容和可见范围。</small></div><button data-chat-role-moment-close type="button">×</button></header><main><button class="chat-role-action-choice" data-chat-role-target="random" type="button"><span><b>随机角色</b><small>选择本次发帖人数</small></span><i>${roleMomentMode === 'random' ? '✓' : '›'}</i></button><div class="chat-role-random-count" data-chat-role-random-count ${roleMomentMode === 'random' ? '' : 'hidden'}><label>发帖角色人数<select id="chatRoleMomentCount">${Array.from({ length: Math.max(1, state.contacts.length) }, (_, index) => `<option value="${index + 1}" ${roleMomentCount === index + 1 ? 'selected' : ''}>${index + 1} 人</option>`).join('')}</select></label></div><button class="chat-role-action-choice" data-chat-role-target="select" type="button"><span><b>指定角色</b><small>点击后可多选角色</small></span><i>${roleMomentMode === 'select' ? '✓' : '›'}</i></button><div class="chat-role-list chat-role-avatar-list" data-chat-role-list ${roleMomentMode === 'select' ? '' : 'hidden'}>${state.contacts.length ? state.contacts.map(contact => `<label class="chat-role-choice"><input type="checkbox" data-chat-role-target="${esc(contact.id)}" ${roleMomentTargets.includes(contact.id) ? 'checked' : ''}><span>${avatarMarkup(contact, 'chat-role-select-avatar')}<small>${esc(contact.nickname || contact.name)}</small></span></label>`).join('') : '<small>请先添加角色。</small>'}</div><label class="chat-role-action-choice chat-role-image-toggle"><span><b>同时生成配图</b><small>${imageReady ? '根据本次动态生成一张配图' : '请先在设置中配置生图 API'}</small></span><i aria-hidden="true"></i><input type="checkbox" data-chat-role-moment-image ${imageReady ? '' : 'disabled'} ${roleMomentWithImage ? 'checked' : ''}></label></main><footer><button data-chat-role-moment-close type="button">取消</button><button data-chat-role-moment-save type="button">生成动态</button></footer></section>`; }
@@ -1576,53 +1587,79 @@ ${roundText}
     if (output) output.textContent = `${size}px`;
     return size;
   }
+  function detectWallpaperContrast(source, onResult) {
+    const imageSource = String(source || '').trim();
+    if (!imageSource) return onResult(null);
+    const probe = new Image();
+    let settled = false;
+    const finish = result => {
+      if (settled) return;
+      settled = true;
+      onResult(result);
+    };
+    probe.decoding = 'async';
+    // data/blob/idb 解出的本地图片不要设置 crossOrigin。iOS Safari 会把这类
+    // 图片当成跨域资源，随后 canvas.getImageData 直接失败。
+    if (/^https?:\/\//i.test(imageSource)) probe.crossOrigin = 'anonymous';
+    probe.onerror = () => finish(null);
+    probe.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 8;
+        // willReadFrequently 是可选优化，部分 iOS Safari 版本不接受带选项的
+        // getContext；必须回退到普通 2d 上下文。
+        const context = canvas.getContext('2d', { willReadFrequently: true }) || canvas.getContext('2d');
+        if (!context) return finish(null);
+        context.clearRect(0, 0, 8, 8);
+        context.drawImage(probe, 0, 0, 8, 8);
+        const pixels = context.getImageData(0, 0, 8, 8).data;
+        let luminanceTotal = 0;
+        let pixelCount = 0;
+        for (let index = 0; index < pixels.length; index += 4) {
+          if (pixels[index + 3] === 0) continue;
+          luminanceTotal += (pixels[index] * 299 + pixels[index + 1] * 587 + pixels[index + 2] * 114) / 1000;
+          pixelCount += 1;
+        }
+        finish((pixelCount ? luminanceTotal / pixelCount : 255) < 145 ? 'dark' : 'light');
+      } catch {
+        // 没有 CORS 的远程图片不能被浏览器读取像素；保留默认可读配色。
+        finish(null);
+      }
+    };
+    probe.src = imageSource;
+  }
   function applyOfflineWallpaper(modal, source) {
     const card = modal?.querySelector('.offline-meeting-v2');
     if (!card) return;
-    const session = currentChat()?.offlineSessions?.find(item => item.id === offlineSessionId);
+    const visibleChat = activeContact ? state.chats?.[activeContact] : null;
+    const session = visibleChat?.offlineSessions?.find(item => item.id === offlineSessionId);
     applyOfflineFontSize(modal, session?.fontSize || 11);
+    const wallpaperSource = String(source || '').trim();
+    const contrastRequest = String(Number(modal.dataset.offlineContrastRequest || 0) + 1);
+    modal.dataset.offlineContrastRequest = contrastRequest;
     modal.dataset.offlineContrast = session?.wallpaperContrast || 'light';
-    const wallpaperSource = String(source || '');
     const paint = value => {
-      if (!card.isConnected) return;
-      const image = String(value || '');
+      if (!card.isConnected || modal.dataset.offlineContrastRequest !== contrastRequest) return;
+      const image = String(value || '').trim();
       card.classList.toggle('has-custom-wallpaper', Boolean(image));
       if (image) card.style.setProperty('--offline-wallpaper-image', `url(${JSON.stringify(image)})`);
       else card.style.removeProperty('--offline-wallpaper-image');
       if (!image) return;
-      const probe = new Image();
-      probe.decoding = 'async';
-      // 只有远程图片需要 CORS；data/blob/idb 解出的本地图片加上它反而会让
-      // iOS Safari 无法正常读取像素，导致对比度一直停留在默认的浅色状态。
-      if (/^https?:\/\//i.test(image)) probe.crossOrigin = 'anonymous';
-      probe.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = canvas.height = 8;
-          const context = canvas.getContext('2d', { willReadFrequently:true }) || canvas.getContext('2d');
-          if (!context) return;
-          context.drawImage(probe, 0, 0, 8, 8);
-          const pixels = context.getImageData(0, 0, 8, 8).data;
-          let luminance = 0;
-          for (let index = 0; index < pixels.length; index += 4) luminance += (pixels[index] * 299 + pixels[index + 1] * 587 + pixels[index + 2] * 114) / 1000;
-          const contrast = luminance / 64 < 145 ? 'dark' : 'light';
-          if (session?.wallpaper !== wallpaperSource) return;
-          const currentModal = document.querySelector('[data-chat-offline-modal]');
-          if (currentModal) currentModal.dataset.offlineContrast = contrast;
-          if (session.wallpaperContrast !== contrast) {
-            session.wallpaperContrast = contrast;
-            const chat = currentChat();
-            if (chat?.offlineWallpaper === wallpaperSource) chat.offlineWallpaperContrast = contrast;
-            save();
-          }
-        } catch { /* Cross-origin images without CORS stay on the readable default. */ }
-      };
-      probe.src = image;
+      detectWallpaperContrast(image, contrast => {
+        if (!contrast || !card.isConnected || modal.dataset.offlineContrastRequest !== contrastRequest) return;
+        if (session && session.wallpaper !== wallpaperSource) return;
+        modal.dataset.offlineContrast = contrast;
+        if (session && session.wallpaperContrast !== contrast) {
+          session.wallpaperContrast = contrast;
+          if (visibleChat?.offlineWallpaper === wallpaperSource) visibleChat.offlineWallpaperContrast = contrast;
+          save();
+        }
+      });
     };
-    if (String(source || '').startsWith('idb:image:') && window.IdealMachineGetImage) {
+    if (/^idb:image:/i.test(wallpaperSource) && typeof window.IdealMachineGetImage === 'function') {
       paint('');
-      window.IdealMachineGetImage(source).then(paint).catch(() => paint(''));
-    } else paint(source);
+      window.IdealMachineGetImage(wallpaperSource).then(paint).catch(() => paint(''));
+    } else paint(wallpaperSource);
   }
   function openOfflineFullscreen() { const chat = currentChat(); if (!chat) return; const contact = state.contacts.find(item => item.id === activeContact) || {}; const resumableId = offlineSessionId || chat.activeOfflineSessionId || ''; let session = chat.offlineSessions?.find(item => item.id === resumableId && !item.ended); if (!session) { const contextMessages = (chat.messages || []).slice(-8).map(item => ({ role: item.role, text: item.text, type: item.type })); const contextText = contextMessages.map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); session = { id: uid('offline'), place: '从聊天继续', reason: '把刚才的聊天延续到线下', mood: '延续刚才的情绪', contextMessages, messages: [{ role: 'user', text: `【聊天背景】\n${contextText || '你们刚刚结束了一段聊天。'}\n请承接这段关系和情绪，进入线下见面。`, contextPrompt: true }] }; chat.offlineSessions ||= []; chat.offlineSessions.push(session); chat.activeOfflineSessionId = session.id; } offlineSessionId = session.id; save(); let modal = document.querySelector('[data-chat-offline-modal]'); if (!modal) { modal = document.createElement('div'); modal.dataset.chatOfflineModal = ''; document.body.appendChild(modal); } modal.className = 'chat-offline-modal is-open'; const now = new Date(); const stamp = `${now.getMonth() + 1}月${now.getDate()}日 · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; const context = (session.contextMessages || []).map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text || '')}</p></article>`).join(''); const messages = session.messages.filter(item => !item.contextPrompt).map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text || '')}</p></article>`).join(''); modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-immersive is-fullscreen"><header class="chat-offline-topbar"><button type="button" data-offline-close>‹</button><div><span class="chat-kicker">OFFLINE MODE</span><h2>线下见面</h2></div><button type="button" class="chat-offline-more" data-offline-close>×</button></header><div class="chat-offline-meta"><b>${esc(contact.nickname || contact.name || '角色')} · 关系延续</b><span>${stamp}</span></div><section class="chat-offline-context"><div class="chat-offline-context-label"><span>刚才的聊天</span><small>作为这次见面的背景</small></div><div class="chat-offline-context-messages">${context || '<p class="chat-offline-context-empty">你们刚刚从一句话开始走到这里。</p>'}</div></section><section class="chat-offline-atmosphere"><div class="chat-offline-orbit"><div class="chat-offline-orbit"><i></i><strong>现场</strong></div><div><span>你们从刚才的聊天里走到这里</span><b>现在，可以继续发生一点什么</b></div></section><section class="chat-offline-character"><div class="chat-offline-pulse"></div><div><span>角色此刻的状态</span><b>${esc(session.mood)}</b></div><em>在你身边</em></section><main class="chat-offline-messages">${messages || '<div class="chat-offline-empty">现场安静下来，角色正在等你先开口。</div>'}</main><div class="chat-offline-actions"><button type="button" data-offline-action="说些什么">✦<span>说些什么</span></button><button type="button" data-offline-action="做个动作">◌<span>做个动作</span></button><button type="button" data-offline-action="观察周围">⌁<span>观察周围</span></button><button type="button" data-offline-action="结束见面">□<span>结束见面</span></button></div><form data-offline-form><input data-offline-input placeholder="在现场说点什么…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}>发送</button></form></section>`; const box = modal.querySelector('.chat-offline-messages'); if (box) box.scrollTop = box.scrollHeight; }
   function refreshOfflinePrompt(session) { const contextText = (session.contextMessages || []).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); const style = offlineWritingStyle(session); const preset = offlineReplyPreset(session, { reply_length:session.replyLength || 500, user_person:session.userPerson || '我', char_person:session.characterPerson || '我', writing_style:`${style.name}\n${style.prompt}` }); const prompt = session.messages.find(item => item.contextPrompt); if (prompt) prompt.text = `请先在内部概括下面前几轮线上聊天发生了什么、双方关系如何、角色此刻的情绪和未说完的话。不要展示这份概括，直接自然进入线下见面。用户输入可能是说的话、动作描写，或两者混合，请结合语境自然识别，不要替用户补写动作或决定。\n\n聊天内容：\n${contextText || '你们刚刚结束了一段聊天。'}\n\n${preset}\n\n${offlineAntiClichePrompt}`;
@@ -2667,30 +2704,20 @@ ${roundText}
     return result;
   }
 
-  function characterReplyIsElaborate(chat) {
-    const latest = [...(chat?.messages || [])].reverse().find(item => item.role === 'user');
-    const text = String(latest?.text || '').trim();
-    return text.length > 28 || /(?:请|帮我|告诉我|解释|分析|总结|详细|计划|作业|考试|工作安排|认真安慰|解决一下)/.test(text);
-  }
-
   function characterReplyBounds(chat, multi) {
     const legacyCount = Math.max(2, Number(chatSettingsFor(chat).characterMessageCount) || 2);
     const configuredMin = Math.max(2, Number(chatSettingsFor(chat).characterMessageMin) || (legacyCount > 2 ? 2 : legacyCount));
     const configuredMax = Math.max(configuredMin, Number(chatSettingsFor(chat).characterMessageMax) || legacyCount);
-    const ordinary = !characterReplyIsElaborate(chat);
     const maxMessages = configuredMax;
     const minMessages = Math.min(maxMessages, configuredMin);
     return {
       min: multi ? minMessages : 1,
-      max: multi ? maxMessages : 1,
-      chunkLimit: ordinary ? (multi ? 18 : 28) : 0
+      max: multi ? maxMessages : 1
     };
   }
 
-  function compactCharacterChunk(value, limit = 0) {
+  function compactCharacterChunk(value) {
     const source = String(value || '').replace(/[ \t]+/g, ' ').trim();
-    // limit 只用于提示词和 token 预算，不能在这里硬截断用户已经收到的内容。
-    // 否则模型返回完整句子时，最后几个字会静默丢失，形成半句话。
     return source;
   }
 
@@ -2778,8 +2805,8 @@ ${roundText}
       if (chunks.length > target) chunks = splitCharacterReplyFallback(chunks.join(' '), target);
       chunks = mergeUnsafeCharacterChunks(chunks);
     }
-    // 这里只清理空白，不按字数截断；完整语义永远优先于“短消息”设置。
-    chunks = chunks.map(chunk => compactCharacterChunk(chunk, bounds.chunkLimit)).filter(Boolean);
+    // 这里只清理空白，不按字数截断；完整语义优先。
+    chunks = chunks.map(chunk => compactCharacterChunk(chunk)).filter(Boolean);
     let sent = 0;
     let stickerSent = false;
     let visualMessageCount = 0;
@@ -2853,7 +2880,7 @@ ${roundText}
 直接输出角色要发送的内容，不要输出 JSON、Markdown 代码块、规则解释或客服式说明。
 【本轮角色风格锚点】\n角色：${contact.nickname || contact.name || '角色'}\n${personaAnchor}\n以上角色设定是本轮语气和行为的首要依据。先在心里判断角色的语速、亲和度、主动性、口癖与亲密表达方式，再组织回复，但不要输出分析过程。不要把“活泼”误写成“凶”，也不要把“短句”误写成命令句。
 默认只发送 1 条自然消息。${settings.characterMultiMessage ? `用户已允许连续消息，本次最多发送 ${characterReplyTargetCount} 条，使用 [[MSG]] 分隔。条数是上限而不是必须凑满：自然说完就停。每条按想表达的意思自然决定长短，不能为了短而停在半句；整轮回复也没有固定字数上限。` : '当前未开启连续消息，不要使用 [[MSG]]，不要主动拆成多条；按想表达的意思自然决定长短，不要为了短而截断句子。'}
-长度只是建议，不是截断规则。每条消息必须是完整、自然、能独立表达意思的语义单位；不要只输出半个短语或半句话，不要为了符合字数在句子中间切开，也不要在不自然的位置插入 [[MSG]]。如果完整表达超过建议长度，优先保留完整表达。
+每条消息必须是完整、自然、能独立表达意思的语义单位；不要只输出半个短语或半句话，不要在不自然的位置插入 [[MSG]]。
 短小不代表敷衍或冷淡。短句也必须保留角色原本的情绪温度：活泼、犬系、开朗、黏人或直球型角色应当轻快、柔和、有亲近感，可以主动接话、好奇追问、撒娇、逗人或表达期待，但不要用命令、训斥、逼问或过多感叹号制造热情。冷淡克制或强势的表达只适用于角色设定和当前情节确实如此。保持角色的性格、关系、口癖和情绪连续。普通闲聊必须优先短回，绝大多数情况下不要连续输出大段文字；只有解释复杂事情、认真安慰、争执或推进重要情节时才展开。每一轮都要根据语境改变长度，不能把一段小作文平均切成几段或为了满足数量破坏自然对话。
 根据用户刚刚那句话决定长度：用户说得很短或只是普通闲聊时，通常也短回；不要复述对方的话，不要补完整前因后果，不要每轮都剖析自己的心理。
 每个聊天气泡不要求以句号或其他符号结尾。是否使用标点、使用哪种标点，都必须看角色的性格、平时打字习惯和这一刻的情绪；不要自动补句号，也不要为了形式完整强行加符号。像“来啦”“给我看看嘛”“等我一下”这样无结尾标点的消息是正常输出。
@@ -2870,10 +2897,9 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         if (system) {
           system.content += instruction;
           // 这里的上限完全来自当前聊天设置，不能再被旧的“最多 3 条”提示覆盖。
-          system.content = system.content.replace(/普通闲聊最多发送 3 条/g, `普通闲聊最多发送 ${rangeMax} 条`)
-            .replace(/普通闲聊通常每条控制在 2—18 个汉字，本轮角色文字总量尽量不超过 42 个汉字/g, '每条消息保持自然完整，不按固定总字数截断');
+          system.content = system.content.replace(/普通闲聊最多发送 3 条/g, `普通闲聊最多发送 ${rangeMax} 条`);
           // 短回复靠提示词控制，不靠过小的 token 上限硬截断；否则长一点的完整句子会被 API 从末尾截掉。
-          if (!payload.max_tokens) payload.max_tokens = replyBounds.chunkLimit ? 1024 : 1536;
+          if (!payload.max_tokens) payload.max_tokens = 1536;
           init = { ...init, body: JSON.stringify(payload) };
         }
       } catch {}
@@ -2929,7 +2955,9 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   function updateChatDockContrast() {
     const conversation = document.querySelector('.chat-conversation');
     app.classList.remove('chat-wallpaper-dark');
+    app.classList.remove('chat-wallpaper-light');
     conversation?.classList.remove('chat-wallpaper-dark');
+    conversation?.classList.remove('chat-wallpaper-light');
     if (!conversation || !activeContact) return;
 
     // 视觉适配必须读取当前正在查看的联系人。后台角色回复时
@@ -2943,35 +2971,14 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     ).trim();
     const applyContrast = (imageSource) => {
       if (!imageSource || !conversation.isConnected || currentVisibleSource() !== source) return;
-      const image = new Image();
-      image.decoding = 'async';
-      // data/blob 图片不要设置 crossOrigin，否则 iOS Safari 可能直接阻止加载。
-      // 仅对远程图片尝试 CORS，避免 canvas 取色时污染。
-      if (/^https?:\/\//i.test(imageSource)) image.crossOrigin = 'anonymous';
-      image.onload = () => {
-        if (!conversation.isConnected || currentVisibleSource() !== source) return;
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = 8;
-          canvas.height = 8;
-          const context = canvas.getContext('2d', { willReadFrequently: true });
-          if (!context) return;
-          context.drawImage(image, 0, 0, 8, 8);
-          const pixels = context.getImageData(0, 0, 8, 8).data;
-          let luminanceTotal = 0;
-          let pixelCount = 0;
-          for (let index = 0; index < pixels.length; index += 4) {
-            if (pixels[index + 3] === 0) continue;
-            luminanceTotal += (pixels[index] * 299 + pixels[index + 1] * 587 + pixels[index + 2] * 114) / 1000;
-            pixelCount += 1;
-          }
-          const luminance = pixelCount ? luminanceTotal / pixelCount : 255;
-          const isDark = luminance < 145;
-          conversation.classList.toggle('chat-wallpaper-dark', isDark);
-          app.classList.toggle('chat-wallpaper-dark', isDark);
-        } catch {}
-      };
-      image.src = imageSource;
+      detectWallpaperContrast(imageSource, contrast => {
+        if (!contrast || !conversation.isConnected || currentVisibleSource() !== source) return;
+        const isDark = contrast === 'dark';
+        conversation.classList.toggle('chat-wallpaper-dark', isDark);
+        conversation.classList.toggle('chat-wallpaper-light', !isDark);
+        app.classList.toggle('chat-wallpaper-dark', isDark);
+        app.classList.toggle('chat-wallpaper-light', !isDark);
+      });
     };
 
     if (/^idb:image:/i.test(source) && typeof window.IdealMachineGetImage === 'function') {
@@ -4746,6 +4753,7 @@ ${recentConversation}`
   const generatedMomentBeforeStable = generateRoleMoment;
   generateRoleMoment = async function(contactId, targetPost=null) {
     momentGenerationDepth += 1;
+    momentBusyPostId = '';
     momentBusy = true;
     render();
     try {
@@ -4802,6 +4810,7 @@ ${recentConversation}`
     const commentContext = existingComments.slice(-20).map(comment => `评论ID：${comment.id}\n评论者：${comment.author || '用户'}\n评论内容：${comment.text || ''}`).join('\n\n') || '暂无评论。';
     const roster = actors.slice(0, 16).map(actor => `角色ID：${actor.id}\n角色姓名：${actor.nickname || actor.name}\n身份：${actor.identity || '未填写'}\n人设：${String(actor.details || actor.signature || '暂无').slice(0, 1200)}\n背景：${String(actor.background || actor.description || '暂无').slice(0, 500)}`).join('\n\n');
     const prompt = `请让 1—3 位合适的角色参与这条朋友圈互动。先阅读每个角色自己的完整资料，再根据角色和动态作者的关系决定是否点赞、评论，或回复已有评论。角色只能依据当前可见的动态、评论、自己的设定和真实聊天背景行动，不得凭空知道幕后信息。动态有具体内容时，通常至少安排 1 位合适角色写一条具体评论，不要让所有角色都只点赞；只有确实没有合适话题时才纯点赞。\n\n【目标动态】\n动态ID：${targetId}\n作者：${post.author || '用户'}\n正文：${originalText || '[图片动态]'}\n\n【现有评论】\n${commentContext}\n\n【可参与角色】\n${roster}\n\n只返回合法 JSON 数组，不要 Markdown、解释或其他字段。每项格式：{"actorId":"角色ID","action":"reply|like|both","targetId":"post或真实评论ID","text":"评论正文；纯点赞时为空"}。回复动态时 targetId 填 post；回复评论时必须填写现有评论的真实评论ID。禁止角色回复自己已有的评论，禁止删除、改写或覆盖动态正文；互动只能追加评论或增加点赞。评论要具体回应动态或评论内容，符合角色本人身份、关系、语气和当前情境，不要每个人都使用相同口吻。JSON 必须完整闭合；评论正文不要使用未转义的双引号。`;
+    momentBusyPostId = String(post.id);
     momentBusy = true;
     render();
     try {
@@ -4914,6 +4923,7 @@ ${recentConversation}`
 第一步，先读取【可见范围】。仅自己可见时禁止返回任何互动；指定分组可见时，只能从已经筛选出的可见角色和 NPC 中选择；所有人可见或仅角色可见时，只能使用下方候选名单。
 第二步，再根据动态内容、评论、每个角色/NPC的人设、身份、关系和背景控制互动数量。一次互动至少安排 ${minimum} 个独立互动单位；如果候选名单只有 1 人，可以让该人物同时点赞并评论，但不能只返回一个孤立点赞。候选人数超过 1 人时，至少安排 2 个不同角色/NPC，其中至少 1 个应该在动态有具体内容时发表评论，其他人可以点赞或评论。不要让所有人使用相同语气，也不要为了凑数量强行让不合适的人互动。
 只返回合法 JSON 数组，不要 Markdown、解释或其他字段。每项格式：{"actorId":"候选名单中的真实ID","action":"reply|like|both","targetId":"post或现有评论ID","text":"评论正文；纯点赞时为空"}。回复动态时 targetId 填 post；回复评论时必须填写现有评论的真实评论ID。禁止回复自己已有的评论、禁止互动不可见的人物、禁止删除或改写动态正文。评论必须符合该角色/NPC本人，不得捏造没有提供的背景。\n\n【可见范围】\n${visibility}\n\n【目标动态】\n动态ID：${targetId}\n作者：${post.author || '用户'}\n正文：${originalText || '[图片动态]'}\n\n【现有评论】\n${commentContext}\n\n【已按可见范围筛选的候选名单】\n${roster}`;
+    momentBusyPostId = String(post.id);
     momentBusy = true;
     render();
     try {
@@ -4964,7 +4974,7 @@ ${recentConversation}`
       if (!newActorIds.size) throw new Error('没有生成新的角色或 NPC 互动，请重新点击互动。');
       if (target.text !== originalText) target.text = originalText;
       save();
-    } catch (error) { window.alert(`生成互动失败：${error.message || '未知错误'}`); } finally { momentBusy = false; render(); }
+    } catch (error) { window.alert(`生成互动失败：${error.message || '未知错误'}`); } finally { momentBusyPostId = ''; momentBusy = false; render(); }
   };
   const renderMomentPostWithNpcLikeNames = renderMomentPost;
   renderMomentPost = function(post) {
@@ -5213,6 +5223,7 @@ ${recentConversation}`
   openVideoCallModal = function(direction = videoCallDirection || 'incoming') {
     videoCallDirection = 'incoming';
     videoCallClearTimer();
+    videoCallGenerating = false;
     videoCallContact = state.contacts.find(item => item.id === activeContact) || {};
     videoCallMessages = [];
     videoCallSession = { id: uid('video-call'), contactId: activeContact, direction, status: direction === 'outgoing' ? 'outgoing' : 'incoming', contextMessages: videoCallContext(activeContact), createdAt: Date.now() };
@@ -5228,7 +5239,7 @@ ${recentConversation}`
     session.startedAt = Date.now();
     videoCallStartTimer();
     renderVideoCallModal('connected');
-    await requestVideoCallReply('opening');
+    // 接通后先等待用户说话；视频通话不再默认由角色自动开场。
   }
   function normalizeVideoCallPart(value) {
     let text = String(value || '').trim();
@@ -5278,7 +5289,7 @@ ${recentConversation}`
     const messages = [...session.contextMessages, ...videoCallMessages.map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text }))];
     messages.push({ role: 'user', content: prompt });
     try {
-      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, idealScope: 'chat-video-call', body: JSON.stringify({ model, temperature: .82, messages: [{ role: 'system', content: system }, ...messages] }) });
+      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, idealScope: 'chat-video-call', timeout: 45000, body: JSON.stringify({ model, temperature: .82, messages: [{ role: 'system', content: system }, ...messages] }) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const answer = String(data.choices?.[0]?.message?.content || '……');
@@ -5294,10 +5305,14 @@ ${recentConversation}`
         return;
       }
     } catch (error) {
-      videoCallMessages.push({ role: 'character', text: `（通话回复失败：${error.message}）`, at: Date.now() });
+      // 关闭通话或切换到新通话后，旧请求的结果不能再写入当前字幕。
+      if (videoCallSession === session && session.status === 'connected') {
+        videoCallMessages.push({ role: 'character', text: `（通话回复失败：${error.message}）`, at: Date.now() });
+      }
     }
+    if (videoCallSession !== session) return;
     videoCallGenerating = false;
-    if (videoCallSession === session && session.status === 'connected') renderVideoCallModal('connected');
+    if (session.status === 'connected') renderVideoCallModal('connected');
   }
   videoCallReply = function() { return requestVideoCallReply('reply'); };
   function videoCallFallbackSummary(session) {
@@ -5343,6 +5358,7 @@ ${recentConversation}`
   function cancelVideoCall() {
     const session = videoCallSession;
     videoCallClearTimer();
+    videoCallGenerating = false;
     if (session?.status === 'incoming') {
       const chat = state.chats?.[session.contactId];
       if (chat) { chat.messages ||= []; chat.messages.push({ id: uid('message'), text: '未接听视频通话', role: 'character', type: 'video', videoCallMissed: true, time: time(), createdAt: Date.now() }); save(); }
@@ -5416,7 +5432,19 @@ ${recentConversation}`
     if (reject || close) return cancelVideoCall();
     const modal = event.target.closest('[data-chat-video-call]');
     const input = modal?.querySelector('[data-video-call-input]');
-    if (send) { const text = input?.value.trim(); if (!text || videoCallSession?.status !== 'connected') return; videoCallMessages.push({ role: 'user', text, at: Date.now() }); input.value = ''; renderVideoCallModal('connected'); requestAnimationFrame(() => document.querySelector('[data-chat-video-call] [data-video-call-input]')?.focus()); return; }
+    if (send) {
+      const text = input?.value.trim();
+      if (!text || videoCallSession?.status !== 'connected') return;
+      videoCallMessages.push({ role: 'user', text, at: Date.now() });
+      input.value = '';
+      // 不重建整个弹窗，保留当前 input 节点和移动端键盘焦点。
+      const logBox = modal?.querySelector('.chat-video-call-log');
+      logBox?.querySelector('.chat-video-call-empty')?.remove();
+      logBox?.insertAdjacentHTML('beforeend', `<p class="is-user"><b>你：</b>${esc(text)}</p>`);
+      if (logBox) requestAnimationFrame(() => { logBox.scrollTop = logBox.scrollHeight; });
+      input.focus({ preventScroll: true });
+      return;
+    }
     if (replyButton) return requestVideoCallReply('reply');
   }, true);
   document.addEventListener('keydown', event => {
@@ -5460,7 +5488,11 @@ ${recentConversation}`
   const renderMomentPostWithCommentButton = renderMomentPost;
   renderMomentPost = function(post) {
     let html = renderMomentPostWithCommentButton(post);
-    if (momentBusy) html = html.replace(/<button data-moment-interact="([^"]*)" type="button">✦ 互动<\/button>/, '<button class="is-moment-busy" data-moment-interact="$1" type="button" disabled>互动中…</button>');
+    if (momentBusy) {
+      const isTarget = !momentBusyPostId || String(post?.id || '') === momentBusyPostId;
+      if (isTarget) html = html.replace(/<button data-moment-interact="([^"]*)" type="button">✦ 互动<\/button>/, '<button class="is-moment-busy" data-moment-interact="$1" type="button" disabled>互动中…</button>');
+      else html = html.replace(/<button data-moment-interact="[^"]*" type="button">✦ 互动<\/button>/, '');
+    }
     return html.replace(/<button data-moment-comment="([^"]*)" type="button">◌\s*(\d+)<\/button>/, (_, id, count) => `<button class="chat-moment-comment-button" data-moment-comment="${id}" type="button" aria-label="评论"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-5 3v-3.2a2 2 0 0 1-3-1.8v-8a2 2 0 0 1 2-2z"/><path d="M7.5 10h9M7.5 13h6"/></svg><span>${count}</span></button>`);
   };
   const messageHtmlBeforeImageBatch = messageHtml;

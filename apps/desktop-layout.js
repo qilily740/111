@@ -174,6 +174,16 @@
       if (document.querySelector(`.desktop-layout-grid [data-desktop-item="${id}"]`)) removed.add(id);
     });
     saveRemovedCreativeApps([...removed]);
+    const hasCreativeApps = builtinCreativeAppIds.some(id => !removed.has(id)) || readCreativeApps().length > 0;
+    if (!hasCreativeApps) {
+      clearDesktopPosition(staticFolderTrigger);
+      hiddenPool.appendChild(staticFolderTrigger);
+    }
+    staticFolderTrigger.hidden = !hasCreativeApps;
+    staticFolderTrigger.setAttribute('aria-hidden', String(!hasCreativeApps));
+    staticFolderTrigger.classList.toggle('is-empty', !hasCreativeApps);
+    if (!hasCreativeApps && !openCreatedFolderId && createdFolderLayer?.classList.contains('is-open')) closeOpenFolderLayer(true);
+    syncPageGridRowHeights();
     [['app-debate', '.is-debate'], ['app-fanfic', '.is-fanfic'], ['app-magazine', '.is-magazine']].forEach(([id, selector]) => { if (removed.has(id)) icon.querySelector(`.folder-mini-app${selector}`)?.remove(); });
     [['app-debate', '.is-debate'], ['app-fanfic', '.is-fanfic'], ['app-magazine', '.is-magazine']].forEach(([id, selector]) => {
       const mini = icon.querySelector(`.folder-mini-app${selector}`);
@@ -466,9 +476,11 @@
     document.querySelectorAll('.desktop-created-folder').forEach(launcher => { if (!validFolderIds.has(launcher.dataset.desktopItem)) { launcher.remove(); itemMap.delete(launcher.dataset.desktopItem); } });
     const ids = new Set(itemMap.keys());
     const creativeMemberIds = new Set(readCreativeApps().filter(id => ids.has(id)));
+    const creativeFolderEmpty = !builtinCreativeAppIds.some(id => !readRemovedCreativeApps().includes(id)) && readCreativeApps().length === 0;
+    const excludedLayoutIds = new Set(creativeFolderEmpty ? ['app-creative-folder'] : []);
     const folderMemberIds = new Set([...folders.flatMap(folder => folder.apps), ...creativeMemberIds]);
     const used = new Set();
-    const clean = values => unique(values).filter(id => ids.has(id) && !folderMemberIds.has(id) && !used.has(id) && used.add(id));
+    const clean = values => unique(values).filter(id => ids.has(id) && !excludedLayoutIds.has(id) && !folderMemberIds.has(id) && !used.has(id) && used.add(id));
     const resultPages = state.pages.length ? state.pages.map(clean) : defaultPages.map(clean);
     while (resultPages.length < pages.length) resultPages.push([]);
     const resultDock = state.dock.length ? clean(state.dock) : clean(defaultDock);
@@ -477,7 +489,7 @@
     widgetDefinitions.filter(definition => definition.defaultHidden && !persistedItems.has(definition.id) && !placedWidgets.has(definition.id)).forEach(definition => { hidden.add(definition.id); used.add(definition.id); });
     if (!resultPages.some(list => list.includes('widget-search')) && !hidden.has('widget-search') && ids.has('widget-search')) { resultPages[1].unshift('widget-search'); used.add('widget-search'); }
     itemMap.forEach((item, id) => {
-      if (used.has(id) || hidden.has(id) || folderMemberIds.has(id)) return;
+      if (excludedLayoutIds.has(id) || used.has(id) || hidden.has(id) || folderMemberIds.has(id)) return;
       const preferred = defaultPages.findIndex(list => list.includes(id));
       if (id.startsWith('app-')) { (resultPages[Math.max(0, preferred)] ||= []).push(id); used.add(id); }
       else { (resultPages[Math.max(0, preferred)] ||= []).push(id); used.add(id); }
@@ -507,6 +519,11 @@
     state.hiddenWidgets.forEach(id => itemMap.get(id) && hiddenPool.appendChild(itemMap.get(id)));
     state.folders.flatMap(folder => folder.apps).forEach(id => itemMap.get(id) && hiddenPool.appendChild(itemMap.get(id)));
     readCreativeApps().forEach(id => itemMap.get(id) && hiddenPool.appendChild(itemMap.get(id)));
+    const creativeFolder = itemMap.get('app-creative-folder');
+    if (creativeFolder && !state.pages.some(list => list.includes('app-creative-folder')) && !state.dock.includes('app-creative-folder')) {
+      clearDesktopPosition(creativeFolder);
+      hiddenPool.appendChild(creativeFolder);
+    }
     document.querySelector('.page1-middle')?.remove();
     document.querySelector('.page2-apps-grid')?.remove();
     syncPageGridRowHeights();
