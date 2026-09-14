@@ -5,7 +5,7 @@
   const neteaseApiBase=String(window.IdealMachineConfig?.neteaseApiBase||'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/,'');
   // 网易云扫码认证不能经过 Cloudflare Worker：网易云会拦截 Worker 出口 IP。
   // 本机代理由 netease-local-relay.mjs 提供，其他音乐接口仍然走 Worker。
-  const neteaseAuthApiBase=String(window.IdealMachineConfig?.neteaseAuthApiBase||'http://127.0.0.1:3210/api').replace(/\/$/,'');
+  const neteaseAuthApiBase=String(window.IdealMachineConfig?.neteaseAuthApiBase||'http://localhost:3210/api').replace(/\/$/,'');
   const app=document.createElement('div');app.className='music-app';document.body.appendChild(app);
   const audio=new Audio();audio.preload='auto';audio.playsInline=true;audio.className='music-global-audio';document.body.appendChild(audio);
   let state, page='player', query='', results=[], loading=false, inviteOpen=false, sourceInput='', playing=false, publicLoading=false, loginQr='', loginLoading=false, loginPollToken=0, loginStatus='', neteaseProfile=null, selectedPlaylistId='', lyricsFullOpen=false;
@@ -93,6 +93,14 @@
           if(code===-462){loginQr='';loginLoading=false;render();window.alert('网易云拒绝了云端扫码请求（-462）。请先在本机启动网易云扫码代理，再重新生成二维码。');return;}
           if(code===803){loginQr='';loginLoading=false;render();window.alert(status?.error||'手机已授权，但音乐接口没有返回登录凭证，请重新扫码。');return;}
           if(code===800){loginQr='';loginLoading=false;render();window.alert('二维码已过期，请重新登录。');return;}
+          const upstreamMessage=String(status?.data?.message||status?.message||status?.error||'').trim();
+          if(code!==801&&code!==802){
+            loginLoading=false;
+            loginStatus=upstreamMessage||`网易云登录失败（${code}）`;
+            render();
+            window.alert(loginStatus);
+            return;
+          }
           const nextStatus=code===802?'手机已扫码，请在网易云音乐 App 中确认授权':'等待手机扫码…';
           if(loginStatus!==nextStatus){loginStatus=nextStatus;render();}
           setTimeout(check,2000);
