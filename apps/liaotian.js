@@ -24,12 +24,16 @@
     const commentButton = event.target.closest?.('[data-moment-comment]');
     if (commentButton && app.classList.contains('is-open')) {
       event.preventDefault(); event.stopImmediatePropagation();
+      const post = state.moments.find(item => item.id === commentButton.dataset.momentComment);
+      if (post && momentPostAuthorIsDeceased(post)) return window.alert('已去世的角色不能参与朋友圈互动。');
       openMomentCommentComposer(commentButton.dataset.momentComment);
       return;
     }
     const replyButton = event.target.closest?.('[data-chat-comment-reply]');
     if (replyButton && app.classList.contains('is-open')) {
       event.preventDefault(); event.stopImmediatePropagation();
+      const post = state.moments.find(item => item.id === replyButton.dataset.chatCommentReply);
+      if (post && momentPostAuthorIsDeceased(post)) return window.alert('已去世的角色不能参与朋友圈互动。');
       openMomentCommentComposer(replyButton.dataset.chatCommentReply, replyButton.dataset.chatCommentId || '');
       return;
     }
@@ -40,7 +44,16 @@
     if (close) return closeMomentCommentComposer();
     saveMomentComment();
   }, true);
-  function tabIcon(type) { const paths = { chat: '<path d="M8 10h32v21H19l-9 7v-7H8z"/><path d="M15 17h18M15 23h12"/>', contacts: '<circle cx="24" cy="16" r="7"/><path d="M11 38c1-7 5-10 13-10s12 3 13 10"/>', moments: '<path d="M24 7 28 20 41 24 28 28 24 41 20 28 7 24 20 20z"/><circle cx="35" cy="13" r="2"/><circle cx="13" cy="35" r="2"/>', me: '<circle cx="24" cy="16" r="6"/><path d="M12 38c1-7 5-10 12-10s11 3 12 10"/>' }; return `<svg class="chat-tab-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; }
+  function tabIcon(type) {
+    const paths = {
+      chat: '<path class="chat-tab-shape" d="M24 5C13.5 5 5 12.4 5 21.6c0 5.7 3.2 10.7 8.2 13.7L11.5 43l8.3-4.6c1.4.3 2.8.4 4.2.4 10.5 0 19-7.4 19-16.6S34.5 5 24 5Z"/>',
+      contacts: '<path class="chat-tab-shape" d="M20.5 5.2c-5.1 0-8.4 4.1-8.4 9.3 0 3.4 1.5 6.2 4.1 7.9l-1.8 5.1-9.1 5.4c-1.2.7-1.9 2-1.9 3.5v2.2h31.4v-2.2c0-1.5-.8-2.8-2-3.5l-9-5.4-1.8-5.1c2.5-1.7 4-4.5 4-7.9 0-5.2-3.2-9.3-8.3-9.3Z"/><path class="chat-tab-detail" d="M34 14h10M34 20h10M34 26h7"/>',
+      moments: '<circle class="chat-tab-shape chat-tab-compass-outline" cx="24" cy="24" r="19"/><circle class="chat-tab-compass-fill" cx="24" cy="24" r="19"/><path class="chat-tab-compass-needle" d="M15.5 32.5 21 21l11.5-5.5L27 27z"/>',
+      me: '<circle class="chat-tab-shape" cx="24" cy="13" r="8"/><path class="chat-tab-shape" d="M4.5 43v-4.1C4.5 30.4 12.4 26 24 26s19.5 4.4 19.5 12.9V43Z"/>'
+    };
+    const icon = `<svg class="chat-tab-icon ${type === 'moments' ? 'chat-tab-compass' : ''}" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`;
+    return type === 'chat' ? `<span class="chat-tab-icon-wrap">${icon}</span>` : icon;
+  }
   function actionIcon(type) { const paths = { back: '<path d="M30 10 16 24l14 14"/>', settings: '<path d="M12 24h.01M24 24h.01M36 24h.01" stroke-width="5"/>', emoji: '<circle cx="24" cy="24" r="16"/><path d="M17 27c2 4 12 4 14 0M18 20h.01M30 20h.01"/>', plus: '<path d="M24 12v24M12 24h24"/>', send: '<path d="m8 23 31-13-9 29-7-13zM8 23l15 3"/>', reply: '<path d="M24 39S8 29 8 18a8 8 0 0 1 15-4 8 8 0 0 1 15 4c0 11-14 21-14 21z"/>' }; return `<svg class="chat-action-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; }
   function readingIcon(type) { const paths = { chapters: '<path d="M10 12h28M10 24h28M10 36h17"/><circle cx="35" cy="36" r="4"/>', night: '<path d="M34 30c-8 1-15-5-15-13 0-3 1-6 3-8-8 1-14 8-14 16 0 9 7 16 16 16 5 0 9-2 12-5 1-2 1-4-2-6z"/>', day: '<circle cx="24" cy="24" r="7"/><path d="M24 6v5M24 37v5M6 24h5M37 24h5M11 11l4 4M33 33l4 4M37 11l-4 4M15 33l-4 4"/>', favorites: '<path d="m24 8 4.9 10 11.1 1.6-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8L19.1 18z"/>', settings: '<path d="M10 13h28M10 24h28M10 35h28"/><circle cx="18" cy="13" r="3"/><circle cx="31" cy="24" r="3"/><circle cx="21" cy="35" r="3"/>' }; return `<svg class="chat-reading-action-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; }
   function read() { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); const profiles = Array.isArray(value.profiles) ? value.profiles.filter(item => !(item.id === 'profile-default' && item.name === '我的设定' && item.persona === '请在这里写下你的性格、身份和说话方式。')) : []; const storedEmojis = Array.isArray(value.emojis) ? { groups: value.emojis } : value.emojis; const emojis = storedEmojis && Array.isArray(storedEmojis.groups) ? storedEmojis : JSON.parse(JSON.stringify(initial.emojis)); return normalizeChatState({ ...initial, ...value, profiles, emojis, contactGroupManageOpen: false }); } catch { return normalizeChatState(JSON.parse(JSON.stringify(initial))); } }
@@ -1105,6 +1118,28 @@ ${roundText}
   }, true);
   function renderContacts() { return `<div class="chat-subhead"><div><span>CHARACTERS</span></div><button data-chat-add-contact type="button">＋ 添加角色</button></div><div class="chat-contact-list">${state.contacts.length ? state.contacts.map(contact => `<article class="chat-contact-card">${avatarMarkup(contact)}<div><b>${esc(contact.name)}</b><p>${esc(contact.nickname || contact.identity || '还没有角色简介')}</p></div><div class="chat-contact-actions"><button data-chat-open="${contact.id}" type="button">聊天</button><button data-chat-edit-contact="${contact.id}" type="button">编辑</button><button data-chat-delete-contact="${contact.id}" type="button">删除</button></div></article>`).join('') : '<div class="chat-empty small"><div class="chat-empty-mark">◎</div><h2>还没有角色</h2><p>添加角色后，就可以为每段关系绑定不同的用户设定。</p></div>'}</div>`; }
   function momentProfile() { return state.momentsProfile || {}; }
+  function momentActorIsDeceased(actor) {
+    if (!actor) return false;
+    if (actor.deceased === true || actor.isDeceased === true || actor.dead === true || actor.alive === false || actor.isAlive === false) return true;
+    const text = [actor.status, actor.lifeStatus, actor.deathStatus, actor.identity, actor.details, actor.signature, actor.description, actor.background, actor.personality, actor.reason, actor.relationDescription].filter(Boolean).join(' ');
+    const alive = /(仍然?健在|还活着|仍活着|存活|在世|生存|未去世|没有去世|并未去世|尚未死亡)/i.test(text);
+    return !alive && /(已故|已死|去世|逝世|死去|死亡|身亡|亡故|阵亡|牺牲|亡者|死者|故人|死于|遗体|葬礼)/i.test(text);
+  }
+  function momentPostAuthorIsDeceased(post) {
+    if (!post || post.authorType !== 'character') return false;
+    const contact = state.contacts.find(item => item.id === post.authorId);
+    return momentActorIsDeceased(contact || post);
+  }
+  document.addEventListener('click', event => {
+    const action = event.target.closest?.('[data-moment-like], [data-moment-interact]');
+    if (!action || !app.classList.contains('is-open')) return;
+    const postId = action.dataset.momentLike || action.dataset.momentInteract;
+    const post = state.moments.find(item => item.id === postId);
+    if (!post || !momentPostAuthorIsDeceased(post)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    window.alert('已去世的角色不能参与朋友圈互动。');
+  }, true);
   function momentAvatar(post) { if (post.authorType === 'user') { const profile = momentProfile(); return avatarMarkup({ name: post.author || profile.nickname || profile.realName || '我', avatar: post.avatar || profile.avatar }, 'small-avatar'); } const contact = state.contacts.find(item => item.id === post.authorId); return avatarMarkup({ name: post.author || contact?.nickname || contact?.name || '角色', avatar: post.avatar || contact?.avatar }, 'small-avatar'); }
   function momentCommentCount(post) {
     const seen = new Set();
@@ -1144,7 +1179,7 @@ ${roundText}
   }
   generateRoleMoment = generateRoleMomentWithVisibility;
   const singleRoleMomentGenerator = generateRoleMoment;
-  generateRoleMoment = async (contactId, targetPost = null) => { if (targetPost) return singleRoleMomentGenerator(contactId, targetPost); const ids = roleMomentMode === 'select' ? roleMomentTargets.slice() : Array.from({ length: Math.min(roleMomentCount, Math.max(1, state.contacts.length)) }, () => null); if (roleMomentMode === 'select' && !ids.length) return window.alert('请至少选择一个角色。'); for (const id of ids) await singleRoleMomentGenerator(id); };
+  generateRoleMoment = async (contactId, targetPost = null) => { if (targetPost) return singleRoleMomentGenerator(contactId, targetPost); const eligibleContacts = state.contacts.filter(contact => !momentActorIsDeceased(contact)); const selectedIds = roleMomentTargets.filter(id => eligibleContacts.some(contact => contact.id === id)); const shuffled = eligibleContacts.slice().sort(() => Math.random() - .5); const ids = roleMomentMode === 'select' ? selectedIds : shuffled.slice(0, Math.min(roleMomentCount, shuffled.length)).map(contact => contact.id); if (!ids.length) return window.alert('当前没有仍在世的角色可以参与朋友圈。'); for (const id of ids) await singleRoleMomentGenerator(id); };
   function boundWorldbookContext(contact) { try { const data = JSON.parse(localStorage.getItem('ideal-machine-worldbooks') || '{}'); const book = (data.local || []).find(item => item.id === contact?.worldbook); if (!book) return '未绑定局部世界书。'; const entries = (book.entries || []).filter(entry => entry.enabled !== false); return entries.length ? `绑定局部世界书：${book.name}\n${entries.map(entry => `${entry.name}：${entry.content}`).join('\n')}` : `绑定局部世界书：${book.name}\n当前没有启用的世界书条目。`; } catch { return '未绑定局部世界书。'; } }
   const offlineWritingStyleKey = 'ideal-machine-if-writing-styles';
   const offlineWritingStyles = {
@@ -1965,7 +2000,7 @@ ${roundText}
       const photos = (Array.isArray(sources) ? sources : [sources]).filter(Boolean);
       if (!photos.length) return;
       if (currentContactId() !== targetContactId) return window.alert('当前聊天已切换，请重新选择图片。');
-      const batchId = photos.length >= 3 ? uid('image-batch') : '';
+      const batchId = photos.length >= 2 ? uid('image-batch') : '';
       photos.forEach((source, index) => addMessage(source, 'user', 'image', {
         realImage:true, visionReadAt:0,
         ...(batchId ? { imageBatchId:batchId, imageBatchIndex:index, imageBatchSources:index === 0 ? photos : undefined } : {})
@@ -2062,7 +2097,7 @@ ${roundText}
   function messageEditBar() { if (!chatMessageEditMode) return ''; const count = selectedChatMessageIds.size; const selected = selectedMessages(); const canRecall = selected.length > 0; return `<div class="chat-message-editbar"><span>已选择 ${count} 条</span><button data-chat-message-edit type="button" ${count !== 1 ? 'disabled' : ''}>编辑</button><button data-chat-message-delete type="button" ${count ? '' : 'disabled'}>删除</button><button data-chat-message-recall type="button" ${canRecall ? '' : 'disabled'}>撤回</button><button data-chat-message-cancel type="button">取消</button></div>`; }
   function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const isSticker = Boolean(message.sticker || (message.type === 'image' && state.emojis.groups.some(group => group.items.some(item => item.url === message.text)))); const body = message.recalled ? `<span class="chat-recalled">${message.role === 'user' ? '你' : '角色'}撤回了一条消息</span>` : message.type === 'image' ? `<img src="${esc(message.text)}" alt="图片">` : message.type === 'image-desc' ? `<div class="chat-image-description"><strong>文字图片</strong><p>${esc(message.text)}</p></div>` : message.type === 'transfer' ? `<div class="chat-transfer-message"><strong>转账</strong><b>¥ ${esc(message.amount || message.text)}</b><p>${esc(message.note || '无备注')}</p><small>${message.status === 'accepted' ? '已收下' : message.status === 'returned' ? '已退回' : '待处理'}</small></div>` : message.type === 'voice' ? `<span class="chat-voice">◖ ${esc(message.text)}</span>` : message.type === 'video' ? `▣ ${esc(message.text)}` : message.type === 'location' ? `⌖ ${esc(message.text)}` : message.type === 'together' ? `▤ ${esc(message.text)}` : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp ? '' : `<small>${esc(message.time || '')}</small>`; const typeClass = `${message.type || ''}${isSticker ? ' sticker' : ''}`; return `<div class="chat-message ${message.role === 'user' ? 'is-user' : 'is-character'} ${selectedChatMessageIds.has(message.id) ? 'is-selected' : ''}" data-chat-message-id="${esc(message.id)}"><div class="chat-message-line">${avatar}<div class="chat-bubble ${typeClass}">${body}</div></div>${stamp}</div>`; }
   function renderChat() { const contact = state.contacts.find(item => item.id === activeContact); if (!contact) return `<div class="chat-launch-list"><div class="chat-launch-head"><span>YOUR CONTACTS</span><p>选择一个角色进入聊天</p></div>${state.contacts.length ? state.contacts.map(item => `<button class="chat-launch-contact" data-chat-open="${item.id}" type="button">${avatarMarkup(item)}<span><b>${esc(item.nickname || item.name)}</b><small>${esc(item.name || item.identity || '等待开始聊天')}</small></span><i>›</i></button>`).join('') : '<div class="chat-empty"><div class="chat-empty-mark">✦</div><h2>还没有角色</h2><p>添加一个角色，绑定你的用户设定后开始聊天。</p><button data-chat-go="contacts" type="button">添加角色</button></div>'}</div>`; const chat = currentChat(); const profile = state.profiles.find(item => item.id === chat.profileId); const settings = chatSettingsFor(chat); return `<div class="chat-conversation" style="--chat-user-bubble:${esc(settings.userBubbleColor)};--chat-user-text:${esc(settings.userBubbleTextColor)};--chat-character-bubble:${esc(settings.characterBubbleColor)};--chat-character-text:${esc(settings.characterBubbleTextColor)}"><div class="chat-person">${avatarMarkup(contact)}<div><b>${esc(contact.nickname || contact.name)}</b><small>${profile ? `使用设定：${esc(profile.nickname || profile.realName || profile.name)}` : '尚未绑定用户设定'}</small></div><button data-chat-bind type="button">${profile ? '更换设定' : '绑定设定'}</button></div>${profilePickerOpen ? profilePicker() : ''}${messageEditBar()}<div class="chat-messages" id="chatMessages">${chat.messages.length ? chat.messages.map(messageHtml).join('') : '<div class="chat-hint">你可以从一句问候开始。</div>'}</div><div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${replying ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div></div>`; }
-  document.addEventListener('pointerdown', event => { const message = event.target.closest('[data-chat-message-id]'); if (!message || !app.classList.contains('is-chatting')) return; clearTimeout(messageLongPressTimer); messageLongPressTimer = setTimeout(() => { const snapshot = captureChatPanelScroll(); chatMessageEditMode = true; selectedChatMessageIds.clear(); selectedChatMessageIds.add(message.dataset.chatMessageId); render(); requestAnimationFrame(() => restoreChatPanelScroll(snapshot)); setTimeout(() => restoreChatPanelScroll(snapshot), 80); }, 560); });
+  document.addEventListener('pointerdown', event => { const message = event.target.closest('[data-chat-message-id]'); if (!message || !app.classList.contains('is-chatting')) return; clearTimeout(messageLongPressTimer); if (message.hasAttribute('data-chat-image-stack-collapsed')) return; messageLongPressTimer = setTimeout(() => { const snapshot = captureChatPanelScroll(); chatMessageEditMode = true; selectedChatMessageIds.clear(); selectedChatMessageIds.add(message.dataset.chatMessageId); render(); requestAnimationFrame(() => restoreChatPanelScroll(snapshot)); setTimeout(() => restoreChatPanelScroll(snapshot), 80); }, 560); });
   document.addEventListener('pointerup', () => clearTimeout(messageLongPressTimer)); document.addEventListener('pointercancel', () => clearTimeout(messageLongPressTimer)); document.addEventListener('contextmenu', event => { if (event.target.closest('[data-chat-message-id]')) event.preventDefault(); });
   function syncMessageEditBarDOM() { const bar=app.querySelector('.chat-message-editbar');if(!bar)return;const count=selectedChatMessageIds.size;const label=bar.querySelector('span');const edit=bar.querySelector('[data-chat-message-edit]');const remove=bar.querySelector('[data-chat-message-delete]');const recall=bar.querySelector('[data-chat-message-recall]');if(label)label.textContent=`已选择 ${count} 条`;if(edit)edit.disabled=count!==1;if(remove)remove.disabled=!count;if(recall)recall.disabled=!count; }
   document.addEventListener('click', event => { const message = event.target.closest('[data-chat-message-id]'); if (chatMessageEditMode && message) { event.stopImmediatePropagation(); const id = message.dataset.chatMessageId; selectedChatMessageIds.has(id) ? selectedChatMessageIds.delete(id) : selectedChatMessageIds.add(id); message.classList.toggle('is-selected',selectedChatMessageIds.has(id)); syncMessageEditBarDOM(); return; } const cancel = event.target.closest('[data-chat-message-cancel]'); if (cancel) return exitMessageEdit(); const edit = event.target.closest('[data-chat-message-edit]'); if (edit && !edit.disabled && selectedChatMessageIds.size === 1) { chatMessageEditingId = [...selectedChatMessageIds][0]; renderMessageEditor(); return; } const remove = event.target.closest('[data-chat-message-delete]'); if (remove && !remove.disabled) { const chat = currentChat(); const deleted = chat?.messages.filter(item => selectedChatMessageIds.has(item.id)) || []; if (chat) { const deletedIds = new Set(deleted.map(item => item.id)); chat.messages = chat.messages.filter(item => !selectedChatMessageIds.has(item.id)); if (chatQuote && deletedIds.has(chatQuote.id)) chatQuote = null; save(); syncDeletedMemory(chat, deleted); } exitMessageEdit(); return; } const recall = event.target.closest('[data-chat-message-recall]'); if (recall && !recall.disabled) { const chat = currentChat(); const selected = selectedMessages(); selected.forEach(item => { item.recalled = true; item.recalledText = item.text; item.text = ''; }); save(); syncDeletedMemory(chat, selected); exitMessageEdit(); return; } }, true);
@@ -2235,7 +2270,7 @@ ${roundText}
   const baseTapSettingsRender2 = renderChatSettings;
   renderChatSettings = function() { baseTapSettingsRender2(); const section = document.querySelector('[data-chat-tap-settings]'); if (!section) return; const settings = chatSettingsFor(currentChat()); section.innerHTML = '<button class="chat-tap-settings-head" data-chat-tap-toggle type="button"><span><b>拍一拍设置</b><small>双击聊天中的头像，可以拍自己或拍一拍对方</small></span><i>' + (tapSettingsOpen ? '⌃' : '⌄') + '</i></button>' + (tapSettingsOpen ? '<div class="chat-tap-settings-body"><label>用户网名拍一拍提示<input type="text" data-chat-tap-setting="userTapText" value="' + esc(settings.userTapText) + '"></label><label>角色网名拍一拍提示<input type="text" data-chat-tap-setting="characterTapText" value="' + esc(settings.characterTapText) + '"></label><small>拍一拍消息会使用双方各自的网名。</small></div>' : ''); };
   document.addEventListener('click', event => { const toggle = event.target.closest('[data-chat-tap-toggle]'); if (!toggle) return; event.preventDefault(); event.stopImmediatePropagation(); tapSettingsOpen = !tapSettingsOpen; renderChatSettings(); }, true);
-  function applyChatBubbleSettingsCSS() { let style = document.querySelector('#chatBubbleSettingsStyle'); if (!style) { style = document.createElement('style'); style.id = 'chatBubbleSettingsStyle'; document.head.appendChild(style); } const settings = chatSettingsFor(currentChat()); const userBubble = settings.userBubbleColor || '#222222'; const userText = settings.userBubbleTextColor || '#ffffff'; const characterBubble = settings.characterBubbleColor || '#ffffff'; const characterText = settings.characterBubbleTextColor || '#111111'; const normalBubble = ':not(.transfer):not(.location):not(.tap):not(.image):not(.image-desc):not(.recalled-bubble):not(:has(.chat-recalled))'; style.textContent = '.chat-message.is-user .chat-bubble' + normalBubble + ' { background: ' + userBubble + ' !important; color: ' + userText + ' !important; } .chat-message.is-character .chat-bubble' + normalBubble + ' { background: ' + characterBubble + ' !important; color: ' + characterText + ' !important; } .chat-message.is-user .chat-bubble.recalled-bubble, .chat-message.is-character .chat-bubble.recalled-bubble, .chat-message .chat-bubble:has(.chat-recalled) { background: rgba(255,255,255,.3) !important; background-image: none !important; color: #555 !important; border: 1px solid rgba(255,255,255,.62) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.58), 0 5px 16px rgba(0,0,0,.08) !important; filter: none !important; -webkit-backdrop-filter: blur(18px) saturate(145%) !important; backdrop-filter: blur(18px) saturate(145%) !important; } .chat-message .chat-bubble.recalled-bubble .chat-recalled, .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled, .chat-message .chat-bubble.recalled-bubble .chat-recalled-original, .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled-original { color: #555 !important; } .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble.recalled-bubble, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble:has(.chat-recalled) { background: rgba(255,255,255,.22) !important; color: #fff !important; border-color: rgba(255,255,255,.52) !important; } .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble.recalled-bubble .chat-recalled, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble.recalled-bubble .chat-recalled-original, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled-original { color: #fff !important; }'; }
+  function applyChatBubbleSettingsCSS() { let style = document.querySelector('#chatBubbleSettingsStyle'); if (!style) { style = document.createElement('style'); style.id = 'chatBubbleSettingsStyle'; document.head.appendChild(style); } const settings = chatSettingsFor(currentChat()); const userBubble = settings.userBubbleColor || '#222222'; const userText = settings.userBubbleTextColor || '#ffffff'; const characterBubble = settings.characterBubbleColor || '#ffffff'; const characterText = settings.characterBubbleTextColor || '#111111'; const normalBubble = ':not(.transfer):not(.location):not(.tap):not(.image):not(.image-stack):not(.image-desc):not(.recalled-bubble):not(:has(.chat-recalled))'; style.textContent = '.chat-message.is-user .chat-bubble' + normalBubble + ' { background: ' + userBubble + ' !important; color: ' + userText + ' !important; } .chat-message.is-character .chat-bubble' + normalBubble + ' { background: ' + characterBubble + ' !important; color: ' + characterText + ' !important; } .chat-message.is-user .chat-bubble.recalled-bubble, .chat-message.is-character .chat-bubble.recalled-bubble, .chat-message .chat-bubble:has(.chat-recalled) { background: rgba(255,255,255,.3) !important; background-image: none !important; color: #555 !important; border: 1px solid rgba(255,255,255,.62) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.58), 0 5px 16px rgba(0,0,0,.08) !important; filter: none !important; -webkit-backdrop-filter: blur(18px) saturate(145%) !important; backdrop-filter: blur(18px) saturate(145%) !important; } .chat-message .chat-bubble.recalled-bubble .chat-recalled, .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled, .chat-message .chat-bubble.recalled-bubble .chat-recalled-original, .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled-original { color: #555 !important; } .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble.recalled-bubble, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble:has(.chat-recalled) { background: rgba(255,255,255,.22) !important; color: #fff !important; border-color: rgba(255,255,255,.52) !important; } .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble.recalled-bubble .chat-recalled, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble.recalled-bubble .chat-recalled-original, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled-original { color: #fff !important; }'; }
   const baseApplyCustomChatCSS = applyCustomChatCSS;
   applyCustomChatCSS = function() { baseApplyCustomChatCSS(); applyChatBubbleSettingsCSS(); const input = document.querySelector('[data-chat-css-input]'); if (input) input.placeholder = '输入 CSS 代码…'; };
   const baseTapSettingsRender3 = renderChatSettings;
@@ -2257,8 +2292,9 @@ ${roundText}
   syncSelectedMessageStyles();
   let bookPickerOpen = false; let bookShelfOpen = false; let selectedBookId = ''; let readingBookId = ''; let readingChatOpen = false; let readingChatMessages = []; let readingTimer = null; let readingStartedAt = 0; let readingLongPressTimer = null; let readingQuote = ''; let readingSettingsOpen = false; let readingFavoritesOpen = false; let readingChatSettingsOpen = false;
   let readingReplying = false;
-  let readingReplyGeneration = 0;
+  const readingReplyJobs = new Map();
   let readingChatSessionKey = '';
+  let readingChatPosition = null;
   function readBooks() { try { const books = JSON.parse(localStorage.getItem('ideal-machine-books') || '[]'); return Array.isArray(books) ? books : []; } catch { return []; } }
   function saveBooks(books) { localStorage.setItem('ideal-machine-books', JSON.stringify(books)); }
   function bookName(book) { return book.name || '未命名书籍'; }
@@ -3132,6 +3168,21 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     }
   }
 
+  function openChatImageBatchViewer(batchId) {
+    const messages = (currentChat()?.messages || [])
+      .filter(message => String(message?.imageBatchId || '') === String(batchId) && message.type === 'image' && !message.recalled)
+      .sort((first, second) => Number(first.imageBatchIndex || 0) - Number(second.imageBatchIndex || 0));
+    const sources = messages.map(message => String(message.text || '').trim()).filter(Boolean);
+    if (!sources.length) return;
+    generatedImageViewerState = { open: true, kind: 'chat', id: messages[0].id, source: sources[0], loading: false };
+    const showTime = !chatSettingsFor(currentChat()).hideTimestamp;
+    const slides = sources.map((source, index) => `<figure><img src="${esc(source)}" alt="第${index + 1}张图片"><figcaption>${index + 1} / ${sources.length}${showTime && messages[index]?.time ? ` · ${esc(messages[index].time)}` : ''}</figcaption></figure>`).join('');
+    const portal = document.querySelector('#chatGeneratedImageViewer');
+    if (!portal) return;
+    portal.innerHTML = `<div class="chat-generated-image-modal chat-image-batch-viewer" data-generated-image-viewer-backdrop><section class="chat-generated-image-card chat-image-batch-card"><header><span>${sources.length} 张图片</span><button data-generated-image-viewer-close type="button">×</button></header><main class="chat-image-batch-carousel" aria-label="左右滑动预览图片">${slides}</main><button class="chat-image-batch-nav is-prev" data-chat-image-batch-step="-1" type="button" aria-label="上一张">‹</button><button class="chat-image-batch-nav is-next" data-chat-image-batch-step="1" type="button" aria-label="下一张">›</button></section></div>`;
+    hydrateGeneratedImages();
+  }
+
   async function saveGeneratedImageLocally() {
     const viewer = generatedImageViewerState;
     const record = generatedImageRecord(viewer.kind, viewer.id);
@@ -3198,7 +3249,13 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     if (image && app.classList.contains('is-open')) {
       const messageRow = image.closest('[data-chat-message-id]');
       const momentRow = image.closest('[data-moment-id]');
-      if (messageRow) { event.preventDefault(); event.stopImmediatePropagation(); openGeneratedImageViewer('chat', messageRow.dataset.chatMessageId); return; }
+      if (messageRow) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (messageRow.dataset.chatImageBatchId) openChatImageBatchViewer(messageRow.dataset.chatImageBatchId);
+        else openGeneratedImageViewer('chat', messageRow.dataset.chatMessageId);
+        return;
+      }
       if (momentRow) { event.preventDefault(); event.stopImmediatePropagation(); openGeneratedImageViewer('moment', momentRow.dataset.momentId); return; }
     }
     if (event.target.closest('[data-generated-image-viewer-close]') || event.target.matches('[data-generated-image-viewer-backdrop]')) { generatedImageViewerState.open = false; renderGeneratedImageViewer(); return; }
@@ -3749,9 +3806,22 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const saved = Array.isArray(byRole?.[roleId]) ? byRole[roleId] : (Array.isArray(book?.readingChatMessages) ? book.readingChatMessages : []);
     return saved.map(item => ({ role: item.role === 'character' ? 'character' : 'user', text: String(item.text || '') })).filter(item => item.text);
   }
+  function appendReadingReply(bookId, roleId, messages) {
+    const books = readBooks();
+    const book = books.find(item => item.id === bookId);
+    if (!book) return false;
+    book.readingChatMessagesByRole ||= {};
+    const saved = readReadingChatMessages(book, roleId);
+    book.readingChatMessagesByRole[roleId] = saved.concat(messages);
+    delete book.readingChatMessages;
+    saveBooks(books);
+    return true;
+  }
 
   const renderReadingChatWithReplyState = renderReadingChat;
   renderReadingChat = function(modal) {
+    const previousInput = modal?.querySelector('.chat-reading-mini [data-chat-reading-input]');
+    const draft = previousInput?.value || '';
     const activeBook = readBooks().find(item => item.id === readingBookId);
     const roleId = activeContact || 'unbound';
     const sessionKey = activeBook?.id ? `${activeBook.id}::${roleId}` : '';
@@ -3759,9 +3829,18 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       readingChatSessionKey = sessionKey;
       readingChatMessages = activeBook ? readReadingChatMessages(activeBook, roleId) : [];
     }
+    readingReplying = readingReplyJobs.has(sessionKey);
     renderReadingChatWithReplyState(modal);
     const mini = modal?.querySelector('.chat-reading-mini');
     if (!mini) return;
+    if (readingChatPosition) {
+      const maxLeft = Math.max(8, modal.clientWidth - mini.offsetWidth - 8);
+      const maxTop = Math.max(8, modal.clientHeight - mini.offsetHeight - 8);
+      mini.style.left = Math.max(8, Math.min(maxLeft, readingChatPosition.left)) + 'px';
+      mini.style.top = Math.max(8, Math.min(maxTop, readingChatPosition.top)) + 'px';
+      mini.style.right = 'auto';
+      mini.style.bottom = 'auto';
+    }
     const persistedBook = readBooks().find(item => item.id === readingBookId);
     if (persistedBook && sessionKey) {
       persistedBook.readingChatMessagesByRole ||= {};
@@ -3783,7 +3862,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     }
     mini.querySelectorAll('[data-chat-reading-send], [data-chat-reading-reply]').forEach(button => { button.disabled = readingReplying; });
     const input = mini.querySelector('[data-chat-reading-input]');
-    if (input) input.disabled = readingReplying;
+    if (input) { input.value = draft; input.focus({ preventScroll: true }); }
     const messages = mini.querySelector('.chat-reading-mini-messages');
     const scrollLatest = () => { if (messages) messages.scrollTop = messages.scrollHeight; };
     requestAnimationFrame(scrollLatest);
@@ -3792,17 +3871,61 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   const closeReadingWithReplyReset = closeReading;
   closeReading = function() {
-    readingReplyGeneration += 1;
     readingReplying = false;
     readingChatSessionKey = '';
+    readingChatPosition = null;
     closeReadingWithReplyReset();
   };
 
+  document.addEventListener('keydown', event => {
+    if (!event.target.matches?.('[data-chat-reading-input]') || event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    event.target.closest('.chat-reading-mini')?.querySelector('[data-chat-reading-send]')?.click();
+  }, true);
+  document.addEventListener('click', event => {
+    if (!event.target.closest?.('[data-chat-reading-send], [data-chat-reading-reply]')) return;
+    document.querySelector('[data-chat-reading] .chat-reading-mini [data-chat-reading-input]')?.focus({ preventScroll: true });
+  });
+
+  let readingChatDrag = null;
+  document.addEventListener('pointerdown', event => {
+    const header = event.target.closest?.('.chat-reading-mini > header');
+    if (!header || event.target.closest('button')) return;
+    const mini = header.closest('.chat-reading-mini');
+    const modal = mini?.closest('[data-chat-reading]');
+    if (!modal) return;
+    const miniRect = mini.getBoundingClientRect();
+    const modalRect = modal.getBoundingClientRect();
+    readingChatDrag = { id: event.pointerId, mini, modal, x: event.clientX, y: event.clientY, left: miniRect.left - modalRect.left, top: miniRect.top - modalRect.top };
+    event.preventDefault();
+  }, true);
+  document.addEventListener('pointermove', event => {
+    const drag = readingChatDrag;
+    if (!drag || drag.id !== event.pointerId || !drag.mini.isConnected) return;
+    const maxLeft = Math.max(8, drag.modal.clientWidth - drag.mini.offsetWidth - 8);
+    const maxTop = Math.max(8, drag.modal.clientHeight - drag.mini.offsetHeight - 8);
+    const left = Math.max(8, Math.min(maxLeft, drag.left + event.clientX - drag.x));
+    const top = Math.max(8, Math.min(maxTop, drag.top + event.clientY - drag.y));
+    drag.mini.style.left = left + 'px';
+    drag.mini.style.top = top + 'px';
+    drag.mini.style.right = 'auto';
+    drag.mini.style.bottom = 'auto';
+    readingChatPosition = { left, top };
+    event.preventDefault();
+  }, { capture: true, passive: false });
+  document.addEventListener('pointerup', event => { if (readingChatDrag?.id === event.pointerId) readingChatDrag = null; }, true);
+  document.addEventListener('pointercancel', () => { readingChatDrag = null; }, true);
+
   replyReadingChat = async function() {
-    if (readingReplying) return;
+    const bookId = readingBookId;
+    const roleId = activeContact || 'unbound';
+    const sessionKey = `${bookId}::${roleId}`;
+    if (!bookId || readingReplyJobs.has(sessionKey)) return;
     const modal = document.querySelector('[data-chat-reading]');
     const input = modal?.querySelector('[data-chat-reading-input]');
     const text = input?.value.trim() || '';
+    const lastMessage = readingChatMessages.at(-1);
+    if (lastMessage?.role === 'character' && /^(?:回复失败(?:[:：，,]|$)|请先在设置中配置聊天 API。)/.test(lastMessage.text)) readingChatMessages.pop();
     if (text) {
       readingChatMessages.push({ role: 'user', text });
       input.value = '';
@@ -3815,19 +3938,20 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const chat = currentChat();
     const profile = state.profiles.find(item => item.id === chat?.profileId) || {};
     if (!config?.endpoint || !config.key || !model) {
-      readingChatMessages.push({ role: 'character', text: '请先在设置中配置聊天 API。' });
+      readingChatMessages.push({ role: 'character', text: '回复失败：请先在设置中配置聊天 API。' });
       if (modal) renderReadingChat(modal);
       return;
     }
-    const book = readBooks().find(item => item.id === readingBookId) || {};
+    const book = readBooks().find(item => item.id === bookId) || {};
     ensureBookChapters(book);
     const chapter = book.chapters?.[readingChapterIndex] || book.chapters?.[0] || {};
     const excerpt = String(chapter.content || book.content || '').slice(0, 6000);
     const roleWorldbook = boundWorldbookContext(contact);
     const recentConversation = (chat?.messages || []).filter(item => item.type !== 'image').slice(-8).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name || '角色'}：${item.text || ''}`).join('\n') || '暂无普通聊天记录';
-    const replyGeneration = readingReplyGeneration;
-    readingReplying = true;
+    const requestMessages = readingChatMessages.map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text }));
+    readingReplyJobs.set(sessionKey, true);
     if (modal) renderReadingChat(modal);
+    let resultMessages = [];
     try {
       const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
         idealScope: 'chat',
@@ -3850,11 +3974,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 最近普通聊天记录（只用于保持关系和称呼一致）：
 ${recentConversation}`
             },
-            ...readingChatMessages.map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text }))
+            ...requestMessages
           ]
         })
       });
-      if (replyGeneration !== readingReplyGeneration) return;
       if (!response.ok) {
         let detail = `HTTP ${response.status}`;
         try {
@@ -3871,14 +3994,17 @@ ${recentConversation}`
       // 不再为了满足“至少两条”从句子中间硬切，也不凭空补一条“……”；
       // 回复只有一句时就保存一句，确保每个气泡都对应完整内容。
       if (!chunks.length) chunks = [answer.replace(/\[\[MSG\]\]/gi, ' ').replace(/\s+/g, ' ').trim() || '……'];
-      chunks.forEach(chunk => readingChatMessages.push({ role: 'character', text: chunk }));
+      resultMessages = chunks.map(chunk => ({ role: 'character', text: chunk }));
     } catch (error) {
-      if (replyGeneration === readingReplyGeneration && error?.name !== 'AbortError') readingChatMessages.push({ role: 'character', text: `回复失败：${error.message}` });
+      if (error?.name !== 'AbortError') resultMessages = [{ role: 'character', text: `回复失败：${error.message}` }];
     } finally {
-      if (replyGeneration !== readingReplyGeneration) return;
-      readingReplying = false;
+      if (resultMessages.length) appendReadingReply(bookId, roleId, resultMessages);
+      readingReplyJobs.delete(sessionKey);
       const currentModal = document.querySelector('[data-chat-reading]');
-      if (currentModal) renderReadingChat(currentModal);
+      if (readingBookId === bookId && (activeContact || 'unbound') === roleId) {
+        readingChatMessages = readReadingChatMessages(readBooks().find(item => item.id === bookId), roleId);
+        if (currentModal?.querySelector('.chat-reading-mini')) renderReadingChat(currentModal);
+      }
     }
   };
 
@@ -3921,6 +4047,7 @@ ${recentConversation}`
     const post = state.moments.find(item => item.id === momentCommentPostId);
     const text = document.querySelector('#chatMomentCommentText')?.value.trim();
     if (!post || !text) return;
+    if (momentPostAuthorIsDeceased(post)) return window.alert('已去世的角色不能参与朋友圈互动。');
     const profile = momentProfile();
     const author = profile.nickname || profile.realName || '我';
     const located = locateMomentComment(post, momentCommentTargetId);
@@ -4070,6 +4197,8 @@ ${recentConversation}`
   };
   let chatQuoteGesture = null;
   document.addEventListener('pointerdown', event => {
+    // Collapsed image stacks own both swipe directions; quoting starts outside the stack.
+    if (event.target.closest?.('[data-chat-image-stack-open]')) return;
     const message = event.target.closest?.('[data-chat-message-id]');
     if (!message || !app.classList.contains('is-chatting') || chatMessageEditMode) return;
     chatQuoteGesture = { message, id: message.dataset.chatMessageId, pointerId:event.pointerId, startX: event.clientX, startY: event.clientY, direction:'', horizontal: false, cancelled: false, frame:0, nextX:0 };
@@ -4752,6 +4881,8 @@ ${recentConversation}`
   }
   const generatedMomentBeforeStable = generateRoleMoment;
   generateRoleMoment = async function(contactId, targetPost=null) {
+    const contact = contactId ? state.contacts.find(item => item.id === contactId) : null;
+    if (contact && momentActorIsDeceased(contact)) return window.alert('已去世的角色不能发布或参与朋友圈互动。');
     momentGenerationDepth += 1;
     momentBusyPostId = '';
     momentBusy = true;
@@ -4875,11 +5006,11 @@ ${recentConversation}`
         const id = String(npc.id || `npc:${sourceRoleId}:${name}`);
         const sourceRole = state.contacts.find(item => item.id === sourceRoleId);
         return { ...npc, id, actorType:'npc', displayName:name, sourceRoleId, groupIds:sourceRole?.groupIds || [], identity:npc.identity || 'NPC', persona:[npc.personality, npc.motivation, npc.reason, npc.relationDescription].filter(Boolean).join('；') || '暂无 NPC 设定' };
-      }).filter(Boolean));
+      }).filter(Boolean).filter(npc => !momentActorIsDeceased(npc)));
     } catch { return []; }
   }
   function momentInteractionActors(post) {
-    const roles = state.contacts.map(contact => ({ ...contact, actorType:'role', displayName:contact.nickname || contact.name || '角色', persona:contact.details || contact.signature || '暂无角色设定', groupIds:Array.isArray(contact.groupIds) ? contact.groupIds : [] }));
+    const roles = state.contacts.filter(contact => !momentActorIsDeceased(contact)).map(contact => ({ ...contact, actorType:'role', displayName:contact.nickname || contact.name || '角色', persona:contact.details || contact.signature || '暂无角色设定', groupIds:Array.isArray(contact.groupIds) ? contact.groupIds : [] }));
     const actors = [...roles, ...momentNpcActors()].filter(actor => actor.id !== post.authorId);
     if (post.visibility !== 'groups') return actors;
     const visibleGroups = new Set(Array.isArray(post.visibleGroups) ? post.visibleGroups : []);
@@ -4905,6 +5036,7 @@ ${recentConversation}`
   }
   generateRoleInteraction = async function(post) {
     if (!post || post.visibility === 'private' || post.userOnly) return window.alert('仅用户可见的动态，其他角色和 NPC 看不见也不能互动。');
+    if (momentPostAuthorIsDeceased(post)) return window.alert('已去世的角色不能参与朋友圈互动。');
     if (momentBusy) return;
     const actors = momentInteractionActors(post);
     if (!actors.length) return window.alert(post.visibility === 'groups' ? '当前可见分组里没有其他角色或 NPC，暂时无法互动。' : '请先添加其他角色，或先在世界书中分析并同步 NPC。');
@@ -5267,6 +5399,18 @@ ${recentConversation}`
     if (!parts.length && source) { const text = normalizeVideoCallPart(source); if (text) parts.push({ role: 'character', text, at: Date.now() }); }
     return { parts, hangup };
   }
+  function videoCallTurnCount(role, session = videoCallSession) {
+    if (!session) return 0;
+    return videoCallMessages.filter(item => item.role === role).length;
+  }
+  function videoCallCanCharacterHangup(session = videoCallSession) {
+    if (!session || session.status !== 'connected') return false;
+    // 至少完成两轮“用户发言 → 角色回复”，避免刚接通或只聊一轮就结束。
+    return videoCallTurnCount('user', session) >= 2 && videoCallTurnCount('character', session) >= 2;
+  }
+  function videoCallShouldCharacterHangup(session = videoCallSession) {
+    return videoCallCanCharacterHangup(session) && Math.random() < 0.15;
+  }
   function waitForVideoCallMessage() { return new Promise(resolve => setTimeout(resolve, 650)); }
   async function requestVideoCallReply(kind = 'reply') {
     const session = videoCallSession;
@@ -5284,7 +5428,7 @@ ${recentConversation}`
       renderVideoCallModal('connected');
       return;
     }
-    const prompt = kind === 'opening' ? '视频通话刚刚接通。请根据角色设定和通话前线上记录，自然地先说一句开场白。不要提及系统、提示词或线上记录。' : '请自然回应用户刚才在视频通话中说的话。保持角色本人身份，适合口语表达，不要输出分析过程。视频通话里只输出角色实际说的话，不要使用 VOICE、VIDEO_CALL 等标记；如果角色自然聊完、临时有事或想主动结束通话，可以在最后加上 [[VIDEO_HANGUP]]，这个标记不会显示给用户。';
+    const prompt = kind === 'opening' ? '视频通话刚刚接通。请根据角色设定和通话前线上记录，自然地先说一句开场白。不要提及系统、提示词或线上记录。' : '请自然回应用户刚才在视频通话中说的话。保持角色本人身份，适合口语表达，不要输出分析过程。视频通话里只输出角色实际说的话，不要使用 VOICE、VIDEO_CALL 或 VIDEO_HANGUP 等标记；通话是否结束由系统根据已经进行的对话轮次随机决定。';
     const system = `${buildChatSystemPrompt(contact, profile, chat)}\n\n【视频通话专用输出格式】\n这是一次独立的视频通话。通话开始前已经读取了下面的线上聊天记录，只用于保持人物连续，不要说自己“读取了记录”。\n通话前线上记录：\n${session.contextMessages.map(item => item.content).join('\n')}\n角色的回复中禁止使用中文或英文引号，不要用引号包裹台词。角色说的话直接输出；动作、表情和正在进行的行为必须使用全角括号“（）”包裹。可以用换行或 [[MSG]] 分隔自然的连续消息，但每条都要完整。\n\n${prompt}`;
     const messages = [...session.contextMessages, ...videoCallMessages.map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text }))];
     messages.push({ role: 'user', content: prompt });
@@ -5300,8 +5444,8 @@ ${recentConversation}`
         renderVideoCallModal('connected');
         if (parsed.parts.indexOf(part) < parsed.parts.length - 1) await waitForVideoCallMessage();
       }
-      if (parsed.hangup && videoCallSession === session && session.status === 'connected') {
-        await finishVideoCall();
+      if (parsed.parts.length && videoCallSession === session && session.status === 'connected' && videoCallShouldCharacterHangup(session)) {
+        await finishVideoCall('character');
         return;
       }
     } catch (error) {
@@ -5331,10 +5475,11 @@ ${recentConversation}`
       return String(data.choices?.[0]?.message?.content || '').trim() || videoCallFallbackSummary(session);
     } catch { return videoCallFallbackSummary(session); }
   }
-  async function finishVideoCall() {
+  async function finishVideoCall(reason = 'user') {
     const session = videoCallSession;
     if (!session || session.status !== 'connected') return;
     session.status = 'ending';
+    session.endedBy = reason;
     session.duration = videoCallDuration(session);
     videoCallClearTimer();
     renderVideoCallModal('ending');
@@ -5342,7 +5487,7 @@ ${recentConversation}`
     session.endedAt = Date.now();
     const chat = state.chats?.[session.contactId];
     if (chat) {
-      const record = { id: session.id, contactId: session.contactId, direction: session.direction, startedAt: session.startedAt, endedAt: session.endedAt, duration: session.duration, contextMessages: session.contextMessages, messages: videoCallMessages.slice(), summary: session.summary };
+      const record = { id: session.id, contactId: session.contactId, direction: session.direction, startedAt: session.startedAt, endedAt: session.endedAt, duration: session.duration, endedBy: session.endedBy, contextMessages: session.contextMessages, messages: videoCallMessages.slice(), summary: session.summary };
       chat.videoCalls ||= [];
       chat.videoCalls.push(record);
       chat.messages ||= [];
@@ -5427,8 +5572,8 @@ ${recentConversation}`
     event.preventDefault();
     event.stopImmediatePropagation();
     if (accept) return beginVideoCall();
-    if (hangup) return finishVideoCall();
-    if (close && videoCallSession?.status === 'connected') return finishVideoCall();
+    if (hangup) return finishVideoCall('user');
+    if (close && videoCallSession?.status === 'connected') return finishVideoCall('user');
     if (reject || close) return cancelVideoCall();
     const modal = event.target.closest('[data-chat-video-call]');
     const input = modal?.querySelector('[data-video-call-input]');
@@ -5488,6 +5633,7 @@ ${recentConversation}`
   const renderMomentPostWithCommentButton = renderMomentPost;
   renderMomentPost = function(post) {
     let html = renderMomentPostWithCommentButton(post);
+    if (momentPostAuthorIsDeceased(post)) html = html.replace(/<button data-moment-interact="[^"]*" type="button">✦ 互动<\/button>/, '');
     if (momentBusy) {
       const isTarget = !momentBusyPostId || String(post?.id || '') === momentBusyPostId;
       if (isTarget) html = html.replace(/<button data-moment-interact="([^"]*)" type="button">✦ 互动<\/button>/, '<button class="is-moment-busy" data-moment-interact="$1" type="button" disabled>互动中…</button>');
@@ -5495,28 +5641,133 @@ ${recentConversation}`
     }
     return html.replace(/<button data-moment-comment="([^"]*)" type="button">◌\s*(\d+)<\/button>/, (_, id, count) => `<button class="chat-moment-comment-button" data-moment-comment="${id}" type="button" aria-label="评论"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-5 3v-3.2a2 2 0 0 1-3-1.8v-8a2 2 0 0 1 2-2z"/><path d="M7.5 10h9M7.5 13h6"/></svg><span>${count}</span></button>`);
   };
+  const expandedImageBatches = new Set();
+  const imageStackFrontIndices = new Map();
+  let imageStackPointer = null;
+  let imageStackSwipedId = '';
+  let imageStackSwipedAt = 0;
   const messageHtmlBeforeImageBatch = messageHtml;
   messageHtml = function(message) {
-    if (message?.imageBatchId && message.imageBatchIndex > 0) return '';
+    const batchId = String(message?.imageBatchId || '');
+    const batchExpanded = Boolean(batchId && expandedImageBatches.has(batchId));
+    if (batchId && batchExpanded) {
+      const plainMessage = { ...message };
+      delete plainMessage.imageBatchId;
+      delete plainMessage.imageBatchIndex;
+      delete plainMessage.imageBatchSources;
+      let expandedHtml = messageHtmlBeforeImageBatch(plainMessage)
+        .replace(`data-chat-message-id="${esc(message.id)}"`, `data-chat-message-id="${esc(message.id)}" data-chat-image-batch-id="${esc(batchId)}" data-chat-image-batch-index="${Number(message.imageBatchIndex || 0)}"`);
+      if (Number(message.imageBatchIndex || 0) === 0 && !message.recalled) {
+        expandedHtml = expandedHtml
+          .replace(/<div class="chat-bubble image([^"]*)">/, '<div class="chat-bubble image image-stack-expanded$1">')
+          .replace(/(<div class="chat-bubble image[^"]*">)(<img)/, `$1<button class="chat-image-stack-collapse" data-chat-image-stack-close="${esc(batchId)}" type="button">收起</button>$2`);
+      }
+      return expandedHtml;
+    }
+    if (batchId && message.imageBatchIndex > 0) return '';
     const html = messageHtmlBeforeImageBatch(message);
     if (!message?.imageBatchId || message.imageBatchIndex !== 0 || message.recalled) return html;
     const sources = Array.isArray(message.imageBatchSources) ? message.imageBatchSources.filter(Boolean) : [];
-    if (sources.length < 3) return html;
-    const previews = sources.slice(0, 3).map((source, index) => `<img class="chat-image-stack-photo is-layer-${index}" src="${esc(source)}" alt="第${index + 1}张图片">`).join('');
-    const stack = `<button class="chat-image-stack" data-chat-image-stack-open="${esc(message.imageBatchId)}" type="button" aria-label="展开 ${sources.length} 张图片"><span class="chat-image-stack-layers">${previews}</span><span class="chat-image-stack-expand">展开 ${sources.length}</span></button>`;
-    return html.replace(/<div class="chat-bubble image[^\"]*">[\s\S]*?<\/div>/, `<div class="chat-bubble image-stack">${stack}</div>`);
+    if (sources.length < 2) return html;
+    const frontIndex = Math.max(0, Math.min(sources.length - 1, imageStackFrontIndices.get(batchId) || 0));
+    const previews = Array.from({ length: Math.min(3, sources.length) }, (_, layer) => {
+      const index = (frontIndex + layer) % sources.length;
+      return `<img class="chat-image-stack-photo is-layer-${layer}" src="${esc(sources[index])}" alt="第${index + 1}张图片" draggable="false">`;
+    }).join('');
+    const stack = `<button class="chat-image-stack" data-chat-image-stack-open="${esc(message.imageBatchId)}" type="button" aria-label="第 ${frontIndex + 1} 张，共 ${sources.length} 张；左右滑动切换，轻点展开"><span class="chat-image-stack-expand">展开 ${sources.length}</span><span class="chat-image-stack-layers">${previews}</span></button>`;
+    return html
+      .replace(`data-chat-message-id="${esc(message.id)}"`, `data-chat-message-id="${esc(message.id)}" data-chat-image-stack-collapsed`)
+      .replace(/<div class="chat-bubble image[^\"]*">[\s\S]*?<\/div>/, `<div class="chat-bubble image-stack">${stack}</div>`)
+      .replace(/<small>[^<]*<\/small>(?=<\/div><\/div>$)/, '');
   };
+  document.addEventListener('pointerdown', event => {
+    const stack = event.target.closest?.('[data-chat-image-stack-open]');
+    imageStackPointer = stack ? { id: event.pointerId, batchId: stack.dataset.chatImageStackOpen, x: event.clientX, y: event.clientY } : null;
+  }, true);
+  document.addEventListener('pointerup', event => {
+    const pointer = imageStackPointer;
+    imageStackPointer = null;
+    if (!pointer || pointer.id !== event.pointerId) return;
+    const deltaX = event.clientX - pointer.x;
+    const deltaY = event.clientY - pointer.y;
+    if (Math.abs(deltaX) < 32 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
+    const firstMessage = currentChat()?.messages.find(item => String(item?.imageBatchId || '') === pointer.batchId && Number(item.imageBatchIndex || 0) === 0);
+    const count = Array.isArray(firstMessage?.imageBatchSources) ? firstMessage.imageBatchSources.filter(Boolean).length : 0;
+    if (count < 2) return;
+    const currentIndex = imageStackFrontIndices.get(pointer.batchId) || 0;
+    imageStackFrontIndices.set(pointer.batchId, Math.max(0, Math.min(count - 1, currentIndex + (deltaX < 0 ? 1 : -1))));
+    imageStackSwipedId = pointer.batchId;
+    imageStackSwipedAt = performance.now();
+    const stack = Array.from(app.querySelectorAll('[data-chat-image-stack-open]')).find(item => item.dataset.chatImageStackOpen === pointer.batchId);
+    const row = stack?.closest('[data-chat-message-id]');
+    if (!row || !firstMessage) return;
+    row.insertAdjacentHTML('beforebegin', messageHtml(firstMessage));
+    row.remove();
+    hydrateGeneratedImages();
+    event.preventDefault();
+  }, true);
+  document.addEventListener('pointercancel', () => { imageStackPointer = null; }, true);
   document.addEventListener('click', event => {
+    const step = event.target.closest?.('[data-chat-image-batch-step]');
+    if (step) {
+      event.preventDefault();
+      const carousel = app.querySelector('.chat-image-batch-carousel');
+      const direction = Number(step.dataset.chatImageBatchStep || 0);
+      if (carousel && direction) carousel.scrollBy({ left: direction * carousel.clientWidth, behavior: 'smooth' });
+      return;
+    }
     const close = event.target.closest?.('[data-chat-image-stack-close]');
-    if (close) { app.querySelector('.chat-image-stack-viewer')?.remove(); return; }
+    if (close) {
+      const batchId = close.dataset.chatImageStackClose;
+      if (batchId) {
+        event.preventDefault();
+        const rows = Array.from(app.querySelectorAll('[data-chat-image-batch-id]')).filter(row => row.dataset.chatImageBatchId === batchId);
+        const firstMessage = currentChat()?.messages.find(message => String(message?.imageBatchId || '') === batchId && Number(message.imageBatchIndex || 0) === 0);
+        expandedImageBatches.delete(batchId);
+        if (rows.length && firstMessage) {
+          rows[0].insertAdjacentHTML('beforebegin', messageHtml(firstMessage));
+          rows.forEach(row => row.remove());
+          hydrateGeneratedImages();
+        } else render();
+      } else app.querySelector('.chat-image-stack-viewer')?.remove();
+      return;
+    }
     const open = event.target.closest?.('[data-chat-image-stack-open]');
     if (!open || !app.classList.contains('is-open')) return;
     event.preventDefault();
-    const batch = currentChat()?.messages.find(item => item.imageBatchId === open.dataset.chatImageStackOpen && item.imageBatchIndex === 0);
-    const sources = Array.isArray(batch?.imageBatchSources) ? batch.imageBatchSources : [];
-    if (!sources.length) return;
-    app.querySelector('.chat-image-stack-viewer')?.remove();
-    app.insertAdjacentHTML('beforeend', `<div class="chat-image-stack-viewer"><button class="chat-image-stack-backdrop" data-chat-image-stack-close type="button" aria-label="关闭图片"></button><section><header><b>${sources.length} 张图片</b><button data-chat-image-stack-close type="button" aria-label="关闭">×</button></header><main>${sources.map((source, index) => `<img src="${esc(source)}" alt="第${index + 1}张图片">`).join('')}</main></section></div>`);
+    const batchId = open.dataset.chatImageStackOpen;
+    if (batchId === imageStackSwipedId && performance.now() - imageStackSwipedAt < 700) return;
+    const chat = currentChat();
+    const batchMessages = (chat?.messages || [])
+      .filter(item => String(item?.imageBatchId || '') === String(batchId) && item.type === 'image' && !item.recalled)
+      .sort((first, second) => Number(first.imageBatchIndex || 0) - Number(second.imageBatchIndex || 0));
+    const row = open.closest('[data-chat-message-id]');
+    if (!row || !batchMessages.length) return;
+    expandedImageBatches.add(batchId);
+    row.insertAdjacentHTML('beforebegin', batchMessages.map(messageHtml).join(''));
+    row.remove();
     hydrateGeneratedImages();
   }, true);
+  const baseApplyImageStackBubbleSettings = applyChatBubbleSettingsCSS;
+  applyChatBubbleSettingsCSS = function() {
+    baseApplyImageStackBubbleSettings();
+    const style = document.querySelector('#chatBubbleSettingsStyle');
+    if (!style) return;
+    style.textContent += ' .chat-message .chat-bubble.image-stack, .chat-message.is-user .chat-bubble.image-stack, .chat-message.is-character .chat-bubble.image-stack { background: transparent !important; background-image: none !important; border: 0 !important; box-shadow: none !important; }';
+  };
+  const renderWithDockUnreadBadge = render;
+  render = function() {
+    renderWithDockUnreadBadge();
+    applyChatBubbleSettingsCSS();
+    const chatTab = app.querySelector('[data-chat-tab="chat"]');
+    if (!chatTab) return;
+    chatTab.querySelector('.chat-tab-unread-badge')?.remove();
+    const unread = chatTotalUnreadCount();
+    if (!unread) return;
+    const badge = document.createElement('em');
+    badge.className = 'chat-tab-unread-badge';
+    badge.textContent = chatUnreadCountText(unread);
+    badge.setAttribute('aria-label', `${unread} 条未读消息`);
+    (chatTab.querySelector('.chat-tab-icon-wrap') || chatTab).appendChild(badge);
+  };
 })();
