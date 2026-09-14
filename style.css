@@ -70,6 +70,8 @@ body .chat-reading-modal.is-night .chat-reading-mini-messages p, body .chat-read
 .chat-reading-background-file { display: flex !important; align-items: center; justify-content: space-between; min-height: 40px; padding: 0 10px; border: 1px solid rgba(0,0,0,.1); border-radius: 10px; background: #f7f7f8; color: #555; font-size: 12px; }
 .chat-reading-background-file input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); }
 .chat-reading-background-file b { display: inline-grid; place-items: center; min-height: 29px; padding: 0 10px; border-radius: 8px; background: #e8e8eb; color: #333; font-size: 11px; font-weight: 550; }
+.chat-reading-background-album { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid rgba(0,0,0,.1); border-radius: 10px; background: #fff; color: #444; font: inherit; font-size: 11px; cursor: pointer; }
+.chat-reading-chat-settings [hidden] { display: none !important; }
 .chat-reading-chat-settings footer button[data-chat-reading-background-reset] { background: #f0f0f2; color: #555; }
 .chat-reading-manage { min-width: 44px; height: 31px; padding: 0 9px; border: 0; border-radius: 9px; background: #efefed; color: #444; font: inherit; font-size: 11px; }
 .chat-reading-book-item { display: flex; align-items: center; gap: 7px; }
