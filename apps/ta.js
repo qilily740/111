@@ -6,7 +6,7 @@
   const apps = [['liaotian','聊天','chat','#8bb8f1'],['luntan','论坛','forum','#f1a66f'],['rili','日历','calendar','#ee9b9b'],['qinglvkongjian','情侣空间','couple','#dc91b7'],['yinyue','音乐','music','#9e9ae9'],['doubao','豆包','doubao','#8ec8c2'],['gouwu','购物','shop','#e5b27d'],['qianbao','钱包','wallet','#78a889']];
   const beautyApp = ['meihua','美化','beauty','#9ba9c8'];
   const desktopApps = [...apps, beautyApp];
-  let state = readState(); let activeApp = ''; let activeChatTarget = ''; let activeDetail = null; let activeCalendarDate = localDateKey(new Date()); let npcBusy = false; let refreshing = false; let refreshPickerOpen = false; let appearanceOpen = false; let appearanceDraft = null; let appearanceSwapKey = ''; let reverseOpen = false; let reverseBusy = false; let reverseLive = null; let reverseForceCaught = false; let reverseRateOpen = false; let reverseViewer = null; let reverseAppearance = {wallpaper:'',icons:{},names:{}}; let reverseStep = 0; let selectedRefreshApps = new Set(); let doubaoHistoryOpen = false; let selectedDoubaoHistory = -1;
+  let state = readState(); let activeApp = ''; let activeChatTarget = ''; let activeDetail = null; let activeCalendarDate = localDateKey(new Date()); let calendarAutoOpenKey = ''; let npcBusy = false; let refreshing = false; let refreshPickerOpen = false; let appearanceOpen = false; let appearanceDraft = null; let appearanceSwapKey = ''; let reverseOpen = false; let reverseBusy = false; let reverseLive = null; let reverseForceCaught = false; let reverseRateOpen = false; let reverseViewer = null; let reverseAppearance = {wallpaper:'',icons:{},names:{}}; let reverseStep = 0; let selectedRefreshApps = new Set(); let doubaoHistoryOpen = false; let selectedDoubaoHistory = -1;
   function readState() { try { const value=JSON.parse(localStorage.getItem(storageKey) || '{}'); return { roleId:value.roleId || '', appearance:{ wallpaper:value.appearance?.wallpaper || '', icons:value.appearance?.icons && typeof value.appearance.icons === 'object' ? value.appearance.icons : {} } }; } catch { return { roleId:'', appearance:{ wallpaper:'', icons:{} } }; } }
   function saveState() { localStorage.setItem(storageKey, JSON.stringify(state)); }
   function read(key, fallback) { try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value ?? fallback; } catch { return fallback; } }
@@ -14,14 +14,67 @@
   function shiftDateKey(value, offset) { const date = new Date(`${value}T12:00:00`); date.setDate(date.getDate() + offset); return localDateKey(date); }
   function calendarDayRecord(ownerId, dateKey = activeCalendarDate) { return read(calendarDaysKey, {})?.[ownerId]?.[dateKey] || null; }
   function saveCalendarDay(ownerId, dateKey, items, previous) { const all = read(calendarDaysKey, {}); all[ownerId] = all[ownerId] || {}; all[ownerId][dateKey] = { items, createdAt:previous?.createdAt || Date.now(), updatedAt:Date.now(), refreshCount:Number(previous?.refreshCount || 0) + 1 }; localStorage.setItem(calendarDaysKey, JSON.stringify(all)); }
+  function syncRoleCalendarToStandalone(owner, items, dateKey) {
+    if (!owner?.id || !dateKey) return;
+    const events = read('ideal-machine-calendar-events', []);
+    const isOwnedSchedule = item => item?.source === 'ta-calendar' && (item.ownerId === owner.id || item.authorId === owner.id) && item.date === dateKey;
+    const preserved = events.filter(item => !isOwnedSchedule(item));
+    const synced = (Array.isArray(items) ? items : []).map((raw, index) => {
+      const item = normalizeCalendarItem(raw);
+      return {
+        id: `ta-calendar:${owner.id}:${dateKey}:${item.id || index}`,
+        title: item.title || item.name || '日程',
+        date: dateKey,
+        time: item.start && item.end ? `${item.start}—${item.end}` : item.start || '',
+        note: item.text || item.note || item.content || '',
+        status: item.status || 'planned',
+        author: 'role',
+        authorId: owner.id,
+        contactId: owner.id,
+        ownerId: owner.id,
+        source: 'ta-calendar'
+      };
+    });
+    const nextEvents = [...preserved, ...synced];
+    localStorage.setItem('ideal-machine-calendar-events', JSON.stringify(nextEvents));
+    try {
+      const couple = read('ideal-machine-couple', {});
+      if (couple.spaces && typeof couple.spaces === 'object') Object.entries(couple.spaces).forEach(([roleId, space]) => {
+        if (space && typeof space === 'object') space.events = nextEvents.filter(item => item.contactId === roleId || item.authorId === roleId || item.roleId === roleId);
+      });
+      else couple.events = nextEvents;
+      localStorage.setItem('ideal-machine-couple', JSON.stringify(couple));
+    } catch {}
+    window.IdealMachineRenderCalendar?.();
+    window.IdealMachineRenderRoleCalendar?.();
+  }
   function calendarStatus(value) { const raw = String(value || '').toLowerCase(); if (/change|deviat|变更|改变|偏离|临时/.test(raw)) return 'changed'; if (/done|complete|已完成|已做|实际/.test(raw)) return 'done'; if (/doing|进行/.test(raw)) return 'doing'; return 'planned'; }
-  function normalizeCalendarItem(item) { const time = eventTimes(item); return { ...item, start:time.start, end:time.end, date:time.end ? `${time.start}—${time.end}` : time.start, status:calendarStatus(item?.status) }; }
-  function applyCalendarClock(items, dateKey) { const today = localDateKey(new Date()); const now = new Date(); const nowMinutes = now.getHours() * 60 + now.getMinutes(); return items.map(raw => { const item = normalizeCalendarItem(raw); if (item.status === 'changed') return item; const start = String(item.start || '').match(/^(\d{1,2}):(\d{2})$/); const end = String(item.end || '').match(/^(\d{1,2}):(\d{2})$/); const startMinutes = start ? Number(start[1]) * 60 + Number(start[2]) : null; const endMinutes = end ? Number(end[1]) * 60 + Number(end[2]) : null; if (dateKey < today) return { ...item, status:'done' }; if (dateKey > today) return { ...item, status:'planned' }; if (endMinutes !== null && endMinutes <= nowMinutes) return { ...item, status:'done' }; if (startMinutes !== null && endMinutes !== null && startMinutes <= nowMinutes && nowMinutes < endMinutes) return { ...item, status:'doing' }; return { ...item, status:'planned' }; }); }
-  function mergeCalendarItems(existing, updates, dateKey) { const merged = existing.map(item => normalizeCalendarItem(item)); updates.forEach(raw => { const item = normalizeCalendarItem(raw); const index = merged.findIndex(old => old.start === item.start || (old.title && old.title === item.title)); if (index >= 0) merged[index] = { ...merged[index], ...item }; else merged.push(item); }); return applyCalendarClock(merged.sort((a,b) => String(a.start).localeCompare(String(b.start))), dateKey); }
+  function normalizeCalendarItem(item) { const time = eventTimes(item); const bedtime = /睡觉|睡眠|入睡|就寝|休息过夜/.test(String(item?.title || item?.name || '')) && (calendarTimeMinutes(time.start) ?? 0) >= 20 * 60; const end = bedtime && time.end === '23:59' ? '06:00' : time.end; return { ...item, start:time.start, end, date:end ? `${time.start}—${end}` : time.start, status:calendarStatus(item?.status) }; }
+  function applyCalendarClock(items, dateKey) { const today = localDateKey(new Date()); const now = new Date(); const nowMinutes = now.getHours() * 60 + now.getMinutes(); return items.map(raw => { const item = normalizeCalendarItem(raw); if (item.status === 'changed') return item; const startMinutes = calendarTimeMinutes(item.start); const rawEndMinutes = calendarTimeMinutes(item.end); const endMinutes = startMinutes !== null && rawEndMinutes !== null && rawEndMinutes <= startMinutes ? rawEndMinutes + 1440 : rawEndMinutes; if (dateKey < today) return { ...item, status:'done' }; if (dateKey > today) return { ...item, status:'planned' }; if (endMinutes !== null && endMinutes <= nowMinutes) return { ...item, status:'done' }; if (startMinutes !== null && endMinutes !== null && startMinutes <= nowMinutes && nowMinutes < endMinutes) return { ...item, status:'doing' }; return { ...item, status:'planned' }; }); }
+  function mergeCalendarItems(existing, updates, dateKey) { const merged = existing.map(item => normalizeCalendarItem(item)); updates.forEach(raw => { const item = normalizeCalendarItem(raw); const index = merged.findIndex(old => old.start === item.start); if (index >= 0) merged[index] = { ...merged[index], ...item }; else merged.push(item); }); return applyCalendarClock(merged.sort((a,b) => String(a.start).localeCompare(String(b.start))), dateKey); }
   function calendarTimeMinutes(value) { const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; }
+  function ensureCalendarSleepRows(items, dateKey) {
+    const rows = (Array.isArray(items) ? items : []).map(item => normalizeCalendarItem(item));
+    const isSleep = item => /睡觉|睡眠|入睡|就寝|休息过夜/.test(String(item.title || item.name || ''));
+    const timeLabel = minutes => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    let early = rows.find(item => isSleep(item) && (calendarTimeMinutes(item.start) ?? 9999) <= 60 && (calendarTimeMinutes(item.end) ?? 0) >= 240);
+    if (!early) {
+      const firstActivity = rows.map(item => calendarTimeMinutes(item.start)).filter(value => value !== null && value >= 240 && value <= 720).sort((a, b) => a - b)[0];
+      if (firstActivity) { early = { start:'00:00', end:timeLabel(firstActivity), title:'睡觉', text:'睡到早晨，醒来后开始今天的安排。', status:'planned' }; rows.push(early); }
+    }
+    const late = rows.find(item => isSleep(item) && (calendarTimeMinutes(item.start) ?? 0) >= 1200 && (calendarTimeMinutes(item.end) ?? 9999) < (calendarTimeMinutes(item.start) ?? 0));
+    if (!late) {
+      const lastEnd = rows.filter(item => !isSleep(item)).map(item => calendarTimeMinutes(item.end)).filter(value => value !== null && value >= 1080 && value <= 1439).sort((a, b) => b - a)[0];
+      if (lastEnd !== undefined) rows.push({ start:timeLabel(Math.max(1200, lastEnd)), end:early?.end || '06:00', title:'睡觉', text:'结束一天的活动，休息到第二天早上。', status:'planned' });
+    }
+    return applyCalendarClock(rows.sort((a, b) => String(a.start).localeCompare(String(b.start))), dateKey);
+  }
   function calendarIsFullDay(items) {
-    const rows = (Array.isArray(items) ? items : []).map(item => normalizeCalendarItem(item)).map(item => ({ start:calendarTimeMinutes(item.start), end:calendarTimeMinutes(item.end) })).filter(item => item.start !== null && item.end !== null && item.end > item.start).sort((a,b) => a.start - b.start);
-    if (rows.length < 7 || rows[0].start > 11 * 60 || Math.max(...rows.map(item => item.end)) < 21 * 60) return false;
+    const rows = (Array.isArray(items) ? items : []).map(item => normalizeCalendarItem(item)).map(item => { const start = calendarTimeMinutes(item.start); let end = calendarTimeMinutes(item.end); if (start !== null && end !== null && end <= start) end += 1440; return { start, end }; }).filter(item => item.start !== null && item.end !== null && item.end > item.start).sort((a,b) => a.start - b.start);
+    const sleepRows = (Array.isArray(items) ? items : []).map(item => normalizeCalendarItem(item)).filter(item => /睡觉|睡眠|入睡|就寝|休息过夜/.test(String(item.title || item.name || '')));
+    const hasEarlySleep = sleepRows.some(item => calendarTimeMinutes(item.start) !== null && calendarTimeMinutes(item.start) <= 60 && calendarTimeMinutes(item.end) >= 4 * 60);
+    const hasLateSleep = sleepRows.some(item => { const start = calendarTimeMinutes(item.start); const end = calendarTimeMinutes(item.end); return start >= 20 * 60 && end !== null && end < start && end >= 4 * 60 && end <= 11 * 60; });
+    if (rows.length < 7 || !hasEarlySleep || !hasLateSleep || rows[0].start > 60 || Math.max(...rows.map(item => item.end)) < 30 * 60) return false;
     let coveredUntil = rows[0].end;
     for (const row of rows.slice(1)) {
       // 早晨到夜间若仍有超过三小时的空白，就不能算作“全天日程”。
@@ -197,7 +250,12 @@
   async function analyzeNpcs(owner) { if (npcBusy) return; const book = worldbook(owner); if (!book) return window.alert('这个角色还没有绑定局部世界书。'); const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('worldbook') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) return window.alert('请先在设置中配置 AI 接口。'); npcBusy = true; render(); try { const prompt = `请分析角色“${owner.nickname || owner.name}”绑定的局部世界书，提取其中与角色有关、可能出现在角色手机聊天列表里的 NPC。只返回 JSON 数组，每项格式为 {"name":"NPC名称","identity":"身份","reason":"与角色的关系或出现依据"}。不要编造世界书没有依据的重要人物。\n角色设定：${owner.details || owner.signature || '暂无'}\n局部世界书：${(book.entries || []).map(item => `【${item.name}】${item.content}`).join('\n')}`; const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({model, temperature:.35, messages:[{role:'system',content:'你是角色手机联系人分析器，只输出合法 JSON。'},{role:'user',content:prompt}]}) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi,'').trim(); const parsed = JSON.parse(raw); const cache = read('ideal-machine-ta-npcs', {}); cache[owner.id] = Array.isArray(parsed) ? parsed : []; localStorage.setItem('ideal-machine-ta-npcs', JSON.stringify(cache)); } catch (error) { window.alert(`NPC 分析失败：${error.message}`); } finally { npcBusy = false; render(); } }
   function apiResponseText(data) {
     const message = data?.choices?.[0]?.message || {};
-    return String(message.content || message.reasoning_content || data?.output_text || data?.choices?.[0]?.text || '').trim();
+    const extract = value => {
+      if (Array.isArray(value)) return value.map(item => typeof item === 'string' ? item : item?.text || item?.content || '').filter(Boolean).join('\n');
+      if (value && typeof value === 'object') return value.text || value.content || JSON.stringify(value);
+      return value || '';
+    };
+    return String(extract(message.content) || extract(message.reasoning_content) || extract(data?.output_text) || extract(data?.choices?.[0]?.text) || '').trim();
   }
   function parseDoubaoContent(value) {
     const source = String(value || '').replace(/```(?:json)?|```/gi, '').trim();
@@ -242,11 +300,43 @@
     const parts = clean.split(/\s*[｜|]\s*/).map(item => item.trim());
     return parts.length > 1 ? parts : [];
   }
+  function structuredCalendarRows(value) {
+    const source = Array.isArray(value) ? value : value?.calendar || value?.events || value?.schedule || value?.items;
+    if (!Array.isArray(source)) return [];
+    return source.map(item => {
+      if (typeof item === 'string') return parseCalendarLooseLine(item);
+      if (!item || typeof item !== 'object') return null;
+      const range = String(item.time || item.schedule || item.date || '').match(/(\d{1,2}[:：]\d{2})\s*(?:—|–|-|至|~)\s*(\d{1,2}[:：]\d{2})/);
+      const start = String(item.start || item.startTime || item.begin || range?.[1] || '').replace('：', ':').trim();
+      const end = String(item.end || item.endTime || item.finish || range?.[2] || '').replace('：', ':').trim();
+      const title = String(item.title || item.name || item.subject || item.event || '').trim();
+      if (!title) return null;
+      return { start:start || '待定', end, date:end ? `${start || '待定'}—${end}` : start || '待定', status:calendarStatus(item.status || item.state), title, text:String(item.text || item.note || item.description || item.detail || item.content || '').trim() };
+    }).filter(Boolean);
+  }
+  function parseCalendarLooseLine(line) {
+    const clean = String(line || '').replace(/^\s*(?:[-*•>]\s*)?/, '').trim();
+    const match = clean.match(/^(?:(?:CALENDAR_UPDATE|CALENDAR|日历|行程|日程更新)\s*(?:[｜|:：-]\s*)?)?(\d{1,2}[:：]\d{2})\s*(?:[-—–~至到]\s*)(\d{1,2}[:：]\d{2})(?:\s*(?:[｜|,:：-]\s*|\s+))(.+)$/i);
+    if (!match) return null;
+    const fields = match[4].split(/\s*[｜|]\s*|\s*；\s*|\s*;\s*/).map(item => item.trim()).filter(Boolean);
+    const statusMatch = fields[0]?.match(/^(PLANNED|DONE|CHANGED|预计|已完成|完成|进行中|变更)\s*(?:[｜|,:：-]\s*|\s+)([\s\S]+)$/i);
+    let status = 'PLANNED'; let title = '';
+    if (statusMatch) { status = statusMatch[1]; fields.shift(); title = statusMatch[2].trim(); }
+    else if (/^(?:PLANNED|DONE|CHANGED|预计|已完成|完成|进行中|变更)$/i.test(fields[0] || '')) { status = fields.shift(); title = (fields.shift() || '').trim(); }
+    else title = (fields.shift() || '').trim();
+    const text = fields.join('｜');
+    return title ? { start:match[1].replace('：', ':'), end:match[2].replace('：', ':'), date:`${match[1]}—${match[2]}`, status:calendarStatus(status), title, text } : null;
+  }
   function parseTaListContent(key, value) {
-    try { const parsed = parseApiJSON(value); if (Array.isArray(parsed?.[key]) && parsed[key].length) return parsed; } catch {}
+    try {
+      const parsed = parseApiJSON(value);
+      if (Array.isArray(parsed?.[key]) && parsed[key].length) return parsed;
+      if (key === 'calendar') { const rows = structuredCalendarRows(parsed); if (rows.length) return { calendar:rows }; }
+    } catch {}
     const rows = []; let lastRow = null;
     String(value || '').replace(/```(?:json)?|```/gi, '').split(/\r?\n/).forEach(line => {
       const cleanLine = String(line || '').replace(/^\s*(?:[-*•>]\s*)?/, '').trim();
+      if (key === 'calendar') { const loose = parseCalendarLooseLine(cleanLine); if (loose) { rows.push(loose); return; } }
       const parts = protocolParts(cleanLine);
       if (parts.length < 4) {
         // 模型偶尔会把较长的购买原因单独换行；把没有协议分隔符的续行接回上一条购物记录。
@@ -368,7 +458,7 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
     const calendarContext = existingCalendar.length ? existingCalendar.map(item => { const row = normalizeCalendarItem(item); return `${row.start}—${row.end}｜${row.status}｜${row.title}｜${row.text || ''}`; }).join('\n') : '';
     const nowLabel = new Intl.DateTimeFormat('zh-CN', { dateStyle:'full', timeStyle:'short' }).format(new Date());
     const lineRules = {
-      calendar:calendarNeedsCompletion ? `现有日程没有覆盖完整一整天，本次刷新必须先补齐，不能只做状态更新。保留所有原有项目，不得删除或整体改写；补充缺少的早晨、白天、晚间时段以及明显空档，使合并后的日程至少有 7—10 项，从合理起床时间一直覆盖到晚上 21:00 以后，并包含三餐、通勤或休息。新增项目及需要修正的项目都严格使用“CALENDAR_UPDATE｜开始时间｜结束时间｜PLANNED、DONE或CHANGED｜事件标题｜具体做什么”。当前时间之前用 DONE，未来用 PLANNED，偏离原计划用 CHANGED。绝对不能输出 NO_CHANGE。现有不完整日程如下：\n${calendarContext}` : existingCalendar.length ? `这是当天第 ${Number(existingCalendarDay?.refreshCount || 1) + 1} 次刷新，现有日程已经覆盖完整一整天，绝对禁止重写整份日程。根据当前时间、角色近期聊天和世界书判断原计划的实际进展，只输出确实需要修改的项目：已经到结束时间的预计事项改为实际完成内容；如果角色临时改变计划或实际行为偏离预计，写明真正发生的事。尚未到时间且没有变化的预计事项禁止输出、必须原样保留。每个变更严格使用“CALENDAR_UPDATE｜原开始时间｜原结束时间｜DONE或CHANGED｜更新后的事件标题｜实际发生或改变后的具体事情”。若完全无需改变，只输出 NO_CHANGE。原日程如下：\n${calendarContext}` : '这是今天第一次生成，只允许建立这一份完整全天计划。不要返回 JSON。每行严格使用“CALENDAR｜开始时间｜结束时间｜PLANNED或DONE｜行程标题｜具体做什么”。开始和结束都必须使用 HH:MM。生成从合理起床时间到睡觉、覆盖角色当天一整天的 7—10 段连续或基本连续行程，最晚必须覆盖到晚上 21:00 以后，按时间顺序排列；当前时间之前已经发生的项目用 DONE，未来项目用 PLANNED；必须包含三餐、必要通勤或休息，不能只写三四件大事。',
+      calendar:calendarNeedsCompletion ? `现有日程没有覆盖完整一整天，本次刷新必须先补齐，不能只做状态更新。保留原有项目；补充缺少时段，尤其是睡觉：当天凌晨 00:00 至起床，以及当晚入睡至次日早上（例如 22:30—次日07:00），分别作为独立行程。跨日行程的结束时间只写次日 HH:MM，不要写“次日”二字。已有当晚睡觉只到 23:59 的，请用相同开始时间更新它的结束时间，不要新增重叠项目。新增项目严格使用“CALENDAR_UPDATE｜开始时间｜结束时间｜PLANNED、DONE或CHANGED｜事件标题｜具体做什么”。每条简介写完整句子，以句号结束。绝对不能输出 NO_CHANGE。现有日程如下：\n${calendarContext}` : existingCalendar.length ? `这是当天第 ${Number(existingCalendarDay?.refreshCount || 1) + 1} 次刷新，现有日程已经覆盖完整一整天，绝对禁止重写整份日程。根据当前时间、角色近期聊天和世界书判断原计划的实际进展，只输出确实需要修改的项目。每个变更严格使用“CALENDAR_UPDATE｜原开始时间｜原结束时间｜DONE或CHANGED｜更新后的事件标题｜实际发生或改变后的具体事情”。简介必须是完整句子。若完全无需改变，只输出 NO_CHANGE。原日程如下：\n${calendarContext}` : '这是今天第一次生成，只允许建立这一份完整全天计划。不要返回 JSON。每行严格使用“CALENDAR｜开始时间｜结束时间｜PLANNED或DONE｜行程标题｜具体做什么”。开始和结束都必须使用 HH:MM。生成包含睡觉的全天行程：00:00 至起床是一段睡觉，当晚入睡至次日早上是另一段睡觉（例如 22:30—次日07:00，结束时间字段只写 07:00）。中间按时间顺序安排符合人设的三餐、活动和必要休息，不得重叠。每条简介必须写完整句子并以句号结束。当前时间之前用 DONE，未来用 PLANNED。',
       music:'不要返回 JSON。每行严格使用“MUSIC｜真实歌手｜真实歌曲名｜听过次数｜听这首歌时的具体心情”。生成 6—10 首最近播放歌单；歌曲和歌手必须是真实存在且对应正确，听过次数写成“12次”这种格式，歌曲选择符合角色身份、性格与近况。',
       shopping:'不要返回 JSON。每行严格使用“SHOPPING｜普通购物、花市或外卖｜价格｜商品完整名称｜订单状态｜角色买它的具体用途”。一次生成 5—8 件不同记录，价格写成“¥39.90”。“具体用途”必须是至少 20 个汉字的完整自然句，说明角色为什么买、准备给谁使用或在什么场景使用；不能只写几个词，不能在逗号、连接词或半个词处结束，不能换行拆开一条记录。是否出现花市、外卖以及各自数量，必须由角色的成年人身份、人设、生活习惯和近况自行决定；不适合就完全不要出现。花市仅限明确成年的角色，只写合法非露骨的成人情趣用品；不得涉及未成年人。普通商品要像真实商城订单，外卖要像真实餐饮订单。',
       wallet:'不要返回 JSON。每行严格使用“WALLET｜收入或支出｜金额｜流水名称｜时间｜具体说明”。必须生成 10—16 条彼此独立的近期钱包流水，不能只写一笔总账；至少包含 2 笔合理收入和 6 笔不同支出，每笔都要有独立金额、名称和时间。金额写成“¥39.90”；收入来源和消费内容必须符合角色职业、经济状况、普通购物、花市与外卖记录，收支要合理。'
@@ -380,7 +470,12 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
       const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.72, max_tokens:key === 'doubao' ? 2600 : key === 'calendar' ? 1800 : 1200, stream:false, messages:[{ role:'system', content:key === 'doubao' ? `${doubaoStylePrompt()} 当前任务是模拟角色“${owner.nickname || owner.name}”本人使用豆包。第一行输出 TITLE｜内容概括，标题用一句简洁短语准确概括具体聊天对象、事情或需求，不限制为 10 个字，也不能使用空泛分类；之后只输出 CHARACTER｜消息 和 DOUBAO｜消息。CHARACTER 永远是该角色，不是现实用户；DOUBAO 的所有回复必须完整遵守上述豆包语气。至少 4 个完整来回、至少 8 条消息，严格交替。` : '你是角色手机 App 内容生成器。只按用户指定的逐行格式返回内容，不要返回 JSON、Markdown 或解释。' }, { role:'user', content:prompt }] }) });
       if (response.status === 429) throw new Error('接口已接通，但当前触发了限流（429），请稍后再试。');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json(); const content = apiResponseText(data); const result = key === 'doubao' ? { doubao:normalizeDoubaoRounds(parseDoubaoContent(content)), doubaoTitle:parseDoubaoTitle(content) } : parseTaListContent(key, content);
+      const data = await response.json(); let content = apiResponseText(data);
+      if (key === 'calendar' && (data.choices?.[0]?.finish_reason === 'length' || /(?:，|,|因为|所以|然后|准备|正在|要|会|把|给)$/.test(content.trim()))) {
+        const tailResponse = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.5, max_tokens:600, stream:false, messages:[{role:'system',content:'只续写最后一条未写完的日历行程简介，不重复已经写出的文字，不增加新行程。'}, {role:'user',content:`以下日历输出在最后一行被截断。请只接着最后一个字续写，直到该行简介成为完整句子：\n${content.slice(-700)}`}] }) });
+        if (tailResponse.ok) content += apiResponseText(await tailResponse.json()).replace(/^\s*(?:CALENDAR(?:_UPDATE)?[｜|][^｜|]*[｜|][^｜|]*[｜|][^｜|]*[｜|][^｜|]*[｜|])?/i, '');
+      }
+      const result = key === 'doubao' ? { doubao:normalizeDoubaoRounds(parseDoubaoContent(content)), doubaoTitle:parseDoubaoTitle(content) } : parseTaListContent(key, content);
       if (key === 'doubao' && result.doubao.length < 8) {
         const missingRounds = 4 - Math.floor(result.doubao.length / 2);
         const existing = result.doubao.map(item => `${item.role === 'user' ? 'CHARACTER' : 'DOUBAO'}｜${item.text}`).join('\n');
@@ -399,21 +494,22 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
       let savedRows = result[key];
       if (key === 'calendar') {
         if (!existingCalendar.length && !result.calendar.length) throw new Error('API 没有生成今天的完整日程');
-        savedRows = existingCalendar.length ? mergeCalendarItems(existingCalendar, result.calendar, todayKey) : applyCalendarClock(result.calendar, todayKey);
+        savedRows = ensureCalendarSleepRows(existingCalendar.length ? mergeCalendarItems(existingCalendar, result.calendar, todayKey) : result.calendar, todayKey);
         let completionAttempt = 0;
         while (!calendarIsFullDay(savedRows) && completionAttempt < 2) {
           completionAttempt += 1;
           const partial = savedRows.map(item => `${item.start}—${item.end}｜${item.status}｜${item.title}｜${item.text || ''}`).join('\n');
-          const completionPrompt = `下面是角色“${owner.nickname || owner.name}”在 ${todayKey} 的不完整日程。请结合角色设定、身份、世界书和当前时间，只补充缺少的时段，使合并后形成真正符合角色生活的一整天行程，从合理起床时间覆盖到晚上 21:00 以后。不要使用通用模板，不要把所有角色都安排成相同的起床、早餐、上班模式；已有项目必须保留，新增项目不能与已有时间重叠。每行严格使用“CALENDAR_UPDATE｜开始时间｜结束时间｜PLANNED、DONE或CHANGED｜事件标题｜具体做什么”，不要 JSON、Markdown、编号或解释。当前时间：${nowLabel}\n角色设定：${String(owner.details || owner.signature || owner.identity || '暂无').slice(0,3500)}\n局部世界书：${bookText}\n现有日程：\n${partial}`;
+          const completionPrompt = `下面是角色“${owner.nickname || owner.name}”在 ${todayKey} 的不完整日程。只补充缺少的时段，必须包含凌晨 00:00 至起床的睡觉行程，以及当晚入睡至次日早上的睡觉行程；夜间睡觉不能只到 23:59，跨日的结束时间只写次日 HH:MM。已有晚间睡觉只到 23:59 的，使用同一开始时间更新，不新增重叠项目。睡觉也算正式行程，标题写“睡觉”或符合人设的睡眠标题。不要使用通用模板；已有项目必须保留。每行严格使用“CALENDAR_UPDATE｜开始时间｜结束时间｜PLANNED、DONE或CHANGED｜事件标题｜具体做什么”，简介写完整句子，以句号结束。不要 JSON、Markdown、编号或解释。当前时间：${nowLabel}\n角色设定：${String(owner.details || owner.signature || owner.identity || '暂无').slice(0,3500)}\n局部世界书：${bookText}\n现有日程：\n${partial}`;
           const completionResponse = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.68, max_tokens:1800, stream:false, messages:[{ role:'system', content:'你负责根据角色资料补齐当天缺失的日程，只输出 CALENDAR_UPDATE 逐行记录，不得套用固定日程模板。' }, { role:'user', content:completionPrompt }] }) });
           if (completionResponse.status === 429) throw new Error('补齐全天日程时触发了限流（429），请稍后再刷新。');
           if (!completionResponse.ok) throw new Error(`补齐全天日程失败：HTTP ${completionResponse.status}`);
           const completionData = await completionResponse.json();
           const completionResult = parseTaListContent('calendar', apiResponseText(completionData));
-          savedRows = mergeCalendarItems(savedRows, completionResult.calendar, todayKey);
+          savedRows = ensureCalendarSleepRows(mergeCalendarItems(savedRows, completionResult.calendar, todayKey), todayKey);
         }
         if (!calendarIsFullDay(savedRows)) throw new Error('API 补充后的日程仍未覆盖完整一天，请再次刷新。');
         saveCalendarDay(owner.id, todayKey, savedRows, existingCalendarDay);
+        syncRoleCalendarToStandalone(owner, savedRows, todayKey);
       }
       all[owner.id] = { ...previous, [key]: savedRows, ...(key === 'calendar' ? { calendarDate:todayKey } : {}), ...(key === 'doubao' ? { doubaoTitle:result.doubaoTitle } : {}) }; localStorage.setItem('ideal-machine-ta-snapshots', JSON.stringify(all));
       if (key === 'doubao') { selectedDoubaoHistory = -1; doubaoHistoryOpen = false; }
@@ -423,7 +519,8 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
   // 最终容错解析：兼容尾逗号、重复逗号、单引号和未加引号的英文属性名。
   function parseApiJSON(value) {
     const clean = String(value || '').replace(/```json|```/gi, '').trim();
-    const start = clean.indexOf('{'); const end = clean.lastIndexOf('}');
+    const starts = [clean.indexOf('{'), clean.indexOf('[')].filter(index => index >= 0); const ends = [clean.lastIndexOf('}'), clean.lastIndexOf(']')].filter(index => index >= 0);
+    const start = starts.length ? Math.min(...starts) : -1; const end = ends.length ? Math.max(...ends) : -1;
     if (start < 0 || end <= start) throw new Error('API 返回的内容不是完整 JSON');
     let source = clean.slice(start, end + 1);
     let normalized = ''; let quoted = false; let escaped = false;
@@ -443,6 +540,16 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
   // 豆包页顶部刷新与手机首页的“豆包”刷新共用同一套容错解析和保存逻辑。
   async function refreshDoubaoChat(owner) { return refreshSelectedApp(owner, 'doubao'); }
   function calendarRows(owner, dateKey = activeCalendarDate) { const saved = calendarDayRecord(owner.id, dateKey); if (saved?.items?.length) return saved.items; if (dateKey !== localDateKey(new Date())) return []; const fresh = snapshot(owner); if (fresh.calendarDate && fresh.calendarDate !== dateKey) return []; return fresh.calendar?.length ? fresh.calendar : read('ideal-machine-calendar-events', []).filter(item => item.contactId === owner.id || item.authorId === owner.id); }
+  async function autoRefreshRoleCalendar(owner) {
+    if (!owner?.id) return;
+    const todayKey = localDateKey(new Date());
+    const openKey = `${owner.id}:${todayKey}`;
+    if (calendarAutoOpenKey === openKey || refreshing) return;
+    calendarAutoOpenKey = openKey;
+    await refreshSelectedApp(owner, 'calendar');
+    const rows = calendarRows(owner, todayKey);
+    if (rows.length) syncRoleCalendarToStandalone(owner, rows, todayKey);
+  }
   function musicRows(owner) { const fresh = snapshot(owner); const music = read('ideal-machine-music', {}); return fresh.music?.length ? fresh.music : music.library?.[owner.id] || []; }
   function shoppingRows(owner) { const fresh = snapshot(owner); const shopping = read('ideal-machine-shopping', {}); return fresh.shopping?.length ? fresh.shopping : [...(shopping.orders?.[owner.id] || []), ...(shopping.wishes?.[owner.id] || [])]; }
   function walletRows(owner) { return Array.isArray(snapshot(owner).wallet) ? snapshot(owner).wallet : []; }
@@ -573,7 +680,7 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
     const files=[...(event.target.files||[])];if(!files.length)return;const max=emptyIconTargets().length;if(!max)return window.alert('所有 App 都已有自定义图标，可先恢复默认或交换图标。');const values=[];for(const file of files.slice(0,max)){const value=window.IdealMachineReadImage?await window.IdealMachineReadImage(file,360,.84):await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>resolve('');reader.readAsDataURL(file);});if(value)values.push(value);}event.target.closest('.ta-icon-source-sheet')?.remove();applyIconBatch(values);
   });
   document.addEventListener('input', event => { if(!app.classList.contains('is-open')||!event.target.matches('[data-ta-reverse-rate-range]'))return;const output=app.querySelector('[data-ta-reverse-rate-output]');if(output)output.textContent=`${event.target.value}%`;const text=app.querySelector('.ta-reverse-rate-sheet>section>p');const owner=role();if(text&&owner)text.textContent=`仅作用于 ${owner.nickname||owner.name}。成功率为 ${event.target.value}%，被发现概率为 ${100-Number(event.target.value)}%。`; });
-  document.addEventListener('click', event => { if (event.target.closest('[data-app-key="ta"]')) { state = readState(); activeApp = ''; activeChatTarget = ''; activeDetail = null; activeCalendarDate = localDateKey(new Date()); refreshPickerOpen = false; appearanceOpen = false; reverseOpen = false; selectedRefreshApps.clear(); doubaoHistoryOpen = false; selectedDoubaoHistory = -1; render(); app.classList.add('is-open'); return; } if (!app.classList.contains('is-open')) return; if (event.target.closest('[data-ta-appearance-close]')) { appearanceOpen = false; render(); return; } const albumPick=event.target.closest('[data-ta-album-pick]'); if(albumPick){const target=albumPick.dataset.taAlbumPick;if(!window.IdealMachineAlbum?.pick)return window.alert('相册 App 还没有准备好。');window.IdealMachineAlbum.pick(url=>setAppearanceImage(target,url));return;} const urlPick=event.target.closest('[data-ta-url-pick]');if(urlPick){const value=window.prompt('输入图片链接（https://…）');if(value&&!/^https?:\/\//i.test(value.trim()))return window.alert('请输入有效的 http(s) 图片链接。');if(value)setAppearanceImage(urlPick.dataset.taUrlPick,value);return;} if (event.target.closest('[data-ta-wallpaper-reset]')) { state.appearance.wallpaper = ''; saveState(); render(); return; } const iconReset=event.target.closest('[data-ta-icon-reset]'); if (iconReset) { delete state.appearance.icons[iconReset.dataset.taIconReset]; saveState(); render(); return; } if (event.target.closest('[data-ta-detail-close]')) { activeDetail = null; render(); return; } const detail = event.target.closest('[data-ta-detail]'); if (detail) { activeDetail = { type:detail.dataset.taDetail, index:Number(detail.dataset.taDetailIndex) }; render(); return; } if (event.target.closest('[data-ta-refresh-close]')) { refreshPickerOpen = false; selectedRefreshApps.clear(); render(); return; } if (event.target.closest('[data-ta-refresh-all]')) { const keys = ['chat','calendar','music','doubao','shopping','wallet']; if (selectedRefreshApps.size === keys.length) selectedRefreshApps.clear(); else keys.forEach(key => selectedRefreshApps.add(key)); syncRefreshPicker(); return; } const refreshChoice = event.target.closest('[data-ta-refresh-app]'); if (refreshChoice) { const key = refreshChoice.dataset.taRefreshApp; selectedRefreshApps.has(key) ? selectedRefreshApps.delete(key) : selectedRefreshApps.add(key); syncRefreshPicker(); return; } if (event.target.closest('[data-ta-refresh-submit]')) { const owner = role(); const keys = [...selectedRefreshApps]; if (owner && keys.length) refreshSelectedApps(owner, keys); return; } if (event.target.closest('[data-ta-close]')) { app.classList.remove('is-open'); app.classList.remove('is-role-picker'); appearanceOpen = false; reverseOpen = false; activeDetail = null; return; } if (event.target.closest('[data-ta-role-picker]')) { app.classList.add('is-role-picker'); render(); return; } if (event.target.closest('[data-ta-role-close]')) { app.classList.remove('is-role-picker'); render(); return; } const selected = event.target.closest('[data-ta-role]'); if (selected) { state.roleId = selected.dataset.taRole; activeDetail = null; activeCalendarDate = localDateKey(new Date()); saveState(); app.classList.remove('is-role-picker'); render(); return; } if (event.target.closest('[data-ta-refresh]')) { if (!role()) return; selectedRefreshApps.clear(); refreshPickerOpen = true; render(); return; } const calendarNav = event.target.closest('[data-ta-calendar-nav]'); if (calendarNav) { activeCalendarDate = shiftDateKey(activeCalendarDate, Number(calendarNav.dataset.taCalendarNav)); render(); return; } const pageRefresh = event.target.closest('[data-ta-page-refresh]'); if (pageRefresh) { const owner = role(); if (owner) { if (pageRefresh.dataset.taPageRefresh === 'calendar' && activeCalendarDate !== localDateKey(new Date())) { window.alert('只能刷新今天的日程；上一天和下一天用于查看已经保存的记录。'); return; } activeDetail = null; refreshSelectedApp(owner, pageRefresh.dataset.taPageRefresh); } return; } if (event.target.closest('[data-ta-chat-refresh]')) { const owner = role(); if (owner) refreshRoleChats(owner); return; } if (event.target.closest('[data-ta-chat-list]')) { activeChatTarget = ''; render(); return; } if (event.target.closest('[data-ta-home]')) { activeApp = ''; activeChatTarget = ''; activeDetail = null; render(); return; } if (event.target.closest('[data-ta-analyze-npc]')) { const owner = role(); if (owner) analyzeNpcs(owner); return; } const chatEntry = event.target.closest('[data-ta-role-chat]'); if (chatEntry) { activeChatTarget = chatEntry.dataset.taRoleChat; render(); return; } const launch = event.target.closest('[data-ta-role-app]'); if (launch) { if(launch.dataset.taRoleApp==='meihua'){appearanceOpen=true;render();return;} activeApp = launch.dataset.taRoleApp; activeDetail = null; if (activeApp === 'rili') activeCalendarDate = localDateKey(new Date()); return render(); } });
+  document.addEventListener('click', event => { if (event.target.closest('[data-app-key="ta"]')) { state = readState(); activeApp = ''; activeChatTarget = ''; activeDetail = null; activeCalendarDate = localDateKey(new Date()); calendarAutoOpenKey = ''; refreshPickerOpen = false; appearanceOpen = false; reverseOpen = false; selectedRefreshApps.clear(); doubaoHistoryOpen = false; selectedDoubaoHistory = -1; render(); app.classList.add('is-open'); return; } if (!app.classList.contains('is-open')) return; if (event.target.closest('[data-ta-appearance-close]')) { appearanceOpen = false; render(); return; } const albumPick=event.target.closest('[data-ta-album-pick]'); if(albumPick){const target=albumPick.dataset.taAlbumPick;if(!window.IdealMachineAlbum?.pick)return window.alert('相册 App 还没有准备好。');window.IdealMachineAlbum.pick(url=>setAppearanceImage(target,url));return;} const urlPick=event.target.closest('[data-ta-url-pick]');if(urlPick){const value=window.prompt('输入图片链接（https://…）');if(value&&!/^https?:\/\//i.test(value.trim()))return window.alert('请输入有效的 http(s) 图片链接。');if(value)setAppearanceImage(urlPick.dataset.taUrlPick,value);return;} if (event.target.closest('[data-ta-wallpaper-reset]')) { state.appearance.wallpaper = ''; saveState(); render(); return; } const iconReset=event.target.closest('[data-ta-icon-reset]'); if (iconReset) { delete state.appearance.icons[iconReset.dataset.taIconReset]; saveState(); render(); return; } if (event.target.closest('[data-ta-detail-close]')) { activeDetail = null; render(); return; } const detail = event.target.closest('[data-ta-detail]'); if (detail) { activeDetail = { type:detail.dataset.taDetail, index:Number(detail.dataset.taDetailIndex) }; render(); return; } if (event.target.closest('[data-ta-refresh-close]')) { refreshPickerOpen = false; selectedRefreshApps.clear(); render(); return; } if (event.target.closest('[data-ta-refresh-all]')) { const keys = ['chat','calendar','music','doubao','shopping','wallet']; if (selectedRefreshApps.size === keys.length) selectedRefreshApps.clear(); else keys.forEach(key => selectedRefreshApps.add(key)); syncRefreshPicker(); return; } const refreshChoice = event.target.closest('[data-ta-refresh-app]'); if (refreshChoice) { const key = refreshChoice.dataset.taRefreshApp; selectedRefreshApps.has(key) ? selectedRefreshApps.delete(key) : selectedRefreshApps.add(key); syncRefreshPicker(); return; } if (event.target.closest('[data-ta-refresh-submit]')) { const owner = role(); const keys = [...selectedRefreshApps]; if (owner && keys.length) refreshSelectedApps(owner, keys); return; } if (event.target.closest('[data-ta-close]')) { calendarAutoOpenKey = ''; app.classList.remove('is-open'); app.classList.remove('is-role-picker'); appearanceOpen = false; reverseOpen = false; activeDetail = null; return; } if (event.target.closest('[data-ta-role-picker]')) { app.classList.add('is-role-picker'); render(); return; } if (event.target.closest('[data-ta-role-close]')) { app.classList.remove('is-role-picker'); render(); return; } const selected = event.target.closest('[data-ta-role]'); if (selected) { state.roleId = selected.dataset.taRole; activeDetail = null; activeCalendarDate = localDateKey(new Date()); calendarAutoOpenKey = ''; saveState(); app.classList.remove('is-role-picker'); render(); return; } if (event.target.closest('[data-ta-refresh]')) { if (!role()) return; selectedRefreshApps.clear(); refreshPickerOpen = true; render(); return; } const calendarNav = event.target.closest('[data-ta-calendar-nav]'); if (calendarNav) { activeCalendarDate = shiftDateKey(activeCalendarDate, Number(calendarNav.dataset.taCalendarNav)); render(); return; } const pageRefresh = event.target.closest('[data-ta-page-refresh]'); if (pageRefresh) { const owner = role(); if (owner) { if (pageRefresh.dataset.taPageRefresh === 'calendar' && activeCalendarDate !== localDateKey(new Date())) { window.alert('只能刷新今天的日程；上一天和下一天用于查看已经保存的记录。'); return; } activeDetail = null; refreshSelectedApp(owner, pageRefresh.dataset.taPageRefresh); } return; } if (event.target.closest('[data-ta-chat-refresh]')) { const owner = role(); if (owner) refreshRoleChats(owner); return; } if (event.target.closest('[data-ta-chat-list]')) { activeChatTarget = ''; render(); return; } if (event.target.closest('[data-ta-home]')) { activeApp = ''; activeChatTarget = ''; activeDetail = null; calendarAutoOpenKey = ''; render(); return; } if (event.target.closest('[data-ta-analyze-npc]')) { const owner = role(); if (owner) analyzeNpcs(owner); return; } const chatEntry = event.target.closest('[data-ta-role-chat]'); if (chatEntry) { activeChatTarget = chatEntry.dataset.taRoleChat; render(); return; } const launch = event.target.closest('[data-ta-role-app]'); if (launch) { if(launch.dataset.taRoleApp==='meihua'){appearanceOpen=true;render();return;} activeApp = launch.dataset.taRoleApp; activeDetail = null; if (activeApp === 'rili') { activeCalendarDate = localDateKey(new Date()); window.setTimeout(() => autoRefreshRoleCalendar(role()), 0); } else calendarAutoOpenKey = ''; return render(); } });
   document.addEventListener('change', event => { if (!app.classList.contains('is-open')||!event.target.matches('[data-ta-image-file]')) return; const file=event.target.files?.[0]; if(!file)return;const target=event.target.dataset.taImageFile;const wallpaper=target==='wallpaper';const reader=window.IdealMachineReadImage ? window.IdealMachineReadImage(file, wallpaper ? 1600 : 360, wallpaper ? .76 : .84) : new Promise(resolve=>{const source=new FileReader();source.onload=()=>resolve(source.result);source.onerror=()=>resolve('');source.readAsDataURL(file);});reader.then(value=>setAppearanceImage(target,value)); });
   function reverseDataLines(value, limit=8) { const rows=[];const visit=(item,prefix='')=>{if(rows.length>=limit||item==null)return;if(typeof item==='string'||typeof item==='number'){const text=String(item).trim();if(text)rows.push(`${prefix}${text}`);return;}if(Array.isArray(item)){item.slice(-limit).forEach(entry=>visit(entry,prefix));return;}if(typeof item==='object'){const title=item.name||item.title||item.productName||item.with||item.text||item.note||'';const detail=item.price||item.amount||item.status||item.category||item.time||'';if(title)rows.push(`${prefix}${title}${detail?` · ${detail}`:''}`);else Object.entries(item).slice(0,limit).forEach(([key,entry])=>visit(entry,`${key}：`));}};visit(value);return rows.slice(0,limit); }
   function reverseWait(ms) { return new Promise(resolve=>window.setTimeout(resolve,ms)); }
@@ -707,6 +814,40 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
     const rate=reverseSuccessRate(owner.id);return `<section class="ta-reverse-page"><header><button type="button" data-ta-reverse-close>‹</button><div><small>SECRET CHECK</small><h1>TA 看我</h1></div><button class="ta-reverse-rate-open" type="button" data-ta-reverse-rate-open aria-label="设置查岗成功概率">%</button></header><main><div class="ta-reverse-hero"><i>${avatar(owner)}</i><span><small>本次查岗角色</small><b>${esc(owner.nickname||owner.name)}</b><p>当前成功率 ${rate}%，被发现概率 ${100-rate}%。点击后 TA 会尝试偷偷查看用户手机。</p></span><button type="button" data-ta-reverse-run>让 TA 偷偷查手机</button></div></main></section>${reverseRateOpen?reverseRateSheet(owner):''}`;
   }
   window.IdealMachineApps = window.IdealMachineApps || {}; window.IdealMachineApps.ta = { name: 'Ta' };
+  window.IdealMachineAutoRefreshRoleCalendar = () => autoRefreshRoleCalendar(role());
+  window.IdealMachineSyncAllRoleCalendars = async dateKey => {
+    const targetDate = /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : localDateKey(new Date());
+    const owners = roles();
+    if (!owners.length) throw new Error('还没有添加角色');
+    const failed = [];
+    for (const owner of owners) {
+      try {
+        let rows = calendarDayRecord(owner.id, targetDate)?.items || [];
+        if (!rows.length) rows = read('ideal-machine-calendar-events', []).filter(item => item.date === targetDate && item.author === 'role' && (item.authorId === owner.id || item.contactId === owner.id || item.ownerId === owner.id)).map(item => ({ ...item, date:item.time || '', text:item.note || item.text || '' }));
+        if (!rows.length) {
+            const config = window.IdealMachineAPI?.getConfig?.() || {};
+            const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('chat');
+            if (!config.endpoint || !config.key || !model) throw new Error('请先配置 AI 接口');
+            const chat = read(chatKey, {});
+            const current = chat.chats?.[owner.id] || {};
+            const profile = (chat.profiles || []).find(item => item.id === current.profileId);
+            const book = worldbook(owner);
+            const prompt = `为角色“${owner.name || owner.nickname}”生成 ${targetDate} 的一天行程。按时间顺序写完整一天，包含当天凌晨 00:00 至起床的睡觉，以及当晚入睡到次日早上的睡觉。跨日睡觉例如 22:30—次日07:00，结束时间字段只写 07:00；不能在 23:59 截断。其余活动符合人设与世界观，简介写完整句子。每行只用 CALENDAR｜HH:MM｜HH:MM｜PLANNED｜标题｜具体安排，不要其他文字。\n角色设定：${String(owner.details || owner.signature || owner.identity || '暂无').slice(0,3000)}\n绑定用户：${String(profile?.persona || '暂无').slice(0,1000)}\n局部世界书：${book ? (book.entries || []).map(item => `${item.name}：${item.content}`).join('\n').slice(-4000) : '暂无'}\n近期聊天：${(current.messages || []).slice(-5).map(item => item.text || item.content || '').join('；') || '暂无'}`;
+            const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:.7, max_tokens:1800, messages:[{ role:'system', content:'你是角色日程生成器，只按指定逐行格式输出。' }, { role:'user', content:prompt }] }) });
+            if (!response.ok) throw new Error(`API ${response.status}`);
+            const data = await response.json();
+            rows = parseTaListContent('calendar', apiResponseText(data)).calendar || [];
+            if (!rows.length) throw new Error('API 未返回可识别的行程');
+            rows = ensureCalendarSleepRows(rows, targetDate);
+            saveCalendarDay(owner.id, targetDate, rows, null);
+        }
+        if (!rows.length) throw new Error('未生成行程');
+        rows = ensureCalendarSleepRows(rows, targetDate);
+        syncRoleCalendarToStandalone(owner, rows, targetDate);
+      } catch (error) { failed.push(`${owner.name || owner.nickname}：${error.message}`); }
+    }
+    if (failed.length) throw new Error(failed.join('；'));
+  };
   function taDoubaoActionImage(type) { return `<img src="assets/ui/doubao-action-${type}.jpeg" alt="">`; }
   doubaoActionIcon = taDoubaoActionImage;
   function cleanTakeoverBubble(value) {
