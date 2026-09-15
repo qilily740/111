@@ -46,22 +46,65 @@ function json(response, data, status = 200) {
   const payload = JSON.stringify(data);
   response.writeHead(status, {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Ideal-Target-URL',
+    'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
     'Cache-Control': 'no-store',
     'Content-Type': 'application/json; charset=utf-8'
   });
   response.end(payload);
 }
 
+async function proxyAI(request, response, url) {
+  if (!url.pathname.startsWith('/api/ai/')) return false;
+  const target = String(request.headers['x-ideal-target-url'] || '').trim();
+  if (!/^https:\/\/[^\s]+$/i.test(target)) {
+    json(response, { error: 'AI 转发目标必须是 HTTPS 地址' }, 400);
+    return true;
+  }
+  const targetUrl = new URL(target);
+  if (!/(?:^|\/)(?:models|chat\/completions|embeddings)$/i.test(targetUrl.pathname)) {
+    json(response, { error: '不支持的 AI 接口路径' }, 400);
+    return true;
+  }
+  if (!['GET', 'POST'].includes(request.method)) {
+    json(response, { error: 'AI 转发只允许 GET 或 POST' }, 405);
+    return true;
+  }
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  const headers = {};
+  if (request.headers.authorization) headers.Authorization = request.headers.authorization;
+  if (request.headers['content-type']) headers['Content-Type'] = request.headers['content-type'];
+  const upstream = await fetch(targetUrl, {
+    method: request.method,
+    headers,
+    body: chunks.length ? Buffer.concat(chunks) : undefined
+  });
+  const body = Buffer.from(await upstream.arrayBuffer());
+  response.writeHead(upstream.status, {
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store',
+    'Content-Type': upstream.headers.get('content-type') || 'application/json; charset=utf-8'
+  });
+  response.end(body);
+  return true;
+}
+
 const mimeTypes = {
+  '.avif': 'image/avif',
   '.css': 'text/css; charset=utf-8',
+  '.gif': 'image/gif',
   '.html': 'text/html; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.manifest': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.webp': 'image/webp',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2'
 };
@@ -98,7 +141,8 @@ function params(request) {
   const url = new URL(request.url, `http://127.0.0.1:${PORT}`);
   const key = url.searchParams.get('key') || '';
   const qrSessionToken = url.searchParams.get('qrSessionToken') || '';
-  return { url, key, qrSessionToken, cookie: decodeToken(qrSessionToken) };
+  const sessionToken = url.searchParams.get('sessionToken') || '';
+  return { url, key, qrSessionToken, cookie: decodeToken(qrSessionToken || sessionToken) };
 }
 
 async function neteasePost(path, values, cookie = '') {
@@ -116,7 +160,9 @@ async function neteasePost(path, values, cookie = '') {
 }
 
 async function handle(request, response) {
-  if (request.method === 'OPTIONS') { response.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'GET, OPTIONS' }); response.end(); return; }
+  if (request.method === 'OPTIONS') { response.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Ideal-Target-URL', 'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS' }); response.end(); return; }
+  const requestUrl = new URL(request.url, `http://127.0.0.1:${PORT}`);
+  if (await proxyAI(request, response, requestUrl)) return;
   if (!['GET', 'HEAD'].includes(request.method)) { json(response, { error: '本机扫码代理只允许 GET、HEAD 或 OPTIONS' }, 405); return; }
   const { url, key, qrSessionToken, cookie } = params(request);
   if (url.pathname.startsWith('/api/auth/qr/')) console.log(`[qr-request] path=${url.pathname} key=${key ? key.slice(-6) : 'none'} token=${qrSessionToken ? qrSessionToken.length : 0}`);
@@ -127,6 +173,20 @@ async function handle(request, response) {
     return;
   }
   if (await serveApp(request, response, url)) return;
+  if (url.pathname === '/api/music/search') {
+    const keyword = url.searchParams.get('keywords') || '';
+    if (!keyword.trim()) { json(response, { code: 400, error: '缺少搜索关键词' }, 400); return; }
+    const result = await neteasePost('/api/cloudsearch/pc', { s: keyword.trim(), type: 1, offset: 0, limit: Math.min(30, Math.max(1, Number(url.searchParams.get('limit') || 24))) });
+    json(response, result.body);
+    return;
+  }
+  if (url.pathname.startsWith('/api/music/song/') && url.pathname.endsWith('/url')) {
+    const songId = decodeURIComponent(url.pathname.slice('/api/music/song/'.length, -'/url'.length));
+    if (!/^\d+$/.test(songId)) { json(response, { code: 400, error: '歌曲 ID 无效' }, 400); return; }
+    const result = await neteasePost('/api/song/enhance/player/url/v1', { ids: JSON.stringify([songId]), level: 'exhigh', encodeType: 'mp3' });
+    json(response, result.body);
+    return;
+  }
   if (!key || !qrSessionToken) { json(response, { error: '缺少二维码 key 或扫码会话' }, 400); return; }
   if (url.pathname === '/api/auth/qr/create') {
     json(response, { code: 200, data: { qrurl: qrUrl(key), qrimg: 'local-relay' } });

@@ -98,6 +98,17 @@
   window.IdealMachineReadImage = readImageFile;
   const nativeFetch = window.fetch.bind(window);
   const activeRequests = new Map();
+  function localAIProxyRequest(input, init) {
+    const configuredProxy = window.IdealMachineConfig?.aiProxyBase;
+    if (!configuredProxy || !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin)) return null;
+    const source = new URL(String(input), location.href);
+    if (!/^https?:$/i.test(source.protocol) || !/\/(?:models|chat\/completions|embeddings)$/i.test(source.pathname)) return null;
+    const proxy = new URL(configuredProxy, location.href);
+    proxy.pathname = `${proxy.pathname.replace(/\/$/, '')}${source.pathname}`;
+    const headers = new Headers(init.headers || {});
+    headers.set('X-Ideal-Target-URL', source.href);
+    return { input: proxy.href, init: { ...init, headers } };
+  }
   window.IdealMachineFetch = async function idealMachineFetch(input, init = {}) {
     const scope = String(init.idealScope || 'shared');
     const timeout = Math.max(1000, Number(init.timeout) || 45000);
@@ -113,7 +124,8 @@
     activeRequests.set(scope, requests);
     const timer = setTimeout(() => controller.abort(new DOMException('请求超时', 'TimeoutError')), timeout);
     const { idealScope, timeout: ignoredTimeout, ...fetchInit } = init;
-    try { return await nativeFetch(input, { ...fetchInit, signal: controller.signal }); }
+    const proxied = localAIProxyRequest(input, fetchInit);
+    try { return await nativeFetch(proxied?.input || input, { ...(proxied?.init || fetchInit), signal: controller.signal }); }
     finally {
       clearTimeout(timer);
       externalSignal?.removeEventListener?.('abort', abortFromExternal);
@@ -639,6 +651,8 @@
 不要固定每次发送几条消息。简单回应就发一条；只有角色确实有连续的想法、追问、情绪变化，或者平时本来就会连着发消息时，才发送多条。多条消息必须按照自然语义拆开，不要把一整句话硬切成几段，也不要为了增加气泡发送“嗯”“然后”“所以”等空话。
 
 如果需要发送多条消息，使用理想机支持的 [[MSG]] 分隔。每一段都必须像角色单独发送的一条真实消息，并且每段都要完整结束。消息长短要自然变化，不要每次都写成同样长度的段落，也不要因为是短消息就统一变得冷淡、强硬或夸张。
+
+聊天气泡拆分优先规则：每个气泡只表达一个自然、独立的想法、动作或情绪。只要回复中出现两句彼此独立、可以分别发送的完整句子，就必须使用 [[MSG]] 拆成不同气泡，不要把多句完整话堆在同一个气泡里。前一句已经说完，后一句开始新的质问、评价、撒娇、命令、动作、情绪或话题时，必须拆分；连续出现两个独立的句号、问号或感叹号句子时，通常也必须拆分。每个气泡通常只放一句完整的话。只有两个很短、语义不可分割、角色平时一定会一口气说完的分句，才可以保留在同一个气泡。不要拆开半句话，也不要把独立句子合并。
 
 如果最近一条消息是角色自己发的，而用户暂时没有继续说话，要判断用户是在等待、犹豫还是已经结束话题。可以根据角色性格自然补充、追问或延续话题，但不要机械使用“我在听”“请继续”“怎么了”等万能回复。
 

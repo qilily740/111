@@ -159,6 +159,7 @@
     if (message.type === 'location') return withTime(`[位置分享] ${message.locationName || message.text || ''}${message.locationDetail ? `（${message.locationDetail}）` : ''}`.trim());
     if (message.type === 'transfer') return withTime(`[转账] 金额：${message.amount || message.text || ''}，备注：${message.note || '无'}，状态：${message.status || '待处理'}`);
     if (message.type === 'video') return withTime(`[视频通话] ${message.text || ''}`.trim());
+    if (message.type === 'music') return withTime(`[音乐分享] 《${message.musicTitle || message.text || '未知歌曲'}》${message.musicArtist ? `，歌手：${message.musicArtist}` : ''}${message.musicAlbum ? `，专辑：${message.musicAlbum}` : ''}`);
     if (message.type === 'together') return withTime(`[一起听] ${message.text || ''}`.trim());
     if (message.type === 'doubao-share') {
       const rows = Array.isArray(message.sharedDoubaoMessages) ? message.sharedDoubaoMessages : [];
@@ -967,7 +968,7 @@ ${roundText}
   };
   function emojiDisplaySource(value) {
     const source = String(value || '').trim();
-    const match = source.match(/^https:\/\/i\.postimg\.cc\/([^/]+)\/([^/?#]+)$/i);
+    const match = source.match(/^https?:\/\/i\.postimg\.cc\/([^/]+)\/([^/?#]+)(?:[?#].*)?$/i);
     return match ? `assets/stickers/postimg/${match[1]}-${match[2]}` : source;
   }
   function normalizeEmojiImageSource(value) {
@@ -1282,7 +1283,120 @@ ${roundText}
   function promptProfile(profile) { const name = window.prompt('设定名称', profile?.name || ''); if (!name?.trim()) return; const persona = window.prompt('用户设定：身份、性格、说话方式等', profile?.persona || '') || ''; if (profile) { profile.name = name.trim(); profile.persona = persona; } else state.profiles.push({ id: uid('profile'), name: name.trim(), persona }); save(); render(); }
   function bindProfile() { if (!currentChat()) return; if (chatSettingsOpen) { settingsProfilePickerOpen = !settingsProfilePickerOpen; render(); return; } profilePickerOpen = true; render(); }
   async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => !['image'].includes(item.type)).map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text })); const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); await addMessage(data.choices?.[0]?.message?.content || '……', 'character'); } catch (error) { if (error?.name !== 'AbortError') await addMessage(`回复失败：${error.message}`, 'character'); } replying = false; render(); }
-  function handleTool(tool) { if (tool === 'reroll') { menuOpen = false; emojiOpen = false; syncChatPanelDOM(); rerollCurrentChatRound().catch(error => window.alert(`重新生成失败：${error.message}`)); return; } if (tool === 'offline') { menuOpen = false; emojiOpen = false; openOfflineMode(); return; } if (tool === 'image-file') { imageChoiceOpen = true; imageDescriptionOpen = false; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderImageChoice(); return; } if (tool === 'transfer') { transferOpen = true; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderTransfer(); return; } if (tool === 'together') { menuOpen = false; emojiOpen = false; openBookPicker(); return; } menuOpen = false; const labels = { voice: ['语音内容', 'voice'], video: ['通话主题', 'video'], location: ['位置名称', 'location'] }; const data = labels[tool]; if (!data) return render(); const value = window.prompt(data[0]); if (value?.trim()) addMessage(value.trim(), 'user', data[1]); }
+  function shareMusicSong(song) {
+    if (!song?.title) return;
+    addMessage(song.title, 'user', 'music', {
+      musicTitle: song.title,
+      musicArtist: song.artist || '未知歌手',
+      musicAlbum: song.album || '',
+      musicCover: song.cover || '',
+      musicId: song.id || '',
+      musicSource: song.source || '',
+      musicPlayUrl: song.playUrl || song.preview || song.url || ''
+    });
+  }
+  function listenToSharedMusic(message) {
+    const chat = currentChat();
+    if (!chat?.profileId || !message?.musicTitle) return;
+    let musicState = {};
+    try { musicState = JSON.parse(localStorage.getItem('ideal-machine-music') || '{}'); } catch {}
+    musicState.profileId = chat.profileId;
+    musicState.current ||= {};
+    musicState.rooms ||= {};
+    const song = { id: message.musicId || `shared-${Date.now()}`, title: message.musicTitle, artist: message.musicArtist || '', album: message.musicAlbum || '', cover: message.musicCover || '', playUrl: message.musicPlayUrl || '', source: message.musicSource || 'character' };
+    musicState.current[chat.profileId] = song;
+    musicState.rooms[chat.profileId] = { song, roleId: activeContact, startedAt: Date.now() };
+    localStorage.setItem('ideal-machine-music', JSON.stringify(musicState));
+    document.querySelector('[data-app-key="yinyue"]')?.click();
+  }
+  function renderMusicShareResults(results = [], status = '') {
+    const modal = document.querySelector('[data-chat-music-share]');
+    const list = modal?.querySelector('[data-chat-music-results]');
+    if (!list) return;
+    list.innerHTML = status ? `<p class="chat-music-share-status">${esc(status)}</p>` : results.length ? results.map(song => `<button class="chat-music-share-song" data-chat-music-pick="${esc(song.id)}" type="button"><span class="chat-music-share-cover">${song.cover ? `<img src="${esc(song.cover)}" alt="">` : '♫'}</span><span><b>${esc(song.title)}</b><small>${esc(song.artist || '未知歌手')}${song.album ? ` · ${esc(song.album)}` : ''}</small></span><em>分享</em></button>`).join('') : '<p class="chat-music-share-status">搜索歌曲、歌手或专辑。</p>';
+    modal._results = results;
+  }
+  function openMusicShareSheet() {
+    if (document.querySelector('[data-chat-music-share]')) return;
+    const modal = document.createElement('div');
+    modal.dataset.chatMusicShare = '';
+    modal.innerHTML = '<div class="chat-music-share-backdrop" data-chat-music-share-close></div><section class="chat-music-share-sheet" role="dialog" aria-modal="true"><header><div><span>MUSIC SHARE</span><h2>分享音乐</h2></div><button type="button" data-chat-music-share-close>×</button></header><form class="chat-music-share-search" data-chat-music-search-form><select data-chat-music-source aria-label="选择音乐来源"><option value="auto">自动搜索</option><option value="netease">网易云音乐</option><option value="deezer">Deezer</option><option value="itunes">iTunes</option><option value="local">我的音乐</option></select><input data-chat-music-search-input placeholder="搜索歌曲、歌手或专辑" autocomplete="off"><button type="submit">搜索</button></form><main data-chat-music-results><p class="chat-music-share-status">自动搜索会依次尝试多个音乐来源。</p></main></section>';
+    document.body.appendChild(modal);
+    modal.querySelector('[data-chat-music-search-input]')?.focus();
+  }
+  function closeMusicShareSheet() { document.querySelector('[data-chat-music-share]')?.remove(); }
+  function searchMusicShareFallback(keyword) {
+    return new Promise((resolve, reject) => {
+      const callbackName = `idealChatMusic${Date.now()}${Math.random().toString(36).slice(2)}`;
+      const script = document.createElement('script');
+      const timer = setTimeout(() => { delete window[callbackName]; script.remove(); reject(new Error('备用搜索超时')); }, 15000);
+      window[callbackName] = data => { clearTimeout(timer); delete window[callbackName]; script.remove(); resolve((data?.data || []).map(item => ({ id: String(item.id || ''), title: item.title || '', artist: item.artist?.name || '', album: item.album?.title || '', cover: item.album?.cover_medium || item.album?.cover || '', source: 'deezer' })).filter(item => item.id && item.title)); };
+      script.onerror = () => { clearTimeout(timer); delete window[callbackName]; script.remove(); reject(new Error('备用搜索不可用')); };
+      script.src = `https://api.deezer.com/search?q=${encodeURIComponent(keyword)}&limit=24&output=jsonp&callback=${callbackName}`;
+      document.head.appendChild(script);
+    });
+  }
+  function searchMusicShareItunes(keyword) {
+    return new Promise((resolve, reject) => {
+      const callbackName = `idealChatItunes${Date.now()}${Math.random().toString(36).slice(2)}`;
+      const script = document.createElement('script');
+      const timer = setTimeout(() => { delete window[callbackName]; script.remove(); reject(new Error('iTunes 搜索超时')); }, 15000);
+      window[callbackName] = data => { clearTimeout(timer); delete window[callbackName]; script.remove(); resolve((data?.results || []).filter(item => item.kind === 'song').map(item => ({ id: `itunes-${item.trackId}`, title: item.trackName || '', artist: item.artistName || '', album: item.collectionName || '', cover: item.artworkUrl100 || '', source: 'itunes' })).filter(item => item.title)); };
+      script.onerror = () => { clearTimeout(timer); delete window[callbackName]; script.remove(); reject(new Error('iTunes 搜索不可用')); };
+      script.src = `https://itunes.apple.com/search?term=${encodeURIComponent(keyword)}&entity=song&limit=24&country=CN&callback=${callbackName}`;
+      document.head.appendChild(script);
+    });
+  }
+  async function searchMusicShareNetease(keyword) {
+    const configuredBase = String(window.IdealMachineConfig?.neteaseApiBase || 'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/, '');
+    const localRelay = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin) ? String(window.IdealMachineConfig?.neteaseAuthApiBase || 'http://localhost:3210/api').replace(/\/$/, '') + '/music/search' : '';
+    const request = window.IdealMachineFetch || window.fetch.bind(window);
+    const searchUrl = localRelay ? `${localRelay}?keywords=${encodeURIComponent(keyword)}&limit=24` : `${configuredBase}/search?keywords=${encodeURIComponent(keyword)}&limit=24&type=1`;
+    const response = await request(searchUrl, { idealScope: 'music', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' } });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error || `API ${response.status}`);
+    const songs = data?.result?.songs || data?.songs || [];
+    return songs.map(item => { const artists = item.ar || item.artists || []; const album = item.al || item.album || {}; return { id: String(item.id), title: item.name || '', artist: artists.map(entry => entry.name).join(' / '), album: album.name || '', cover: album.picUrl || '', source: 'netease' }; }).filter(item => item.title);
+  }
+  function searchMusicShareLocal(keyword) {
+    const chat = currentChat();
+    let musicState = {};
+    try { musicState = JSON.parse(localStorage.getItem('ideal-machine-music') || '{}'); } catch {}
+    const songs = Array.isArray(musicState.library?.[chat?.profileId]) ? musicState.library[chat.profileId] : [];
+    const query = keyword.toLowerCase();
+    return songs.filter(song => [song.title, song.artist, song.album].some(value => String(value || '').toLowerCase().includes(query)));
+  }
+  async function searchMusicForShare() {
+    const modal = document.querySelector('[data-chat-music-share]');
+    const input = modal?.querySelector('[data-chat-music-search-input]');
+    const source = modal?.querySelector('[data-chat-music-source]')?.value || 'auto';
+    const keyword = input?.value.trim();
+    if (!keyword) return;
+    renderMusicShareResults([], '正在搜索音乐…');
+    const sources = source === 'auto' ? ['netease', 'deezer', 'itunes', 'local'] : [source];
+    const errors = [];
+    for (const currentSource of sources) {
+      try {
+        const results = currentSource === 'netease' ? await searchMusicShareNetease(keyword) : currentSource === 'deezer' ? await searchMusicShareFallback(keyword) : currentSource === 'itunes' ? await searchMusicShareItunes(keyword) : searchMusicShareLocal(keyword);
+        if (results.length) { renderMusicShareResults(results); return; }
+      } catch (error) { errors.push(error); }
+    }
+    renderMusicShareResults([], errors.length ? `搜索失败：已尝试 ${sources.length} 个来源。` : '没有找到相关歌曲。');
+  }
+  function handleTool(tool) { if (tool === 'reroll') { menuOpen = false; emojiOpen = false; syncChatPanelDOM(); rerollCurrentChatRound().catch(error => window.alert(`重新生成失败：${error.message}`)); return; } if (tool === 'offline') { menuOpen = false; emojiOpen = false; openOfflineMode(); return; } if (tool === 'image-file') { imageChoiceOpen = true; imageDescriptionOpen = false; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderImageChoice(); return; } if (tool === 'transfer') { transferOpen = true; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderTransfer(); return; } if (tool === 'music') { menuOpen = false; emojiOpen = false; syncChatPanelDOM(); openMusicShareSheet(); return; } if (tool === 'together') { menuOpen = false; emojiOpen = false; openBookPicker(); return; } menuOpen = false; const labels = { voice: ['语音内容', 'voice'], video: ['通话主题', 'video'], location: ['位置名称', 'location'] }; const data = labels[tool]; if (!data) return render(); const value = window.prompt(data[0]); if (value?.trim()) addMessage(value.trim(), 'user', data[1]); }
+  document.addEventListener('click', event => {
+    if (event.target.closest('[data-chat-music-share-close]')) { closeMusicShareSheet(); return; }
+    const listen = event.target.closest('[data-chat-music-listen]');
+    if (listen && app.classList.contains('is-open')) { const message = currentChat()?.messages.find(item => item.id === listen.dataset.chatMusicListen); if (message) listenToSharedMusic(message); return; }
+    const pick = event.target.closest('[data-chat-music-pick]');
+    if (pick) { const modal = document.querySelector('[data-chat-music-share]'); const song = modal?._results?.find(item => item.id === pick.dataset.chatMusicPick); if (song) { shareMusicSong(song); closeMusicShareSheet(); } return; }
+  }, true);
+  document.addEventListener('submit', event => {
+    const form = event.target.closest('[data-chat-music-search-form]');
+    if (!form) return;
+    event.preventDefault();
+    searchMusicForShare();
+  }, true);
   function addEmoji() {
     const group = state.emojis.groups.find(item => item.id === activeEmojiGroup);
     if (!group) return;
@@ -1591,7 +1705,7 @@ ${roundText}
   function toolIcon(type) { if (type === 'image-desc') return '<span class="chat-tool-text-icon" aria-hidden="true">字</span>'; const paths = { transfer: '<rect x="7" y="12" width="34" height="24" rx="5"/><path d="M7 19h34M15 28h11"/>', 'image-file': '<rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="19" r="3"/><path d="m12 33 8-8 6 6 4-4 6 6"/>', voice: '<path d="M16 22a8 8 0 0 0 16 0V14a8 8 0 0 0-16 0zM12 22a12 12 0 0 0 24 0M24 36v6M18 42h12"/>', video: '<rect x="7" y="14" width="25" height="20" rx="4"/><path d="m32 21 9-5v16l-9-5z"/>', location: '<path d="M24 42s12-10 12-21a12 12 0 1 0-24 0c0 11 12 21 12 21z"/><circle cx="24" cy="21" r="4"/>', music: '<path d="M30 9v24a6 6 0 1 1-3-5V15l13-3v13"/>', together: '<path d="M13 8h19a4 4 0 0 1 4 4v28H17a4 4 0 0 0-4 0z"/><path d="M13 8a4 4 0 0 0-4 4v28h4a4 4 0 0 1 4 0M18 15h12M18 21h12M18 27h9"/>' }; return `<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type] || ''}</svg>`; }
   function toolIcon(type) { const paths = { 'image-desc': '<rect x="6" y="8" width="25" height="21" rx="4"/><circle cx="14" cy="15" r="2.5"/><path d="m10 25 6-6 4 4 4-4 5 6M34 17h8M34 23h8M34 29h5"/>', music: '<circle cx="19" cy="28" r="7"/><circle cx="19" cy="28" r="3"/><path d="M24 28V10l17-4v17M24 14l17-4"/>' }; if (paths[type]) return `<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; const fallback = { transfer: '<rect x="7" y="12" width="34" height="24" rx="5"/><path d="M7 19h34M15 28h11"/>', 'image-file': '<rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="19" r="3"/><path d="m12 33 8-8 6 6 4-4 6 6"/>', voice: '<path d="M16 22a8 8 0 0 0 16 0V14a8 8 0 0 0-16 0zM12 22a12 12 0 0 0 24 0M24 36v6M18 42h12"/>', video: '<rect x="7" y="14" width="25" height="20" rx="4"/><path d="m32 21 9-5v16l-9-5z"/>', location: '<path d="M24 42s12-10 12-21a12 12 0 1 0-24 0c0 11 12 21 12 21z"/><circle cx="24" cy="21" r="4"/>', together: '<path d="M13 8h19a4 4 0 0 1 4 4v28H17a4 4 0 0 0-4 0z"/><path d="M13 8a4 4 0 0 0-4 4v28h4a4 4 0 0 1 4 0M18 15h12M18 21h12M18 27h9"/>', offline: '<circle cx="24" cy="24" r="15"/><path d="M24 9v15l10 8M24 24H14"/>' }; return `<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true">${fallback[type] || ''}</svg>`; }
   document.addEventListener('click', event => { const choice = event.target.closest('[data-chat-image-choice]'); const close = event.target.closest('[data-chat-image-description-cancel]'); const send = event.target.closest('[data-chat-image-description-send]'); if (!choice && !close && !send) return; if (choice?.dataset.chatImageChoice === 'album') return; event.stopImmediatePropagation(); if (close) { imageDescriptionOpen = false; renderImageChoice(); return; } if (send) { const value = document.querySelector('#chatImageDescription')?.value.trim(); if (!value) return window.alert('请填写图片描述。'); imageDescriptionOpen = false; imageChoiceOpen = false; menuOpen = false; renderImageChoice(); addMessage(value, 'user', 'image-desc'); return; } if (choice.dataset.chatImageChoice === 'text') { imageDescriptionOpen = true; renderImageChoice(); return; } imageDescriptionOpen = false; imageChoiceOpen = false; menuOpen = false; renderImageChoice(); document.querySelector('#chatImageFile')?.click(); }, true);
-  function toolMenu() { if (imageChoiceOpen) return imageDescriptionOpen ? '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>图片文字描述</h3><textarea id="chatImageDescription" placeholder="输入这张图片的内容描述…"></textarea><div><button data-chat-image-description-cancel type="button">取消</button><button data-chat-image-description-send type="button">发送</button></div></div></div>' : '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>发送图片</h3><button data-chat-image-choice="text" type="button">文字描述</button><button data-chat-image-choice="file" type="button">本地相册</button></div></div>'; const tools = [['transfer', '转账'], ['image-file', '发送图片'], ['voice', '发送语音'], ['video', '视频通话'], ['location', '发送定位'], ['together', '一起看书'], ['offline', '线下'], ['reroll', '重roll']]; const rerollIcon = '<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M38 17a15 15 0 0 0-26-3l-3 4M10 14v6h6M10 31a15 15 0 0 0 26 3l3-4M38 34v-6h-6"/></svg>'; return `<div class="chat-tools">${tools.map(([type, label]) => `<button data-chat-tool="${type}" type="button" ${type === 'reroll' && replying ? 'disabled' : ''}>${type === 'reroll' ? rerollIcon : toolIcon(type)}<span>${label}</span></button>`).join('')}</div>`; }
+  function toolMenu() { if (imageChoiceOpen) return imageDescriptionOpen ? '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>图片文字描述</h3><textarea id="chatImageDescription" placeholder="输入这张图片的内容描述…"></textarea><div><button data-chat-image-description-cancel type="button">取消</button><button data-chat-image-description-send type="button">发送</button></div></div></div>' : '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>发送图片</h3><button data-chat-image-choice="text" type="button">文字描述</button><button data-chat-image-choice="file" type="button">本地相册</button></div></div>'; const tools = [['transfer', '转账'], ['image-file', '发送图片'], ['voice', '发送语音'], ['video', '视频通话'], ['location', '发送定位'], ['music', '分享音乐'], ['together', '一起看书'], ['offline', '线下'], ['reroll', '重roll']]; const rerollIcon = '<svg class="chat-tool-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M38 17a15 15 0 0 0-26-3l-3 4M10 14v6h6M10 31a15 15 0 0 0 26 3l3-4M38 34v-6h-6"/></svg>'; return `<div class="chat-tools">${tools.map(([type, label]) => `<button data-chat-tool="${type}" type="button" ${type === 'reroll' && replying ? 'disabled' : ''}>${type === 'reroll' ? rerollIcon : toolIcon(type)}<span>${label}</span></button>`).join('')}</div>`; }
   function openOfflineMode() { let modal = document.querySelector('[data-chat-offline-modal]'); if (!modal) { modal = document.createElement('div'); modal.dataset.chatOfflineModal = ''; document.body.appendChild(modal); } const chat = currentChat(); const sessions = chat?.offlineSessions || []; const session = sessions.find(item => item.id === offlineSessionId); const contact = state.contacts.find(item => item.id === activeContact) || {}; if (!session) { modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card"><header><div><span class="chat-kicker">OFFLINE MODE</span><h2>线下见面</h2></div><button type="button" data-offline-close>×</button></header><p class="chat-offline-note">这是一次独立的见面经历，不会混入普通聊天记录。</p><label>见面地点<input data-offline-place placeholder="例如：街角咖啡店"></label><label>见面原因<input data-offline-reason placeholder="例如：一起庆祝生日"></label><label>角色此刻的状态<input data-offline-mood placeholder="例如：有点紧张，但很期待"></label><footer><button type="button" data-offline-close>取消</button><button type="button" data-offline-start>开始见面</button></footer></section>`; } else { modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-session"><header><div><span class="chat-kicker">${esc(session.place)}</span><h2>${esc(contact.nickname || contact.name)} · 线下</h2></div><button type="button" data-offline-close>×</button></header><div class="chat-offline-scene"><b>${esc(session.reason)}</b><small>${esc(session.mood)}</small></div><main class="chat-offline-messages">${session.messages.length ? session.messages.map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><p>${esc(item.text)}</p></article>`).join('') : '<div class="chat-offline-empty">见面开始了。和角色说第一句话吧。</div>'}</main><form data-offline-form><input data-offline-input placeholder="在现场说点什么…"><button type="submit">发送</button></form></section>`; const box = modal.querySelector('.chat-offline-messages'); if (box) box.scrollTop = box.scrollHeight; } modal.classList.add('is-open'); }
   async function offlineReply(text) { const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); const contact = state.contacts.find(item => item.id === activeContact); if (!session || !contact) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) { session.messages.push({ role:'character', text:'（请先配置聊天 API，才能让角色回应这次见面。）' }); save(); openOfflineMode(); return; } offlineBusy = true; openOfflineMode(); try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.85, messages:[{role:'system',content:`你正在扮演角色“${contact.name}”，和用户在线下见面。地点：${session.place}。见面原因：${session.reason}。角色状态：${session.mood}。这次经历独立于普通聊天记录，请用现场感自然回应，不要提及 AI。`}, ...session.messages.map(item => ({ role:item.role === 'user' ? 'user' : 'assistant', content:item.text }))]}) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); session.messages.push({ role:'character', text:data.choices?.[0]?.message?.content || '……' }); save(); } catch (error) { session.messages.push({ role:'character', text:`（这次见面暂时无法继续：${error.message}）` }); save(); } finally { offlineBusy = false; openOfflineMode(); } }
   function enhanceOfflineMode() { const modal = document.querySelector('[data-chat-offline-modal]'); if (!modal) return; const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); const contact = state.contacts.find(item => item.id === activeContact) || {}; const now = new Date(); const stamp = `${now.getMonth() + 1}月${now.getDate()}日 · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; if (!session) { modal.querySelector('.chat-offline-card')?.classList.add('is-setup'); return; } const card = modal.querySelector('.chat-offline-card'); if (!card) return; card.classList.add('is-immersive'); const messages = session.messages.map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text)}</p></article>`).join(''); card.innerHTML = `<header class="chat-offline-topbar"><button type="button" data-offline-close>‹</button><div><span class="chat-kicker">LIVE MEETING</span><h2>线下见面</h2></div><button type="button" class="chat-offline-more" data-offline-close>×</button></header><div class="chat-offline-meta"><b>${esc(session.place)}</b><span>${stamp}</span></div><section class="chat-offline-atmosphere"><div class="chat-offline-orbit"><i></i><strong>现场</strong></div><div><span>正在和 ${esc(contact.nickname || contact.name || '角色')} 见面</span><b>${esc(session.reason)}</b></div></section><section class="chat-offline-character"><div class="chat-offline-pulse"></div><div><span>角色此刻的状态</span><b>${esc(session.mood)}</b></div><em>${offlineBusy ? '正在回应…' : '在你身边'}</em></section><main class="chat-offline-messages">${messages || '<div class="chat-offline-empty">你们刚刚见面。先观察一下此刻的他吧。</div>'}</main><div class="chat-offline-actions"><button type="button" data-offline-action="说些什么">✦<span>说些什么</span></button><button type="button" data-offline-action="做个动作">◌<span>做个动作</span></button><button type="button" data-offline-action="观察周围">⌁<span>观察周围</span></button><button type="button" data-offline-action="结束见面">□<span>结束见面</span></button></div><form data-offline-form><input data-offline-input placeholder="在现场说点什么…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}>发送</button></form>`; const box = modal.querySelector('.chat-offline-messages'); if (box) box.scrollTop = box.scrollHeight; }
@@ -2242,7 +2356,7 @@ ${roundText}
   document.addEventListener('pointerdown', event => { if (event.target.closest('[data-chat-plus], [data-chat-emoji]')) captureChatPanelScroll(); }, true);
   document.addEventListener('scroll', event => { const target = event.target.closest?.('#chatMessages'); if (target) chatPanelScrollSnapshot = { messageTop: target.scrollTop, mainTop: document.querySelector('#chatMain')?.scrollTop || 0, pageTop: window.scrollY || 0 }; }, true);
   function syncChatPanelDOM() { const wrap = document.querySelector('.chat-compose-wrap'); if (!wrap) return; wrap.querySelectorAll('.chat-tools, .chat-emoji-panel').forEach(panel => panel.remove()); if (menuOpen) wrap.insertAdjacentHTML('afterbegin', toolMenu()); else if (emojiOpen) wrap.insertAdjacentHTML('afterbegin', emojiPanel()); app.classList.toggle('is-emoji-open', emojiOpen); app.classList.toggle('is-menu-open', menuOpen); const scrollToLatest = () => { const messages = document.querySelector('#chatMessages'); if (messages) messages.scrollTop = messages.scrollHeight; }; requestAnimationFrame(scrollToLatest); setTimeout(scrollToLatest, 20); setTimeout(scrollToLatest, 100); setTimeout(scrollToLatest, 250); }
-  function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const body = message.recalled ? '<span class="chat-recalled">' + (message.role === 'user' ? '你' : '角色') + '撤回了一条消息</span>' : message.type === 'voice' ? voiceMessageBody(message) : message.type === 'image' ? '<img src="' + esc(message.text) + '" alt="图片">' : message.type === 'image-desc' ? '<div class="chat-image-description"><strong>文字图片</strong><p>' + esc(message.text) + '</p></div>' : message.type === 'transfer' ? '<div class="chat-transfer-message"><strong>转账</strong><b>¥ ' + esc(message.amount || message.text) + '</b><p>' + esc(message.note || '无备注') + '</p><small>' + (message.status === 'accepted' ? (message.role === 'user' ? '已被接收' : '已接收') : message.status === 'returned' ? (message.role === 'user' ? '已被退回' : '已退回') : '待处理') + '</small></div>' : message.type === 'video' ? '▣ ' + esc(message.text) : message.type === 'location' ? '<div class="chat-location-message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.2"/></svg><div class="chat-location-copy"><b>' + esc(message.locationName || message.text || '定位') + '</b><p>' + esc(message.locationDetail || '具体地点未填写') + '</p></div><strong class="chat-location-distance">' + esc(message.distance || '未知') + '</strong></div>' : message.type === 'together' ? '▤ ' + esc(message.text) : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp || message.recalled ? '' : '<small>' + esc(message.time || '') + '</small>'; const typeClass = (message.type || '') + (message.status === 'accepted' ? ' is-settled is-accepted' : message.status === 'returned' ? ' is-settled is-returned' : '') + (message.sticker ? ' sticker' : ''); return '<div class="chat-message ' + (message.role === 'user' ? 'is-user' : 'is-character') + '" data-chat-message-id="' + esc(message.id) + '"><div class="chat-message-line">' + avatar + '<div class="chat-bubble ' + typeClass + '">' + body + '</div>' + stamp + '</div></div>'; }
+  function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const body = message.recalled ? '<span class="chat-recalled">' + (message.role === 'user' ? '你' : '角色') + '撤回了一条消息</span>' : message.type === 'voice' ? voiceMessageBody(message) : message.type === 'image' ? '<img src="' + esc(message.text) + '" alt="图片">' : message.type === 'image-desc' ? '<div class="chat-image-description"><strong>文字图片</strong><p>' + esc(message.text) + '</p></div>' : message.type === 'transfer' ? '<div class="chat-transfer-message"><strong>转账</strong><b>¥ ' + esc(message.amount || message.text) + '</b><p>' + esc(message.note || '无备注') + '</p><small>' + (message.status === 'accepted' ? (message.role === 'user' ? '已被接收' : '已接收') : message.status === 'returned' ? (message.role === 'user' ? '已被退回' : '已退回') : '待处理') + '</small></div>' : message.type === 'music' ? '<div class="chat-music-message" data-chat-music-listen="' + esc(message.id) + '" role="button" tabindex="0" title="点击一起听">' + (message.musicCover ? '<img src="' + esc(message.musicCover) + '" alt="">' : '<span class="chat-music-mark">♫</span>') + '<div><b>' + esc(message.musicTitle || message.text || '未知歌曲') + '</b><small>' + esc(message.musicArtist || '未知歌手') + (message.musicAlbum ? ' · ' + esc(message.musicAlbum) : '') + '</small></div></div>' : message.type === 'video' ? '▣ ' + esc(message.text) : message.type === 'location' ? '<div class="chat-location-message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.2"/></svg><div class="chat-location-copy"><b>' + esc(message.locationName || message.text || '定位') + '</b><p>' + esc(message.locationDetail || '具体地点未填写') + '</p></div><strong class="chat-location-distance">' + esc(message.distance || '未知') + '</strong></div>' : message.type === 'together' ? '▤ ' + esc(message.text) : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp || message.recalled ? '' : '<small>' + esc(message.time || '') + '</small>'; const typeClass = (message.type || '') + (message.status === 'accepted' ? ' is-settled is-accepted' : message.status === 'returned' ? ' is-settled is-returned' : '') + (message.sticker ? ' sticker' : ''); return '<div class="chat-message ' + (message.role === 'user' ? 'is-user' : 'is-character') + '" data-chat-message-id="' + esc(message.id) + '"><div class="chat-message-line">' + avatar + '<div class="chat-bubble ' + typeClass + '">' + body + '</div>' + stamp + '</div></div>'; }
   const baseAddMessage = addMessage;
   addMessage = function(text, role = 'user', type = '', meta = {}) { const raw = String(text || ''); if (role === 'character') { const location = raw.match(/\[\[LOCATION\s+name\s*=\s*([^\]]+?)\s+detail\s*=\s*([^\]]+?)\s+distance\s*=\s*([^\]]+?)\]\]/i); if (location) { const remaining = raw.replace(location[0], '').trim(); baseAddMessage(location[1].trim(), role, 'location', { locationName: location[1].trim(), locationDetail: location[2].trim(), distance: location[3].trim() }); if (remaining) baseAddMessage(remaining, role, '', {}); return; } } baseAddMessage(text, role, type, meta); };
   const baseReply = reply;
@@ -2721,6 +2835,40 @@ ${roundText}
     return grouped;
   }
 
+  // 即使没有开启“连续消息”，也只在模型确实写出了多个完整句子时自然拆泡。
+  // 不按字数硬切，不要求固定气泡数量，也不会拆开没有结束标点的半句话。
+  function splitCharacterReplyNaturally(text) {
+    const source = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!source) return [];
+    const parts = splitCharacterReplyFallback(source, Number.MAX_SAFE_INTEGER);
+    return parts.length ? parts : [source];
+  }
+
+  function parseCharacterMusicMarkers(text) {
+    const songs = [];
+    const marker = /\[\[MUSIC\b([^\]]*)\]\]/ig;
+    const clean = String(text || '').replace(marker, (_, attributes) => {
+      const values = {};
+      String(attributes || '').replace(/([a-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s]+))/ig, (match, key, doubleValue, singleValue, plainValue) => { values[key.toLowerCase()] = String(doubleValue ?? singleValue ?? plainValue ?? '').trim(); return match; });
+      if (values.title) songs.push({ title: values.title, artist: values.artist || '未知歌手', album: values.album || '', cover: values.cover || '', source: values.source || 'character' });
+      return ' ';
+    });
+    return { clean, songs };
+  }
+
+  function capCharacterChunks(chunks, max) {
+    const limit = Math.max(1, Number(max) || 1);
+    if (chunks.length <= limit) return chunks;
+    const grouped = [];
+    for (let index = 0; index < limit; index += 1) {
+      const start = Math.floor(index * chunks.length / limit);
+      const end = Math.floor((index + 1) * chunks.length / limit);
+      const value = chunks.slice(start, end).join('').trim();
+      if (value) grouped.push(value);
+    }
+    return grouped;
+  }
+
   function mergeUnsafeCharacterChunks(chunks) {
     const result = [];
     chunks.forEach(value => {
@@ -2831,9 +2979,9 @@ ${roundText}
     const bounds = characterReplyBounds(chat, settings.characterMultiMessage);
     const target = settings.characterMultiMessage ? (characterReplyTargetCount || (bounds.min + Math.floor(Math.random() * (bounds.max - bounds.min + 1)))) : 1;
     if (!settings.characterMultiMessage) {
-      // 连续消息关闭时，即使模型误用了分隔符，也合并成一个完整气泡，避免丢掉后半段。
+      // 不再把多个完整句子强行合并成一个气泡；只按自然句号、问号、感叹号等断句。
       const compact = chunks.join(' ').replace(/\s+/g, ' ').trim() || raw.replace(/\[\[MSG\]\]/gi, ' ').replace(/\s+/g, ' ').trim();
-      chunks = compact ? [compact] : [];
+      chunks = splitCharacterReplyNaturally(compact);
     } else {
       // 模型偶尔会忘记分隔符：只在用户开启连续消息时做自然断句兜底。
       if (chunks.length < target) chunks = splitCharacterReplyFallback(raw, target);
@@ -2841,6 +2989,10 @@ ${roundText}
       if (chunks.length > target) chunks = splitCharacterReplyFallback(chunks.join(' '), target);
       chunks = mergeUnsafeCharacterChunks(chunks);
     }
+    // 无论是否开启连续消息，已经存在于同一段里的多个完整句子都要自然拆开。
+    // 这一步放在两条分支之后，避免“连续消息已开启”时绕过句子拆分。
+    chunks = chunks.flatMap(chunk => splitCharacterReplyNaturally(chunk));
+    if (settings.characterMultiMessage) chunks = capCharacterChunks(chunks, bounds.max);
     // 这里只清理空白，不按字数截断；完整语义优先。
     chunks = chunks.map(chunk => compactCharacterChunk(chunk)).filter(Boolean);
     let sent = 0;
@@ -2858,7 +3010,9 @@ ${roundText}
     };
     // 不再用 slice(0, target) 丢弃目标条数以外的内容。
     // target 只是模型分条的期望数量，完整回复始终必须保留。
-    for (const chunk of chunks) {
+    for (let chunk of chunks) {
+      const musicParsed = parseCharacterMusicMarkers(chunk);
+      chunk = musicParsed.clean;
       let cursor = 0;
       const marker = /\[\[STICKER\s*:\s*([^\]]+)\]\]/ig;
       let match;
@@ -2871,6 +3025,7 @@ ${roundText}
       }
       const rest = chunk.slice(cursor).trim();
       if (rest) { await appendCharacterMessage(rest); sent += 1; }
+      for (const song of musicParsed.songs) { await appendCharacterMessage(song.title, 'music', { musicTitle: song.title, musicArtist: song.artist, musicAlbum: song.album, musicCover: song.cover, musicSource: song.source }); sent += 1; }
     }
     if (!stickerSent && characterStickerFallbackRequested && items.length) {
       const latestUser = [...(chat.messages || [])].reverse().find(message => message.role === 'user');
@@ -2880,6 +3035,21 @@ ${roundText}
     if (!sent) await appendCharacterMessage(cleanCharacterVisibleText(String(text || '……').replace(/\[\[STICKER\s*:[^\]]+\]\]/ig, '')) || '……');
   }
 
+  // 最后一层入库保护：即使某条旧回复路径绕过上面的生成拆分，写入聊天记录前仍按完整句拆泡。
+  const baseNaturalAddMessage = addMessage;
+  addMessage = function(text, role = 'user', type = '', meta = {}) {
+    const raw = String(text || '').trim();
+    const hasControlMarker = /\[\[(?:MSG|STICKER|MUSIC|TRANSFER|LOCATION|VOICE|VIDEO_CALL|IMAGE_PROMPT)\b/i.test(raw);
+    const settings = currentChat() ? chatSettingsFor(currentChat()) : {};
+    if (role === 'character' && !type && raw && !hasControlMarker && !settings.characterMultiMessage) {
+      const chunks = splitCharacterReplyNaturally(raw);
+      if (chunks.length > 1) {
+        chunks.forEach(chunk => baseNaturalAddMessage(chunk, role, type, meta));
+        return;
+      }
+    }
+    return baseNaturalAddMessage(text, role, type, meta);
+  };
   const baseCharacterAddMessage = addMessage;
   addMessage = function(text, role = 'user', type = '', meta = {}) {
     if (role === 'character' && !type && currentChat()) return sendCharacterReplyContent(text, currentChat());
@@ -2932,6 +3102,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         const system = payload.messages?.find(item => item.role === 'system');
         if (system) {
           system.content += instruction;
+          system.content += '\n\n【音乐分享规则】角色可以在确实符合自己的人设、兴趣、情绪和当前线上聊天背景时分享音乐，但不是每轮都要分享。只有角色真的想推荐歌曲、回应歌词或表达当下心情时才使用，不要为了凑消息类型而分享。需要分享时，在正常文字之外追加严格格式：[[MUSIC title="歌曲名" artist="歌手名" album="专辑名"]]；歌曲名、歌手和专辑必须真实一致，不知道专辑时可省略 album，不要编造 cover 链接。控制标记不要展示给用户。';
           // 这里的上限完全来自当前聊天设置，不能再被旧的“最多 3 条”提示覆盖。
           system.content = system.content.replace(/普通闲聊最多发送 3 条/g, `普通闲聊最多发送 ${rangeMax} 条`);
           // 短回复靠提示词控制，不靠过小的 token 上限硬截断；否则长一点的完整句子会被 API 从末尾截掉。
@@ -5176,8 +5347,13 @@ ${recentConversation}`
     const data = await response.json();
     const answer = String(data.choices?.[0]?.message?.content || '……');
     let chunks = answer.split(/\[\[MSG\]\]/i).map(cleanCharacterVisibleText).filter(Boolean);
-    if (!settings.characterMultiMessage) chunks = [cleanCharacterVisibleText(chunks.join(' '))];
-    else if (chunks.length < bounds.min) chunks = splitCharacterReplyFallback(answer, bounds.min);
+    if (!settings.characterMultiMessage) {
+      chunks = splitCharacterReplyNaturally(cleanCharacterVisibleText(chunks.join(' ')));
+    } else {
+      if (chunks.length < bounds.min) chunks = splitCharacterReplyFallback(answer, bounds.min);
+      chunks = chunks.flatMap(chunk => splitCharacterReplyNaturally(chunk));
+      chunks = capCharacterChunks(chunks, bounds.max);
+    }
     chunks = mergeUnsafeCharacterChunks(chunks).filter(Boolean);
     for (const chunk of chunks) {
       if (!state.chats?.[contactId] || !state.contacts.some(item => item.id === contactId)) break;
@@ -5318,6 +5494,7 @@ ${recentConversation}`
   let videoCallTimerId = 0;
   let videoCallDirection = 'incoming';
   let videoCallGenerating = false;
+  let videoCallError = '';
   function videoCallName(contact = videoCallContact) { return contact?.nickname || contact?.name || '角色'; }
   function videoCallDuration(session = videoCallSession) { return session?.startedAt ? Math.max(0, Math.floor((Date.now() - session.startedAt) / 1000)) : 0; }
   function videoCallDurationText(seconds = 0) { const value = Math.max(0, Number(seconds) || 0); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`; }
@@ -5335,6 +5512,7 @@ ${recentConversation}`
     const name = videoCallName(contact);
     const avatar = avatarMarkup(contact, 'chat-video-call-avatar');
     const log = videoCallMessages.map(item => `<p class="${item.role === 'user' ? 'is-user' : ''}"><b>${item.role === 'user' ? '你' : esc(name)}：</b>${esc(item.text)}</p>`).join('');
+    const errorNote = videoCallError ? `<p class="chat-video-call-error">${esc(videoCallError)}，点击“回复”重试</p>` : '';
     if (status === 'incoming' || status === 'outgoing' || status === 'connecting') {
       const label = status === 'incoming' ? `${esc(name)}正在呼叫你` : status === 'outgoing' ? `正在呼叫${esc(name)}…` : '正在接通…';
       const actions = status === 'incoming' ? '<div class="chat-video-call-actions"><button data-video-call-reject type="button">挂断</button><button data-video-call-accept type="button">接听</button></div>' : '<div class="chat-video-call-actions"><button data-video-call-cancel type="button">取消</button></div>';
@@ -5345,7 +5523,7 @@ ${recentConversation}`
       modal.innerHTML = `<div class="chat-video-call-head"><b>视频通话</b></div><div class="chat-video-call-stage"><div>${avatar}<p class="chat-video-call-status">正在整理通话记录…</p><strong class="chat-video-call-ending-time">${videoCallDurationText(videoCallDuration(videoCallSession))}</strong></div></div>`;
       return;
     }
-    modal.innerHTML = `<div class="chat-video-call-head"><div><b>${esc(name)}</b><small>视频通话</small></div><button data-video-call-close type="button">×</button></div><div class="chat-video-call-stage chat-video-call-live-stage"><div>${avatar}<p class="chat-video-call-status">正在通话</p><strong class="chat-video-call-timer" data-video-call-time>${videoCallDurationText(videoCallDuration())}</strong><button class="chat-video-call-hangup" data-video-call-hangup type="button">挂断</button></div><span class="chat-video-call-online">LIVE</span></div><div class="chat-video-call-log">${log || '<p class="chat-video-call-empty">通话已经接通，可以开始说话。</p>'}</div><div class="chat-video-call-bottom"><input data-video-call-input placeholder="输入通话内容…" autocomplete="off"><button data-video-call-send type="button">发送</button><button data-video-reply type="button" ${videoCallGenerating ? 'disabled' : ''}>${videoCallGenerating ? '回复中…' : '回复'}</button></div>`;
+    modal.innerHTML = `<div class="chat-video-call-head"><div><b>${esc(name)}</b><small>视频通话</small></div><button data-video-call-close type="button">×</button></div><div class="chat-video-call-stage chat-video-call-live-stage"><div>${avatar}<p class="chat-video-call-status">正在通话</p><strong class="chat-video-call-timer" data-video-call-time>${videoCallDurationText(videoCallDuration())}</strong><button class="chat-video-call-hangup" data-video-call-hangup type="button">挂断</button></div><span class="chat-video-call-online">LIVE</span></div><div class="chat-video-call-log">${log || '<p class="chat-video-call-empty">通话已经接通，可以开始说话。</p>'}${errorNote}</div><div class="chat-video-call-bottom"><input data-video-call-input placeholder="输入通话内容…" autocomplete="off"><button data-video-call-send type="button">发送</button><button data-video-reply type="button" ${videoCallGenerating ? 'disabled' : ''}>${videoCallGenerating ? '回复中…' : '回复'}</button></div>`;
     const logBox = modal.querySelector('.chat-video-call-log');
     if (logBox) requestAnimationFrame(() => { logBox.scrollTop = logBox.scrollHeight; });
     videoCallRenderTick();
@@ -5356,6 +5534,7 @@ ${recentConversation}`
     videoCallDirection = 'incoming';
     videoCallClearTimer();
     videoCallGenerating = false;
+    videoCallError = '';
     videoCallContact = state.contacts.find(item => item.id === activeContact) || {};
     videoCallMessages = [];
     videoCallSession = { id: uid('video-call'), contactId: activeContact, direction, status: direction === 'outgoing' ? 'outgoing' : 'incoming', contextMessages: videoCallContext(activeContact), createdAt: Date.now() };
@@ -5381,7 +5560,8 @@ ${recentConversation}`
   }
   function appendVideoCallCharacterAnswer(raw) {
     let source = String(raw || '').replace(/\[\[VIDEO_CALL\]\]/ig, '').trim();
-    const hangup = /\[\[VIDEO_HANGUP\]\]/i.test(source);
+    const naturalHangup = /(?:^|[，。！!？?\s（(])(?:好[了啦]?|那我先?|我先?|咱们先?|先)?(?:挂了|挂断了?|挂电话了?|结束通话了?|不聊了|下了|晚安)(?:$|[，。！!？?\s）)])/i.test(source);
+    const hangup = /\[\[VIDEO_HANGUP\]\]/i.test(source) || naturalHangup;
     source = source.replace(/\[\[VIDEO_HANGUP\]\]/ig, '').trim();
     const voicePattern = /\[\[VOICE\s+seconds\s*=\s*(\d+)\s+text\s*=\s*(?:"([\s\S]*?)"|'([\s\S]*?)'|([\s\S]*?))\s*\]\]/ig;
     const parts = [];
@@ -5409,13 +5589,14 @@ ${recentConversation}`
     return videoCallTurnCount('user', session) >= 2 && videoCallTurnCount('character', session) >= 2;
   }
   function videoCallShouldCharacterHangup(session = videoCallSession) {
-    return videoCallCanCharacterHangup(session) && Math.random() < 0.15;
+    return false;
   }
   function waitForVideoCallMessage() { return new Promise(resolve => setTimeout(resolve, 650)); }
   async function requestVideoCallReply(kind = 'reply') {
     const session = videoCallSession;
     if (!session || session.status !== 'connected' || videoCallGenerating) return;
     videoCallGenerating = true;
+    videoCallError = '';
     renderVideoCallModal('connected');
     const config = window.IdealMachineAPI?.getConfig?.();
     const model = window.IdealMachineAPI?.getModel?.('chat');
@@ -5423,12 +5604,12 @@ ${recentConversation}`
     const chat = state.chats?.[session.contactId] || {};
     const profile = state.profiles.find(item => item.id === chat.profileId);
     if (!config?.endpoint || !config.key || !model) {
-      videoCallMessages.push({ role: 'character', text: '（请先配置聊天 API，才能继续视频通话。）', at: Date.now() });
+      videoCallError = '请先配置聊天 API';
       videoCallGenerating = false;
       renderVideoCallModal('connected');
       return;
     }
-    const prompt = kind === 'opening' ? '视频通话刚刚接通。请根据角色设定和通话前线上记录，自然地先说一句开场白。不要提及系统、提示词或线上记录。' : '请自然回应用户刚才在视频通话中说的话。保持角色本人身份，适合口语表达，不要输出分析过程。视频通话里只输出角色实际说的话，不要使用 VOICE、VIDEO_CALL 或 VIDEO_HANGUP 等标记；通话是否结束由系统根据已经进行的对话轮次随机决定。';
+    const prompt = kind === 'opening' ? '视频通话刚刚接通。请根据角色设定和通话前线上记录，自然地先说一句开场白。不要提及系统、提示词或线上记录。' : '请自然回应用户刚才在视频通话中说的话。保持角色本人身份，适合口语表达，不要输出分析过程。若角色确实要结束通话，在结束话语后单独追加 [[VIDEO_HANGUP]]；否则不要使用任何通话控制标记。';
     const system = `${buildChatSystemPrompt(contact, profile, chat)}\n\n【视频通话专用输出格式】\n这是一次独立的视频通话。通话开始前已经读取了下面的线上聊天记录，只用于保持人物连续，不要说自己“读取了记录”。\n通话前线上记录：\n${session.contextMessages.map(item => item.content).join('\n')}\n角色的回复中禁止使用中文或英文引号，不要用引号包裹台词。角色说的话直接输出；动作、表情和正在进行的行为必须使用全角括号“（）”包裹。可以用换行或 [[MSG]] 分隔自然的连续消息，但每条都要完整。\n\n${prompt}`;
     const messages = [...session.contextMessages, ...videoCallMessages.map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text }))];
     messages.push({ role: 'user', content: prompt });
@@ -5444,14 +5625,14 @@ ${recentConversation}`
         renderVideoCallModal('connected');
         if (parsed.parts.indexOf(part) < parsed.parts.length - 1) await waitForVideoCallMessage();
       }
-      if (parsed.parts.length && videoCallSession === session && session.status === 'connected' && videoCallShouldCharacterHangup(session)) {
+      if (parsed.hangup && videoCallSession === session && session.status === 'connected') {
         await finishVideoCall('character');
         return;
       }
     } catch (error) {
       // 关闭通话或切换到新通话后，旧请求的结果不能再写入当前字幕。
       if (videoCallSession === session && session.status === 'connected') {
-        videoCallMessages.push({ role: 'character', text: `（通话回复失败：${error.message}）`, at: Date.now() });
+        videoCallError = `通话回复失败：${error.message}`;
       }
     }
     if (videoCallSession !== session) return;
@@ -5496,6 +5677,7 @@ ${recentConversation}`
     }
     videoCallSession = null;
     videoCallMessages = [];
+    videoCallError = '';
     videoCallModal()?.remove();
     render();
     requestAnimationFrame(() => { const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = box.scrollHeight; });
@@ -5510,6 +5692,7 @@ ${recentConversation}`
     }
     videoCallSession = null;
     videoCallMessages = [];
+    videoCallError = '';
     videoCallModal()?.remove();
     render();
   }
@@ -5754,6 +5937,22 @@ ${recentConversation}`
     const style = document.querySelector('#chatBubbleSettingsStyle');
     if (!style) return;
     style.textContent += ' .chat-message .chat-bubble.image-stack, .chat-message.is-user .chat-bubble.image-stack, .chat-message.is-character .chat-bubble.image-stack { background: transparent !important; background-image: none !important; border: 0 !important; box-shadow: none !important; }';
+  };
+  // 发送记录可能保存的是旧的 postimg / idb:image 地址，而表情面板会先做本地资源映射。
+  // 聊天气泡也必须走同一套地址处理，否则面板能显示、历史气泡却会裂图。
+  const messageHtmlWithEmojiSource = messageHtml;
+  messageHtml = function(message) {
+    const html = messageHtmlWithEmojiSource(message);
+    if (message?.type !== 'image') return html;
+    const rawSource = normalizeEmojiImageSource(message.text || '');
+    const matchingEmoji = (state.emojis?.groups || []).flatMap(group => group.items || []).find(item => {
+      const itemSource = normalizeEmojiImageSource(item.url || '');
+      return itemSource === rawSource || emojiDisplaySource(itemSource) === rawSource || (message.stickerDescription && item.text === message.stickerDescription);
+    });
+    if (!message?.sticker && !matchingEmoji) return html;
+    const originalSource = matchingEmoji ? normalizeEmojiImageSource(matchingEmoji.url || rawSource) : rawSource;
+    const displaySource = emojiDisplaySource(originalSource);
+    return html.replace(/<img src="[^"]*" alt="图片">/, `<img data-emoji-src="${esc(originalSource)}" src="${esc(displaySource)}" referrerpolicy="no-referrer" alt="图片">`);
   };
   const renderWithDockUnreadBadge = render;
   render = function() {
