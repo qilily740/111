@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260916-takeaway-api-2';
+const CACHE_NAME = 'ideal-machine-shell-v20260916-desktop-float-1';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
