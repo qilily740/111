@@ -7632,3 +7632,20 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .music-search-source { flex:0 0 auto; color:#555; font-size:10px; font-weight:600; white-space:nowrap; }
 .chat-music-share-source { display:grid; flex:0 0 112px; place-items:center; border-radius:12px; background:#eeeef1; color:#555; font-size:11px; white-space:nowrap; }
 @media (prefers-color-scheme:dark) { .music-search-source { color:#eee; } .chat-music-share-source { background:rgba(255,255,255,.1); color:#eee; } }
+
+/* 黑胶唱片播放台：唱片只在播放时旋转，唱臂保持压在唱片上。 */
+.music-turntable { position:relative; width:min(78vw,310px); aspect-ratio:1; margin:0 auto 4px; }
+.music-turntable .music-disc { position:absolute; inset:17px 0 0; display:grid; place-items:center; width:calc(100% - 17px); height:calc(100% - 17px); margin:auto; padding:0; overflow:visible; border:1px solid rgba(0,0,0,.12); border-radius:50%; background:repeating-radial-gradient(circle at 50% 50%,#08080a 0 2px,#111114 2px 4px,#050506 4px 6px),radial-gradient(circle,#25252a 0 8%,#08080a 8% 100%); box-shadow:0 18px 34px rgba(0,0,0,.2),inset 0 0 0 9px rgba(255,255,255,.035),inset 0 0 0 13px rgba(0,0,0,.5); transform-origin:center; }
+.music-turntable .music-disc.is-playing { animation:music-vinyl-spin 7s linear infinite; }
+.music-turntable .music-disc>div { position:relative; width:57%; height:57%; overflow:hidden; border:8px solid #17171a; border-radius:50%; background:#76767b; box-shadow:0 0 0 2px rgba(255,255,255,.12),0 3px 10px rgba(0,0,0,.45); }
+.music-turntable .music-disc>div::after { position:absolute; top:50%; left:50%; width:9px; height:9px; border:2px solid rgba(255,255,255,.9); border-radius:50%; background:#25252a; content:""; transform:translate(-50%,-50%); }
+.music-turntable .music-disc img { position:relative; z-index:0; }
+.music-tonearm { position:absolute; top:-7px; right:-1px; z-index:3; width:64%; height:78%; pointer-events:none; transform:rotate(2deg); transform-origin:86% 9%; filter:drop-shadow(0 3px 4px rgba(0,0,0,.24)); }
+.music-tonearm svg { width:100%; height:100%; overflow:visible; }
+.music-tonearm-pivot-ring { fill:rgba(0,0,0,.17); stroke:rgba(255,255,255,.16); stroke-width:2; }
+.music-tonearm-pivot { fill:#fff; stroke:#e4e4e7; stroke-width:5; }
+.music-tonearm-arm { fill:none; stroke:#f7f7f8; stroke-width:8; stroke-linecap:round; stroke-linejoin:round; }
+.music-tonearm-needle { fill:none; stroke:#f7f7f8; stroke-width:3; stroke-linecap:round; }
+.music-tonearm-head { fill:#f7f7f8; stroke:#d9d9dd; stroke-width:2; }
+@keyframes music-vinyl-spin { to { transform:rotate(360deg); } }
+@media (prefers-color-scheme:dark) { .music-turntable .music-disc { border-color:rgba(255,255,255,.16); box-shadow:0 18px 34px rgba(0,0,0,.4),inset 0 0 0 9px rgba(255,255,255,.035),inset 0 0 0 13px rgba(0,0,0,.6); }.music-turntable .music-disc>div { border-color:#0c0c0e; }.music-tonearm-pivot-ring { fill:rgba(255,255,255,.1); stroke:rgba(255,255,255,.2); } }
