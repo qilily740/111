@@ -1320,7 +1320,7 @@ ${roundText}
     if (document.querySelector('[data-chat-music-share]')) return;
     const modal = document.createElement('div');
     modal.dataset.chatMusicShare = '';
-    modal.innerHTML = '<div class="chat-music-share-backdrop" data-chat-music-share-close></div><section class="chat-music-share-sheet" role="dialog" aria-modal="true"><header><div><span>MUSIC SHARE</span><h2>分享音乐</h2></div><button type="button" data-chat-music-share-close>×</button></header><form class="chat-music-share-search" data-chat-music-search-form><select data-chat-music-source aria-label="选择音乐来源"><option value="netease" selected>网易云音乐</option><option value="auto">自动搜索</option><option value="deezer">Deezer</option><option value="itunes">iTunes</option><option value="local">我的音乐</option></select><input data-chat-music-search-input placeholder="搜索网易云歌曲、歌手或专辑" autocomplete="off"><button type="submit">搜索</button></form><main data-chat-music-results><p class="chat-music-share-status">搜索结果来自网易云音乐。</p></main></section>';
+    modal.innerHTML = '<div class="chat-music-share-backdrop" data-chat-music-share-close></div><section class="chat-music-share-sheet" role="dialog" aria-modal="true"><header><div><span>MUSIC SHARE</span><h2>分享网易云音乐</h2></div><button type="button" data-chat-music-share-close>×</button></header><form class="chat-music-share-search" data-chat-music-search-form><span class="chat-music-share-source">网易云音乐</span><input data-chat-music-search-input placeholder="搜索网易云歌曲、歌手或专辑" autocomplete="off"><button type="submit">搜索</button></form><main data-chat-music-results><p class="chat-music-share-status">搜索结果来自网易云音乐。</p></main></section>';
     document.body.appendChild(modal);
     modal.querySelector('[data-chat-music-search-input]')?.focus();
   }
@@ -1368,19 +1368,15 @@ ${roundText}
   async function searchMusicForShare() {
     const modal = document.querySelector('[data-chat-music-share]');
     const input = modal?.querySelector('[data-chat-music-search-input]');
-    const source = modal?.querySelector('[data-chat-music-source]')?.value || 'auto';
     const keyword = input?.value.trim();
     if (!keyword) return;
-    renderMusicShareResults([], '正在搜索音乐…');
-    const sources = source === 'auto' ? ['netease', 'deezer', 'itunes', 'local'] : [source];
-    const errors = [];
-    for (const currentSource of sources) {
-      try {
-        const results = currentSource === 'netease' ? await searchMusicShareNetease(keyword) : currentSource === 'deezer' ? await searchMusicShareFallback(keyword) : currentSource === 'itunes' ? await searchMusicShareItunes(keyword) : searchMusicShareLocal(keyword);
-        if (results.length) { renderMusicShareResults(results); return; }
-      } catch (error) { errors.push(error); }
+    renderMusicShareResults([], '正在搜索网易云音乐…');
+    try {
+      const results = await searchMusicShareNetease(keyword);
+      renderMusicShareResults(results, results.length ? '' : '网易云音乐没有找到相关歌曲。');
+    } catch (error) {
+      renderMusicShareResults([], `网易云音乐搜索失败：${error.message}`);
     }
-    renderMusicShareResults([], errors.length ? `搜索失败：已尝试 ${sources.length} 个来源。` : '没有找到相关歌曲。');
   }
   function handleTool(tool) { if (tool === 'reroll') { menuOpen = false; emojiOpen = false; syncChatPanelDOM(); rerollCurrentChatRound().catch(error => window.alert(`重新生成失败：${error.message}`)); return; } if (tool === 'offline') { menuOpen = false; emojiOpen = false; openOfflineMode(); return; } if (tool === 'image-file') { imageChoiceOpen = true; imageDescriptionOpen = false; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderImageChoice(); return; } if (tool === 'transfer') { transferOpen = true; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderTransfer(); return; } if (tool === 'music') { menuOpen = false; emojiOpen = false; syncChatPanelDOM(); openMusicShareSheet(); return; } if (tool === 'together') { menuOpen = false; emojiOpen = false; openBookPicker(); return; } menuOpen = false; const labels = { voice: ['语音内容', 'voice'], video: ['通话主题', 'video'], location: ['位置名称', 'location'] }; const data = labels[tool]; if (!data) return render(); const value = window.prompt(data[0]); if (value?.trim()) addMessage(value.trim(), 'user', data[1]); }
   document.addEventListener('click', event => {
