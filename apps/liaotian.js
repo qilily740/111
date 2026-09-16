@@ -1363,11 +1363,17 @@ ${roundText}
       document.head.appendChild(script);
     });
   }
+  function neteaseMusicRequestHeaders() {
+    const headers = { accept: 'application/json' };
+    const session = localStorage.getItem('ideal-machine-netease-session');
+    if (session) headers.authorization = `Bearer ${session}`;
+    return headers;
+  }
   async function searchMusicShareNetease(keyword) {
     const configuredBase = String(window.IdealMachineConfig?.neteaseApiBase || 'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/, '');
     const request = window.IdealMachineFetch || window.fetch.bind(window);
     const searchUrl = `${configuredBase}/search?keywords=${encodeURIComponent(keyword)}&limit=24&type=1`;
-    const response = await request(searchUrl, { idealScope: 'music', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' } });
+    const response = await request(searchUrl, { idealScope: 'music', credentials: 'omit', cache: 'no-store', headers: neteaseMusicRequestHeaders() });
     const data = await response.json();
     if (!response.ok) throw new Error(data?.error || `API ${response.status}`);
     const songs = data?.result?.songs || data?.songs || [];
@@ -2882,7 +2888,7 @@ ${roundText}
     const configuredBase = String(window.IdealMachineConfig?.neteaseApiBase || 'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/, '');
     const request = window.IdealMachineFetch || window.fetch.bind(window);
     try {
-      const response = await request(`${configuredBase}/song/${encodeURIComponent(id)}/url?br=320000`, { idealScope: 'music', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' } });
+      const response = await request(`${configuredBase}/song/${encodeURIComponent(id)}/url?br=320000`, { idealScope: 'music', credentials: 'omit', cache: 'no-store', headers: neteaseMusicRequestHeaders() });
       const data = await response.json();
       return response.ok ? data?.data?.[0]?.url || data?.data?.url || data?.url || '' : '';
     } catch {
@@ -3090,6 +3096,8 @@ ${roundText}
           musicCover: verifiedSong.cover,
           musicId: verifiedSong.id,
           musicSource: verifiedSong.source,
+          musicPlayUrl: verifiedSong.playUrl || '',
+          musicPlayable: Boolean(verifiedSong.playUrl),
           musicVerified: true
         });
         sent += 1;
