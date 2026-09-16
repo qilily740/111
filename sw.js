@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260916-desktop-orb-click-1';
+const CACHE_NAME = 'ideal-machine-shell-v20260916-queue-scroll-1';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
