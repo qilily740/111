@@ -7811,3 +7811,27 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   width:56px !important;
   height:56px !important;
 }
+
+/* 歌词逐字高亮：每个字都有独立的底层文字和覆盖层，避免整句一次性变色。 */
+.music-lyric-text { white-space: pre-wrap; }
+.music-lyric-char { position:relative; display:inline-block; white-space:pre; }
+.music-lyric-char > .music-lyric-base { display:block; }
+.music-lyric-char > .music-lyric-highlight {
+  position:absolute !important;
+  inset:0 auto 0 0 !important;
+  display:block !important;
+  width:var(--char-progress,0%) !important;
+  max-width:100% !important;
+  overflow:hidden !important;
+  white-space:pre !important;
+  transition:width .08s linear;
+  will-change:width;
+}
+.music-full-lyrics-scroll p:not(.is-active) .music-lyric-char > .music-lyric-highlight {
+  width:0 !important;
+}
+.music-player .music-lyrics p.is-active .music-lyric-char > .music-lyric-highlight {
+  width:100% !important;
+  color:#222 !important;
+  -webkit-text-fill-color:#222 !important;
+}
