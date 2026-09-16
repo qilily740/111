@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260916-desktop-lyrics-3';
+const CACHE_NAME = 'ideal-machine-shell-v20260916-queue-playing-1';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());

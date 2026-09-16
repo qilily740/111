@@ -7888,6 +7888,28 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   .music-desktop-lyrics footer button.is-primary { background:#050506; color:#fff; }
 }
 
+/* 歌单面板：当前播放歌曲显示灰色条目，并把播放三角切换为暂停双竖线。 */
+.music-queue-song.is-current {
+  background:#e7e7ea;
+  color:#222;
+}
+.music-queue-song.is-current > i {
+  color:#222;
+}
+.music-queue-song.is-playing > i {
+  display:grid;
+  place-items:center;
+}
+@media (prefers-color-scheme:dark) {
+  .music-queue-song.is-current {
+    background:#4a4a50;
+    color:#fff;
+  }
+  .music-queue-song.is-current > i {
+    color:#fff;
+  }
+}
+
 /* 歌词逐字高亮：每个字都有独立的底层文字和覆盖层，避免整句一次性变色。 */
 .music-lyric-text { white-space: pre-wrap; }
 .music-lyric-char { position:relative; display:inline-block; white-space:pre; }
