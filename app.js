@@ -586,13 +586,18 @@
 
   function registerIdealMachineServiceWorker() {
     if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+    if (/^(localhost|127\.0\.0\.1)$/i.test(location.hostname)) {
+      navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(registrations.map(registration => registration.unregister()))).catch(() => {});
+      if ('caches' in window) caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('ideal-machine-shell-')).map(key => caches.delete(key)))).catch(() => {});
+      return;
+    }
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (refreshing) return;
       refreshing = true;
       location.reload();
     });
-    navigator.serviceWorker.register('./sw.js?v=20260916-player-controls-lyrics-7', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=20260916-local-preview-fix-8', { updateViaCache: 'none' }).catch(() => {});
   }
   // 所有角色型 API 请求共用的身份顺序：先读角色，再读当前绑定用户。
   // 基础资料只认明确字段，避免模型从称呼、名字或语气反推生日和性别。
