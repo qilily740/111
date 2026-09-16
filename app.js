@@ -592,7 +592,7 @@
       refreshing = true;
       location.reload();
     });
-    navigator.serviceWorker.register('./sw.js?v=20260909-1', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=20260916-player-controls-lyrics-7', { updateViaCache: 'none' }).catch(() => {});
   }
   // 所有角色型 API 请求共用的身份顺序：先读角色，再读当前绑定用户。
   // 基础资料只认明确字段，避免模型从称呼、名字或语气反推生日和性别。

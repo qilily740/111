@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260916-music-auth-worker-4';
+const CACHE_NAME = 'ideal-machine-shell-v20260916-player-controls-lyrics-7';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
