@@ -7761,3 +7761,17 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   stroke-linecap:round;
   stroke-linejoin:round;
 }
+
+/* 播放页的单行歌词是信息预览：当前句直接使用黑色，不参与逐字高亮动画。
+   逐字高亮只保留在完整歌词页。 */
+.music-player .music-lyrics p[data-music-lyric-line].is-active,
+.music-player .music-lyrics p[data-music-lyric-line].is-active .music-lyric-text,
+.music-player .music-lyrics p[data-music-lyric-line].is-active .music-lyric-base,
+.music-player .music-lyrics p[data-music-lyric-line].is-active .music-lyric-highlight {
+  color:#222 !important;
+  -webkit-text-fill-color:#222 !important;
+  background:none !important;
+}
+.music-player .music-lyrics p[data-music-lyric-line].is-active .music-lyric-highlight {
+  width:100% !important;
+}

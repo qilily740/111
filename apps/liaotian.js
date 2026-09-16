@@ -1285,8 +1285,11 @@ ${roundText}
   async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => !['image'].includes(item.type)).map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text })); const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); await addMessage(data.choices?.[0]?.message?.content || '……', 'character'); } catch (error) { if (error?.name !== 'AbortError') await addMessage(`回复失败：${error.message}`, 'character'); } replying = false; render(); }
   async function shareMusicSong(song) {
     if (!song?.title) return;
-    const playUrl = song.playUrl || song.preview || song.url || await getNeteaseMusicPlayUrl(song.id);
-    if (!playUrl) return window.alert('这首歌暂时没有可用播放地址，未发送分享。');
+    // “真实曲目”和“当前可播放地址”是两个状态：网易云可能返回了
+    // 完整的标题、歌手、专辑和歌词，但因版权/账号权限不给试听地址。
+    // 这种情况下仍然要发送真实歌曲卡，不能把分享本身拦掉。
+    let playUrl = song.playUrl || song.preview || song.url || '';
+    if (!playUrl && song.source === 'netease' && song.id) playUrl = await getNeteaseMusicPlayUrl(song.id);
     addMessage(song.title, 'user', 'music', {
       musicTitle: song.title,
       musicArtist: song.artist || '未知歌手',
@@ -1295,7 +1298,8 @@ ${roundText}
       musicId: song.id || '',
       musicSource: song.source || 'netease',
       musicPlayUrl: playUrl,
-      musicVerified: true
+      musicVerified: song.source === 'netease',
+      musicPlayable: Boolean(playUrl)
     });
   }
   async function listenToSharedMusic(message) {
@@ -2897,8 +2901,7 @@ ${roundText}
       const exact = matches.find(item => normalizeMusicMatchValue(item.title) === titleKey && normalizeMusicMatchValue(item.artist) === artistKey);
       if (!exact) return null;
       const playUrl = await getNeteaseMusicPlayUrl(exact.id);
-      if (!playUrl) return null;
-      return { ...exact, playUrl, source: 'netease', verifiedRealSong: true };
+      return { ...exact, playUrl, source: 'netease', verifiedRealSong: true, playable: Boolean(playUrl) };
     } catch (error) {
       console.warn('角色音乐分享校验失败：', error);
       return null;
