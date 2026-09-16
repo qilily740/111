@@ -7740,24 +7740,6 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   stroke:#fff !important;
 }
 
-/* 中间第三格始终是主播放按钮，兼容旧 DOM 中 class 缺失但位置仍保留的情况。 */
-.music-player .music-player-controls > button:nth-child(3) {
-  display:grid !important;
-  place-items:center !important;
-  width:56px !important;
-  height:56px !important;
-  border:0 !important;
-  border-radius:50% !important;
-  background:#18181a !important;
-  color:#fff !important;
-  opacity:1 !important;
-  visibility:visible !important;
-}
-.music-player .music-player-controls > button:nth-child(3) svg {
-  display:block !important;
-  fill:none !important;
-  stroke:#fff !important;
-}
 .music-player .music-primary-control-svg {
   display:block !important;
   width:56px !important;
