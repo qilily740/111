@@ -1320,7 +1320,7 @@ ${roundText}
     if (document.querySelector('[data-chat-music-share]')) return;
     const modal = document.createElement('div');
     modal.dataset.chatMusicShare = '';
-    modal.innerHTML = '<div class="chat-music-share-backdrop" data-chat-music-share-close></div><section class="chat-music-share-sheet" role="dialog" aria-modal="true"><header><div><span>MUSIC SHARE</span><h2>分享音乐</h2></div><button type="button" data-chat-music-share-close>×</button></header><form class="chat-music-share-search" data-chat-music-search-form><select data-chat-music-source aria-label="选择音乐来源"><option value="auto">自动搜索</option><option value="netease">网易云音乐</option><option value="deezer">Deezer</option><option value="itunes">iTunes</option><option value="local">我的音乐</option></select><input data-chat-music-search-input placeholder="搜索歌曲、歌手或专辑" autocomplete="off"><button type="submit">搜索</button></form><main data-chat-music-results><p class="chat-music-share-status">自动搜索会依次尝试多个音乐来源。</p></main></section>';
+    modal.innerHTML = '<div class="chat-music-share-backdrop" data-chat-music-share-close></div><section class="chat-music-share-sheet" role="dialog" aria-modal="true"><header><div><span>MUSIC SHARE</span><h2>分享音乐</h2></div><button type="button" data-chat-music-share-close>×</button></header><form class="chat-music-share-search" data-chat-music-search-form><select data-chat-music-source aria-label="选择音乐来源"><option value="netease" selected>网易云音乐</option><option value="auto">自动搜索</option><option value="deezer">Deezer</option><option value="itunes">iTunes</option><option value="local">我的音乐</option></select><input data-chat-music-search-input placeholder="搜索网易云歌曲、歌手或专辑" autocomplete="off"><button type="submit">搜索</button></form><main data-chat-music-results><p class="chat-music-share-status">搜索结果来自网易云音乐。</p></main></section>';
     document.body.appendChild(modal);
     modal.querySelector('[data-chat-music-search-input]')?.focus();
   }
@@ -1349,9 +1349,8 @@ ${roundText}
   }
   async function searchMusicShareNetease(keyword) {
     const configuredBase = String(window.IdealMachineConfig?.neteaseApiBase || 'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/, '');
-    const localRelay = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin) ? String(window.IdealMachineConfig?.neteaseAuthApiBase || 'http://localhost:3210/api').replace(/\/$/, '') + '/music/search' : '';
     const request = window.IdealMachineFetch || window.fetch.bind(window);
-    const searchUrl = localRelay ? `${localRelay}?keywords=${encodeURIComponent(keyword)}&limit=24` : `${configuredBase}/search?keywords=${encodeURIComponent(keyword)}&limit=24&type=1`;
+    const searchUrl = `${configuredBase}/search?keywords=${encodeURIComponent(keyword)}&limit=24&type=1`;
     const response = await request(searchUrl, { idealScope: 'music', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' } });
     const data = await response.json();
     if (!response.ok) throw new Error(data?.error || `API ${response.status}`);
