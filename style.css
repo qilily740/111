@@ -7647,7 +7647,7 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .chat-music-message b { font-size:13px; }
 .chat-music-message small { color:#888; font-size:10px; }
 .chat-music-share-backdrop { position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.25); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); }
-.chat-music-share-sheet { position:fixed; right:0; bottom:0; left:0; z-index:41; display:flex; flex-direction:column; height:min(78vh,620px); box-sizing:border-box; overflow:hidden; padding:18px 18px calc(18px + env(safe-area-inset-bottom)); border-radius:24px 24px 0 0; background:#fbfbfc; box-shadow:0 -12px 38px rgba(0,0,0,.18); color:#222; animation:chatMusicSheetUp .22s ease-out; }
+.chat-music-share-sheet { position:fixed; top:auto !important; right:0; bottom:0 !important; left:0; z-index:41; display:flex; flex-direction:column; width:100%; height:min(78vh,620px); height:min(78dvh,620px); max-height:calc(100dvh - max(12px, env(safe-area-inset-top))); min-height:260px; box-sizing:border-box; overflow:hidden; padding:18px 18px calc(18px + env(safe-area-inset-bottom)); border-radius:24px 24px 0 0; background:#fbfbfc; box-shadow:0 -12px 38px rgba(0,0,0,.18); color:#222; animation:chatMusicSheetUp .22s ease-out; }
 .chat-music-share-sheet header { display:flex; align-items:center; justify-content:space-between; margin-bottom:15px; }
 .chat-music-share-sheet header div { display:grid; gap:5px; }.chat-music-share-sheet header span { color:#999; font-size:9px; font-weight:700; letter-spacing:.16em; }.chat-music-share-sheet h2 { font-size:20px; }.chat-music-share-sheet header button { width:30px; height:30px; border:0; border-radius:50%; background:#eeeef1; color:#555; font-size:22px; line-height:1; }
 .chat-music-share-search { display:flex; gap:8px; height:42px; margin-bottom:12px; }.chat-music-share-search select { flex:0 0 112px; min-width:0; padding:0 8px; border:0; border-radius:12px; outline:0; background:#eeeef1; color:#222; font:inherit; font-size:11px; }.chat-music-share-search input { flex:1; min-width:0; padding:0 13px; border:0; border-radius:12px; outline:0; background:#eeeef1; color:#222; font:inherit; font-size:12px; }.chat-music-share-search button { padding:0 15px; border:0; border-radius:12px; background:#222; color:#fff; font:inherit; font-size:11px; }
@@ -7657,6 +7657,10 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .music-search-source { flex:0 0 auto; color:#555; font-size:10px; font-weight:600; white-space:nowrap; }
 .chat-music-share-source { display:grid; flex:0 0 112px; place-items:center; border-radius:12px; background:#eeeef1; color:#555; font-size:11px; white-space:nowrap; }
 @media (prefers-color-scheme:dark) { .music-search-source { color:#eee; } .chat-music-share-source { background:rgba(255,255,255,.1); color:#eee; } }
+@media (max-width:600px) {
+  .chat-music-share-sheet { height:min(70dvh,560px); max-height:calc(100dvh - max(12px, env(safe-area-inset-top))); }
+  .chat-music-share-search { flex:0 0 42px; }
+}
 
 /* 黑胶唱片播放台：唱片只在播放时旋转，唱臂保持压在唱片上。 */
 .music-turntable { position:relative; width:min(78vw,310px); aspect-ratio:1; margin:0 auto 4px; }
