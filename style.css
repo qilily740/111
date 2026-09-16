@@ -7705,6 +7705,25 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   stroke:#fff !important;
 }
 
+/* 主按钮再用独立圆底兜底，避免 SVG 动态替换或旧 DOM 导致黑底消失。 */
+.music-player .music-player-controls > .music-play-control {
+  position:relative !important;
+  isolation:isolate;
+}
+.music-player .music-player-controls > .music-play-control::before {
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  border-radius:50%;
+  background:#18181a !important;
+  content:"";
+  pointer-events:none;
+}
+.music-player .music-player-controls > .music-play-control svg {
+  position:relative;
+  z-index:1;
+}
+
 /* 中间第三格始终是主播放按钮，兼容旧 DOM 中 class 缺失但位置仍保留的情况。 */
 .music-player .music-player-controls > button:nth-child(3) {
   display:grid !important;
