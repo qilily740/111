@@ -7709,8 +7709,8 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .music-player .music-player-controls > button:nth-child(3) {
   display:grid !important;
   place-items:center !important;
-  width:52px !important;
-  height:52px !important;
+  width:56px !important;
+  height:56px !important;
   border:0 !important;
   border-radius:50% !important;
   background:#18181a !important;
@@ -7725,8 +7725,8 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 }
 .music-player .music-primary-control-svg {
   display:block !important;
-  width:52px !important;
-  height:52px !important;
+  width:56px !important;
+  height:56px !important;
   overflow:visible !important;
 }
 .music-player .music-primary-control-svg .music-primary-control-bg {
