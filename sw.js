@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260916-local-preview-fix-20';
+const CACHE_NAME = 'ideal-machine-shell-v20260916-local-preview-fix-21';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
