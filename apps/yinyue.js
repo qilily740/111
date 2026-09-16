@@ -8,6 +8,9 @@
   const neteaseAuthApiBase=String(window.IdealMachineConfig?.neteaseAuthApiBase||localAuthApiBase).replace(/\/$/,'');
   const app=document.createElement('div');app.className='music-app';document.body.appendChild(app);
   const audio=new Audio();audio.preload='auto';audio.autoplay=false;audio.playsInline=true;audio.className='music-global-audio';document.body.appendChild(audio);
+  audio.dataset.musicUserStart='0';
+  document.addEventListener('click',event=>{if(event.target.closest?.('[data-app-key="yinyue"]'))audio.dataset.musicUserStart='0';if(event.target.closest?.('[data-music-toggle],[data-music-library-play],[data-music-select],[data-music-playlist-song],[data-music-prev],[data-music-next],[data-music-queue-song]'))audio.dataset.musicUserStart='1';},true);
+  audio.addEventListener('play',()=>{if(audio.dataset.musicUserStart!=='1'){audio.pause();playing=false;}});
   let state, page='player', query='', results=[], loading=false, inviteOpen=false, sourceInput='', playing=false, publicLoading=false, loginQr='', loginLoading=false, loginPollToken=0, loginStatus='', neteaseProfile=null, selectedPlaylistId='', lyricsFullOpen=false, searchSource='netease';
   // 公开曲目只在用户主动搜索后载入，不预置在“我的音乐”里。
   let publicTracks=[], lyricRequested=new Set(), lyricLoading=new Set(), queueOpen=false, selectedQueueId='', playMode='list', discRotation=0;
