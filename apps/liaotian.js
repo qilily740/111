@@ -1283,8 +1283,10 @@ ${roundText}
   function promptProfile(profile) { const name = window.prompt('设定名称', profile?.name || ''); if (!name?.trim()) return; const persona = window.prompt('用户设定：身份、性格、说话方式等', profile?.persona || '') || ''; if (profile) { profile.name = name.trim(); profile.persona = persona; } else state.profiles.push({ id: uid('profile'), name: name.trim(), persona }); save(); render(); }
   function bindProfile() { if (!currentChat()) return; if (chatSettingsOpen) { settingsProfilePickerOpen = !settingsProfilePickerOpen; render(); return; } profilePickerOpen = true; render(); }
   async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => !['image'].includes(item.type)).map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text })); const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); await addMessage(data.choices?.[0]?.message?.content || '……', 'character'); } catch (error) { if (error?.name !== 'AbortError') await addMessage(`回复失败：${error.message}`, 'character'); } replying = false; render(); }
-  function shareMusicSong(song) {
+  async function shareMusicSong(song) {
     if (!song?.title) return;
+    const playUrl = song.playUrl || song.preview || song.url || await getNeteaseMusicPlayUrl(song.id);
+    if (!playUrl) return window.alert('这首歌暂时没有可用播放地址，未发送分享。');
     addMessage(song.title, 'user', 'music', {
       musicTitle: song.title,
       musicArtist: song.artist || '未知歌手',
@@ -1292,7 +1294,7 @@ ${roundText}
       musicCover: song.cover || '',
       musicId: song.id || '',
       musicSource: song.source || 'netease',
-      musicPlayUrl: song.playUrl || song.preview || song.url || '',
+      musicPlayUrl: playUrl,
       musicVerified: true
     });
   }
@@ -1312,6 +1314,8 @@ ${roundText}
     musicState.current[chat.profileId] = song;
     musicState.rooms[chat.profileId] = { song, roleId: activeContact, startedAt: Date.now() };
     localStorage.setItem('ideal-machine-music', JSON.stringify(musicState));
+    const openSharedSong = window.IdealMachineApps?.yinyue?.openSharedSong;
+    if (typeof openSharedSong === 'function' && openSharedSong(song)) return;
     // 分享卡片是用户明确的播放操作；音乐 App 自己打开时仍保持禁止自动播放。
     window.IdealMachineMusicAutoplayOnOpen = true;
     document.querySelector('[data-app-key="yinyue"]')?.click();
@@ -1391,7 +1395,7 @@ ${roundText}
     const listen = event.target.closest('[data-chat-music-listen]');
     if (listen && app.classList.contains('is-open')) { const message = currentChat()?.messages.find(item => item.id === listen.dataset.chatMusicListen); if (message) listenToSharedMusic(message); return; }
     const pick = event.target.closest('[data-chat-music-pick]');
-    if (pick) { const modal = document.querySelector('[data-chat-music-share]'); const song = modal?._results?.find(item => item.id === pick.dataset.chatMusicPick); if (song) { shareMusicSong(song); closeMusicShareSheet(); } return; }
+    if (pick) { const modal = document.querySelector('[data-chat-music-share]'); const song = modal?._results?.find(item => item.id === pick.dataset.chatMusicPick); if (song) shareMusicSong(song).finally(closeMusicShareSheet); return; }
   }, true);
   document.addEventListener('submit', event => {
     const form = event.target.closest('[data-chat-music-search-form]');
@@ -2868,6 +2872,19 @@ ${roundText}
       .replace(/[“”"'‘’()（）[\]{}【】]/g, '');
   }
 
+  async function getNeteaseMusicPlayUrl(id) {
+    if (!id) return '';
+    const configuredBase = String(window.IdealMachineConfig?.neteaseApiBase || 'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/, '');
+    const request = window.IdealMachineFetch || window.fetch.bind(window);
+    try {
+      const response = await request(`${configuredBase}/song/${encodeURIComponent(id)}/url?br=320000`, { idealScope: 'music', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' } });
+      const data = await response.json();
+      return response.ok ? data?.data?.[0]?.url || data?.data?.url || data?.url || '' : '';
+    } catch {
+      return '';
+    }
+  }
+
   async function resolveCharacterMusic(song) {
     const title = String(song?.title || '').trim();
     const artist = String(song?.artist || '').trim();
@@ -2878,7 +2895,9 @@ ${roundText}
       const artistKey = normalizeMusicMatchValue(artist);
       const exact = matches.find(item => normalizeMusicMatchValue(item.title) === titleKey && normalizeMusicMatchValue(item.artist) === artistKey);
       if (!exact) return null;
-      return { ...exact, source: 'netease', verifiedRealSong: true };
+      const playUrl = await getNeteaseMusicPlayUrl(exact.id);
+      if (!playUrl) return null;
+      return { ...exact, playUrl, source: 'netease', verifiedRealSong: true };
     } catch (error) {
       console.warn('角色音乐分享校验失败：', error);
       return null;
