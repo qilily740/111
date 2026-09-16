@@ -1,0 +1,14 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "ideal-machine-music-auth",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-16",
+  "vars": {
+    "ALLOWED_ORIGIN": "http://localhost:8787,https://qilily740.github.io",
+    "NETEASE_AUTH_ORIGIN": "https://music.163.com"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

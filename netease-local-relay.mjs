@@ -13,35 +13,6 @@ const headers = {
   Referer: 'https://music.163.com/'
 };
 
-function encodeToken(value) {
-  return Buffer.from(String(value || ''), 'utf8').toString('base64url');
-}
-
-function decodeToken(value) {
-  try { return Buffer.from(String(value || ''), 'base64url').toString('utf8'); } catch { return ''; }
-}
-
-function bodyCookie(body) {
-  const value = body?.cookie || body?.cookies || '';
-  return Array.isArray(value) ? value.join('; ') : String(value || '');
-}
-
-function responseCookies(response) {
-  const values = typeof response.headers.getSetCookie === 'function'
-    ? response.headers.getSetCookie()
-    : (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')] : []);
-  return values.map(value => value.split(';', 1)[0]).filter(Boolean).join('; ');
-}
-
-function mergeCookies(...values) {
-  const map = new Map();
-  values.join('; ').split(';').forEach(part => {
-    const [key, ...rest] = part.trim().split('=');
-    if (key && rest.length) map.set(key, `${key}=${rest.join('=')}`);
-  });
-  return [...map.values()].join('; ');
-}
-
 function json(response, data, status = 200) {
   const payload = JSON.stringify(data);
   response.writeHead(status, {
@@ -133,18 +104,6 @@ async function serveApp(request, response, url) {
   }
 }
 
-function qrUrl(key) {
-  return `${ORIGIN}/login?codekey=${encodeURIComponent(key)}`;
-}
-
-function params(request) {
-  const url = new URL(request.url, `http://127.0.0.1:${PORT}`);
-  const key = url.searchParams.get('key') || '';
-  const qrSessionToken = url.searchParams.get('qrSessionToken') || '';
-  const sessionToken = url.searchParams.get('sessionToken') || '';
-  return { url, key, qrSessionToken, cookie: decodeToken(qrSessionToken || sessionToken) };
-}
-
 async function neteasePost(path, values, cookie = '') {
   const requestHeaders = { ...headers };
   if (cookie) requestHeaders.Cookie = cookie;
@@ -156,22 +115,15 @@ async function neteasePost(path, values, cookie = '') {
   let body = {};
   try { body = await response.json(); } catch {}
   if (!response.ok) throw new Error(`网易云上游 HTTP ${response.status}`);
-  return { body, cookie: mergeCookies(cookie, responseCookies(response), bodyCookie(body)) };
+  return { body };
 }
 
 async function handle(request, response) {
   if (request.method === 'OPTIONS') { response.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Ideal-Target-URL', 'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS' }); response.end(); return; }
   const requestUrl = new URL(request.url, `http://127.0.0.1:${PORT}`);
   if (await proxyAI(request, response, requestUrl)) return;
-  if (!['GET', 'HEAD'].includes(request.method)) { json(response, { error: '本机扫码代理只允许 GET、HEAD 或 OPTIONS' }, 405); return; }
-  const { url, key, qrSessionToken, cookie } = params(request);
-  if (url.pathname.startsWith('/api/auth/qr/')) console.log(`[qr-request] path=${url.pathname} key=${key ? key.slice(-6) : 'none'} token=${qrSessionToken ? qrSessionToken.length : 0}`);
-  if (url.pathname === '/api/auth/qr/key') {
-    const result = await neteasePost('/api/login/qrcode/unikey', { type: 3 });
-    if (!result.body?.unikey) throw new Error('网易云没有返回二维码 key');
-    json(response, { code: 200, data: { unikey: result.body.unikey, qrSessionToken: encodeToken(result.cookie) } });
-    return;
-  }
+  if (!['GET', 'HEAD'].includes(request.method)) { json(response, { error: '本地中转服务只允许 GET、HEAD 或 OPTIONS' }, 405); return; }
+  const url = requestUrl;
   if (await serveApp(request, response, url)) return;
   if (url.pathname === '/api/music/search') {
     const keyword = url.searchParams.get('keywords') || '';
@@ -187,41 +139,14 @@ async function handle(request, response) {
     json(response, result.body);
     return;
   }
-  if (!key || !qrSessionToken) { json(response, { error: '缺少二维码 key 或扫码会话' }, 400); return; }
-  if (url.pathname === '/api/auth/qr/create') {
-    json(response, { code: 200, data: { qrurl: qrUrl(key), qrimg: 'local-relay' } });
-    return;
-  }
-  if (url.pathname === '/api/auth/qr/image') {
-    const image = await fetch(`https://quickchart.io/qr?size=220&margin=1&text=${encodeURIComponent(qrUrl(key))}`);
-    if (!image.ok) throw new Error('二维码图片生成失败');
-    response.writeHead(200, { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store', 'Content-Type': image.headers.get('content-type') || 'image/png' });
-    response.end(Buffer.from(await image.arrayBuffer()));
-    return;
-  }
-  if (url.pathname === '/api/auth/qr/check') {
-    const result = await neteasePost('/api/login/qrcode/client/login', { key, type: 3 }, cookie);
-    const payload = { ...result.body };
-    const code = Number(result.body?.data?.code ?? result.body?.code);
-    console.log(`[qr-result] key=${key.slice(-6)} code=${code} message=${String(result.body?.data?.message ?? result.body?.message ?? '').slice(0, 40)}`);
-    if (code === 803) {
-      const loginCookie = mergeCookies(result.cookie, bodyCookie(result.body), bodyCookie(result.body?.data));
-      if (/(?:^|;\s*)(?:MUSIC_U|MUSIC_A)=/i.test(loginCookie)) payload.sessionToken = encodeToken(loginCookie);
-      else payload.error = '手机已授权，但网易云未返回登录凭证。';
-      delete payload.cookie;
-      delete payload.cookies;
-    }
-    json(response, payload);
-    return;
-  }
-  json(response, { error: '不支持的本机扫码代理路径' }, 404);
+  json(response, { error: '本地中转服务不提供音乐登录接口，请使用 music-auth-worker' }, 404);
 }
 
 http.createServer((request, response) => {
   handle(request, response).catch(error => {
-    console.log(`[relay-error] path=${new URL(request.url, `http://127.0.0.1:${PORT}`).pathname} message=${String(error.message || '本机扫码代理失败').slice(0, 100)}`);
-    json(response, { error: error.message || '本机扫码代理失败' }, 502);
+    console.log(`[relay-error] path=${new URL(request.url, `http://127.0.0.1:${PORT}`).pathname} message=${String(error.message || '本地中转服务失败').slice(0, 100)}`);
+    json(response, { error: error.message || '本地中转服务失败' }, 502);
   });
 }).listen(PORT, '127.0.0.1', () => {
-  console.log(`网易云本机扫码代理已启动：http://127.0.0.1:${PORT}/api`);
+  console.log(`理想机本地中转服务已启动：http://127.0.0.1:${PORT}`);
 });

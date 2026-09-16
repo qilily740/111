@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260915-music-click-play-fallback-51';
+const CACHE_NAME = 'ideal-machine-shell-v20260916-music-auth-worker-4';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
