@@ -164,5 +164,33 @@
   function decorateNeteasePanel(){if(page==='my'&&neteaseProfile){const panel=app.querySelector('.music-netease-profile');if(panel&&!app.querySelector('.music-netease-account'))panel.outerHTML=neteaseAccountCard(neteaseProfile);decorateNeteasePlaylists();}decoratePlaybackControls();decorateListeningTogether();placeLyricsBetween();requestAnimationFrame(()=>requestAnimationFrame(placeLyricsBetween));}
   new MutationObserver(decorateNeteasePanel).observe(app,{childList:true,subtree:true});
   document.addEventListener('click',e=>{if(!app.classList.contains('is-open'))return;if(e.target.closest('[data-music-netease-logout]')){logoutNetease();return;}const playlist=e.target.closest('[data-music-playlist]');if(playlist){selectedPlaylistId=playlist.dataset.musicPlaylist;render();return;}if(e.target.closest('[data-music-playlist-back]')){selectedPlaylistId='';render();return;}const songButton=e.target.closest('[data-music-playlist-song]');if(songButton){const selected=neteaseProfile?.playlists?.find(list=>list.id===selectedPlaylistId),song=selected?.tracks?.find(item=>item.id===songButton.dataset.musicPlaylistSong);if(song){selectedQueueId=selectedPlaylistId;activate({...song,source:'netease'},{navigate:false,preserveScroll:true});}return;}});
-  window.addEventListener('resize',placeLyricsBetween);window.IdealMachineApps=window.IdealMachineApps||{};window.IdealMachineApps.yinyue={name:'音乐'};
+  window.addEventListener('resize',placeLyricsBetween);
+  function openSharedSong(song) {
+    if (!song?.id || song.source !== 'netease' || !song.playUrl) return false;
+    state = read();
+    profile();
+    if (!state.profileId) return false;
+    const sharedSong = { ...song, source: 'netease', musicVerified: true };
+    state.current[state.profileId] = sharedSong;
+    state.rooms[state.profileId] = { song: sharedSong, roleId: song.roleId || state.rooms[state.profileId]?.roleId || '', startedAt: Date.now() };
+    save();
+    neteaseProfile = readNeteaseProfile();
+    page = 'player';
+    lyricsFullOpen = false;
+    lyricRequested.clear();
+    lyricLoading.clear();
+    app.classList.add('is-open');
+    audio.pause();
+    audio.src = '';
+    audio.load();
+    audio.src = sharedSong.playUrl;
+    audio.load();
+    audio.currentTime = 0;
+    audio.dataset.musicUserStart = '1';
+    render();
+    loadLyrics(sharedSong);
+    audio.play().catch(() => { playing = false; render(); });
+    return true;
+  }
+  window.IdealMachineApps=window.IdealMachineApps||{};window.IdealMachineApps.yinyue={name:'音乐',openSharedSong};
 })();
