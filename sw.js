@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260916-local-preview-fix-23';
+const CACHE_NAME = 'ideal-machine-shell-v20260916-chat-concurrent-reply-1';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());

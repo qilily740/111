@@ -740,7 +740,7 @@ ${boundWorldbookContext(contact)}
   }
   async function rerollCurrentChatRound() {
     const chat = currentChat();
-    if (!chat || replying || isContactReplying(activeContact)) return;
+    if (!chat || isContactReplying(activeContact)) return;
     // 重roll对话时允许打断正在读取的心声；心声请求会通过 requestId
     // 自行丢弃过期结果，不应阻止最新角色回复生成。
     if (thoughtLoading) { thoughtRequestId += 1; thoughtLoading = false; }
@@ -844,7 +844,7 @@ ${roundText}
     }
   }
   async function rerollThoughtOnly() {
-    if (thoughtLoading || replying || !thoughtOpen) return;
+    if (thoughtLoading || isContactReplying(activeContact) || !thoughtOpen) return;
     thoughtText = '';
     thoughtKey = '';
     await loadCurrentThought(true);
@@ -5468,7 +5468,7 @@ ${recentConversation}`
 
   const renderChatBeforeConcurrentContacts = renderChat;
   renderChat = function() {
-    return renderChatBeforeConcurrentContacts().replace(/(<button class="chat-reply" data-chat-reply type="button")(?:\s+disabled)?(?=>)/, (_, opening) => `${opening}${isContactReplying(activeContact) ? ' disabled' : ''}`);
+    return renderChatBeforeConcurrentContacts().replace(/(<button class="chat-reply" data-chat-reply type="button")(?:\s+disabled)?\s*(?=>)/, (_, opening) => `${opening}${isContactReplying(activeContact) ? ' disabled' : ''}`);
   };
 
   let chatThoughtSettingsOpen = false;
