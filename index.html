@@ -114,12 +114,22 @@
     if (!window.IdealMachineConfig.imageHostProvider) window.IdealMachineConfig.imageHostProvider = 'catbox';
     if (!window.IdealMachineConfig.imageApiBase) window.IdealMachineConfig.imageApiBase = 'https://ideal-machine-catbox-relay.ideal-machine.workers.dev';
     if (!window.IdealMachineConfig.neteaseApiBase) window.IdealMachineConfig.neteaseApiBase = 'https://ideal-machine-music-api.ideal-machine.workers.dev/api';
-    if (!window.IdealMachineConfig.neteaseAuthApiBase) window.IdealMachineConfig.neteaseAuthApiBase = 'http://localhost:3210/api';
+    if (!window.IdealMachineConfig.neteaseAuthApiBase) {
+      const authParam = new URLSearchParams(location.search).get('neteaseAuthApiBase') || '';
+      const publicAuthBase = /^https:\/\/[^/]+\/api\/?$/i.test(authParam) ? authParam.replace(/\/$/, '') : '';
+      if (publicAuthBase) {
+        try { localStorage.setItem('ideal-machine-netease-auth-api', publicAuthBase); } catch {}
+      }
+      let savedAuthBase = '';
+      try { savedAuthBase = localStorage.getItem('ideal-machine-netease-auth-api') || ''; } catch {}
+      const isLocalPage = /^(?:https?:\/\/)(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin);
+      window.IdealMachineConfig.neteaseAuthApiBase = publicAuthBase || (isLocalPage ? 'http://127.0.0.1:3211/api' : savedAuthBase || 'https://ideal-machine-music-auth.ideal-machine.workers.dev/api');
+    }
     if (!window.IdealMachineConfig.aiProxyBase) window.IdealMachineConfig.aiProxyBase = 'http://localhost:3210/api/ai';
   </script>
     <script src="apps/xiangce.js?v=20260914-chat-album-multiselect-1"></script>
   <script src="apps/rili.js?v=20260914-calendar-overnight-sleep-1"></script>
-  <script src="apps/yinyue.js?v=20260915-music-click-play-fallback-9"></script>
+  <script src="apps/yinyue.js?v=20260916-music-auth-worker-4"></script>
   <script src="apps/doubao.js?v=20260912-action-images-1"></script>
   <script src="apps/gouwu.js?v=20260911-role-user-context-1"></script>
   <script src="apps/ifshikong.js?v=20260911-role-user-context-1"></script>

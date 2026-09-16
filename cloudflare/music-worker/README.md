@@ -1,16 +1,8 @@
 # 理想机音乐 Cloudflare Worker
 
-这个 Worker 是音乐 App 的安全接口层。它不保存网易云账号密码，直接调用网易云接口处理二维码登录状态、登录会话、搜索、歌词和个人资料请求；登录会话只以短期令牌形式返回给浏览器。
+这个 Worker 是音乐 App 的数据接口层。它不保存网易云账号密码，负责账号资料、歌单、搜索、歌词和播放地址请求。
 
-## 网易云扫码登录
-
-网易云会拦截 Cloudflare Worker 的扫码认证请求，因此扫码认证使用仓库根目录的本机代理。先在项目根目录启动：
-
-```sh
-node netease-local-relay.mjs
-```
-
-保持这个终端运行，再刷新理想机并重新生成二维码。搜索、播放和个人资料接口仍然使用已部署的 Worker；本机代理只转发二维码登录的 key、二维码图片和状态轮询，不保存账号 Cookie。
+网易云二维码登录已经拆到独立的 `cloudflare/music-auth-worker`，本 Worker 不再提供任何登录接口。这样重做登录后不会触碰账号和音乐同步链路。
 
 ## 配置
 
@@ -42,10 +34,7 @@ window.IdealMachineConfig = {
 
 ## 已开放的接口
 
-- `/api/auth/qr/key`
-- `/api/auth/qr/create`
-- `/api/auth/qr/check`
-- `/api/user/profile`
+- `/api/user/sync`
 - `/api/user/account`
 - `/api/user/playlist`
 - `/api/user/vip`
