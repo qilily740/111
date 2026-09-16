@@ -4,7 +4,7 @@
   "main": "src/index.js",
   "compatibility_date": "2026-08-18",
   "vars": {
-    "ALLOWED_ORIGIN": "http://localhost:3210,https://qilily740.github.io",
+    "ALLOWED_ORIGIN": "http://localhost:3210,http://localhost:8765,http://127.0.0.1:3210,http://127.0.0.1:8765,https://qilily740.github.io",
     "NETEASE_UPSTREAM": "https://api-enhanced-ochre-kappa.vercel.app"
   }
 }

@@ -1333,7 +1333,8 @@ ${roundText}
     modal.dataset.chatMusicShare = '';
     modal.innerHTML = '<div class="chat-music-share-backdrop" data-chat-music-share-close></div><section class="chat-music-share-sheet" role="dialog" aria-modal="true"><header><div><span>MUSIC SHARE</span><h2>分享网易云音乐</h2></div><button type="button" data-chat-music-share-close>×</button></header><form class="chat-music-share-search" data-chat-music-search-form><span class="chat-music-share-source">网易云音乐</span><input data-chat-music-search-input placeholder="搜索网易云歌曲、歌手或专辑" autocomplete="off"><button type="submit">搜索</button></form><main data-chat-music-results><p class="chat-music-share-status">搜索结果来自网易云音乐。</p></main></section>';
     document.body.appendChild(modal);
-    modal.querySelector('[data-chat-music-search-input]')?.focus();
+    // 手机端不要在面板刚打开时强制聚焦输入框，否则系统键盘会把底部面板顶出可视区域。
+    if (window.matchMedia?.('(pointer: fine)')?.matches) modal.querySelector('[data-chat-music-search-input]')?.focus();
   }
   function closeMusicShareSheet() { document.querySelector('[data-chat-music-share]')?.remove(); }
   function searchMusicShareFallback(keyword) {
