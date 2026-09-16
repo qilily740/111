@@ -7775,3 +7775,39 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .music-player .music-lyrics p[data-music-lyric-line].is-active .music-lyric-highlight {
   width:100% !important;
 }
+
+/* 跨浏览器/跨手机兜底：不使用桌面端专属选择器，也不让系统原生按钮皮肤覆盖播放器控件。 */
+.music-app .music-player-controls .music-play-control,
+.music-app .music-full-lyrics-controls .is-primary {
+  appearance:none !important;
+  -webkit-appearance:none !important;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+.music-app .music-player-controls .music-play-control {
+  display:grid !important;
+  place-items:center !important;
+  width:56px !important;
+  min-width:56px !important;
+  height:56px !important;
+  min-height:56px !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:50% !important;
+  background:#18181a !important;
+  background-color:#18181a !important;
+  color:#fff !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+.music-app .music-player-controls .music-play-control > svg {
+  display:block !important;
+  width:24px !important;
+  height:24px !important;
+  fill:none !important;
+  stroke:#fff !important;
+}
+.music-app .music-player-controls .music-play-control > svg.music-primary-control-svg {
+  width:56px !important;
+  height:56px !important;
+}
