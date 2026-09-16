@@ -7814,6 +7814,80 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   height:56px !important;
 }
 
+/* 播放页桌面歌词开关：与进度条同宽区域的右端对齐。 */
+.music-player .music-player-meta {
+  position:relative;
+  width:min(86vw,350px);
+  box-sizing:border-box;
+}
+.music-player .music-desktop-lyrics-toggle {
+  position:absolute;
+  top:0;
+  right:0;
+  display:grid;
+  place-items:center;
+  width:28px;
+  height:28px;
+  padding:0;
+  border:0;
+  border-radius:8px;
+  background:#b9b9bd;
+  color:#fff;
+  font:700 12px/1 inherit;
+  cursor:pointer;
+  transition:background .18s ease,transform .18s ease;
+}
+.music-player .music-desktop-lyrics-toggle.is-enabled {
+  background:#18181a;
+}
+.music-player .music-desktop-lyrics-toggle:active {
+  transform:scale(.94);
+}
+.music-desktop-lyrics {
+  position:fixed;
+  right:16px;
+  bottom:max(18px,env(safe-area-inset-bottom));
+  z-index:120;
+  width:min(420px,calc(100vw - 32px));
+  box-sizing:border-box;
+  padding:13px 15px 12px;
+  border:1px solid rgba(0,0,0,.1);
+  border-radius:18px;
+  background:rgba(250,250,252,.94);
+  color:#1b1b1e;
+  box-shadow:0 14px 38px rgba(0,0,0,.2);
+  -webkit-backdrop-filter:blur(22px);
+  backdrop-filter:blur(22px);
+}
+.music-desktop-lyrics header,
+.music-desktop-lyrics-song,
+.music-desktop-lyrics footer {
+  display:flex;
+  align-items:center;
+}
+.music-desktop-lyrics header { justify-content:space-between; }
+.music-desktop-lyrics header span { color:#999; font-size:9px; font-weight:700; letter-spacing:.14em; }
+.music-desktop-lyrics header button { width:24px; height:24px; border:0; border-radius:50%; background:rgba(0,0,0,.07); color:#555; font-size:17px; line-height:1; cursor:pointer; }
+.music-desktop-lyrics-song { gap:7px; margin-top:8px; min-width:0; }
+.music-desktop-lyrics-song b { overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.music-desktop-lyrics-song small { overflow:hidden; color:#999; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.music-desktop-lyrics-line { min-height:28px; margin:12px 0 10px; overflow:hidden; font-size:16px; font-weight:650; line-height:1.6; text-overflow:ellipsis; white-space:nowrap; }
+.music-desktop-lyrics footer { justify-content:center; gap:22px; }
+.music-desktop-lyrics footer button { display:grid; place-items:center; width:34px; height:34px; padding:0; border:0; border-radius:50%; background:transparent; color:#35353a; cursor:pointer; }
+.music-desktop-lyrics footer button.is-primary { width:40px; height:40px; background:#18181a; color:#fff; }
+.music-desktop-lyrics footer svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+@media (max-width:520px) {
+  .music-desktop-lyrics { right:10px; bottom:max(10px,env(safe-area-inset-bottom)); left:10px; width:auto; }
+}
+@media (prefers-color-scheme:dark) {
+  .music-player .music-desktop-lyrics-toggle { background:#68686d; }
+  .music-player .music-desktop-lyrics-toggle.is-enabled { background:#050506; }
+  .music-desktop-lyrics { border-color:rgba(255,255,255,.12); background:rgba(35,35,39,.94); color:#f4f4f5; }
+  .music-desktop-lyrics header button { background:rgba(255,255,255,.1); color:#ddd; }
+  .music-desktop-lyrics footer button { color:#ddd; }
+  .music-desktop-lyrics footer button.is-primary { background:#050506; color:#fff; }
+}
+
 /* 歌词逐字高亮：每个字都有独立的底层文字和覆盖层，避免整句一次性变色。 */
 .music-lyric-text { white-space: pre-wrap; }
 .music-lyric-char { position:relative; display:inline-block; white-space:pre; }
