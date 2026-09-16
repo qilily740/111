@@ -114,14 +114,7 @@
     if (!window.IdealMachineConfig.imageHostProvider) window.IdealMachineConfig.imageHostProvider = 'catbox';
     if (!window.IdealMachineConfig.imageApiBase) window.IdealMachineConfig.imageApiBase = 'https://ideal-machine-catbox-relay.ideal-machine.workers.dev';
     if (!window.IdealMachineConfig.neteaseApiBase) window.IdealMachineConfig.neteaseApiBase = 'https://ideal-machine-music-api.ideal-machine.workers.dev/api';
-    if (!window.IdealMachineConfig.neteaseAuthApiBase) {
-      const authParam = new URLSearchParams(location.search).get('neteaseAuthApiBase') || '';
-      const publicAuthBase = /^https:\/\/[^/]+\/api\/?$/i.test(authParam) ? authParam.replace(/\/$/, '') : '';
-      if (publicAuthBase) {
-        try { localStorage.setItem('ideal-machine-netease-auth-api', publicAuthBase); } catch {}
-      }
-      window.IdealMachineConfig.neteaseAuthApiBase = publicAuthBase || window.IdealMachineConfig.neteaseApiBase;
-    }
+    window.IdealMachineConfig.neteaseAuthApiBase = window.IdealMachineConfig.neteaseApiBase;
     if (!window.IdealMachineConfig.aiProxyBase) window.IdealMachineConfig.aiProxyBase = 'http://localhost:3210/api/ai';
   </script>
     <script src="apps/xiangce.js?v=20260914-chat-album-multiselect-1"></script>

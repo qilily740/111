@@ -1,6 +1,8 @@
 # 跨网络网易云登录
 
-运行：
+当前版本已经把登录、账号同步和歌曲接口统一部署到 `ideal-machine-music-api`，不再需要 Tunnel。
+
+只有需要临时把本机旧版登录服务暴露给外网时，才运行：
 
 ```bash
 node start-public-music-auth.mjs
