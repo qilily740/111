@@ -1291,19 +1291,24 @@ ${roundText}
       musicAlbum: song.album || '',
       musicCover: song.cover || '',
       musicId: song.id || '',
-      musicSource: song.source || '',
-      musicPlayUrl: song.playUrl || song.preview || song.url || ''
+      musicSource: song.source || 'netease',
+      musicPlayUrl: song.playUrl || song.preview || song.url || '',
+      musicVerified: true
     });
   }
-  function listenToSharedMusic(message) {
+  async function listenToSharedMusic(message) {
     const chat = currentChat();
     if (!chat?.profileId || !message?.musicTitle) return;
+    let verified = message.musicVerified && message.musicId && message.musicSource === 'netease'
+      ? { id: message.musicId, title: message.musicTitle, artist: message.musicArtist || '', album: message.musicAlbum || '', cover: message.musicCover || '', source: 'netease', playUrl: message.musicPlayUrl || '' }
+      : await resolveCharacterMusic({ title: message.musicTitle, artist: message.musicArtist });
+    if (!verified) return window.alert('这条音乐分享没有找到歌名和歌手完全匹配的真实曲目，未开始播放。');
     let musicState = {};
     try { musicState = JSON.parse(localStorage.getItem('ideal-machine-music') || '{}'); } catch {}
     musicState.profileId = chat.profileId;
     musicState.current ||= {};
     musicState.rooms ||= {};
-    const song = { id: message.musicId || `shared-${Date.now()}`, title: message.musicTitle, artist: message.musicArtist || '', album: message.musicAlbum || '', cover: message.musicCover || '', playUrl: message.musicPlayUrl || '', source: message.musicSource || 'character' };
+    const song = { id: verified.id, title: verified.title, artist: verified.artist, album: verified.album, cover: verified.cover, playUrl: verified.playUrl || '', source: 'netease', musicVerified: true };
     musicState.current[chat.profileId] = song;
     musicState.rooms[chat.profileId] = { song, roleId: activeContact, startedAt: Date.now() };
     localStorage.setItem('ideal-machine-music', JSON.stringify(musicState));
@@ -2851,6 +2856,33 @@ ${roundText}
     return { clean, songs };
   }
 
+  // 角色发出的音乐标记不能直接当成歌曲数据：模型可能会把歌名和歌手拼错。
+  // 分享前必须回到网易云搜索结果中做严格校验，确保展示的标题、歌手、专辑来自同一首真实曲目。
+  function normalizeMusicMatchValue(value) {
+    return String(value || '')
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[\s·•・,，、/／&＆+＋;；|｜]/g, '')
+      .replace(/[“”"'‘’()（）[\]{}【】]/g, '');
+  }
+
+  async function resolveCharacterMusic(song) {
+    const title = String(song?.title || '').trim();
+    const artist = String(song?.artist || '').trim();
+    if (!title || !artist || artist === '未知歌手') return null;
+    try {
+      const matches = await searchMusicShareNetease(`${title} ${artist}`);
+      const titleKey = normalizeMusicMatchValue(title);
+      const artistKey = normalizeMusicMatchValue(artist);
+      const exact = matches.find(item => normalizeMusicMatchValue(item.title) === titleKey && normalizeMusicMatchValue(item.artist) === artistKey);
+      if (!exact) return null;
+      return { ...exact, source: 'netease', verifiedRealSong: true };
+    } catch (error) {
+      console.warn('角色音乐分享校验失败：', error);
+      return null;
+    }
+  }
+
   function capCharacterChunks(chunks, max) {
     const limit = Math.max(1, Number(max) || 1);
     if (chunks.length <= limit) return chunks;
@@ -2904,6 +2936,8 @@ ${roundText}
     return String(value || '')
       // 完整的 MSG 已经在分条阶段处理；这里再兜底一次，避免控制标记进入气泡。
       .replace(/\[\[MSG\]\]/gi, '')
+      // 无法校验的音乐分享也不能把控制标记漏到聊天气泡里。
+      .replace(/\[\[MUSIC\b[^\]]*\]\]/ig, '')
       // API 截断或模型漏写结尾时，清掉残留的“[[”及其后半个控制标记。
       .replace(/\[\[[^\]\r\n]*$/g, '')
       .replace(/[ \t]+/g, ' ')
@@ -3020,7 +3054,21 @@ ${roundText}
       }
       const rest = chunk.slice(cursor).trim();
       if (rest) { await appendCharacterMessage(rest); sent += 1; }
-      for (const song of musicParsed.songs) { await appendCharacterMessage(song.title, 'music', { musicTitle: song.title, musicArtist: song.artist, musicAlbum: song.album, musicCover: song.cover, musicSource: song.source }); sent += 1; }
+      for (const song of musicParsed.songs) {
+        const verifiedSong = await resolveCharacterMusic(song);
+        // 找不到标题和歌手同时完全匹配的网易云曲目时，不发送这张卡片，避免出现“歌名对了但歌手错了”的假分享。
+        if (!verifiedSong) continue;
+        await appendCharacterMessage(verifiedSong.title, 'music', {
+          musicTitle: verifiedSong.title,
+          musicArtist: verifiedSong.artist,
+          musicAlbum: verifiedSong.album,
+          musicCover: verifiedSong.cover,
+          musicId: verifiedSong.id,
+          musicSource: verifiedSong.source,
+          musicVerified: true
+        });
+        sent += 1;
+      }
     }
     if (!stickerSent && characterStickerFallbackRequested && items.length) {
       const latestUser = [...(chat.messages || [])].reverse().find(message => message.role === 'user');
@@ -3097,7 +3145,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         const system = payload.messages?.find(item => item.role === 'system');
         if (system) {
           system.content += instruction;
-          system.content += '\n\n【音乐分享规则】角色可以在确实符合自己的人设、兴趣、情绪和当前线上聊天背景时分享音乐，但不是每轮都要分享。只有角色真的想推荐歌曲、回应歌词或表达当下心情时才使用，不要为了凑消息类型而分享。需要分享时，在正常文字之外追加严格格式：[[MUSIC title="歌曲名" artist="歌手名" album="专辑名"]]；歌曲名、歌手和专辑必须真实一致，不知道专辑时可省略 album，不要编造 cover 链接。控制标记不要展示给用户。';
+          system.content += '\n\n【音乐分享规则】角色可以在确实符合自己的人设、兴趣、情绪和当前线上聊天背景时分享音乐，但不是每轮都要分享。只有角色真的想推荐歌曲、回应歌词或表达当下心情时才使用，不要为了凑消息类型而分享。需要分享时，在正常文字之外追加严格格式：[[MUSIC title="歌曲名" artist="歌手名" album="专辑名"]]；歌曲名和歌手名必须是现实中同一首歌的准确信息，不确定就不要分享，不要编造 cover、id 或播放链接。系统会用网易云真实搜索结果再次校验，校验不到标题和歌手同时匹配的曲目就不会发送音乐卡片。控制标记不要展示给用户。';
           // 这里的上限完全来自当前聊天设置，不能再被旧的“最多 3 条”提示覆盖。
           system.content = system.content.replace(/普通闲聊最多发送 3 条/g, `普通闲聊最多发送 ${rangeMax} 条`);
           // 短回复靠提示词控制，不靠过小的 token 上限硬截断；否则长一点的完整句子会被 API 从末尾截掉。
