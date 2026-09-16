@@ -1312,6 +1312,8 @@ ${roundText}
     musicState.current[chat.profileId] = song;
     musicState.rooms[chat.profileId] = { song, roleId: activeContact, startedAt: Date.now() };
     localStorage.setItem('ideal-machine-music', JSON.stringify(musicState));
+    // 分享卡片是用户明确的播放操作；音乐 App 自己打开时仍保持禁止自动播放。
+    window.IdealMachineMusicAutoplayOnOpen = true;
     document.querySelector('[data-app-key="yinyue"]')?.click();
   }
   function renderMusicShareResults(results = [], status = '') {
