@@ -7935,20 +7935,6 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 }
 
 /* 外卖页搜索与推荐操作。 */
-.shop-takeaway-search button {
-  flex:0 0 auto;
-  min-width:42px;
-  height:28px;
-  padding:0 10px;
-  border:0;
-  border-radius:9px;
-  background:#222;
-  color:#fff;
-  font:inherit;
-  font-size:10px;
-  cursor:pointer;
-}
-.shop-takeaway-search button:disabled,
 .shop-section-head button:disabled {
   cursor:wait;
   opacity:.55;
@@ -7959,12 +7945,6 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   color:#999;
   font-size:10px;
   text-align:center;
-}
-@media (prefers-color-scheme:dark) {
-  .shop-takeaway-search button {
-    background:#eee;
-    color:#171719;
-  }
 }
 
 /* 桌面歌词：磨砂毛玻璃、可拖动、紧凑模式与最小化悬浮球。 */
