@@ -7723,3 +7723,20 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   fill:none !important;
   stroke:#fff !important;
 }
+.music-player .music-primary-control-svg {
+  display:block !important;
+  width:52px !important;
+  height:52px !important;
+  overflow:visible !important;
+}
+.music-player .music-primary-control-svg .music-primary-control-bg {
+  fill:#18181a !important;
+  stroke:none !important;
+}
+.music-player .music-primary-control-svg .music-primary-control-icon {
+  fill:none !important;
+  stroke:#fff !important;
+  stroke-width:2.1 !important;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
