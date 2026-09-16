@@ -120,9 +120,7 @@
       if (publicAuthBase) {
         try { localStorage.setItem('ideal-machine-netease-auth-api', publicAuthBase); } catch {}
       }
-      let savedAuthBase = '';
-      try { savedAuthBase = localStorage.getItem('ideal-machine-netease-auth-api') || ''; } catch {}
-      window.IdealMachineConfig.neteaseAuthApiBase = publicAuthBase || savedAuthBase || window.IdealMachineConfig.neteaseApiBase;
+      window.IdealMachineConfig.neteaseAuthApiBase = publicAuthBase || window.IdealMachineConfig.neteaseApiBase;
     }
     if (!window.IdealMachineConfig.aiProxyBase) window.IdealMachineConfig.aiProxyBase = 'http://localhost:3210/api/ai';
   </script>
