@@ -122,8 +122,7 @@
       }
       let savedAuthBase = '';
       try { savedAuthBase = localStorage.getItem('ideal-machine-netease-auth-api') || ''; } catch {}
-      const isLocalPage = /^(?:https?:\/\/)(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin);
-      window.IdealMachineConfig.neteaseAuthApiBase = publicAuthBase || (isLocalPage ? 'http://127.0.0.1:3211/api' : savedAuthBase || 'https://ideal-machine-music-auth.ideal-machine.workers.dev/api');
+      window.IdealMachineConfig.neteaseAuthApiBase = publicAuthBase || savedAuthBase || window.IdealMachineConfig.neteaseApiBase;
     }
     if (!window.IdealMachineConfig.aiProxyBase) window.IdealMachineConfig.aiProxyBase = 'http://localhost:3210/api/ai';
   </script>

@@ -1,8 +1,8 @@
 # 理想机音乐 Cloudflare Worker
 
-这个 Worker 是音乐 App 的数据接口层。它不保存网易云账号密码，负责账号资料、歌单、搜索、歌词和播放地址请求。
+这个 Worker 是音乐 App 的统一网易云接口层。它不保存网易云账号密码，负责二维码登录、账号资料、歌单、搜索、歌词和播放地址请求。
 
-网易云二维码登录已经拆到独立的 `cloudflare/music-auth-worker`，本 Worker 不再提供任何登录接口。这样重做登录后不会触碰账号和音乐同步链路。
+网易云接口统一转发到 `NETEASE_UPSTREAM` 指定的 `api-enhanced` 服务。浏览器只访问本 Worker；扫码会话 Cookie 只以编码令牌形式返回浏览器，个人资料和歌单请求不缓存。
 
 ## 配置
 
@@ -12,7 +12,7 @@
 cd cloudflare/music-worker
 ```
 
-不需要配置网易云 API 密钥。把 `wrangler.jsonc` 中的 `ALLOWED_ORIGIN` 改成实际网页地址；本地测试可保留 `http://localhost:8787`。
+不需要配置网易云 API 密钥。把 `wrangler.jsonc` 中的 `ALLOWED_ORIGIN` 改成实际网页地址，并把 `NETEASE_UPSTREAM` 指向你自己部署的 api-enhanced 实例。
 
 部署：
 
@@ -25,6 +25,7 @@ npx wrangler deploy
 ```js
 window.IdealMachineConfig = {
   neteaseApiBase: 'https://你的-worker-域名.workers.dev/api',
+  neteaseAuthApiBase: 'https://你的-worker-域名.workers.dev/api',
   imageApiBase: 'https://你的-worker-域名.workers.dev',
   imageUploadToken: '仅供你自己的理想机使用的上传口令'
 };

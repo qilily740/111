@@ -2,8 +2,9 @@
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
   "name": "ideal-machine-music-api",
   "main": "src/index.js",
-  "compatibility_date": "2026-08-22",
+  "compatibility_date": "2026-08-18",
   "vars": {
-    "ALLOWED_ORIGIN": "http://localhost:8787,https://qilily740.github.io"
+    "ALLOWED_ORIGIN": "http://localhost:3210,https://qilily740.github.io",
+    "NETEASE_UPSTREAM": "https://api-enhanced-ochre-kappa.vercel.app"
   }
 }
