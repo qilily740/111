@@ -25,8 +25,25 @@
   const iconElement = item => item.querySelector('.app-icon, .dock-icon, .folder-app-icon');
   const nameElement = item => item.querySelector('.app-name, .dock-name, .folder-app-name');
   const ios17IconKeys = new Set(['liaotian','ta','luntan','xiangce','rili','jiyiku','debate','fanfic','magazine','yinyue','doubao','gouwu','ifshikong','shezhi','meihua','shijieshu','qinglvkongjian']);
+  const defaultIconPath = key => `assets/icons/default-ios17/${key}.png`;
+  const defaultIconUrl = key => `${defaultIconPath(key)}${key === 'qinglvkongjian' ? '?v=20260917-couple-default' : ''}`;
+  const normalizeStoredIconPath = value => String(value || '').split(/[?#]/, 1)[0].replace(/^\.\//, '');
+  function removeLegacyDefaultIconSettings() {
+    if (!saved.icons || typeof saved.icons !== 'object') return;
+    let changed = false;
+    ios17IconKeys.forEach(key => {
+      const source = normalizeStoredIconPath(saved.icons[key]);
+      if (source === defaultIconPath(key) || source === `assets/icons/${key}.png`) {
+        delete saved.icons[key];
+        changed = true;
+      }
+    });
+    if (changed) { try { localStorage.setItem(storageKey, JSON.stringify(saved)); } catch {} }
+  }
+  // 旧版本可能把默认图标路径当成自定义图标保存，清除后才能回到当前默认资源。
+  removeLegacyDefaultIconSettings();
   const defaultIconMarkup = key => ios17IconKeys.has(key)
-    ? `<img class="default-app-icon" src="assets/icons/default-ios17/${key}.png" alt="">`
+    ? `<img class="default-app-icon" src="${defaultIconUrl(key)}" alt="">`
     : '';
   // 美化页的默认值固定使用这 19 个 iOS17 图标，不再从旧版 SVG 节点继承默认图标。
   const defaultApps = new Map(appItems.map(item => [item.dataset.appKey, { name: nameElement(item)?.textContent || '', icon: defaultIconMarkup(item.dataset.appKey) || iconElement(item)?.innerHTML || '' }]));
@@ -420,19 +437,25 @@
     setTimeout(updateAutoContrast, 80);
   }
 
+  let autoContrastRequest = 0;
   function updateAutoContrast() {
+    const request = ++autoContrastRequest;
+    const liveAppItems = [...document.querySelectorAll('.app-item[data-app-key], .dock-item[data-app-key]')];
     const folderAppItems = [...document.querySelectorAll('.folder-app-item')];
-    const targets = [...appItems, ...folderItems, ...document.querySelectorAll('.profile-card, .todo-widget, .countdown-widget, .shared-widget, .elapsed-days-widget, .chat-widget, .now-playing-widget, .mood-profile-widget, .time-photo-widget, .habit-mini-widget, .search-input, .date-calendar-card, .dock-bar, .page-indicator, .desktop-layout-toolbar > button')].filter(target => !target.matches('.folder-app-item'));
-    // 文件夹里的 App 始终使用黑色，不参与桌面壁纸的自动对比度判断。
-    folderAppItems.forEach(target => {
-      target.classList.remove('auto-light', 'auto-dark');
-      target.querySelector('.folder-app-name')?.classList.remove('auto-light', 'auto-dark');
-      target.querySelector('.folder-app-icon')?.classList.remove('auto-light', 'auto-dark');
-    });
-    if (!saved.wallpaper) { targets.forEach(target => target.classList.remove('auto-light', 'auto-dark')); return; }
+    folderAppItems.forEach(target => window.IdealMachineWallpaperTone?.watch?.(target));
+    const targets = [...liveAppItems, ...folderItems, ...folderAppItems, ...document.querySelectorAll('.profile-card, .todo-widget, .image-widget, .photo-card, .countdown-widget, .shared-widget, .chat-widget, .now-playing-widget, .mood-profile-widget, .time-photo-widget, .habit-mini-widget, .search-input, .date-calendar-card, .dock-bar, .page-indicator, .desktop-layout-toolbar > button')];
+    let currentWallpaper = saved.wallpaper || '';
+    try {
+      const latest = JSON.parse(localStorage.getItem(storageKey) || '{}') || {};
+      if (typeof latest.wallpaper === 'string' && latest.wallpaper !== currentWallpaper) { saved.wallpaper = latest.wallpaper; currentWallpaper = latest.wallpaper; }
+    } catch {}
+    if (!currentWallpaper) { targets.forEach(target => target.classList.remove('auto-light', 'auto-dark')); return; }
+    // 新壁纸完成取样前先清掉上一张壁纸的白字状态，避免深色切到浅色时残留。
+    targets.forEach(target => { target.classList.remove('auto-light'); target.classList.add('auto-dark'); });
     const image = new Image();
     image.crossOrigin = 'anonymous';
     image.onload = () => {
+      if (request !== autoContrastRequest) return;
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d', { willReadFrequently: true });
       const viewportWidth = document.documentElement.clientWidth;
@@ -446,23 +469,34 @@
       canvas.height = image.naturalHeight;
       context.drawImage(image, 0, 0);
       targets.forEach(target => {
-        const rect = target.getBoundingClientRect();
+        if (request !== autoContrastRequest) return;
+        const label = target.matches('[data-app-key]') ? target.querySelector('.app-name, .dock-name, .folder-app-name') : null;
+        const rect = (label || target).getBoundingClientRect();
         const viewportX = Math.max(0, Math.min(viewportWidth - 1, rect.left + rect.width / 2));
         const viewportY = Math.max(0, Math.min(viewportHeight - 1, rect.top + rect.height / 2));
         const pixelX = Math.max(0, Math.min(image.naturalWidth - 1, Math.round((viewportX - offsetX) / scale)));
         const pixelY = Math.max(0, Math.min(image.naturalHeight - 1, Math.round((viewportY - offsetY) / scale)));
-        const pixel = context.getImageData(pixelX, pixelY, 1, 1).data;
-        const luminance = (pixel[0] * 299 + pixel[1] * 587 + pixel[2] * 114) / 1000;
+        const radius = 2;
+        const sample = context.getImageData(Math.max(0, pixelX - radius), Math.max(0, pixelY - radius), Math.min(image.naturalWidth - Math.max(0, pixelX - radius), radius * 2 + 1), Math.min(image.naturalHeight - Math.max(0, pixelY - radius), radius * 2 + 1)).data;
+        let red = 0, green = 0, blue = 0, count = 0;
+        for (let index = 0; index < sample.length; index += 4) { red += sample[index]; green += sample[index + 1]; blue += sample[index + 2]; count += 1; }
+        const luminance = ((red / Math.max(1, count)) * 299 + (green / Math.max(1, count)) * 587 + (blue / Math.max(1, count)) * 114) / 1000;
         target.classList.toggle('auto-light', luminance < 145);
         target.classList.toggle('auto-dark', luminance >= 145);
       });
     };
-    const source = saved.wallpaper;
+    const source = currentWallpaper;
     if (String(source).startsWith('idb:image:') && window.IdealMachineGetImage) window.IdealMachineGetImage(source).then(value => { if (value) image.src = value; }); else image.src = source;
   }
 
   appRoot.meihua.updateAutoContrast = updateAutoContrast;
   window.addEventListener('ideal-machine-folder-open', updateAutoContrast);
+  let autoContrastTimer = 0;
+  const scheduleAutoContrast = () => { window.clearTimeout(autoContrastTimer); autoContrastTimer = window.setTimeout(updateAutoContrast, 90); };
+  window.addEventListener('resize', scheduleAutoContrast);
+  window.addEventListener('scroll', scheduleAutoContrast, { capture:true, passive:true });
+  window.addEventListener('ideal-machine-wallpaper-change', scheduleAutoContrast);
+  window.addEventListener('storage', event => { if (event.key === storageKey) scheduleAutoContrast(); });
 
   function open() {
     closeIconPicker();

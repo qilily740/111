@@ -156,6 +156,58 @@
   window.IdealMachineGetImage = getImageAsset;
   window.IdealMachineDeleteImage = deleteImageAsset;
   window.IdealMachineCleanupAssets = cleanupImageAssets;
+  const wallpaperToneTargets = new Set();
+  const wallpaperToneCache = new Map();
+  let wallpaperToneRequest = 0;
+  function readWallpaperSource() { try { return String(JSON.parse(localStorage.getItem('ideal-machine-beauty') || '{}')?.wallpaper || '').trim(); } catch { return ''; } }
+  function setWallpaperTone(target, tone) {
+    if (!target?.isConnected) return;
+    target.classList.toggle('is-wallpaper-dark', tone === 'dark');
+    target.classList.toggle('is-wallpaper-light', tone === 'light');
+    target.dataset.wallpaperTone = tone || '';
+  }
+  function applyWallpaperTone(tone) { wallpaperToneTargets.forEach(target => setWallpaperTone(target, tone)); }
+  function detectWallpaperTone() {
+    const request = ++wallpaperToneRequest;
+    let source = readWallpaperSource();
+    const resolve = value => {
+      source = String(value || '').trim();
+      if (!source) { applyWallpaperTone(''); return; }
+      const cached = wallpaperToneCache.get(source);
+      if (cached) { applyWallpaperTone(cached); return; }
+      const image = new Image();
+      if (/^https?:\/\//i.test(source)) image.crossOrigin = 'anonymous';
+      image.onload = () => {
+        let tone = 'light';
+        try {
+          const canvas = document.createElement('canvas'); canvas.width = canvas.height = 16;
+          const context = canvas.getContext('2d', { willReadFrequently:true }) || canvas.getContext('2d');
+          context.drawImage(image, 0, 0, 16, 16);
+          const pixels = context.getImageData(0, 0, 16, 16).data;
+          let luminance = 0, count = 0;
+          for (let index = 0; index < pixels.length; index += 4) { if (pixels[index + 3] === 0) continue; luminance += (pixels[index] * 299 + pixels[index + 1] * 587 + pixels[index + 2] * 114) / 1000; count += 1; }
+          tone = (count ? luminance / count : 255) < 145 ? 'dark' : 'light';
+        } catch {}
+        wallpaperToneCache.set(source, tone);
+        if (request === wallpaperToneRequest) applyWallpaperTone(tone);
+      };
+      image.onerror = () => { if (request === wallpaperToneRequest) applyWallpaperTone(''); };
+      image.src = source;
+    };
+    if (/^idb:image:/i.test(source)) getImageAsset(source).then(resolve).catch(() => resolve('')); else resolve(source);
+  }
+  window.IdealMachineWallpaperTone = {
+    watch(target) { if (target) wallpaperToneTargets.add(target); detectWallpaperTone(); },
+    refresh: detectWallpaperTone,
+    unwatch(target) { if (target) wallpaperToneTargets.delete(target); }
+  };
+  const wallpaperToneObserver = new MutationObserver(records => {
+    if (!records.some(record => record.target === document.body && record.attributeName === 'style')) return;
+    detectWallpaperTone();
+    window.dispatchEvent(new Event('ideal-machine-wallpaper-change'));
+  });
+  wallpaperToneObserver.observe(document.body, { attributes:true, attributeFilter:['style'] });
+  window.addEventListener('storage', event => { if (event.key === 'ideal-machine-beauty') detectWallpaperTone(); });
   setTimeout(cleanupImageAssets, 5000);
   function updateStoredObject(key, fallback, update) {
     try {

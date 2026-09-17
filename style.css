@@ -848,12 +848,10 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .folder-app-item.auto-dark .folder-app-icon { color: #222; border-color: rgba(0,0,0,.24); }
 .folder-app-item.auto-dark .generated-folder-icon .icon-day { display: inline; }
 .folder-app-item.auto-dark .generated-folder-icon .icon-night { display: none; }
-.folder-app-item,
-.folder-app-item.auto-light,
-.folder-app-item.auto-dark { color: #222 !important; text-shadow: none !important; }
-.folder-app-item .folder-app-name,
-.folder-app-item.auto-light .folder-app-name,
-.folder-app-item.auto-dark .folder-app-name { color: #222 !important; text-shadow: none !important; }
+.folder-app-item { color: #222 !important; text-shadow: none !important; }
+.folder-app-item .folder-app-name { color: #222 !important; text-shadow: none !important; }
+.folder-app-item.is-wallpaper-dark .folder-app-name { color:#fff !important; -webkit-text-fill-color:#fff !important; text-shadow:0 1px 4px rgba(0,0,0,.5) !important; }
+.folder-app-item.is-wallpaper-light .folder-app-name { color:#222 !important; -webkit-text-fill-color:#222 !important; text-shadow:0 1px 2px rgba(255,255,255,.28) !important; }
 .folder-app-item .folder-app-icon,
 .folder-app-item.auto-light .folder-app-icon,
 .folder-app-item.auto-dark .folder-app-icon { color: #222 !important; border-color: rgba(255,255,255,.58) !important; box-shadow: 0 5px 13px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.58) !important; }
@@ -863,6 +861,10 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .desktop-layout-toolbar > button.auto-dark { background:#111 !important; color:#fff !important; box-shadow:0 3px 8px rgba(0,0,0,.3) !important; text-shadow:none; }
 .profile-card.auto-light .nickname-text, .profile-card.auto-light .love-heart { color: #fff !important; text-shadow: 0 1px 4px rgba(0,0,0,.55); }
 .profile-card.auto-light .sign-text, .todo-widget.auto-light .todo-title, .todo-widget.auto-light .todo-list, .todo-widget.auto-light .todo-new-row { color: #f5f5f5 !important; text-shadow: 0 1px 4px rgba(0,0,0,.55); }
+.image-widget.auto-light { color:#fff !important; }
+.image-widget.auto-light .image-widget-placeholder { color:#fff !important; text-shadow:0 1px 4px rgba(0,0,0,.55); }
+.image-widget.auto-dark { color:#222 !important; }
+.image-widget.auto-dark .image-widget-placeholder { color:#777 !important; text-shadow:0 1px 3px rgba(255,255,255,.3); }
 .search-input.auto-light { color: #fff !important; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
 .search-input.auto-light::placeholder { color: rgba(255,255,255,.82); }
 .date-calendar-card.auto-light .date-calendar-left, .date-calendar-card.auto-light .date-calendar-year, .date-calendar-card.auto-light .date-calendar-weekday, .date-calendar-card.auto-light .date-calendar-note, .date-calendar-card.auto-light .calendar-header, .date-calendar-card.auto-light .calendar-days { color: #fff !important; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
@@ -5845,6 +5847,7 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .dock-icon > .default-app-icon { transform:scale(1.02); }
 /* 情侣空间原图四周透明留白较宽，放大到主体贴合裁剪区。 */
 [data-app-key="qinglvkongjian"] .default-app-icon { transform:scale(1.32); }
+.beauty-app-preview[data-beauty-preview="qinglvkongjian"] > .default-app-icon { transform:scale(1.32); }
 
 /* TA 角色手机：图片图标不显示白色容器边缘或内高光。 */
 .ta-app-icon > i:has(img),
@@ -8171,3 +8174,156 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   backdrop-filter:blur(24px) saturate(155%) !important;
   opacity:1;
 }
+
+/* 创作类 App 按桌面壁纸色系切换，覆盖系统深色模式的固定配色。 */
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) {
+  background:#202020 !important;
+  color:#f1f1f1 !important;
+}
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-page,.fanfic-page,.magazine-page) {
+  background:linear-gradient(155deg,#292929,#1d1d1d) !important;
+  color:#f1f1f1 !important;
+}
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-header,.fanfic-header,.magazine-header) {
+  border-color:rgba(255,255,255,.12) !important;
+  background:rgba(35,35,35,.9) !important;
+  color:#f1f1f1 !important;
+}
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-header h1,.fanfic-header h1,.magazine-header h1) {
+  color:#fff !important;
+  -webkit-text-fill-color:#fff !important;
+  text-shadow:0 1px 3px rgba(0,0,0,.42) !important;
+}
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-header button,.fanfic-header button,.magazine-round-button) {
+  background:rgba(255,255,255,.1) !important;
+  color:#eee !important;
+}
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-history-card,.debate-topic-card,.debate-arrange-card,.debate-composer,.debate-turn,.debate-draft-side,.debate-room-topic,.fanfic-story-card,.fanfic-setup-card,.fanfic-story-settings,.fanfic-chapter,.magazine-form-card,.magazine-overview,.magazine-section-card,.magazine-article-editor,.magazine-cover-settings,.magazine-issue-card > button:first-child,.magazine-interview-room,.magazine-toc,.magazine-reading-page) {
+  border-color:rgba(255,255,255,.12) !important;
+  background:rgba(255,255,255,.08) !important;
+  color:#eee !important;
+}
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(input,textarea,select) {
+  border-color:rgba(255,255,255,.16) !important;
+  background:rgba(0,0,0,.24) !important;
+  color:#f1f1f1 !important;
+  -webkit-text-fill-color:#f1f1f1 !important;
+}
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(input,textarea,select)::placeholder { color:rgba(255,255,255,.58) !important; }
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-history-card b,.debate-topic-card h2,.debate-room-side b,.debate-turn p,.fanfic-story-card b,.fanfic-setup-title h2,.fanfic-story-settings-head h2,.fanfic-chapter-head input,.magazine-form-title h2,.magazine-section-head h2,.magazine-article-editor input,.magazine-reading-page h2) { color:#f1f1f1 !important; }
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-header p,.debate-section-head > b,.debate-section-head > small,.debate-local-note,.fanfic-header p,.fanfic-section-head > b,.fanfic-local-note,.magazine-header p,.magazine-panel-head p,.magazine-form-title p,.magazine-section-head > b,.magazine-empty,.magazine-empty-small) { color:rgba(255,255,255,.62) !important; }
+:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-generate-button,.debate-start-button,.debate-record-button,.fanfic-primary-action,.magazine-interview-form button,.magazine-article-editor footer button) { background:#f1f1f1 !important; color:#202020 !important; }
+
+:is(.debate-app.is-wallpaper-light,.fanfic-app.is-wallpaper-light,.magazine-app.is-wallpaper-light) {
+  background:#f5f5f3 !important;
+  color:#272727 !important;
+  color-scheme:light;
+}
+:is(.debate-app.is-wallpaper-light,.fanfic-app.is-wallpaper-light,.magazine-app.is-wallpaper-light) :is(.debate-page,.fanfic-page,.magazine-page) {
+  background:linear-gradient(155deg,#f8f8f6,#efefed) !important;
+  color:#272727 !important;
+}
+:is(.debate-app.is-wallpaper-light,.fanfic-app.is-wallpaper-light,.magazine-app.is-wallpaper-light) :is(.debate-header,.fanfic-header,.magazine-header) {
+  border-color:rgba(0,0,0,.08) !important;
+  background:rgba(248,248,246,.88) !important;
+  color:#272727 !important;
+}
+:is(.debate-app.is-wallpaper-light,.fanfic-app.is-wallpaper-light,.magazine-app.is-wallpaper-light) :is(.debate-header h1,.fanfic-header h1,.magazine-header h1) {
+  color:#222 !important;
+  -webkit-text-fill-color:#222 !important;
+  text-shadow:none !important;
+}
+:is(.debate-app.is-wallpaper-light,.fanfic-app.is-wallpaper-light,.magazine-app.is-wallpaper-light) :is(.debate-header button,.fanfic-header button,.magazine-round-button) {
+  background:rgba(0,0,0,.055) !important;
+  color:#555 !important;
+}
+:is(.debate-app.is-wallpaper-light,.fanfic-app.is-wallpaper-light,.magazine-app.is-wallpaper-light) :is(input,textarea,select) {
+  background:rgba(255,255,255,.7) !important;
+  color:#333 !important;
+  -webkit-text-fill-color:#333 !important;
+}
+
+/* 聊天页“十字”工具面板保持原有浅色，不跟随聊天壁纸切换文字颜色。 */
+.chat-app.is-chatting.chat-wallpaper-dark .chat-conversation > .chat-compose-wrap > .chat-tools,
+.chat-app.is-chatting.chat-wallpaper-light .chat-conversation > .chat-compose-wrap > .chat-tools {
+  border-top-color:rgba(0,0,0,.08) !important;
+  background:rgba(248,248,246,.94) !important;
+  color:#555 !important;
+  text-shadow:none !important;
+}
+.chat-app.is-chatting.chat-wallpaper-dark .chat-conversation > .chat-compose-wrap > .chat-tools button,
+.chat-app.is-chatting.chat-wallpaper-light .chat-conversation > .chat-compose-wrap > .chat-tools button {
+  border-color:rgba(0,0,0,.07) !important;
+  background:rgba(255,255,255,.45) !important;
+  color:#555 !important;
+  -webkit-text-fill-color:#555 !important;
+  text-shadow:none !important;
+  filter:none !important;
+}
+.chat-app.is-chatting.chat-wallpaper-dark .chat-conversation > .chat-compose-wrap > .chat-tools button span,
+.chat-app.is-chatting.chat-wallpaper-light .chat-conversation > .chat-compose-wrap > .chat-tools button span,
+.chat-app.is-chatting.chat-wallpaper-dark .chat-conversation > .chat-compose-wrap > .chat-tools .chat-tool-icon,
+.chat-app.is-chatting.chat-wallpaper-light .chat-conversation > .chat-compose-wrap > .chat-tools .chat-tool-icon {
+  background:transparent !important;
+  color:#555 !important;
+  -webkit-text-fill-color:#555 !important;
+  text-shadow:none !important;
+  filter:none !important;
+  stroke:currentColor;
+}
+
+/* 表情包面板固定使用黑色按钮文字，不跟随聊天壁纸自动换色。 */
+.chat-app.is-chatting:is(.chat-wallpaper-dark,.chat-wallpaper-light) .chat-conversation > .chat-compose-wrap > .chat-emoji-panel,
+.chat-app.is-chatting:is(.chat-wallpaper-dark,.chat-wallpaper-light) .chat-conversation > .chat-compose-wrap > .chat-emoji-panel button,
+.chat-app.is-chatting:is(.chat-wallpaper-dark,.chat-wallpaper-light) .chat-conversation > .chat-compose-wrap > .chat-emoji-panel button span {
+  color:#171717 !important;
+  -webkit-text-fill-color:#171717 !important;
+  text-shadow:none !important;
+}
+.chat-app.is-chatting:is(.chat-wallpaper-dark,.chat-wallpaper-light) .chat-conversation > .chat-compose-wrap > .chat-emoji-panel .chat-emoji-groups button.is-active {
+  border-color:rgba(0,0,0,.12) !important;
+  background:#ededeb !important;
+  color:#171717 !important;
+  -webkit-text-fill-color:#171717 !important;
+}
+
+/* 浅色桌面壁纸：App 名称和小组件文字明确回到黑色，覆盖系统深色模式的默认白字。 */
+.app-item.auto-dark .app-name,
+.dock-item.auto-dark .dock-name,
+.dock-bar.auto-dark .dock-name {
+  color:#222 !important;
+  -webkit-text-fill-color:#222 !important;
+  text-shadow:0 1px 2px rgba(255,255,255,.28) !important;
+}
+.profile-card.auto-dark { color:#222 !important; text-shadow:0 1px 3px rgba(255,255,255,.24); }
+.profile-card.auto-dark .nickname-text,
+.profile-card.auto-dark .love-heart { color:#222 !important; -webkit-text-fill-color:#222 !important; }
+.profile-card.auto-dark .sign-text { color:#777 !important; -webkit-text-fill-color:#777 !important; }
+.todo-widget.auto-dark { color:#222 !important; text-shadow:0 1px 3px rgba(255,255,255,.24); }
+.todo-widget.auto-dark .todo-title,
+.todo-widget.auto-dark .todo-list { color:#222 !important; -webkit-text-fill-color:#222 !important; }
+.todo-widget.auto-dark .todo-new-row { color:#777 !important; -webkit-text-fill-color:#777 !important; }
+.search-input.auto-dark {
+  color:#222 !important;
+  -webkit-text-fill-color:#222 !important;
+  text-shadow:0 1px 2px rgba(255,255,255,.24) !important;
+}
+.search-input.auto-dark::placeholder { color:rgba(34,34,34,.58) !important; }
+.date-calendar-card.auto-dark .date-calendar-left,
+.date-calendar-card.auto-dark .date-calendar-month-day,
+.date-calendar-card.auto-dark .date-calendar-note,
+.date-calendar-card.auto-dark .calendar-header,
+.date-calendar-card.auto-dark .calendar-days,
+.date-calendar-card.auto-dark .date-calendar-year,
+.date-calendar-card.auto-dark .date-calendar-weekday {
+  color:#222 !important;
+  -webkit-text-fill-color:#222 !important;
+  text-shadow:0 1px 2px rgba(255,255,255,.24) !important;
+}
+.date-calendar-card.auto-dark .date-calendar-note,
+.date-calendar-card.auto-dark .date-calendar-year,
+.date-calendar-card.auto-dark .date-calendar-weekday,
+.date-calendar-card.auto-dark .calendar-header,
+.date-calendar-card.auto-dark .calendar-days { color:#666 !important; -webkit-text-fill-color:#666 !important; }
+.page-indicator.auto-dark .dot { background:rgba(0,0,0,.28); box-shadow:0 1px 3px rgba(255,255,255,.24); }
+.page-indicator.auto-dark .dot.active { background:#222; box-shadow:0 1px 4px rgba(255,255,255,.28); }

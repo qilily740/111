@@ -3282,6 +3282,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     baseRenderWithChatContrast();
     requestAnimationFrame(updateChatDockContrast);
   };
+  window.addEventListener('resize', () => requestAnimationFrame(updateChatDockContrast));
 
   document.addEventListener('click', event => {
     const wallpaper = event.target.closest('[data-offline-theme-button]');
