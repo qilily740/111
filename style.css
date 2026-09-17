@@ -8328,6 +8328,53 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .page-indicator.auto-dark .dot { background:rgba(0,0,0,.28); box-shadow:0 1px 3px rgba(255,255,255,.24); }
 .page-indicator.auto-dark .dot.active { background:#222; box-shadow:0 1px 4px rgba(255,255,255,.28); }
 
+/* 手机端性能与触摸响应：主屏横向翻页，页面内部纵向滚动。 */
+@media (max-width:680px) {
+  .desktop-scroll-wrap {
+    scroll-snap-type:x proximity;
+    scroll-snap-stop:normal;
+    -webkit-overflow-scrolling:touch;
+  }
+  .desktop-page {
+    box-sizing:border-box;
+    min-width:0;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior-y:contain;
+    touch-action:pan-y;
+    -webkit-overflow-scrolling:touch;
+  }
+  .desktop-page .app-item,
+  .desktop-page .dock-item,
+  .desktop-page button,
+  .desktop-page a,
+  .desktop-page [role="button"] {
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
+  /* iOS 对大面积 backdrop-filter 的重绘成本很高，手机端保留通透感但降低模糊半径。 */
+  .desktop-page .profile-card,
+  .desktop-page .todo-widget,
+  .desktop-page .image-widget,
+  .desktop-page .countdown-widget,
+  .desktop-page .elapsed-days-widget,
+  .desktop-page .shared-widget,
+  .desktop-page .now-playing-widget,
+  .desktop-page .search-input,
+  .desktop-page .photo-card,
+  .desktop-page .date-calendar-card,
+  .desktop-page .dock-bar {
+    -webkit-backdrop-filter:blur(10px) saturate(115%);
+    backdrop-filter:blur(10px) saturate(115%);
+    box-shadow:0 5px 16px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.62);
+  }
+  .desktop-page .app-icon,
+  .desktop-page .dock-icon {
+    -webkit-backdrop-filter:blur(7px) saturate(110%);
+    backdrop-filter:blur(7px) saturate(110%);
+  }
+}
+
 /* 情侣空间新版首页：把它从功能入口改成双人关系仪表盘。 */
 .couple-dashboard-hero,
 .couple-today-card,
