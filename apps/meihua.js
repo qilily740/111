@@ -453,38 +453,55 @@
     // 新壁纸完成取样前先清掉上一张壁纸的白字状态，避免深色切到浅色时残留。
     targets.forEach(target => { target.classList.remove('auto-light'); target.classList.add('auto-dark'); });
     const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.onload = () => {
+    // 只有真正跨源的网络图片才需要 CORS；对 data/blob/同源图片设置 crossOrigin
+    // 会让部分手机浏览器把本来可读的图片判成画布污染。
+    try {
+      if (/^https?:\/\//i.test(String(currentWallpaper)) && new URL(String(currentWallpaper), location.href).origin !== location.origin) image.crossOrigin = 'anonymous';
+    } catch {}
+    const applyContrastFallback = () => {
       if (request !== autoContrastRequest) return;
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-      const viewportWidth = document.documentElement.clientWidth;
-      const viewportHeight = document.documentElement.clientHeight;
-      const scale = Math.max(viewportWidth / image.naturalWidth, viewportHeight / image.naturalHeight);
-      const renderedWidth = image.naturalWidth * scale;
-      const renderedHeight = image.naturalHeight * scale;
-      const offsetX = (viewportWidth - renderedWidth) / 2;
-      const offsetY = (viewportHeight - renderedHeight) / 2;
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      context.drawImage(image, 0, 0);
       targets.forEach(target => {
-        if (request !== autoContrastRequest) return;
-        const label = target.matches('[data-app-key]') ? target.querySelector('.app-name, .dock-name, .folder-app-name') : null;
-        const rect = (label || target).getBoundingClientRect();
-        const viewportX = Math.max(0, Math.min(viewportWidth - 1, rect.left + rect.width / 2));
-        const viewportY = Math.max(0, Math.min(viewportHeight - 1, rect.top + rect.height / 2));
-        const pixelX = Math.max(0, Math.min(image.naturalWidth - 1, Math.round((viewportX - offsetX) / scale)));
-        const pixelY = Math.max(0, Math.min(image.naturalHeight - 1, Math.round((viewportY - offsetY) / scale)));
-        const radius = 2;
-        const sample = context.getImageData(Math.max(0, pixelX - radius), Math.max(0, pixelY - radius), Math.min(image.naturalWidth - Math.max(0, pixelX - radius), radius * 2 + 1), Math.min(image.naturalHeight - Math.max(0, pixelY - radius), radius * 2 + 1)).data;
-        let red = 0, green = 0, blue = 0, count = 0;
-        for (let index = 0; index < sample.length; index += 4) { red += sample[index]; green += sample[index + 1]; blue += sample[index + 2]; count += 1; }
-        const luminance = ((red / Math.max(1, count)) * 299 + (green / Math.max(1, count)) * 587 + (blue / Math.max(1, count)) * 114) / 1000;
-        target.classList.toggle('auto-light', luminance < 145);
-        target.classList.toggle('auto-dark', luminance >= 145);
+        target.classList.remove('auto-light');
+        target.classList.add('auto-dark');
       });
     };
+    image.onload = () => {
+      if (request !== autoContrastRequest) return;
+      try {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context || !image.naturalWidth || !image.naturalHeight) throw new Error('壁纸不可取样');
+        const viewportWidth = document.documentElement.clientWidth;
+        const viewportHeight = document.documentElement.clientHeight;
+        const scale = Math.max(viewportWidth / image.naturalWidth, viewportHeight / image.naturalHeight);
+        const renderedWidth = image.naturalWidth * scale;
+        const renderedHeight = image.naturalHeight * scale;
+        const offsetX = (viewportWidth - renderedWidth) / 2;
+        const offsetY = (viewportHeight - renderedHeight) / 2;
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        context.drawImage(image, 0, 0);
+        targets.forEach(target => {
+          if (request !== autoContrastRequest) return;
+          const label = target.matches('[data-app-key]') ? target.querySelector('.app-name, .dock-name, .folder-app-name') : null;
+          const rect = (label || target).getBoundingClientRect();
+          const viewportX = Math.max(0, Math.min(viewportWidth - 1, rect.left + rect.width / 2));
+          const viewportY = Math.max(0, Math.min(viewportHeight - 1, rect.top + rect.height / 2));
+          const pixelX = Math.max(0, Math.min(image.naturalWidth - 1, Math.round((viewportX - offsetX) / scale)));
+          const pixelY = Math.max(0, Math.min(image.naturalHeight - 1, Math.round((viewportY - offsetY) / scale)));
+          const radius = 2;
+          const sample = context.getImageData(Math.max(0, pixelX - radius), Math.max(0, pixelY - radius), Math.min(image.naturalWidth - Math.max(0, pixelX - radius), radius * 2 + 1), Math.min(image.naturalHeight - Math.max(0, pixelY - radius), radius * 2 + 1)).data;
+          let red = 0, green = 0, blue = 0, count = 0;
+          for (let index = 0; index < sample.length; index += 4) { red += sample[index]; green += sample[index + 1]; blue += sample[index + 2]; count += 1; }
+          const luminance = ((red / Math.max(1, count)) * 299 + (green / Math.max(1, count)) * 587 + (blue / Math.max(1, count)) * 114) / 1000;
+          target.classList.toggle('auto-light', luminance < 145);
+          target.classList.toggle('auto-dark', luminance >= 145);
+        });
+      } catch {
+        applyContrastFallback();
+      }
+    };
+    image.onerror = applyContrastFallback;
     const source = currentWallpaper;
     if (String(source).startsWith('idb:image:') && window.IdealMachineGetImage) window.IdealMachineGetImage(source).then(value => { if (value) image.src = value; }); else image.src = source;
   }
