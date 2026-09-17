@@ -6,6 +6,7 @@
   app.className = 'magazine-app';
   app.setAttribute('aria-hidden', 'true');
   document.body.appendChild(app);
+  window.IdealMachineWallpaperTone?.watch?.(app);
 
   let state = readState();
   let openedFromCreativeFolder = false;
