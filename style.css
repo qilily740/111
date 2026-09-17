@@ -8327,3 +8327,185 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .date-calendar-card.auto-dark .calendar-days { color:#666 !important; -webkit-text-fill-color:#666 !important; }
 .page-indicator.auto-dark .dot { background:rgba(0,0,0,.28); box-shadow:0 1px 3px rgba(255,255,255,.24); }
 .page-indicator.auto-dark .dot.active { background:#222; box-shadow:0 1px 4px rgba(255,255,255,.28); }
+
+/* 情侣空间新版首页：把它从功能入口改成双人关系仪表盘。 */
+.couple-dashboard-hero,
+.couple-today-card,
+.couple-next-card,
+.couple-question-teaser,
+.couple-recent-section,
+.couple-quick-section,
+.couple-stat-grid { width:min(100%,540px); margin-right:auto; margin-left:auto; }
+.couple-dashboard-hero { position:relative; display:grid; grid-template-columns:110px 1fr; gap:14px; align-items:center; padding:18px; border:1px solid rgba(0,0,0,.08); border-radius:24px; background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(250,244,241,.68)); box-shadow:0 12px 30px rgba(42,35,32,.06); }
+.couple-dashboard-avatars { position:relative; display:flex; align-items:center; justify-content:center; }
+.couple-dashboard-avatars > span { z-index:2; display:grid; place-items:center; width:22px; height:22px; margin:0 -7px; border:2px solid #f7f3f0; border-radius:50%; background:#282526; color:#fff; font-size:11px; }
+.couple-dashboard-hero .couple-hero-avatar { width:58px; height:58px; border:3px solid rgba(255,255,255,.9); border-radius:19px; box-shadow:0 6px 14px rgba(0,0,0,.12); }
+.couple-dashboard-copy { min-width:0; }
+.couple-dashboard-copy > span,.couple-next-card > div > span,.couple-question-teaser > span { color:#a08d86; font-size:8px; font-weight:800; letter-spacing:.16em; }
+.couple-dashboard-copy h2 { overflow:hidden; margin-top:7px; font-size:18px; text-overflow:ellipsis; white-space:nowrap; }
+.couple-dashboard-copy h2 i { color:#b89b98; font-style:normal; }
+.couple-dashboard-copy p { margin-top:7px; color:#8f8583; font-size:10px; line-height:1.5; }
+.couple-ghost-action { grid-column:1 / -1; justify-self:start; min-height:29px; padding:0 11px; border:1px solid rgba(0,0,0,.11); border-radius:999px; background:rgba(255,255,255,.5); color:#665d5c; font:inherit; font-size:10px; cursor:pointer; }
+.couple-today-card { margin-top:12px; padding:16px; border-radius:21px; background:#282526; color:#fff; box-shadow:0 12px 26px rgba(27,23,23,.14); }
+.couple-card-kicker { display:flex; align-items:center; justify-content:space-between; color:rgba(255,255,255,.62); font-size:9px; }
+.couple-card-kicker span { color:#fff; font-size:11px; font-weight:700; }
+.couple-checkin-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:17px; }
+.couple-checkin-row strong { display:block; font-size:18px; letter-spacing:-.04em; }
+.couple-checkin-row p { margin-top:5px; color:rgba(255,255,255,.62); font-size:10px; }
+.couple-checkin { flex:0 0 auto; min-height:36px; padding:0 12px; border:1px solid rgba(255,255,255,.25); border-radius:12px; background:#fff; color:#272324; font:inherit; font-size:10px; cursor:pointer; }
+.couple-checkin.is-checked { background:rgba(255,255,255,.13); color:#fff; cursor:default; }
+.couple-today-line { display:grid; grid-template-columns:auto 1fr; gap:6px 11px; align-items:center; margin-top:18px; padding-top:13px; border-top:1px solid rgba(255,255,255,.13); color:rgba(255,255,255,.62); font-size:10px; }
+.couple-today-line button { justify-self:end; border:0; background:none; color:#fff; font:inherit; font-size:11px; cursor:pointer; }
+.couple-today-line button b { margin-left:4px; color:rgba(255,255,255,.6); font-size:15px; }
+.couple-today-line p { grid-column:1 / -1; overflow:hidden; color:rgba(255,255,255,.8); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.couple-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:12px; }
+.couple-stat-grid > div { display:grid; gap:3px; padding:12px 8px; border:1px solid rgba(0,0,0,.07); border-radius:15px; background:rgba(255,255,255,.68); text-align:center; }
+.couple-stat-grid strong { font-size:18px; letter-spacing:-.05em; }
+.couple-stat-grid span { color:#5f5857; font-size:10px; }
+.couple-stat-grid small { color:#aaa; font-size:8px; }
+.couple-quick-section { margin-top:24px; }
+.couple-quick-section .couple-section-head { margin-bottom:10px; }
+.couple-quick-section .couple-section-head > div > span,.couple-recent-section .couple-section-head > div > span { color:#a08d86; font-size:8px; font-weight:800; letter-spacing:.16em; }
+.couple-quick-section .couple-section-head h2,.couple-recent-section .couple-section-head h2 { margin-top:5px; font-size:17px; }
+.couple-quick-section .couple-section-head > small { color:#aaa; font-size:9px; }
+.couple-quick-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.couple-quick-grid button { display:flex; align-items:center; gap:10px; min-height:62px; padding:11px; border:1px solid rgba(0,0,0,.07); border-radius:16px; background:rgba(255,255,255,.68); color:#2c2929; text-align:left; cursor:pointer; }
+.couple-quick-grid button > i { display:grid; flex:0 0 28px; place-items:center; width:28px; height:28px; border-radius:10px; background:#eee7e3; color:#605350; font-size:17px; font-style:normal; }
+.couple-quick-grid button > span { display:grid; min-width:0; gap:4px; }
+.couple-quick-grid b { overflow:hidden; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.couple-quick-grid small { overflow:hidden; color:#999; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+.couple-next-card { display:flex; align-items:center; justify-content:space-between; gap:15px; margin-top:12px; padding:16px; border:1px solid rgba(0,0,0,.08); border-radius:20px; background:linear-gradient(120deg,rgba(235,225,220,.78),rgba(255,255,255,.7)); }
+.couple-next-card h2 { overflow:hidden; margin-top:6px; font-size:17px; text-overflow:ellipsis; white-space:nowrap; }
+.couple-next-card p { margin-top:5px; color:#867b78; font-size:10px; }
+.couple-next-card button,.couple-recent-section .couple-section-head > button,.couple-question-teaser button { flex:0 0 auto; border:0; background:none; color:#554b49; font:inherit; font-size:10px; cursor:pointer; }
+.couple-next-card button b,.couple-question-teaser button b { margin-left:3px; font-size:15px; }
+.couple-recent-section { margin-top:25px; }
+.couple-recent-section .couple-section-head { margin-bottom:9px; }
+.couple-recent-list { display:grid; gap:7px; }
+.couple-recent-item { display:flex; align-items:center; gap:10px; width:100%; min-width:0; padding:10px 11px; border:1px solid rgba(0,0,0,.07); border-radius:14px; background:rgba(255,255,255,.58); color:#302c2c; text-align:left; cursor:pointer; }
+.couple-recent-item > i { display:grid; flex:0 0 27px; place-items:center; width:27px; height:27px; border-radius:9px; background:#eeebe8; color:#786965; font-size:11px; font-style:normal; }
+.couple-recent-item > span { display:grid; flex:1; min-width:0; gap:4px; }
+.couple-recent-item b { overflow:hidden; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.couple-recent-item small { color:#999; font-size:9px; }
+.couple-recent-item em { color:#aaa; font-size:16px; font-style:normal; }
+.couple-question-teaser { position:relative; margin-top:12px; padding:17px 16px; border-radius:20px; background:#eee8e4; }
+.couple-question-teaser h2 { max-width:83%; margin-top:7px; font-size:15px; line-height:1.45; }
+.couple-question-teaser p { max-width:83%; margin-top:6px; color:#8c817e; font-size:10px; line-height:1.5; }
+.couple-question-teaser button { position:absolute; right:16px; bottom:16px; }
+@media (max-width:360px) { .couple-dashboard-hero { grid-template-columns:92px 1fr; padding:14px; }.couple-dashboard-hero .couple-hero-avatar { width:50px; height:50px; }.couple-checkin-row strong { font-size:16px; }.couple-stat-grid > div { padding-right:4px; padding-left:4px; } }
+@media (prefers-color-scheme:dark) {
+  .couple-dashboard-hero { border-color:rgba(255,255,255,.12); background:linear-gradient(135deg,rgba(57,51,51,.92),rgba(38,35,36,.78)); box-shadow:none; }
+  .couple-dashboard-avatars > span { border-color:#373233; background:#eee; color:#222; }
+  .couple-dashboard-copy > span,.couple-next-card > div > span,.couple-question-teaser > span,.couple-quick-section .couple-section-head > div > span,.couple-recent-section .couple-section-head > div > span { color:#c0a9a2; }
+  .couple-dashboard-copy p,.couple-next-card p,.couple-quick-section .couple-section-head > small { color:#aaa0a0; }
+  .couple-ghost-action { border-color:rgba(255,255,255,.18); background:rgba(255,255,255,.08); color:#eee; }
+  .couple-stat-grid > div,.couple-quick-grid button,.couple-recent-item { border-color:rgba(255,255,255,.12); background:rgba(255,255,255,.07); color:#eee; }
+  .couple-stat-grid span,.couple-recent-item small { color:#c5bdbd; }
+  .couple-quick-grid button > i,.couple-recent-item > i { background:rgba(255,255,255,.12); color:#eee; }
+  .couple-next-card { border-color:rgba(255,255,255,.12); background:linear-gradient(120deg,rgba(92,72,72,.72),rgba(43,40,41,.8)); }
+  .couple-next-card button,.couple-recent-section .couple-section-head > button,.couple-question-teaser button { color:#eee; }
+  .couple-question-teaser { background:rgba(255,255,255,.11); }
+  .couple-question-teaser p { color:#c4bcbc; }
+}
+
+/* 一起玩：本地完成型玩法，API 只作为主动请求的补充。 */
+.couple-play-intro,.couple-challenge-card,.couple-play-grid,.couple-progress-card,.couple-play-plans,.couple-play-api { width:min(100%,540px); margin-right:auto; margin-left:auto; }
+.couple-play-intro { padding:4px 1px 17px; }
+.couple-play-intro > span,.couple-challenge-top span,.couple-play-card > span,.couple-progress-card > div > span,.couple-play-plans .couple-section-head span { color:#a08d86; font-size:8px; font-weight:800; letter-spacing:.16em; }
+.couple-play-intro h2 { margin-top:8px; font-size:24px; letter-spacing:-.06em; }
+.couple-play-intro p { max-width:390px; margin-top:8px; color:#918684; font-size:11px; line-height:1.6; }
+.couple-challenge-card { padding:18px; border-radius:22px; background:#292526; color:#fff; box-shadow:0 13px 30px rgba(38,31,31,.15); }
+.couple-challenge-card.is-done { background:linear-gradient(135deg,#4a4746,#292526); }
+.couple-challenge-top { display:flex; align-items:center; justify-content:space-between; }
+.couple-challenge-top span { color:#d1b9b0; }
+.couple-challenge-top small { color:rgba(255,255,255,.5); font-size:9px; }
+.couple-challenge-card h2 { margin-top:18px; font-size:20px; letter-spacing:-.04em; }
+.couple-challenge-card p { max-width:390px; margin-top:7px; color:rgba(255,255,255,.66); font-size:11px; line-height:1.6; }
+.couple-challenge-button { min-height:35px; margin-top:17px; padding:0 13px; border:1px solid rgba(255,255,255,.23); border-radius:11px; background:#fff; color:#292526; font:inherit; font-size:10px; cursor:pointer; }
+.couple-challenge-card.is-done .couple-challenge-button { background:rgba(255,255,255,.12); color:#fff; cursor:default; }
+.couple-play-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:11px; }
+.couple-play-card { min-width:0; min-height:157px; padding:15px; border:1px solid rgba(0,0,0,.08); border-radius:19px; background:rgba(255,255,255,.68); }
+.couple-play-card h3 { margin-top:10px; font-size:16px; }
+.couple-play-card p { min-height:39px; margin-top:8px; color:#8f8583; font-size:10px; line-height:1.55; }
+.couple-play-card button { margin-top:8px; border:0; background:none; color:#554b49; font:inherit; font-size:10px; cursor:pointer; }
+.couple-play-card button b { margin-left:4px; font-size:14px; }
+.couple-play-card button:disabled { color:#bbb; cursor:not-allowed; }
+.couple-progress-card { display:grid; grid-template-columns:1fr auto; gap:7px 14px; margin-top:11px; padding:16px; border:1px solid rgba(0,0,0,.08); border-radius:20px; background:linear-gradient(135deg,rgba(247,237,232,.9),rgba(255,255,255,.68)); }
+.couple-progress-card h3 { margin-top:6px; font-size:17px; }
+.couple-progress-number { display:flex; align-items:baseline; gap:4px; }
+.couple-progress-number strong { font-size:28px; letter-spacing:-.08em; }
+.couple-progress-number small { color:#918684; font-size:9px; }
+.couple-progress-card p { grid-column:1 / -1; color:#827774; font-size:10px; line-height:1.6; }
+.couple-progress-bar { grid-column:1 / -1; height:5px; overflow:hidden; border-radius:999px; background:rgba(90,70,65,.13); }
+.couple-progress-bar i { display:block; height:100%; border-radius:inherit; background:#655653; }
+.couple-play-plans { margin-top:25px; }
+.couple-play-plans .couple-section-head { margin-bottom:10px; }
+.couple-play-plans .couple-section-head > button { border:0; background:none; color:#675956; font:inherit; font-size:10px; cursor:pointer; }
+.couple-plan-list { display:grid; gap:7px; }
+.couple-plan-item { display:flex; align-items:center; gap:10px; width:100%; min-width:0; padding:11px 12px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:rgba(255,255,255,.64); color:#2e2a2a; text-align:left; cursor:pointer; }
+.couple-plan-item > i { display:grid; flex:0 0 22px; place-items:center; width:22px; height:22px; border:1px solid #b7aaa5; border-radius:50%; color:#7d6e69; font-size:12px; font-style:normal; }
+.couple-plan-item > span { display:grid; min-width:0; gap:3px; }
+.couple-plan-item b { overflow:hidden; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.couple-plan-item small { color:#999; font-size:9px; }
+.couple-plan-item.is-done b { color:#999; text-decoration:line-through; }
+.couple-plan-item.is-done > i { border-color:#655653; background:#655653; color:#fff; }
+.couple-play-api { min-height:35px; margin-top:12px; border:1px solid rgba(0,0,0,.1); border-radius:11px; background:rgba(255,255,255,.48); color:#8a7e7b; font:inherit; font-size:10px; cursor:pointer; }
+@media (max-width:360px) { .couple-play-grid { gap:7px; }.couple-play-card { padding:12px; }.couple-play-card h3 { font-size:14px; } }
+@media (prefers-color-scheme:dark) {
+  .couple-play-intro p { color:#aaa0a0; }
+  .couple-play-intro > span,.couple-challenge-top span,.couple-play-card > span,.couple-progress-card > div > span,.couple-play-plans .couple-section-head span { color:#c0a9a2; }
+  .couple-play-card,.couple-progress-card,.couple-plan-item { border-color:rgba(255,255,255,.12); background:rgba(255,255,255,.07); color:#eee; }
+  .couple-play-card p,.couple-progress-card p,.couple-progress-number small,.couple-plan-item small { color:#bcb2b2; }
+  .couple-play-card button,.couple-play-plans .couple-section-head > button { color:#eee; }
+  .couple-progress-card { background:linear-gradient(135deg,rgba(85,67,67,.72),rgba(38,36,37,.78)); }
+  .couple-progress-bar { background:rgba(255,255,255,.14); }.couple-progress-bar i { background:#eee; }
+  .couple-plan-item > i { border-color:#aaa; color:#eee; }.couple-plan-item.is-done > i { border-color:#eee; background:#eee; color:#222; }
+  .couple-play-api { border-color:rgba(255,255,255,.15); background:rgba(255,255,255,.07); color:#c8bebe; }
+}
+
+/* 角色互动工作台：连续对话和现场生成内容。 */
+.couple-ai-intro,.couple-live-play,.couple-ai-start,.couple-ai-plan-card,.couple-play-record { width:min(100%,540px); margin-right:auto; margin-left:auto; }
+.couple-ai-intro { padding:3px 1px 17px; }
+.couple-ai-intro > span,.couple-live-head span,.couple-ai-plan-card > div > span { color:#a08d86; font-size:8px; font-weight:800; letter-spacing:.16em; }
+.couple-ai-intro h2 { margin-top:8px; font-size:23px; letter-spacing:-.06em; line-height:1.25; }
+.couple-ai-intro p { max-width:410px; margin-top:9px; color:#8f8583; font-size:11px; line-height:1.65; }
+.couple-ai-start { display:grid; place-items:center; padding:31px 20px 28px; border:1px solid rgba(0,0,0,.08); border-radius:23px; background:linear-gradient(145deg,rgba(255,255,255,.84),rgba(246,235,231,.8)); text-align:center; }
+.couple-ai-orbit { display:grid; place-items:center; width:65px; height:65px; border:1px solid rgba(96,75,70,.18); border-radius:50%; background:rgba(255,255,255,.75); box-shadow:0 0 0 10px rgba(255,255,255,.3),0 11px 25px rgba(59,41,37,.12); }
+.couple-ai-orbit i { color:#62514e; font:700 15px/1 Georgia,serif; font-style:normal; }
+.couple-ai-start h2 { margin-top:24px; font-size:19px; }
+.couple-ai-start p { max-width:330px; margin-top:8px; color:#8e8380; font-size:10px; line-height:1.65; }
+.couple-ai-start button,.couple-play-send { min-height:38px; margin-top:18px; padding:0 16px; border:0; border-radius:12px; background:#292526; color:#fff; font:inherit; font-size:10px; cursor:pointer; }
+.couple-ai-start button:disabled,.couple-play-send:disabled,.couple-ai-plan-card button:disabled { cursor:wait; opacity:.6; }
+.couple-live-play { padding:17px; border-radius:22px; background:#292526; color:#fff; box-shadow:0 13px 30px rgba(38,31,31,.15); }
+.couple-live-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.couple-live-head span { color:#d1b9b0; }.couple-live-head h2 { margin-top:7px; font-size:19px; }
+.couple-live-head small { flex:0 0 auto; margin-top:3px; color:rgba(255,255,255,.58); font-size:9px; }
+.couple-live-intro { margin-top:13px; color:rgba(255,255,255,.72); font-size:11px; line-height:1.65; white-space:pre-wrap; }
+.couple-play-thread { display:grid; gap:8px; margin-top:17px; max-height:270px; overflow-y:auto; padding-right:3px; }
+.couple-play-bubble { justify-self:start; max-width:88%; padding:10px 12px; border-radius:13px 13px 13px 4px; background:rgba(255,255,255,.1); }
+.couple-play-bubble.is-user { justify-self:end; border-radius:13px 13px 4px 13px; background:#fff; color:#2b2728; }
+.couple-play-bubble span { color:rgba(255,255,255,.5); font-size:9px; }.couple-play-bubble.is-user span { color:#9b8f8d; }
+.couple-play-bubble p { margin-top:5px; font-size:11px; line-height:1.6; white-space:pre-wrap; }
+.couple-live-prompt { margin-top:15px; padding-top:14px; border-top:1px solid rgba(255,255,255,.13); }
+.couple-live-prompt > span { color:#d1b9b0; font-size:9px; }.couple-live-prompt > p { margin-top:6px; color:#fff; font-size:12px; line-height:1.6; }
+.couple-live-prompt textarea { width:100%; min-height:76px; margin-top:10px; padding:10px; border:1px solid rgba(255,255,255,.17); border-radius:11px; outline:0; background:rgba(0,0,0,.18); color:#fff; font:inherit; font-size:11px; line-height:1.5; resize:vertical; }
+.couple-live-prompt textarea::placeholder { color:rgba(255,255,255,.45); }
+.couple-play-send { margin-top:9px; background:#fff; color:#292526; }
+.couple-play-reset { display:block; margin:13px auto 0; border:0; background:none; color:rgba(255,255,255,.58); font:inherit; font-size:9px; cursor:pointer; }
+.couple-ai-plan-card { margin-top:11px; padding:17px; border:1px solid rgba(0,0,0,.08); border-radius:21px; background:linear-gradient(140deg,rgba(242,230,225,.82),rgba(255,255,255,.7)); }
+.couple-ai-plan-card h2 { margin-top:7px; font-size:17px; }
+.couple-ai-plan-card > p { margin-top:11px; color:#7f7471; font-size:11px; line-height:1.7; white-space:pre-wrap; }
+.couple-ai-plan-card button { margin-top:14px; border:0; background:none; color:#5b4d4a; font:inherit; font-size:10px; cursor:pointer; }
+.couple-ai-plan-card button b { margin-left:4px; font-size:15px; }
+.couple-play-record { min-height:36px; margin-top:11px; border:1px solid rgba(0,0,0,.1); border-radius:11px; background:rgba(255,255,255,.5); color:#827774; font:inherit; font-size:10px; cursor:pointer; }
+@media (prefers-color-scheme:dark) {
+  .couple-ai-intro > span,.couple-live-head span,.couple-ai-plan-card > div > span { color:#c0a9a2; }
+  .couple-ai-intro p { color:#aaa0a0; }
+  .couple-ai-start { border-color:rgba(255,255,255,.12); background:linear-gradient(145deg,rgba(57,51,51,.92),rgba(38,35,36,.8)); }
+  .couple-ai-orbit { border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.12); box-shadow:0 0 0 10px rgba(255,255,255,.04),0 11px 25px rgba(0,0,0,.2); }.couple-ai-orbit i { color:#eee; }
+  .couple-ai-start p { color:#bcb2b2; }
+  .couple-ai-start button { background:#eee; color:#222; }
+  .couple-ai-plan-card { border-color:rgba(255,255,255,.12); background:linear-gradient(140deg,rgba(85,67,67,.72),rgba(38,36,37,.78)); }
+  .couple-ai-plan-card > p { color:#c5baba; }.couple-ai-plan-card button { color:#eee; }
+  .couple-play-record { border-color:rgba(255,255,255,.15); background:rgba(255,255,255,.07); color:#c8bebe; }
+}
