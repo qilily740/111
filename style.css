@@ -8381,17 +8381,21 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   min-height:0;
   overflow-x:auto;
   overflow-y:hidden;
+  scroll-snap-type:x mandatory;
+  scroll-snap-stop:always;
   touch-action:pan-x pan-y;
   -webkit-overflow-scrolling:touch;
 }
 .desktop-page {
   min-height:0;
+  overflow-y:hidden;
+  overscroll-behavior-y:none;
   touch-action:pan-x pan-y;
 }
 @media (max-width:680px) {
   .desktop-page {
     overflow-x:hidden;
-    overflow-y:auto;
+    overflow-y:hidden;
     touch-action:pan-x pan-y;
   }
 }
