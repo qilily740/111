@@ -8375,6 +8375,27 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   }
 }
 
+/* 主屏横向翻页与页面内部纵向滚动需要同时放行，不能让子页面的 pan-y 拦住外层横向滚动。 */
+.desktop-scroll-wrap {
+  height:calc(100dvh - 140px);
+  min-height:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  touch-action:pan-x pan-y;
+  -webkit-overflow-scrolling:touch;
+}
+.desktop-page {
+  min-height:0;
+  touch-action:pan-x pan-y;
+}
+@media (max-width:680px) {
+  .desktop-page {
+    overflow-x:hidden;
+    overflow-y:auto;
+    touch-action:pan-x pan-y;
+  }
+}
+
 /* 情侣空间新版首页：把它从功能入口改成双人关系仪表盘。 */
 .couple-dashboard-hero,
 .couple-today-card,
