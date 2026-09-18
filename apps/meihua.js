@@ -378,7 +378,7 @@
 
   function applySettings() {
     applyLauncherIcon();
-    const applyWallpaper = value => { const wallpaperValue = value ? `url("${cssUrl(value)}")` : ''; document.body.style.backgroundImage = wallpaperValue; const preview = document.querySelector('#beautyWallpaperPreview'); if (preview) preview.style.backgroundImage = wallpaperValue; updateAutoContrast(); };
+    const applyWallpaper = value => { const wallpaperValue = value ? `url("${cssUrl(value)}")` : ''; document.body.style.backgroundImage = wallpaperValue; const preview = document.querySelector('#beautyWallpaperPreview'); if (preview) preview.style.backgroundImage = wallpaperValue; updateAutoContrast(); window.IdealMachineWallpaperTone?.refresh?.(); };
     if (String(saved.wallpaper || '').startsWith('idb:image:') && window.IdealMachineGetImage) window.IdealMachineGetImage(saved.wallpaper).then(applyWallpaper); else applyWallpaper(saved.wallpaper || '');
     const desktop = document.querySelector('.desktop-scroll-wrap');
     if (desktop) desktop.style.backgroundImage = 'none';
@@ -443,7 +443,7 @@
     const liveAppItems = [...document.querySelectorAll('.app-item[data-app-key], .dock-item[data-app-key]')];
     const folderAppItems = [...document.querySelectorAll('.folder-app-item')];
     folderAppItems.forEach(target => window.IdealMachineWallpaperTone?.watch?.(target));
-    const targets = [...liveAppItems, ...folderItems, ...folderAppItems, ...document.querySelectorAll('.profile-card, .todo-widget, .image-widget, .photo-card, .countdown-widget, .shared-widget, .chat-widget, .now-playing-widget, .mood-profile-widget, .time-photo-widget, .habit-mini-widget, .search-input, .date-calendar-card, .dock-bar, .page-indicator, .desktop-layout-toolbar > button')];
+    const targets = [...liveAppItems, ...folderItems, ...folderAppItems, ...document.querySelectorAll('.profile-card, .todo-widget, .image-widget, .photo-card, .countdown-widget, .shared-widget, .chat-widget, .now-playing-widget, .mood-profile-widget, .time-photo-widget, .habit-mini-widget, .contact-mini-widget, .daily-photo-widget, .relationship-mini-widget, .polaroid-mini-widget, .frost-profile-widget, .celestial-specimen-widget, .mist-rain-window-widget, .search-input, .date-calendar-card, .dock-bar, .page-indicator, .desktop-layout-toolbar > button')];
     let currentWallpaper = saved.wallpaper || '';
     try {
       const latest = JSON.parse(localStorage.getItem(storageKey) || '{}') || {};
@@ -460,9 +460,11 @@
     } catch {}
     const applyContrastFallback = () => {
       if (request !== autoContrastRequest) return;
+      const globalTone = window.IdealMachineWallpaperTone?.getTone?.();
       targets.forEach(target => {
         target.classList.remove('auto-light');
-        target.classList.add('auto-dark');
+        target.classList.toggle('auto-light', globalTone === 'dark');
+        target.classList.toggle('auto-dark', globalTone !== 'dark');
       });
     };
     image.onload = () => {
@@ -503,7 +505,14 @@
     };
     image.onerror = applyContrastFallback;
     const source = currentWallpaper;
-    if (String(source).startsWith('idb:image:') && window.IdealMachineGetImage) window.IdealMachineGetImage(source).then(value => { if (value) image.src = value; }); else image.src = source;
+    const setImageSource = value => {
+      if (request !== autoContrastRequest) return;
+      if (value) image.src = value;
+      else applyContrastFallback();
+    };
+    if (String(source).startsWith('idb:image:') && window.IdealMachineGetImage) {
+      window.IdealMachineGetImage(source).then(setImageSource).catch(applyContrastFallback);
+    } else setImageSource(source);
   }
 
   appRoot.meihua.updateAutoContrast = updateAutoContrast;
@@ -511,8 +520,14 @@
   let autoContrastTimer = 0;
   const scheduleAutoContrast = () => { window.clearTimeout(autoContrastTimer); autoContrastTimer = window.setTimeout(updateAutoContrast, 90); };
   window.addEventListener('resize', scheduleAutoContrast);
+  window.addEventListener('orientationchange', scheduleAutoContrast, { passive:true });
+  window.addEventListener('pageshow', scheduleAutoContrast, { passive:true });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleAutoContrast(); });
+  window.visualViewport?.addEventListener('resize', scheduleAutoContrast, { passive:true });
+  window.visualViewport?.addEventListener('scroll', scheduleAutoContrast, { passive:true });
   window.addEventListener('scroll', scheduleAutoContrast, { capture:true, passive:true });
   window.addEventListener('ideal-machine-wallpaper-change', scheduleAutoContrast);
+  window.addEventListener('ideal-machine-wallpaper-tone', scheduleAutoContrast);
   window.addEventListener('storage', event => { if (event.key === storageKey) scheduleAutoContrast(); });
 
   function open() {

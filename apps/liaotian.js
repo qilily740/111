@@ -2145,7 +2145,7 @@ ${roundText}
   function renderTransfer() { const portal = document.querySelector('#chatTransferPortal'); if (!portal) return; portal.innerHTML = transferOpen ? '<div class="chat-transfer-modal"><section class="chat-transfer-card"><header><span>TRANSFER</span><button data-transfer-cancel type="button">×</button></header><h2>转账</h2><label>金额<input id="transferAmount" inputmode="decimal" type="number" min="0.01" step="0.01" placeholder="0.00"></label><label>备注<span class="chat-transfer-optional">可选</span><input id="transferNote" type="text" maxlength="60" placeholder="写一句备注"></label><footer><button data-transfer-cancel type="button">取消</button><button data-transfer-send type="button">发送转账</button></footer></section></div>' : ''; }
   function addMessage(text, role = 'user', type = '', meta = {}) { const chat = currentChat(); if (!chat) return; const raw = String(text || ''); const profileId = chat.profileId || ''; const transfer = role === 'character' ? raw.match(/\[\[TRANSFER\s+amount\s*=\s*([\d.,]+)\s+note\s*=\s*([^\]]*)\]\]/i) : null; if (transfer) { const remaining = raw.replace(transfer[0], '').trim(); const transferNote = transfer[2].trim(); chat.messages.push({ id: uid('message'), text: transferNote, role, type: 'transfer', amount: transfer[1], note: transferNote, status: 'pending', profileId, time: time(), createdAt: Date.now() }); if (remaining) chat.messages.push({ id: uid('message'), text: remaining, role, type: '', profileId, time: time(), createdAt: Date.now() }); } else chat.messages.push({ id: uid('message'), text: raw, role, type, profileId, ...meta, time: time(), createdAt: Date.now() }); save(); render(); setTimeout(() => { const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = box.scrollHeight; }, 0); }
   function messageHtml(message) { const transferStatus = message.status === 'accepted' ? '已收下' : message.status === 'returned' ? '已退回' : '待处理'; const transferActions = message.type === 'transfer' && message.role === 'character' && message.status === 'pending' ? `<div class="chat-transfer-actions"><button data-transfer-action="${message.id}" data-transfer-value="accept" type="button">收下</button><button data-transfer-action="${message.id}" data-transfer-value="return" type="button">退回</button></div>` : ''; const body = message.type === 'image' ? `<img src="${message.text}" alt="图片">` : message.type === 'image-desc' ? `<div class="chat-image-description"><strong>文字图片</strong><p>${esc(message.text)}</p></div>` : message.type === 'transfer' ? `<div class="chat-transfer-message"><strong>转账</strong><b>¥ ${esc(message.amount || message.text)}</b><p>${esc(message.note || '无备注')}</p><small>${transferStatus}</small>${transferActions}</div>` : message.type === 'voice' ? `<span class="chat-voice">◖ ${esc(message.text)}</span>` : message.type === 'video' ? `▣ ${esc(message.text)}` : message.type === 'location' ? `⌖ ${esc(message.text)}` : message.type === 'share' ? `♫ ${esc(message.text)}` : message.type === 'together' ? `▤ ${esc(message.text)}` : esc(message.text); return `<div class="chat-message ${message.role === 'user' ? 'is-user' : 'is-character'}"><div class="chat-bubble ${message.type || ''}">${body}</div><small>${message.time || ''}</small></div>`; }
-  async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => item && item.type !== 'image').map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: chatMessageContentForApi(item) })).filter(item => item.content); const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const answer = data.choices?.[0]?.message?.content || '……'; const videoCall = answer.match(/\[\[VIDEO_CALL\]\]/i); if (videoCall) { await addMessage('角色发起了视频通话', 'character', 'video'); setTimeout(() => openVideoCallModal(), 0); } const voice = answer.match(/\[\[VOICE\s+seconds\s*=\s*(\d+)\s+text\s*=\s*([\s\S]*?)\]\]/i); if (voice) { await addMessage(voice[2].trim(), 'character', 'voice', { voiceText: voice[2].trim(), seconds: Number(voice[1]) }); } else if (!videoCall) await addMessage(answer, 'character'); } catch (error) { await addMessage(`回复失败：${error.message}`, 'character'); } finally { replying = false; render(); loadCurrentThought(); } }
+  async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => item && item.type !== 'image').map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: chatMessageContentForApi(item) })).filter(item => item.content); const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const answer = data.choices?.[0]?.message?.content || '……'; const completionFinishReason = data.choices?.[0]?.finish_reason || ''; const videoCall = answer.match(/\[\[VIDEO_CALL\]\]/i); if (videoCall) { await addMessage('角色发起了视频通话', 'character', 'video'); setTimeout(() => openVideoCallModal(), 0); } const voice = answer.match(/\[\[VOICE\s+seconds\s*=\s*(\d+)\s+text\s*=\s*([\s\S]*?)\]\]/i); if (voice) { await addMessage(voice[2].trim(), 'character', 'voice', { voiceText: voice[2].trim(), seconds: Number(voice[1]), completionFinishReason }); } else if (!videoCall) await addMessage(answer, 'character', '', { completionFinishReason }); } catch (error) { await addMessage(`回复失败：${error.message}`, 'character'); } finally { replying = false; render(); loadCurrentThought(); } }
   function ensureWallet(profile) { profile.wallet ||= { balance: 0, records: [] }; profile.wallet.records ||= []; return profile.wallet; }
   function walletCardNumber(ownerKey) {
     const storage='ideal-machine-wallet-card-numbers';let cards={};try{cards=JSON.parse(localStorage.getItem(storage)||'{}')||{};}catch{}
@@ -2899,12 +2899,17 @@ ${roundText}
   async function resolveCharacterMusic(song) {
     const title = String(song?.title || '').trim();
     const artist = String(song?.artist || '').trim();
-    if (!title || !artist || artist === '未知歌手') return null;
+    if (!title) return null;
     try {
       const matches = await searchMusicShareNetease(`${title} ${artist}`);
       const titleKey = normalizeMusicMatchValue(title);
       const artistKey = normalizeMusicMatchValue(artist);
-      const exact = matches.find(item => normalizeMusicMatchValue(item.title) === titleKey && normalizeMusicMatchValue(item.artist) === artistKey);
+      const titleMatches = matches.filter(item => normalizeMusicMatchValue(item.title) === titleKey);
+      const exact = titleMatches.find(item => {
+        if (!artistKey || artist === '未知歌手') return true;
+        const resultArtist = normalizeMusicMatchValue(item.artist);
+        return resultArtist === artistKey || resultArtist.includes(artistKey) || artistKey.includes(resultArtist);
+      });
       if (!exact) return null;
       const playUrl = await getNeteaseMusicPlayUrl(exact.id);
       return { ...exact, playUrl, source: 'netease', verifiedRealSong: true, playable: Boolean(playUrl) };
@@ -3001,20 +3006,21 @@ ${roundText}
 
   function chatReplyTailIncomplete(value) {
     const tail = String(value || '').replace(/\[\[MSG\]\]/gi, ' ').replace(/\[\[STICKER:[^\]]+\]\]/gi, '').trim();
-    return /(?:是不是|能不能|要不要|可不可以|会不会|因为|所以|但是|如果|不过|或者|虽然|然后|到底|难道|只要|除非|应该|打算|准备|让我|让你|给我|给你|把你|把我|你这声|我这声|买个好|一个好|给你买个|下次给你|下次哥给你|还没|还要|想要个|想给你)$/.test(tail)
+    return /(?:是不是|能不能|要不要|可不可以|会不会|因为|所以|但是|如果|不过|或者|虽然|然后|到底|难道|只要|除非|应该|打算|准备|让我|让你|给我|给你|把你|把我|你这声|我这声|买个好|一个好|给你买个|下次给你|下次哥给你|还没|还要|想要个|想给你|离不开|离不掉|停不下|说不完|放不下|舍不得|忘不了|回不来|走不掉)$/.test(tail)
       || /[，,、：:]$/.test(tail)
       || ((tail.match(/[“「『（(]/g) || []).length > (tail.match(/[”」』）)]/g) || []).length && /[，,：:]$/.test(tail));
   }
-  async function completeChatReplyTail(value, chat) {
+  async function completeChatReplyTail(value, chat, forceContinuation = false) {
     let answer = String(value || '');
-    if (!chatReplyTailIncomplete(answer)) return answer;
+    let needsContinuation = forceContinuation || chatReplyTailIncomplete(answer);
+    if (!needsContinuation) return answer;
     const trailingSticker = answer.match(/((?:\s*\[\[STICKER\s*:\s*[^\]]+\]\]\s*)+)$/i)?.[1] || '';
     if (trailingSticker) answer = answer.slice(0, -trailingSticker.length).trimEnd();
     const config = window.IdealMachineAPI?.getConfig?.() || {};
     const model = window.IdealMachineAPI?.getModel?.('chat');
     if (!config.endpoint || !config.key || !model) return answer;
     const contact = state.contacts.find(item => item.id === currentContactId()) || {};
-    for (let attempt = 0; attempt < 2 && chatReplyTailIncomplete(answer); attempt += 1) {
+    for (let attempt = 0; attempt < 2 && needsContinuation; attempt += 1) {
       try {
         const response = await (window.IdealMachineFetch || window.fetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:.55, max_tokens:256, messages:[{ role:'system', content:`你正在扮演${contact.name || '角色'}。上一条聊天回复在句子中间断掉了。只续写尚未完成的最后半句，直到意思完整。不要重写开头，不要解释，不要另起话题，不要输出 [[MSG]] 或表情包标记。` }, { role:'user', content:`未完成的回复：${answer.slice(-240)}\n请只输出从断点接下去的文字。` }] }) });
         if (!response.ok) break;
@@ -3025,17 +3031,18 @@ ${roundText}
           if (answer.endsWith(continuation.slice(0, overlap))) { continuation = continuation.slice(overlap); break; }
         }
         answer += continuation;
+        needsContinuation = chatReplyTailIncomplete(answer);
       } catch { break; }
     }
     return trailingSticker ? `${answer} ${trailingSticker.trim()}` : answer;
   }
 
-  async function sendCharacterReplyContent(text, chat) {
+  async function sendCharacterReplyContent(text, chat, meta = {}) {
     const settings = chatSettingsFor(chat);
     const selectedGroups = new Set(settings.characterEmojiGroupIds || []);
     const items = characterEmojiItems().filter(item => selectedGroups.has(item.groupId));
     const byId = new Map(items.map(item => [item.id, item]));
-    const raw = await completeChatReplyTail(text, chat);
+    const raw = await completeChatReplyTail(text, chat, meta.completionFinishReason === 'length');
     if (isSingleChatSystemNotice(raw)) {
       baseCharacterAddMessage(cleanCharacterVisibleText(raw), 'character');
       return;
@@ -3133,7 +3140,7 @@ ${roundText}
   };
   const baseCharacterAddMessage = addMessage;
   addMessage = function(text, role = 'user', type = '', meta = {}) {
-    if (role === 'character' && !type && currentChat()) return sendCharacterReplyContent(text, currentChat());
+    if (role === 'character' && !type && currentChat()) return sendCharacterReplyContent(text, currentChat(), meta);
     return baseCharacterAddMessage(text, role, type, meta);
   };
 
@@ -3183,11 +3190,11 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         const system = payload.messages?.find(item => item.role === 'system');
         if (system) {
           system.content += instruction;
-          system.content += '\n\n【音乐分享规则】角色可以在确实符合自己的人设、兴趣、情绪和当前线上聊天背景时分享音乐，但不是每轮都要分享。只有角色真的想推荐歌曲、回应歌词或表达当下心情时才使用，不要为了凑消息类型而分享。需要分享时，在正常文字之外追加严格格式：[[MUSIC title="歌曲名" artist="歌手名" album="专辑名"]]；歌曲名和歌手名必须是现实中同一首歌的准确信息，不确定就不要分享，不要编造 cover、id 或播放链接。系统会用网易云真实搜索结果再次校验，校验不到标题和歌手同时匹配的曲目就不会发送音乐卡片。控制标记不要展示给用户。';
+          system.content += '\n\n【音乐分享规则】角色可以在确实符合自己的人设、兴趣、情绪和当前线上聊天背景时分享音乐，但不是每轮都要分享。只有角色真的想推荐歌曲、回应歌词或表达当下心情时才使用，不要为了凑消息类型而分享。若用户明确要求“分享一首歌、推荐歌曲、发歌或一起听”，本轮必须选择一首真实存在且符合角色身份或当前语境的歌曲并分享，不要只用文字答应。需要分享时，在正常文字之外追加严格格式：[[MUSIC title="歌曲名" artist="歌手名" album="专辑名"]]；歌曲名和歌手名必须是现实中同一首歌的准确信息，不确定歌手时可以省略 artist，让系统按准确歌名检索；不要编造 cover、id 或播放链接。系统会用网易云真实搜索结果校验歌名，并优先核对歌手；只有找不到真实曲目时才不发送音乐卡片。控制标记不要展示给用户。';
           // 这里的上限完全来自当前聊天设置，不能再被旧的“最多 3 条”提示覆盖。
           system.content = system.content.replace(/普通闲聊最多发送 3 条/g, `普通闲聊最多发送 ${rangeMax} 条`);
           // 短回复靠提示词控制，不靠过小的 token 上限硬截断；否则长一点的完整句子会被 API 从末尾截掉。
-          if (!payload.max_tokens) payload.max_tokens = 1536;
+          payload.max_tokens = Math.max(Number(payload.max_tokens) || 0, 4096);
           init = { ...init, body: JSON.stringify(payload) };
         }
       } catch {}

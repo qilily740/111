@@ -7892,6 +7892,12 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 @media (max-width:520px) {
   .music-desktop-lyrics { right:10px; bottom:max(10px,env(safe-area-inset-bottom)); left:10px; width:auto; }
 }
+@media (max-width:680px) {
+  .music-desktop-lyrics:not(.is-orb) {
+    -webkit-backdrop-filter:blur(12px) saturate(135%);
+    backdrop-filter:blur(12px) saturate(135%);
+  }
+}
 @media (prefers-color-scheme:dark) {
   .music-player .music-desktop-lyrics-toggle { background:#68686d; }
   .music-player .music-desktop-lyrics-toggle.is-enabled { background:#050506; }
@@ -8327,6 +8333,47 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .date-calendar-card.auto-dark .calendar-days { color:#666 !important; -webkit-text-fill-color:#666 !important; }
 .page-indicator.auto-dark .dot { background:rgba(0,0,0,.28); box-shadow:0 1px 3px rgba(255,255,255,.24); }
 .page-indicator.auto-dark .dot.active { background:#222; box-shadow:0 1px 4px rgba(255,255,255,.28); }
+
+/* Safari 对继承色和系统深色模式的处理更严格，补齐新增桌面小组件的壁纸色系覆盖。 */
+.app-item.auto-light .app-name,
+.dock-item.auto-light .dock-name {
+  color:#fff !important;
+  -webkit-text-fill-color:#fff !important;
+  text-shadow:0 1px 4px rgba(0,0,0,.5) !important;
+}
+.app-item.auto-dark .app-name,
+.dock-item.auto-dark .dock-name {
+  color:#222 !important;
+  -webkit-text-fill-color:#222 !important;
+}
+:is(.contact-mini-widget,.daily-photo-widget,.relationship-mini-widget,.polaroid-mini-widget,.frost-profile-widget,.celestial-specimen-widget,.mist-rain-window-widget).auto-light {
+  color:#fff !important;
+  text-shadow:0 1px 4px rgba(0,0,0,.5) !important;
+}
+:is(.contact-mini-widget,.daily-photo-widget,.relationship-mini-widget,.polaroid-mini-widget,.frost-profile-widget,.celestial-specimen-widget,.mist-rain-window-widget).auto-dark {
+  color:#222 !important;
+  text-shadow:0 1px 3px rgba(255,255,255,.3) !important;
+}
+:is(.contact-mini-widget,.daily-photo-widget).auto-dark :is(.contact-mini-copy,.daily-photo-copy),
+.polaroid-mini-widget.auto-dark > p,
+.frost-profile-widget.auto-dark .frost-profile-body,
+.frost-profile-widget.auto-dark .frost-profile-body > p,
+.relationship-mini-widget.auto-dark .relationship-mini-names,
+.relationship-mini-widget.auto-dark > small {
+  color:#222 !important;
+  -webkit-text-fill-color:#222 !important;
+  text-shadow:0 1px 2px rgba(255,255,255,.3) !important;
+}
+:is(.contact-mini-widget,.daily-photo-widget).auto-light :is(.contact-mini-copy,.daily-photo-copy),
+.polaroid-mini-widget.auto-light > p,
+.frost-profile-widget.auto-light .frost-profile-body,
+.frost-profile-widget.auto-light .frost-profile-body > p,
+.relationship-mini-widget.auto-light .relationship-mini-names,
+.relationship-mini-widget.auto-light > small {
+  color:#fff !important;
+  -webkit-text-fill-color:#fff !important;
+  text-shadow:0 1px 4px rgba(0,0,0,.5) !important;
+}
 
 /* 手机端性能与触摸响应：主屏横向翻页，页面内部纵向滚动。 */
 @media (max-width:680px) {
