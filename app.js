@@ -159,6 +159,7 @@
   const wallpaperToneTargets = new Set();
   const wallpaperToneCache = new Map();
   let wallpaperToneRequest = 0;
+  let currentWallpaperTone = '';
   function readWallpaperSource() { try { return String(JSON.parse(localStorage.getItem('ideal-machine-beauty') || '{}')?.wallpaper || '').trim(); } catch { return ''; } }
   function setWallpaperTone(target, tone) {
     if (!target?.isConnected) return;
@@ -166,7 +167,13 @@
     target.classList.toggle('is-wallpaper-light', tone === 'light');
     target.dataset.wallpaperTone = tone || '';
   }
-  function applyWallpaperTone(tone) { wallpaperToneTargets.forEach(target => setWallpaperTone(target, tone)); }
+  function applyWallpaperTone(tone) {
+    const nextTone = tone === 'dark' || tone === 'light' ? tone : '';
+    const changed = currentWallpaperTone !== nextTone;
+    currentWallpaperTone = nextTone;
+    wallpaperToneTargets.forEach(target => setWallpaperTone(target, currentWallpaperTone));
+    if (changed) window.dispatchEvent(new CustomEvent('ideal-machine-wallpaper-tone', { detail:{ tone:currentWallpaperTone } }));
+  }
   function detectWallpaperTone() {
     const request = ++wallpaperToneRequest;
     let source = readWallpaperSource();
@@ -199,6 +206,7 @@
   window.IdealMachineWallpaperTone = {
     watch(target) { if (target) wallpaperToneTargets.add(target); detectWallpaperTone(); },
     refresh: detectWallpaperTone,
+    getTone() { return currentWallpaperTone; },
     unwatch(target) { if (target) wallpaperToneTargets.delete(target); }
   };
   const wallpaperToneObserver = new MutationObserver(records => {
