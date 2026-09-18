@@ -516,6 +516,14 @@
       dock.appendChild(item);
     });
     applyDockPosition(state.dockPosition);
+    // 浏览器地址栏、旋转或换设备后，旧的拖动偏移可能把 Dock 推出当前视口。
+    // 等一次布局完成后按当前视口重新约束，避免首次进入时 Dock 落到屏幕下方。
+    requestAnimationFrame(() => {
+      const previousPosition = dockPosition(state.dockPosition);
+      const nextPosition = constrainedDockPosition(state.dockPosition);
+      if (nextPosition.y !== previousPosition.y) saveState();
+      applyDockPosition(nextPosition);
+    });
     state.hiddenWidgets.forEach(id => itemMap.get(id) && hiddenPool.appendChild(itemMap.get(id)));
     state.folders.flatMap(folder => folder.apps).forEach(id => itemMap.get(id) && hiddenPool.appendChild(itemMap.get(id)));
     readCreativeApps().forEach(id => itemMap.get(id) && hiddenPool.appendChild(itemMap.get(id)));
