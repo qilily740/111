@@ -8724,6 +8724,121 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   .chat-group-system-event span { background:#343d4c; color:#b8c1ce; }
 }
 
+/* 群聊消息统一为微信式消息行：头像在外侧，昵称在气泡上方，时间贴着气泡底部。 */
+.chat-group-conversation .chat-message {
+  display:flex;
+  width:100%;
+  max-width:none;
+  margin-bottom:15px;
+}
+.chat-group-conversation .chat-message.is-character { align-items:flex-start; }
+.chat-group-conversation .chat-message.is-user { align-items:flex-end; margin-left:0; }
+.chat-group-conversation .chat-message-line {
+  display:flex !important;
+  align-items:flex-start !important;
+  gap:8px;
+  width:100%;
+  max-width:100%;
+}
+.chat-group-conversation .chat-group-message-content {
+  display:grid;
+  flex:0 1 auto;
+  width:fit-content;
+  min-width:0;
+  max-width:calc(100% - 52px);
+  gap:4px;
+}
+.chat-group-conversation .chat-group-sender {
+  display:flex;
+  align-items:baseline;
+  gap:5px;
+  width:fit-content;
+  max-width:100%;
+  margin:0;
+  overflow:hidden;
+  color:#596576;
+  font-size:11px;
+  line-height:1.2;
+}
+.chat-group-conversation .chat-group-sender b {
+  max-width:100%;
+  padding:0;
+  overflow:hidden;
+  background:transparent;
+  font-weight:750;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.chat-group-conversation .chat-group-sender em {
+  overflow:hidden;
+  color:#8a95a5;
+  font-size:9px;
+  font-style:normal;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.chat-group-conversation .chat-group-message-content .chat-bubble {
+  width:fit-content;
+  max-width:100%;
+}
+.chat-group-conversation .chat-message.is-user .chat-group-message-content {
+  justify-items:end;
+}
+.chat-group-conversation .chat-message.is-user .chat-group-sender {
+  justify-content:flex-end;
+  text-align:right;
+}
+.chat-group-conversation .chat-message-line > small {
+  flex:0 0 auto;
+  align-self:flex-end;
+  margin:0 0 4px;
+  color:#9ba4b2;
+  font-size:9px;
+  line-height:1;
+  white-space:nowrap;
+}
+.chat-group-conversation .chat-message-line:not(:has(.chat-message-avatar)) .chat-group-message-content { max-width:calc(100% - 10px); }
+
+/* TA 角色视角的群聊也使用同一套排列，避免时间戳脱离气泡。 */
+.ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) {
+  display:flex;
+  width:100%;
+  max-width:none;
+  margin-bottom:15px;
+}
+.ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-message-line {
+  display:flex !important;
+  align-items:flex-start !important;
+  gap:8px;
+  width:100%;
+  max-width:100%;
+}
+.ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-message-content {
+  display:grid;
+  flex:0 1 auto;
+  width:fit-content;
+  min-width:0;
+  max-width:calc(100% - 52px);
+  gap:4px;
+}
+.ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-sender-name {
+  width:fit-content;
+  max-width:100%;
+  padding:0;
+  overflow:hidden;
+  border-radius:0;
+  background:transparent;
+  font-size:11px;
+  line-height:1.2;
+}
+.ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-bubble { max-width:100%; }
+.ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-message-line > small {
+  align-self:flex-end;
+  margin:0 0 4px;
+  line-height:1;
+}
+.ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-message-line > i { align-self:flex-start; }
+
 /* TA 角色视角中的特殊消息沿用桌面聊天 App 的卡片结构与尺寸。 */
 .ta-role-conversation .ta-chat-bubble.transfer { min-width:224px; width:224px; max-width:calc(100% - 48px); padding:0; border:1px solid #111; border-radius:18px; background:#111; color:#fff; box-shadow:0 14px 30px rgba(0,0,0,.2); }
 .ta-role-conversation .ta-chat-message.is-owner .ta-chat-bubble.transfer { border-color:#222; background:#fff; color:#111; }
