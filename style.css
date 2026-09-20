@@ -9195,3 +9195,46 @@ select,
 @media (prefers-color-scheme:dark) { .couple-date-place-intro,.couple-date-plan { border-color:rgba(255,255,255,.12); background:rgba(255,255,255,.04); }.couple-date-place-intro h2,.couple-date-plan h2,.couple-date-history-item > header h4 { color:#f1e8e5; }.couple-date-place-intro p,.couple-date-timeline-node p { color:#c3b4b0 !important; }.couple-date-history-route { color:#d0bfba; }.couple-date-timeline-node > i { border-color:rgba(225,165,149,.45); background:#312829; }.couple-date-history-item > footer p { color:#dfd1cd !important; } }
 @media (prefers-color-scheme:dark) { .couple-date-folder > summary,.couple-date-folder > summary::before { border-color:rgba(255,255,255,.08); background:#6a504a; color:#f1e8e5; }.couple-date-folder > summary p { color:#d0bbb5; }.couple-date-folder > summary span { color:#deb0a4; }.couple-date-folder > summary > i { border-color:rgba(255,255,255,.15); background:rgba(255,255,255,.07); color:#ecc1b7; }.couple-date-folder-paper { border-color:rgba(255,255,255,.08); background:linear-gradient(180deg,#3b3232,#302a2b); }.couple-date-folder-paper > footer p { color:#dfd1cd; } }
 @media (prefers-color-scheme:dark) { .couple-exchange-start,.couple-exchange-board { border-color:rgba(255,255,255,.1); background:linear-gradient(145deg,rgba(83,62,60,.75),rgba(42,36,37,.88)); }.couple-exchange-start label { color:#e5d8d4; }.couple-exchange-start input { border-color:rgba(255,255,255,.12); background:rgba(0,0,0,.18); color:#eee; }.couple-exchange-items > article { background:linear-gradient(155deg,#684b4d,#4c3d3f); }.couple-exchange-items > article:last-child { background:linear-gradient(155deg,#675643,#493f35); }.couple-exchange-reason,.couple-exchange-feelings article,.couple-exchange-feelings article:last-child { background:rgba(255,255,255,.06); }.couple-exchange-reason p,.couple-exchange-feelings p,.couple-exchange-board blockquote { color:#dfd1cd; } }
+
+/* 具体聊天输入栏贴底通栏；发送与回复仅在输入框获得焦点时出现。 */
+.chat-conversation > .chat-compose-wrap {
+  flex:0 0 auto !important;
+  box-sizing:border-box !important;
+  width:100% !important;
+  height:auto !important;
+  min-height:58px;
+  margin:0 !important;
+  padding:8px 10px max(10px,env(safe-area-inset-bottom)) !important;
+  border:0 !important;
+  border-top:1px solid rgba(0,0,0,.08) !important;
+  border-radius:0 !important;
+  background:rgba(248,248,246,.94) !important;
+  box-shadow:none !important;
+}
+.chat-conversation > .chat-compose-wrap > .chat-tools,
+.chat-conversation > .chat-compose-wrap > .chat-emoji-panel { border-radius:0 !important; }
+.chat-conversation > .chat-compose-wrap .chat-compose { gap:5px !important; }
+.chat-conversation > .chat-compose-wrap .chat-compose > .chat-send,
+.chat-conversation > .chat-compose-wrap .chat-compose > .chat-reply {
+  display:none !important;
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:48px !important;
+  height:32px !important;
+  min-height:32px !important;
+  padding:0 11px !important;
+  border-radius:8px !important;
+  font-size:11px !important;
+  font-weight:650;
+  line-height:1 !important;
+}
+.chat-conversation > .chat-compose-wrap.has-input-focus .chat-compose > .chat-send,
+.chat-conversation > .chat-compose-wrap.has-input-focus .chat-compose > .chat-reply,
+.chat-conversation > .chat-compose-wrap.is-chat-action-press .chat-compose > .chat-send,
+.chat-conversation > .chat-compose-wrap.is-chat-action-press .chat-compose > .chat-reply { display:inline-flex !important; align-items:center; justify-content:center; }
+
+/* 群聊两侧文字气泡使用同一宽度边界：最长延伸到对侧头像内边线。 */
+.chat-group-conversation .chat-group-bubble-row > .chat-bubble:not(.transfer):not(.location):not(.tap):not(.image):not(.image-stack):not(.image-desc) {
+  width:max-content;
+  max-width:calc(100% - 48px);
+}
