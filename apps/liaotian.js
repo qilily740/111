@@ -2768,7 +2768,7 @@ ${roundText}
       render();
       const config = window.IdealMachineAPI?.getConfig?.();
       const model = window.IdealMachineAPI?.getModel?.('chat');
-      if (config?.endpoint && config?.key && model) setTimeout(() => reply(), 0);
+      if (!taGroupContact() && config?.endpoint && config?.key && model) setTimeout(() => reply(), 0);
       return;
     }
     const message = chat?.messages.find(item => item.id === action.dataset.transferAction);
@@ -6459,6 +6459,34 @@ ${recentConversation}
       content.appendChild(row);
     });
   }
+  function normalizeChatComposerActions() {
+    document.querySelectorAll('.chat-conversation > .chat-compose-wrap').forEach(wrap => {
+      const input = wrap.querySelector('#chatInput');
+      const send = wrap.querySelector('[data-chat-send]');
+      const replyButton = wrap.querySelector('[data-chat-reply]');
+      if (send) { send.textContent = '发送'; send.setAttribute('aria-label', '发送消息'); }
+      if (replyButton) { replyButton.textContent = '回复'; replyButton.setAttribute('aria-label', '请求回复'); }
+      wrap.classList.toggle('has-input-focus', document.activeElement === input);
+    });
+  }
+  document.addEventListener('focusin', event => {
+    const input = event.target.closest?.('.chat-conversation #chatInput');
+    if (!input) return;
+    input.closest('.chat-compose-wrap')?.classList.add('has-input-focus');
+  });
+  document.addEventListener('focusout', event => {
+    const input = event.target.closest?.('.chat-conversation #chatInput');
+    if (!input) return;
+    const wrap = input.closest('.chat-compose-wrap');
+    setTimeout(() => { if (document.activeElement !== input && !wrap?.classList.contains('is-chat-action-press')) wrap?.classList.remove('has-input-focus'); }, 180);
+  });
+  document.addEventListener('pointerdown', event => {
+    const button = event.target.closest?.('[data-chat-send], [data-chat-reply]');
+    const wrap = button?.closest('.chat-compose-wrap');
+    if (!wrap) return;
+    wrap.classList.add('is-chat-action-press');
+    setTimeout(() => wrap.classList.remove('is-chat-action-press'), 320);
+  }, true);
   const renderChatSettingsWithoutRealTimeAwareness = renderChatSettings;
   renderChatSettings = function() {
     renderChatSettingsWithoutRealTimeAwareness();
@@ -6472,6 +6500,7 @@ ${recentConversation}
   render = function() {
     renderWithDockUnreadBadge();
     normalizeGroupMessageRows();
+    normalizeChatComposerActions();
     applyChatBubbleSettingsCSS();
     const chatTab = app.querySelector('[data-chat-tab="chat"]');
     if (!chatTab) return;
