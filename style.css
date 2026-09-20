@@ -8743,10 +8743,11 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .chat-group-conversation .chat-group-message-content {
   display:grid;
   flex:0 1 auto;
-  width:fit-content;
+  width:max-content;
   min-width:0;
   max-width:calc(100% - 52px);
   gap:4px;
+  justify-items:start;
 }
 .chat-group-conversation .chat-group-sender {
   display:flex;
@@ -8778,7 +8779,7 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   white-space:nowrap;
 }
 .chat-group-conversation .chat-group-message-content .chat-bubble {
-  width:fit-content;
+  width:max-content;
   max-width:100%;
 }
 .chat-group-conversation .chat-message.is-user .chat-group-message-content {
@@ -8816,10 +8817,11 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-message-content {
   display:grid;
   flex:0 1 auto;
-  width:fit-content;
+  width:max-content;
   min-width:0;
   max-width:calc(100% - 52px);
   gap:4px;
+  justify-items:start;
 }
 .ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-sender-name {
   width:fit-content;
@@ -8831,7 +8833,7 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   font-size:11px;
   line-height:1.2;
 }
-.ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-bubble { max-width:100%; }
+.ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-bubble { width:max-content; max-width:100%; }
 .ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) .ta-chat-message-line > small {
   align-self:flex-end;
   margin:0 0 4px;
