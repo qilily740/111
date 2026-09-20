@@ -6367,6 +6367,22 @@ ${recentConversation}
   }, true);
   const renderChatWithoutTaGroup = renderChat;
   renderChat = function() { const contact = state.contacts.find(item => item.id === activeContact); return contact?.isGroup ? taGroupConversation(contact, currentChat()) : renderChatWithoutTaGroup(); };
+  function normalizeGroupMessageRows() {
+    document.querySelectorAll('.chat-group-conversation .chat-message-line').forEach(line => {
+      const content = line.querySelector(':scope > .chat-group-message-content');
+      const stamp = line.querySelector(':scope > small');
+      const bubble = content?.querySelector(':scope > .chat-bubble');
+      if (!content || !stamp || !bubble || content.querySelector(':scope > .chat-group-bubble-row')) return;
+      const row = document.createElement('div');
+      row.className = 'chat-group-bubble-row';
+      if (line.closest('.chat-message')?.classList.contains('is-user')) {
+        row.append(stamp, bubble);
+      } else {
+        row.append(bubble, stamp);
+      }
+      content.appendChild(row);
+    });
+  }
   const renderChatSettingsWithoutRealTimeAwareness = renderChatSettings;
   renderChatSettings = function() {
     renderChatSettingsWithoutRealTimeAwareness();
@@ -6379,6 +6395,7 @@ ${recentConversation}
   const renderWithDockUnreadBadge = render;
   render = function() {
     renderWithDockUnreadBadge();
+    normalizeGroupMessageRows();
     applyChatBubbleSettingsCSS();
     const chatTab = app.querySelector('[data-chat-tab="chat"]');
     if (!chatTab) return;
