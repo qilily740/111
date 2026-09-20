@@ -80,11 +80,11 @@
   document.body.appendChild(app);
   app.querySelector('.settings-storage-section').insertAdjacentHTML('beforebegin', `<section class="settings-section settings-keepalive-section"><div class="settings-section-head"><div><span class="settings-eyebrow">BACKGROUND AUDIO</span><h2>音频保活</h2><p>使用系统媒体播放通道保持页面活跃；音乐播放时会自动让位。</p></div><span class="settings-status" id="settingsKeepAliveStatus">已关闭</span></div><div class="settings-notification-row"><div><b>开启系统媒体保活</b><small>锁屏或控制中心会显示 Ideal 播放卡片</small></div><label class="settings-notification-switch"><input type="checkbox" data-settings-keepalive-toggle><i></i></label></div></section>`);
   function setupCollapsibleSections() {
-    const sections = app.querySelectorAll('.settings-api-section, .settings-image-api-section, .settings-vector-section, .settings-prompt-section');
+    const sections = app.querySelectorAll('.settings-api-section, .settings-image-api-section, .settings-vector-section, .settings-prompt-section, .settings-storage-section');
     sections.forEach(section => {
       const header = section.querySelector('.settings-section-head');
       if (!header || header.dataset.settingsCollapseReady === 'true') return;
-      const key = section.classList.contains('settings-api-section') ? 'api' : section.classList.contains('settings-image-api-section') ? 'image' : section.classList.contains('settings-vector-section') ? 'vector' : 'prompt';
+      const key = section.classList.contains('settings-api-section') ? 'api' : section.classList.contains('settings-image-api-section') ? 'image' : section.classList.contains('settings-vector-section') ? 'vector' : section.classList.contains('settings-storage-section') ? 'storage' : 'prompt';
       section.classList.add('settings-collapsible');
       header.classList.add('settings-collapse-toggle');
       header.dataset.settingsCollapse = key;
