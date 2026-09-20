@@ -92,7 +92,7 @@
     all[roleId] = normalized.slice(0, maxGroups);
     writeAll(all);
     if (options.sync !== false) syncRole(roleId);
-    window.dispatchEvent(new CustomEvent('ideal-machine-ta-groups-updated'));
+    if (options.notify !== false) window.dispatchEvent(new CustomEvent('ideal-machine-ta-groups-updated'));
     return all[roleId];
   }
 
@@ -205,6 +205,16 @@
     return group;
   }
 
+  function replaceMessages(roleId, groupId, messages, options = {}) {
+    const groups = list(roleId);
+    const group = groups.find(item => item.id === groupId);
+    if (!group) return null;
+    group.messages = (Array.isArray(messages) ? messages : []).map(normalizeMessage).filter(message => message.text || message.recalled);
+    group.updatedAt = Date.now();
+    save(roleId, groups, options);
+    return group;
+  }
+
   function join(roleId, groupId, profile = {}) {
     const groups = list(roleId);
     const group = groups.find(item => item.id === groupId);
@@ -223,6 +233,6 @@
     return group;
   }
 
-  window.IdealMachineTaGroups = { storageKey, maxGroups, list, save, upsert, appendMessage, join, syncToDesktop, syncRole, normalizeGroup, normalizeMessage };
+  window.IdealMachineTaGroups = { storageKey, maxGroups, list, save, upsert, appendMessage, replaceMessages, join, syncToDesktop, syncRole, normalizeGroup, normalizeMessage };
   Object.keys(readAll()).forEach(syncRole);
 })();
