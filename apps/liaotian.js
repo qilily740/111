@@ -6426,7 +6426,8 @@ ${recentConversation}
       (Array.isArray(parsed.messages) ? parsed.messages : []).filter(item => item?.text && !taGroupMessageNoise(item.text)).slice(0, 3).forEach(item => {
         const sender = resolveMember(item.sender);
         if (!sender) return;
-        const rawText = String(item.text).trim();
+        const rawText = String(item.text).trim().replace(/^(["'])|(["'])$/g, '').trim();
+        if (!rawText || /^[\[\]{}:,"']+$/.test(rawText) || normalizedName(rawText) === normalizedName(sender.name)) return;
         const plainText = rawText.replace(/\[\[STICKER:([^\]]+)\]\]/gi, '').trim();
         if (plainText) {
           window.IdealMachineTaGroups.appendMessage(contact.taRoleId, contact.taGroupId, { id:uid('message'), senderId:sender.id, senderName:sender.name, senderAvatar:sender.avatar, senderKind:sender.kind, role:'character', text:plainText, time:time(), createdAt:Date.now() });
