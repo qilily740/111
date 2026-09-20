@@ -8802,6 +8802,26 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 }
 .chat-group-conversation .chat-message-line:not(:has(.chat-message-avatar)) .chat-group-message-content { max-width:calc(100% - 10px); }
 
+/* 群聊只增加昵称这一层，气泡本身完全沿用单人聊天的外观。 */
+.chat-group-conversation .chat-message .chat-bubble:not(.image):not(.transfer):not(.location):not(.tap):not(.image-desc):not(.image-stack) {
+  box-sizing:border-box;
+  padding:10px 13px;
+  border:1px solid rgba(0,0,0,.07);
+  border-radius:16px;
+  font-size:13px;
+  line-height:1.55;
+}
+.chat-group-conversation .chat-message.is-character .chat-bubble:not(.image):not(.transfer):not(.location):not(.tap):not(.image-desc):not(.image-stack) {
+  border-bottom-left-radius:5px;
+  background:var(--chat-character-bubble,#fff);
+  color:var(--chat-character-text,#111);
+}
+.chat-group-conversation .chat-message.is-user .chat-bubble:not(.image):not(.transfer):not(.location):not(.tap):not(.image-desc):not(.image-stack) {
+  border-bottom-right-radius:5px;
+  background:var(--chat-user-bubble,#222);
+  color:var(--chat-user-text,#fff);
+}
+
 /* TA 角色视角的群聊也使用同一套排列，避免时间戳脱离气泡。 */
 .ta-role-conversation .ta-chat-message:has(.ta-chat-sender-name) {
   display:flex;

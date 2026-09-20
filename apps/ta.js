@@ -481,7 +481,7 @@
     const clean = String(line || '').replace(/^\s*(?:[-*•>]\s*)?/, '').trim();
     const match = clean.match(/^(?:(?:CALENDAR_UPDATE|CALENDAR|日历|行程|日程更新)\s*(?:[｜|:：-]\s*)?)?(\d{1,2}[:：]\d{2})\s*(?:[-—–~至到]\s*)(\d{1,2}[:：]\d{2})(?:\s*(?:[｜|,:：-]\s*|\s+))(.+)$/i);
     if (!match) return null;
-    const fields = match[4].split(/\s*[｜|]\s*|\s*；\s*|\s*;\s*/).map(item => item.trim()).filter(Boolean);
+    const fields = match[3].split(/\s*[｜|]\s*|\s*；\s*|\s*;\s*/).map(item => item.trim()).filter(Boolean);
     const statusMatch = fields[0]?.match(/^(PLANNED|DONE|CHANGED|预计|已完成|完成|进行中|变更)\s*(?:[｜|,:：-]\s*|\s+)([\s\S]+)$/i);
     let status = 'PLANNED'; let title = '';
     if (statusMatch) { status = statusMatch[1]; fields.shift(); title = statusMatch[2].trim(); }
