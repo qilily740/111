@@ -9271,3 +9271,56 @@ select,
   margin:0 0 4px;
   white-space:nowrap;
 }
+
+/* 群聊沿用单聊消息行：整条消息限宽，群聊只增加昵称层。 */
+.chat-group-conversation .chat-message {
+  display:flex !important;
+  width:82% !important;
+  max-width:82% !important;
+}
+.chat-group-conversation .chat-message.is-character { align-items:flex-start !important; margin-right:auto !important; }
+.chat-group-conversation .chat-message.is-user { align-items:flex-end !important; margin-left:auto !important; }
+.chat-group-conversation .chat-message-line {
+  display:flex !important;
+  grid-template-columns:none !important;
+  align-items:flex-start !important;
+  gap:8px !important;
+  width:100% !important;
+  max-width:100% !important;
+}
+.chat-group-conversation .chat-message.is-user .chat-message-line { flex-direction:row-reverse !important; }
+.chat-group-conversation .chat-message .chat-message-avatar,
+.chat-group-conversation .chat-message .chat-group-message-content,
+.chat-group-conversation .chat-message .chat-message-line > small {
+  grid-column:auto !important;
+  grid-row:auto !important;
+}
+.chat-group-conversation .chat-group-message-content {
+  display:flex !important;
+  flex:1 1 0 !important;
+  flex-direction:column;
+  width:0 !important;
+  min-width:0 !important;
+  max-width:none !important;
+  gap:4px;
+}
+.chat-group-conversation .chat-message.is-character .chat-group-message-content { align-items:flex-start; }
+.chat-group-conversation .chat-message.is-user .chat-group-message-content { align-items:flex-end; }
+.chat-group-conversation .chat-group-message-content > .chat-bubble {
+  box-sizing:border-box !important;
+  width:fit-content !important;
+  min-width:0 !important;
+  max-width:100% !important;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.chat-group-conversation .chat-message-line > small {
+  flex:0 0 auto !important;
+  align-self:flex-end !important;
+  justify-self:auto !important;
+  margin:0 0 4px !important;
+}
+.chat-conversation > .chat-compose-wrap.has-input-focus .chat-compose > .chat-emoji,
+.chat-conversation > .chat-compose-wrap.has-input-focus .chat-compose > .chat-plus,
+.chat-conversation > .chat-compose-wrap.is-chat-action-press .chat-compose > .chat-emoji,
+.chat-conversation > .chat-compose-wrap.is-chat-action-press .chat-compose > .chat-plus { display:none !important; }
