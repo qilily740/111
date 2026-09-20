@@ -8787,6 +8787,42 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .chat-group-conversation .chat-message.is-user .chat-group-message-content {
   justify-items:end;
 }
+
+/* 群聊时间戳与气泡绑定，避免时间作为第三个 flex 子项抢占气泡宽度。 */
+.chat-group-conversation .chat-group-message-content {
+  display:grid;
+  flex:0 1 auto;
+  width:fit-content;
+  min-width:0;
+  max-width:calc(100% - 52px);
+  gap:4px;
+}
+.chat-group-conversation .chat-group-bubble-row {
+  display:flex;
+  align-items:flex-end;
+  gap:8px;
+  width:fit-content;
+  min-width:0;
+  max-width:100%;
+}
+.chat-group-conversation .chat-group-bubble-row > .chat-bubble {
+  flex:0 1 auto;
+  width:fit-content;
+  min-width:0;
+  max-width:100%;
+}
+.chat-group-conversation .chat-group-bubble-row > small {
+  flex:0 0 auto;
+  align-self:flex-end;
+  margin:0 0 4px;
+  color:#9ba4b2;
+  font-size:9px;
+  line-height:1;
+  white-space:nowrap;
+}
+.chat-group-conversation .chat-message.is-user .chat-group-bubble-row {
+  justify-content:flex-end;
+}
 .chat-group-conversation .chat-message.is-user .chat-group-sender {
   justify-content:flex-end;
   text-align:right;
