@@ -670,7 +670,7 @@
       if (event.data?.type !== 'ideal-open-chat') return;
       window.dispatchEvent(new CustomEvent('ideal-machine-open-chat', { detail:{ contactId:String(event.data.contactId || '') } }));
     });
-    navigator.serviceWorker.register('./sw.js?v=20260920-system-push-4', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=20260920-system-push-5', { updateViaCache: 'none' }).catch(() => {});
   }
   // 所有角色型 API 请求共用的身份顺序：先读角色，再读当前绑定用户。
   // 基础资料只认明确字段，避免模型从称呼、名字或语气反推生日和性别。

@@ -3957,6 +3957,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   const addMessageBeforeSystemNotification = addMessage;
   function chatAppIsForeground() {
     if (!app.classList.contains('is-open')) return false;
+    if (document.visibilityState !== 'visible' || document.hidden) return false;
     if (typeof document.elementFromPoint !== 'function') return true;
     const topElement = document.elementFromPoint(Math.max(1, window.innerWidth / 2), Math.max(1, window.innerHeight / 2));
     return topElement === app || Boolean(topElement && app.contains(topElement));
@@ -5662,10 +5663,10 @@ ${recentConversation}
     chunks = mergeUnsafeCharacterChunks(chunks).map(cleanCharacterReplyText).filter(Boolean);
     for (const chunk of chunks) {
       if (!state.chats?.[contactId] || !state.contacts.some(item => item.id === contactId)) break;
-      const message = { id: uid('message'), text: cleanCharacterReplyText(chunk), role: 'character', type: '', time: time(), unread: activeContact !== contactId || !app.classList.contains('is-open') };
+      const message = { id: uid('message'), text: cleanCharacterReplyText(chunk), role: 'character', type: '', time: time(), unread: activeContact !== contactId || !chatAppIsForeground() };
       chat.messages.push(message);
       save();
-      if (activeContact !== contactId || !app.classList.contains('is-open')) {
+      if (!chatAppIsForeground() || activeContact !== contactId) {
         window.IdealMachineNotifications?.show?.({ contactId, name:contact?.nickname || contact?.name || '角色', avatar:contact?.avatar || '', message:message.text, messageId:message.id });
       }
       if (activeContact === contactId && app.classList.contains('is-open')) render();
