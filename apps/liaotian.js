@@ -163,7 +163,18 @@
       const content = document.createElement('div');
       content.className = 'chat-group-message-content';
       content.insertAdjacentHTML('beforeend', senderMarkup);
-      original.forEach(node => content.appendChild(node));
+      const bubble = original.find(node => node.nodeType === 1 && node.matches('.chat-bubble'));
+      const stamp = original.find(node => node.nodeType === 1 && node.matches('small'));
+      const bubbleRow = document.createElement('div');
+      bubbleRow.className = 'chat-group-bubble-row';
+      if (message.role === 'user') {
+        if (stamp) bubbleRow.appendChild(stamp);
+        if (bubble) bubbleRow.appendChild(bubble);
+      } else {
+        if (bubble) bubbleRow.appendChild(bubble);
+        if (stamp) bubbleRow.appendChild(stamp);
+      }
+      content.appendChild(bubbleRow);
       line.appendChild(content);
       row.appendChild(line);
       return row.outerHTML;
@@ -172,11 +183,22 @@
     if (!chatSettingsFor(chat).hideAvatar) line.insertAdjacentHTML('afterbegin', avatarMarkup(sender, 'chat-message-avatar'));
     const bubble = line.querySelector(':scope > .chat-bubble');
     if (!bubble) return row.outerHTML;
+    const stamp = line.querySelector(':scope > small');
     const content = document.createElement('div');
     content.className = 'chat-group-message-content';
     content.insertAdjacentHTML('beforeend', senderMarkup);
-    line.insertBefore(content, bubble);
-    content.appendChild(bubble);
+    const bubbleRow = document.createElement('div');
+    bubbleRow.className = 'chat-group-bubble-row';
+    if (stamp) stamp.remove();
+    if (message.role === 'user') {
+      if (stamp) bubbleRow.appendChild(stamp);
+      bubbleRow.appendChild(bubble);
+    } else {
+      bubbleRow.appendChild(bubble);
+      if (stamp) bubbleRow.appendChild(stamp);
+    }
+    content.appendChild(bubbleRow);
+    line.appendChild(content);
     return row.outerHTML;
   }
   function taGroupConversation(contact, chat) {
@@ -227,7 +249,7 @@
       const message = (id ? byId.get(id) : null) || messages[fallbackIndex++];
       if (!message) return;
       const currentDateKey = messageDateKey(message);
-      const stamp = row.querySelector(':scope > .chat-message-line > small') || row.querySelector(':scope > small');
+      const stamp = row.querySelector(':scope > .chat-message-line .chat-group-bubble-row > small') || row.querySelector(':scope > .chat-message-line > small') || row.querySelector(':scope > small');
       if (stamp) stamp.textContent = messageTimeLabel(message);
       if (showTimestamp && currentDateKey && currentDateKey !== previousDateKey) {
         row.insertAdjacentHTML('beforebegin', `<div class="chat-date-divider"><span>${esc(messageDateLabel(message))}</span></div>`);
@@ -1682,7 +1704,9 @@ ${roundText}
         if (messageBox && sentMessage && sentMessage.role === 'user') {
           messageBox.querySelector('.chat-hint')?.remove();
           chatViewRendering = true;
-          try { messageBox.insertAdjacentHTML('beforeend', messageHtml(sentMessage)); } finally { chatViewRendering = previousChatViewRendering; }
+          const sentContact = state.contacts.find(item => item.id === focusContactId);
+          const sentHtml = sentContact?.isGroup ? taGroupMessageHtml(sentMessage, sentContact, sendingChat) : messageHtml(sentMessage);
+          try { messageBox.insertAdjacentHTML('beforeend', sentHtml); } finally { chatViewRendering = previousChatViewRendering; }
           messageBox.scrollTop = messageBox.scrollHeight;
         }
         const restoreFocus = () => {
@@ -6400,6 +6424,7 @@ ${recentConversation}
     const model = window.IdealMachineAPI?.getModel?.('chat');
     if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。');
     const members = contact.taGroupMembers || [];
+    const replyMembers = members.filter(member => member.kind !== 'user');
     const roleContact = state.contacts.find(item => item.id === contact.taRoleId) || {};
     const timeAware = chatSettingsFor(chat).realTimeAwareness;
     const history = chat.messages.filter(item => item.senderKind !== 'system' && !taGroupMessageNoise(item.text)).slice(-24).map(item => `${timeAware ? `[${messageTimeForApi(item)}] ` : ''}${item.senderName || (item.role === 'user' ? profile.nickname || '用户' : '群成员')}：${item.text || ''}`).join('\n');
@@ -6408,22 +6433,60 @@ ${recentConversation}
     const groupStickerItems = (state.emojis?.groups || []).filter(group => allowedEmojiGroups.has(group.id)).flatMap(group => group.items || []);
     const stickerPrompt = groupStickerItems.length ? `\n可用表情包：${groupStickerItems.map(item => `${item.id}（${item.text || '表情'}）`).join('；')}。角色或 NPC 确实想发送表情包时，可把对应消息的 text 写成 [[STICKER:表情ID]]；ID只能从此列表选择。` : '\n当前没有给群成员分配可用表情包，不要输出表情包标记。';
     const groupSystemPrompt = `${buildChatSystemPrompt(roleContact, profile, chat)}\n\n# 群聊扩展规则（在上面的角色聊天规则基础上执行）\n你正在群聊“${contact.name}”中。主角色仍必须严格遵守上面的完整角色设定；此外，逐一阅读下面每位 NPC 的身份与人设。NPC也是独立参与者，可以根据自己的身份、关系、知识范围和说话习惯自然回复，不能都说成主角色的语气，也不能让任何成员知道其设定之外的信息。\n群成员：\n${members.filter(member => member.kind !== 'user').map(member => `- ${member.name}：${member.identity || '群成员'}；${member.id === contact.taRoleId ? (roleContact.details || member.persona || '暂无详细设定') : (member.persona || '暂无详细设定')}`).join('\n')}${stickerPrompt}\n\n本次输出格式优先级最高：只返回合法 JSON，格式为 {"messages":[{"sender":"成员姓名","text":"完整消息"}]}。发送者只能是群内的主角色或 NPC，不能代替用户发言。`;
-    const prompt = `根据群成员的人设、关系和最近一条消息自然接话，生成 1—3 条消息。第一条必须明确回应最近一条非系统消息中的具体内容、问题或情绪；后续消息只能在上一条基础上继续，形成自然的有来有回，不能让几个人各自发表无关感想。除非上一话题已经自然收束，否则不要突然跳到不相关的话题；需要换话题时，要自然承接。不能写旁白、舞台说明、系统说明，也不要生成“系统提示、账号注销、消息无法送达、API、提示词、请求失败”等内容。JSON 字符串中的双引号、反斜杠和换行必须正确转义。\n最近聊天：\n${history || '暂无消息'}`;
+    const speakerRule = replyMembers.length > 1
+      ? `本轮必须生成 2—4 条连续消息，并且至少由 2 名不同的群成员分别发送；每条消息的 sender 都必须填写真实成员姓名，不能全部让同一个人说。`
+      : `当前只有 1 名可发言成员，最多生成 2 条连续消息；不要虚构群外成员。`;
+    const prompt = `根据群成员的人设、关系和最近一条消息自然接话。${speakerRule}第一条必须明确回应最近一条非系统消息中的具体内容、问题或情绪；后续消息只能在上一条基础上继续，形成自然的有来有回，不能让几个人各自发表无关感想。除非上一话题已经自然收束，否则不要突然跳到不相关的话题；需要换话题时，要自然承接。不能写旁白、舞台说明、系统说明，也不要生成“系统提示、账号注销、消息无法送达、API、提示词、请求失败”等内容。JSON 字符串中的双引号、反斜杠和换行必须正确转义。\n最近聊天：\n${history || '暂无消息'}`;
     replyingContacts.add(activeContact); render();
     try {
-      const response = await (window.IdealMachineFetch || window.fetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.82, max_tokens:1000, stream:false, messages:[{ role:'system', content:groupSystemPrompt }, { role:'user', content:prompt }] }), idealScope:'chat' });
+      const response = await (window.IdealMachineFetch || window.fetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.82, max_tokens:1400, stream:false, messages:[{ role:'system', content:groupSystemPrompt }, { role:'user', content:prompt }] }), idealScope:'chat' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const responseContent = data.choices?.[0]?.message?.content ?? data.output_text ?? data.response ?? '';
       const raw = Array.isArray(responseContent) ? responseContent.map(item => typeof item === 'string' ? item : item?.text || item?.content || '').join('\n') : String(responseContent || '');
-      const fallbackMember = members.find(member => member.id === contact.taRoleId) || members[0];
-      const parsed = parseTaGroupReply(raw, fallbackMember?.name || '');
-      const byName = new Map(members.map(member => [member.name, member]));
+      const fallbackMember = members.find(member => member.kind === 'npc') || members.find(member => member.id === contact.taRoleId) || members[0];
+      let parsed = parseTaGroupReply(raw, fallbackMember?.name || '');
+      const byName = new Map();
+      members.forEach(member => {
+        [member.name, member.id === contact.taRoleId ? roleContact.name : '', member.id === contact.taRoleId ? roleContact.nickname : ''].filter(Boolean).forEach(name => byName.set(String(name).trim(), member));
+      });
       const normalizedName = value => String(value || '').replace(/^@/, '').replace(/[\s“”"'：:，,。.!！?？]+/g, '').toLowerCase();
-      const resolveMember = name => byName.get(name) || members.find(member => normalizedName(member.name) === normalizedName(name) || normalizedName(name).includes(normalizedName(member.name)) || normalizedName(member.name).includes(normalizedName(name))) || fallbackMember;
+      const roleMember = members.find(member => member.id === contact.taRoleId) || members.find(member => member.kind !== 'npc' && member.kind !== 'user');
+      const npcMembers = members.filter(member => member.kind === 'npc');
+      let genericNpcCursor = 0;
+      const resolveMember = name => {
+        const rawName = String(name || '').replace(/^@/, '').trim();
+        const normalized = normalizedName(rawName);
+        const direct = byName.get(rawName) || members.find(member => normalizedName(member.name) === normalized || normalized.includes(normalizedName(member.name)) || normalizedName(member.name).includes(normalized));
+        if (direct) return direct;
+        if (/^(?:主角色|角色本人|角色|群主|本人|owner)$/i.test(rawName)) return roleMember || fallbackMember;
+        if (/^(?:npc|npc\d+|群成员|成员)$/i.test(normalized) && npcMembers.length) return npcMembers[genericNpcCursor++ % npcMembers.length];
+        return fallbackMember;
+      };
+      // 如果模型仍然只让同一人发言，再自动请求一次“多人接话”，避免群聊退化成单人回复。
+      if (replyMembers.length > 1) {
+        genericNpcCursor = 0;
+        const firstSpeakerIds = new Set(parsed.messages.map(item => resolveMember(item.sender)?.id).filter(Boolean));
+        if (firstSpeakerIds.size < 2) {
+          try {
+            const retryPrompt = `${prompt}\n上一轮输出没有形成多人对话。请重新生成，必须让至少两名不同的群成员各发送一条连续消息；只输出合法 JSON，不要解释。`;
+            const retryResponse = await (window.IdealMachineFetch || window.fetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.88, max_tokens:1400, stream:false, messages:[{ role:'system', content:groupSystemPrompt }, { role:'user', content:retryPrompt }] }), idealScope:'chat' });
+            if (retryResponse.ok) {
+              const retryData = await retryResponse.json();
+              const retryContent = retryData.choices?.[0]?.message?.content ?? retryData.output_text ?? retryData.response ?? '';
+              const retryRaw = Array.isArray(retryContent) ? retryContent.map(item => typeof item === 'string' ? item : item?.text || item?.content || '').join('\n') : String(retryContent || '');
+              const retryParsed = parseTaGroupReply(retryRaw, fallbackMember?.name || '');
+              genericNpcCursor = 0;
+              const retrySpeakerIds = new Set(retryParsed.messages.map(item => resolveMember(item.sender)?.id).filter(Boolean));
+              if (retrySpeakerIds.size >= 2) parsed = retryParsed;
+            }
+          } catch {}
+        }
+      }
+      genericNpcCursor = 0;
       const stickerById = new Map(groupStickerItems.map(item => [String(item.id), item]));
       let appended = 0;
-      (Array.isArray(parsed.messages) ? parsed.messages : []).filter(item => item?.text && !taGroupMessageNoise(item.text)).slice(0, 3).forEach(item => {
+      (Array.isArray(parsed.messages) ? parsed.messages : []).filter(item => item?.text && !taGroupMessageNoise(item.text)).slice(0, 4).forEach(item => {
         const sender = resolveMember(item.sender);
         if (!sender) return;
         const rawText = String(item.text).trim().replace(/^(["'])|(["'])$/g, '').trim();
