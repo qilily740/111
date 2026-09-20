@@ -6276,6 +6276,52 @@ ${recentConversation}
     save(); render();
     setTimeout(() => { const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = box.scrollHeight; }, 0);
   };
+  function looseTaGroupJsonString(source, key, fromIndex = 0) {
+    const matcher = new RegExp(`"${String(key)}"\\s*:\\s*"`, 'g');
+    matcher.lastIndex = Math.max(0, fromIndex);
+    const match = matcher.exec(source);
+    if (!match) return null;
+    const start = match.index + match[0].length;
+    let value = '';
+    for (let index = start; index < source.length; index += 1) {
+      const character = source[index];
+      if (character === '\\') {
+        const next = source[index + 1];
+        if (next === 'n') value += '\n';
+        else if (next === 'r') value += '\r';
+        else if (next === 't') value += '\t';
+        else if (next) value += next;
+        index += 1;
+        continue;
+      }
+      if (character === '"') {
+        const rest = source.slice(index + 1);
+        if (/^\s*[,}\]]/.test(rest) || !rest.trim()) return { value, end: index + 1 };
+      }
+      value += character;
+    }
+    return { value, end: source.length };
+  }
+  function parseTaGroupReply(raw) {
+    const source = String(raw || '').replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+    const candidate = source.match(/\{[\s\S]*\}/)?.[0] || source;
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch {}
+    const messages = [];
+    let cursor = 0;
+    while (cursor < source.length) {
+      const sender = looseTaGroupJsonString(source, 'sender', cursor);
+      if (!sender) break;
+      const text = looseTaGroupJsonString(source, 'text', sender.end);
+      if (!text) break;
+      if (sender.value.trim() && text.value.trim()) messages.push({ sender:sender.value.trim(), text:text.value.trim() });
+      cursor = Math.max(text.end, sender.end + 1);
+    }
+    if (messages.length) return { messages };
+    throw new Error('群聊回复格式无效，请重试');
+  }
   async function replyTaGroup() {
     const contact = taGroupContact();
     const chat = state.chats?.[activeContact];
@@ -6288,14 +6334,14 @@ ${recentConversation}
     const members = contact.taGroupMembers || [];
     const timeAware = chatSettingsFor(chat).realTimeAwareness;
     const history = chat.messages.filter(item => item.senderKind !== 'system' && !taGroupMessageNoise(item.text)).slice(-24).map(item => `${timeAware ? `[${messageTimeForApi(item)}] ` : ''}${item.senderName || (item.role === 'user' ? profile.nickname || '用户' : '群成员')}：${item.text || ''}`).join('\n');
-    const prompt = `你正在模拟真实群聊“${contact.name}”。只返回 JSON：{"messages":[{"sender":"成员姓名","text":"完整消息"}]}。根据群成员的人设、关系和最近一条消息自然接话，生成 1—3 条消息。第一条必须明确回应最近一条非系统消息中的具体内容、问题或情绪；后续消息只能在上一条基础上继续，形成 2—3 轮有来有回的对话，不能让几个人各自发表无关感想。除非上一话题已经自然收束，否则不要突然跳到不相关的话题；需要换话题时，要用一句自然的承接。发送者必须是已有群成员，不能代替用户发言，不能写旁白、舞台说明或系统说明。不要复制角色私聊原文，不要生成“系统提示、账号注销、消息无法送达、API、提示词、请求失败”等内容。${realTimeAwarenessPrompt(chat)}\n群成员：${members.map(member => `${member.name}（${member.identity || '群成员'}；${member.persona || '暂无设定'}）`).join('；')}\n最近聊天：\n${history || '暂无消息'}\n角色设定：${contact.taRoleId ? (state.contacts.find(item => item.id === contact.taRoleId)?.details || '') : ''}`;
+    const prompt = `你正在模拟真实群聊“${contact.name}”。只返回 JSON：{"messages":[{"sender":"成员姓名","text":"完整消息"}]}。根据群成员的人设、关系和最近一条消息自然接话，生成 1—3 条消息。第一条必须明确回应最近一条非系统消息中的具体内容、问题或情绪；后续消息只能在上一条基础上继续，形成 2—3 轮有来有回的对话，不能让几个人各自发表无关感想。除非上一话题已经自然收束，否则不要突然跳到不相关的话题；需要换话题时，要用一句自然的承接。发送者必须是已有群成员，不能代替用户发言，不能写旁白、舞台说明或系统说明。不要复制角色私聊原文，不要生成“系统提示、账号注销、消息无法送达、API、提示词、请求失败”等内容。JSON 字符串中的双引号、反斜杠和换行必须正确转义，不能输出未闭合的字符串。${realTimeAwarenessPrompt(chat)}\n群成员：${members.map(member => `${member.name}（${member.identity || '群成员'}；${member.persona || '暂无设定'}）`).join('；')}\n最近聊天：\n${history || '暂无消息'}\n角色设定：${contact.taRoleId ? (state.contacts.find(item => item.id === contact.taRoleId)?.details || '') : ''}`;
     replyingContacts.add(activeContact); render();
     try {
       const response = await (window.IdealMachineFetch || window.fetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.82, max_tokens:700, stream:false, messages:[{ role:'system', content:'你是群聊续写器，只返回合法 JSON。' }, { role:'user', content:prompt }] }), idealScope:'chat' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim();
-      const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || raw);
+      const parsed = parseTaGroupReply(raw);
       const byName = new Map(members.map(member => [member.name, member]));
       (Array.isArray(parsed.messages) ? parsed.messages : []).filter(item => item?.text && !taGroupMessageNoise(item.text) && byName.has(item.sender)).slice(0, 3).forEach(item => {
         const sender = byName.get(item.sender);
