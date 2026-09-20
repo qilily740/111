@@ -3631,6 +3631,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .ta-chat-entry small { overflow:hidden; color:#8e98a7; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
 .ta-chat-entry em { color:#a2aab6; font-size:21px; font-style:normal; }
 .ta-group-entry { border-color:#d8e5f2; background:linear-gradient(135deg,#fff,#f3f8fc); }
+.ta-group-entry > em { display:flex; align-items:center; gap:2px; font-size:10px; line-height:1.2; white-space:nowrap; }
 .ta-group-entry.is-long-press { border-color:#e58c8c; background:#fff3f3; transform:scale(.985); transition:transform .12s ease,background .12s ease,border-color .12s ease; }
 .chat-group-entry.is-long-press { border-color:#e58c8c; background:#fff3f3; transform:scale(.985); transition:transform .12s ease,background .12s ease,border-color .12s ease; }
 .chat-app,
