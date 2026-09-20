@@ -24,7 +24,7 @@ self.addEventListener('push', event => {
     tag: String(payload.tag || `ideal-message-${Date.now()}-${Math.random().toString(36).slice(2)}`),
     renotify: true,
     timestamp: Number(payload.timestamp || Date.now()),
-    data: { ...(payload.data || {}), url: payload.url || payload.data?.url || './', source: 'From Ideal' }
+    data: { ...(payload.data || {}), url: payload.url || payload.data?.url || './' }
   }));
 });
 
