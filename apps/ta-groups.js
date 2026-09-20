@@ -233,6 +233,22 @@
     return group;
   }
 
-  window.IdealMachineTaGroups = { storageKey, maxGroups, list, save, upsert, appendMessage, replaceMessages, join, syncToDesktop, syncRole, normalizeGroup, normalizeMessage };
+  function leave(roleId, groupId) {
+    const groups = list(roleId);
+    const group = groups.find(item => item.id === groupId);
+    if (!group) return null;
+    const userName = group.members.find(member => member.kind === 'user')?.name || '用户';
+    group.members = group.members.filter(member => member.kind !== 'user' && member.id !== group.joinedUserId);
+    group.memberIds = group.memberIds.filter(id => id !== group.joinedUserId);
+    group.userJoined = false;
+    group.joinedUserId = '';
+    group.profileId = '';
+    group.messages.push(normalizeMessage({ senderId:'system', senderName:'群聊', senderKind:'system', role:'character', text:`${userName} 退出了群聊`, time:new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }) }));
+    group.updatedAt = Date.now();
+    save(roleId, groups);
+    return group;
+  }
+
+  window.IdealMachineTaGroups = { storageKey, maxGroups, list, save, upsert, appendMessage, replaceMessages, join, leave, syncToDesktop, syncRole, normalizeGroup, normalizeMessage };
   Object.keys(readAll()).forEach(syncRole);
 })();

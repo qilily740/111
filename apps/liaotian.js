@@ -6400,12 +6400,18 @@ ${recentConversation}
     const model = window.IdealMachineAPI?.getModel?.('chat');
     if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。');
     const members = contact.taGroupMembers || [];
+    const roleContact = state.contacts.find(item => item.id === contact.taRoleId) || {};
     const timeAware = chatSettingsFor(chat).realTimeAwareness;
     const history = chat.messages.filter(item => item.senderKind !== 'system' && !taGroupMessageNoise(item.text)).slice(-24).map(item => `${timeAware ? `[${messageTimeForApi(item)}] ` : ''}${item.senderName || (item.role === 'user' ? profile.nickname || '用户' : '群成员')}：${item.text || ''}`).join('\n');
-    const prompt = `你正在模拟真实群聊“${contact.name}”。只返回 JSON：{"messages":[{"sender":"成员姓名","text":"完整消息"}]}。根据群成员的人设、关系和最近一条消息自然接话，生成 1—3 条消息。第一条必须明确回应最近一条非系统消息中的具体内容、问题或情绪；后续消息只能在上一条基础上继续，形成 2—3 轮有来有回的对话，不能让几个人各自发表无关感想。除非上一话题已经自然收束，否则不要突然跳到不相关的话题；需要换话题时，要用一句自然的承接。发送者必须是已有群成员，不能代替用户发言，不能写旁白、舞台说明或系统说明。不要复制角色私聊原文，不要生成“系统提示、账号注销、消息无法送达、API、提示词、请求失败”等内容。JSON 字符串中的双引号、反斜杠和换行必须正确转义，不能输出未闭合的字符串。${realTimeAwarenessPrompt(chat)}\n群成员：${members.map(member => `${member.name}（${member.identity || '群成员'}；${member.persona || '暂无设定'}）`).join('；')}\n最近聊天：\n${history || '暂无消息'}\n角色设定：${contact.taRoleId ? (state.contacts.find(item => item.id === contact.taRoleId)?.details || '') : ''}`;
+    const groupSettings = chatSettingsFor(chat);
+    const allowedEmojiGroups = new Set(groupSettings.characterEmojiGroupIds || []);
+    const groupStickerItems = (state.emojis?.groups || []).filter(group => allowedEmojiGroups.has(group.id)).flatMap(group => group.items || []);
+    const stickerPrompt = groupStickerItems.length ? `\n可用表情包：${groupStickerItems.map(item => `${item.id}（${item.text || '表情'}）`).join('；')}。角色或 NPC 确实想发送表情包时，可把对应消息的 text 写成 [[STICKER:表情ID]]；ID只能从此列表选择。` : '\n当前没有给群成员分配可用表情包，不要输出表情包标记。';
+    const groupSystemPrompt = `${buildChatSystemPrompt(roleContact, profile, chat)}\n\n# 群聊扩展规则（在上面的角色聊天规则基础上执行）\n你正在群聊“${contact.name}”中。主角色仍必须严格遵守上面的完整角色设定；此外，逐一阅读下面每位 NPC 的身份与人设。NPC也是独立参与者，可以根据自己的身份、关系、知识范围和说话习惯自然回复，不能都说成主角色的语气，也不能让任何成员知道其设定之外的信息。\n群成员：\n${members.filter(member => member.kind !== 'user').map(member => `- ${member.name}：${member.identity || '群成员'}；${member.id === contact.taRoleId ? (roleContact.details || member.persona || '暂无详细设定') : (member.persona || '暂无详细设定')}`).join('\n')}${stickerPrompt}\n\n本次输出格式优先级最高：只返回合法 JSON，格式为 {"messages":[{"sender":"成员姓名","text":"完整消息"}]}。发送者只能是群内的主角色或 NPC，不能代替用户发言。`;
+    const prompt = `根据群成员的人设、关系和最近一条消息自然接话，生成 1—3 条消息。第一条必须明确回应最近一条非系统消息中的具体内容、问题或情绪；后续消息只能在上一条基础上继续，形成自然的有来有回，不能让几个人各自发表无关感想。除非上一话题已经自然收束，否则不要突然跳到不相关的话题；需要换话题时，要自然承接。不能写旁白、舞台说明、系统说明，也不要生成“系统提示、账号注销、消息无法送达、API、提示词、请求失败”等内容。JSON 字符串中的双引号、反斜杠和换行必须正确转义。\n最近聊天：\n${history || '暂无消息'}`;
     replyingContacts.add(activeContact); render();
     try {
-      const response = await (window.IdealMachineFetch || window.fetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.82, max_tokens:700, stream:false, messages:[{ role:'system', content:'你是群聊续写器，只返回合法 JSON。' }, { role:'user', content:prompt }] }), idealScope:'chat' });
+      const response = await (window.IdealMachineFetch || window.fetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.82, max_tokens:1000, stream:false, messages:[{ role:'system', content:groupSystemPrompt }, { role:'user', content:prompt }] }), idealScope:'chat' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const responseContent = data.choices?.[0]?.message?.content ?? data.output_text ?? data.response ?? '';
@@ -6415,12 +6421,23 @@ ${recentConversation}
       const byName = new Map(members.map(member => [member.name, member]));
       const normalizedName = value => String(value || '').replace(/^@/, '').replace(/[\s“”"'：:，,。.!！?？]+/g, '').toLowerCase();
       const resolveMember = name => byName.get(name) || members.find(member => normalizedName(member.name) === normalizedName(name) || normalizedName(name).includes(normalizedName(member.name)) || normalizedName(member.name).includes(normalizedName(name))) || fallbackMember;
+      const stickerById = new Map(groupStickerItems.map(item => [String(item.id), item]));
       let appended = 0;
       (Array.isArray(parsed.messages) ? parsed.messages : []).filter(item => item?.text && !taGroupMessageNoise(item.text)).slice(0, 3).forEach(item => {
         const sender = resolveMember(item.sender);
         if (!sender) return;
-        window.IdealMachineTaGroups.appendMessage(contact.taRoleId, contact.taGroupId, { id:uid('message'), senderId:sender.id, senderName:sender.name, senderAvatar:sender.avatar, senderKind:sender.kind, role:'character', text:String(item.text).trim(), time:time(), createdAt:Date.now() });
-        appended += 1;
+        const rawText = String(item.text).trim();
+        const plainText = rawText.replace(/\[\[STICKER:([^\]]+)\]\]/gi, '').trim();
+        if (plainText) {
+          window.IdealMachineTaGroups.appendMessage(contact.taRoleId, contact.taGroupId, { id:uid('message'), senderId:sender.id, senderName:sender.name, senderAvatar:sender.avatar, senderKind:sender.kind, role:'character', text:plainText, time:time(), createdAt:Date.now() });
+          appended += 1;
+        }
+        for (const marker of rawText.matchAll(/\[\[STICKER:([^\]]+)\]\]/gi)) {
+          const sticker = stickerById.get(String(marker[1]).trim());
+          if (!sticker) continue;
+          window.IdealMachineTaGroups.appendMessage(contact.taRoleId, contact.taGroupId, { id:uid('message'), senderId:sender.id, senderName:sender.name, senderAvatar:sender.avatar, senderKind:sender.kind, role:'character', text:emojiDisplaySource(sticker.url || ''), type:'image', sticker:true, stickerDescription:sticker.text || '', time:time(), createdAt:Date.now() });
+          appended += 1;
+        }
       });
       if (!appended) throw new Error('接口没有返回可用的群聊消息，请重试');
     } catch (error) { window.alert(`群聊回复失败：${error.message}`); }
@@ -6448,15 +6465,13 @@ ${recentConversation}
       const content = line.querySelector(':scope > .chat-group-message-content');
       const stamp = line.querySelector(':scope > small');
       const bubble = content?.querySelector(':scope > .chat-bubble');
-      if (!content || !stamp || !bubble || content.querySelector(':scope > .chat-group-bubble-row')) return;
-      const row = document.createElement('div');
-      row.className = 'chat-group-bubble-row';
-      if (line.closest('.chat-message')?.classList.contains('is-user')) {
-        row.append(stamp, bubble);
-      } else {
-        row.append(bubble, stamp);
+      if (!content || !bubble) return;
+      const oldRow = content.querySelector(':scope > .chat-group-bubble-row');
+      if (oldRow) {
+        content.appendChild(bubble);
+        if (stamp) line.appendChild(stamp);
+        oldRow.remove();
       }
-      content.appendChild(row);
     });
   }
   function normalizeChatComposerActions() {
@@ -6495,7 +6510,50 @@ ${recentConversation}
     if (!section || section.querySelector('[data-chat-setting-toggle="realTimeAwareness"]')) return;
     const settings = chatSettingsFor(currentChat());
     section.insertAdjacentHTML('beforeend', `<label class="chat-setting-toggle"><span>角色感知实际时间<small>根据真实日期、时间间隔和已过期事件自然推进聊天</small></span><input type="checkbox" data-chat-setting-toggle="realTimeAwareness" ${settings.realTimeAwareness ? 'checked' : ''}></label>`);
+    const contact = taGroupContact();
+    if (!contact) return;
+    const panel = document.querySelector('#chatSettings');
+    const main = panel?.querySelector('.chat-settings-page main');
+    panel?.querySelector('[data-chat-thought-options]')?.remove();
+    panel?.querySelector('[data-chat-tap-settings]')?.remove();
+    panel?.querySelector('[data-character-message-settings]')?.remove();
+    const emojiSettings = panel?.querySelector('[data-character-emoji-settings]');
+    const emojiTitle = emojiSettings?.querySelector('.character-setting-head b');
+    const emojiHelp = emojiSettings?.querySelector('.character-emoji-title b');
+    const emojiNote = emojiSettings?.querySelector('.character-emoji-title small');
+    if (emojiTitle) emojiTitle.textContent = '角色与 NPC 可用表情包';
+    if (emojiHelp) emojiHelp.textContent = '选择群成员可发送的分组表情包';
+    if (emojiNote) emojiNote.textContent = '勾选后，角色和 NPC 都可以按各自人设使用这些表情包。';
+    panel?.querySelectorAll('[data-chat-block-contact], [data-chat-delete-contact]').forEach(button => button.remove());
+    if (main && !main.querySelector('[data-chat-group-leave]')) {
+      const clear = main.querySelector('[data-chat-clear]');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'chat-settings-row danger';
+      button.dataset.chatGroupLeave = '';
+      button.innerHTML = '<span>退出群聊</span><b>退出</b>';
+      if (clear) main.insertBefore(button, clear);
+      else main.appendChild(button);
+    }
   };
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.('[data-chat-group-leave]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const contact = taGroupContact();
+    if (!contact || !window.confirm(`确定退出群聊“${contact.name}”吗？`)) return;
+    chatSettingsOpen = false;
+    window.IdealMachineTaGroups?.leave?.(contact.taRoleId, contact.taGroupId);
+    activeContact = null;
+    state = read();
+    render();
+  }, true);
+  document.addEventListener('click', event => {
+    if (!event.target.closest?.('[data-chat-thought]') || !taGroupContact()) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
   const renderWithDockUnreadBadge = render;
   render = function() {
     renderWithDockUnreadBadge();

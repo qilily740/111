@@ -9238,3 +9238,36 @@ select,
   width:max-content;
   max-width:calc(100% - 48px);
 }
+
+/* 群聊固定三列：左侧成员头像｜消息内容｜右侧用户头像。 */
+.chat-group-conversation .chat-message-line {
+  display:grid !important;
+  grid-template-columns:38px minmax(0,1fr) 38px;
+  column-gap:8px;
+  align-items:start !important;
+  width:100%;
+}
+.chat-group-conversation .chat-message.is-character .chat-message-avatar { grid-column:1; }
+.chat-group-conversation .chat-message.is-character .chat-group-message-content { grid-column:2; }
+.chat-group-conversation .chat-message.is-character .chat-message-line > small { grid-column:3; justify-self:start; }
+.chat-group-conversation .chat-message.is-user .chat-message-avatar { grid-column:3; grid-row:1; }
+.chat-group-conversation .chat-message.is-user .chat-group-message-content { grid-column:2; grid-row:1; }
+.chat-group-conversation .chat-message.is-user .chat-message-line > small { grid-column:1; grid-row:1; justify-self:end; }
+.chat-group-conversation .chat-group-message-content {
+  display:grid;
+  width:100%;
+  min-width:0;
+  max-width:none;
+  gap:4px;
+}
+.chat-group-conversation .chat-message.is-character .chat-group-message-content { justify-items:start; }
+.chat-group-conversation .chat-message.is-user .chat-group-message-content { justify-items:end; }
+.chat-group-conversation .chat-group-message-content > .chat-bubble {
+  width:max-content;
+  max-width:100%;
+}
+.chat-group-conversation .chat-message-line > small {
+  align-self:end;
+  margin:0 0 4px;
+  white-space:nowrap;
+}
