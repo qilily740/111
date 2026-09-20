@@ -6,13 +6,13 @@
   <meta id="appleWebAppCapable" name="apple-mobile-web-app-capable" content="yes">
   <meta id="mobileWebAppCapable" name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="理想机">
+  <meta name="apple-mobile-web-app-title" content="Ideal">
   <meta name="theme-color" content="#f4f4f2">
   <title>理想机</title>
   <link id="idealMachineFavicon" rel="icon" type="image/png" href="assets/icons/ideal-orbit-day.png">
   <link id="idealMachineAppleTouchIcon" rel="apple-touch-icon" href="assets/icons/ideal-orbit-day.png">
   <link id="idealMachineManifest" rel="manifest" href="site.webmanifest">
-    <link rel="stylesheet" href="style.css?v=20260918-wallpaper-tone-safari-2">
+    <link rel="stylesheet" href="style.css?v=20260920-notification-fix-1">
 </head>
 <body>
   <main class="desktop-scroll-wrap">
@@ -97,26 +97,28 @@
       <div class="edit-actions"><button class="edit-cancel" type="button" data-edit-close>取消</button><button class="edit-save" id="editSave" type="button">保存</button></div>
     </section>
   </div>
-  <script src="app.js?v=20260918-wallpaper-tone-safari-1"></script>
-  <script src="apps/desktop-layout.js?v=20260918-desktop-swipe-dock-1"></script>
-  <script src="apps/shezhi.js?v=20260917-audio-keepalive-1"></script>
-  <script src="apps/shengtu.js?v=20260903-3"></script>
-  <script src="apps/meihua.js?v=20260918-wallpaper-tone-safari-1"></script>
-  <script src="apps/shijieshu.js?v=20260911-analysis-normalize-16"></script>
-  <script src="apps/activation.js?v=20260904-3"></script>
-  <script src="apps/qinglvkongjian.js?v=20260917-couple-space-ta-7"></script>
-    <script src="apps/memory-engine.js?v=20260901-5"></script>
-  <script src="apps/liaotian.js?v=20260918-chat-reply-complete-1"></script>
-  <script src="apps/ta.js?v=20260914-calendar-sleep-guarantee-1"></script>
-  <script src="apps/luntan.js?v=20260911-role-user-context-1"></script>
   <script>
     window.IdealMachineConfig = window.IdealMachineConfig || {};
     if (!window.IdealMachineConfig.imageHostProvider) window.IdealMachineConfig.imageHostProvider = 'catbox';
     if (!window.IdealMachineConfig.imageApiBase) window.IdealMachineConfig.imageApiBase = 'https://ideal-machine-catbox-relay.ideal-machine.workers.dev';
     if (!window.IdealMachineConfig.neteaseApiBase) window.IdealMachineConfig.neteaseApiBase = 'https://ideal-machine-music-api.ideal-machine.workers.dev/api';
+    if (!window.IdealMachineConfig.pushApiBase) window.IdealMachineConfig.pushApiBase = 'https://ideal-machine-push.ideal-machine.workers.dev';
     window.IdealMachineConfig.neteaseAuthApiBase = window.IdealMachineConfig.neteaseApiBase;
     if (!window.IdealMachineConfig.aiProxyBase) window.IdealMachineConfig.aiProxyBase = 'http://localhost:3210/api/ai';
   </script>
+  <script src="app.js?v=20260920-notification-fix-1"></script>
+  <script src="apps/desktop-layout.js?v=20260918-desktop-swipe-dock-1"></script>
+  <script src="apps/shezhi.js?v=20260920-notification-fix-1"></script>
+  <script src="apps/shengtu.js?v=20260903-3"></script>
+  <script src="apps/meihua.js?v=20260918-wallpaper-tone-safari-1"></script>
+  <script src="apps/shijieshu.js?v=20260911-analysis-normalize-16"></script>
+  <script src="apps/activation.js?v=20260904-3"></script>
+  <script src="apps/qinglvkongjian.js?v=20260920-couple-space-exchange-1"></script>
+  <script src="apps/memory-engine.js?v=20260901-5"></script>
+  <script src="apps/ta-groups.js?v=20260919-persistent-groups-1"></script>
+  <script src="apps/liaotian.js?v=20260920-notification-fix-1"></script>
+  <script src="apps/ta.js?v=20260920-persistent-groups-1"></script>
+  <script src="apps/luntan.js?v=20260911-role-user-context-1"></script>
     <script src="apps/xiangce.js?v=20260914-chat-album-multiselect-1"></script>
   <script src="apps/rili.js?v=20260914-calendar-overnight-sleep-1"></script>
   <script src="apps/yinyue.js?v=20260918-lyrics-performance-1"></script>

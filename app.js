@@ -1,4 +1,7 @@
 (() => {
+  document.addEventListener('contextmenu', event => {
+    if (!event.target.closest('input,textarea,select,[contenteditable="true"]')) event.preventDefault();
+  }, true);
   const storageKey = 'ideal-machine-desktop';
   const state = (() => { try { const value = JSON.parse(localStorage.getItem(storageKey) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; } })();
   localStorage.removeItem('ideal-machine-layout');
@@ -125,7 +128,18 @@
     const timer = setTimeout(() => controller.abort(new DOMException('请求超时', 'TimeoutError')), timeout);
     const { idealScope, timeout: ignoredTimeout, ...fetchInit } = init;
     const proxied = localAIProxyRequest(input, fetchInit);
-    try { return await nativeFetch(proxied?.input || input, { ...(proxied?.init || fetchInit), signal: controller.signal }); }
+    try {
+      if (proxied) {
+        try {
+          return await nativeFetch(proxied.input, { ...proxied.init, signal: controller.signal });
+        } catch (proxyError) {
+          // 本地 AI 代理未启动时，直接回退到用户配置的原始接口；否则所有 App 都只会显示 Failed to fetch。
+          if (controller.signal.aborted) throw proxyError;
+          return await nativeFetch(input, { ...fetchInit, signal: controller.signal });
+        }
+      }
+      return await nativeFetch(input, { ...fetchInit, signal: controller.signal });
+    }
     finally {
       clearTimeout(timer);
       externalSignal?.removeEventListener?.('abort', abortFromExternal);
@@ -646,18 +660,17 @@
 
   function registerIdealMachineServiceWorker() {
     if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
-    if (/^(localhost|127\.0\.0\.1)$/i.test(location.hostname)) {
-      navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(registrations.map(registration => registration.unregister()))).catch(() => {});
-      if ('caches' in window) caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('ideal-machine-shell-')).map(key => caches.delete(key)))).catch(() => {});
-      return;
-    }
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (refreshing) return;
       refreshing = true;
       location.reload();
     });
-    navigator.serviceWorker.register('./sw.js?v=20260916-local-preview-fix-8', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data?.type !== 'ideal-open-chat') return;
+      window.dispatchEvent(new CustomEvent('ideal-machine-open-chat', { detail:{ contactId:String(event.data.contactId || '') } }));
+    });
+    navigator.serviceWorker.register('./sw.js?v=20260920-system-push-3', { updateViaCache: 'none' }).catch(() => {});
   }
   // 所有角色型 API 请求共用的身份顺序：先读角色，再读当前绑定用户。
   // 基础资料只认明确字段，避免模型从称呼、名字或语气反推生日和性别。

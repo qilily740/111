@@ -14,6 +14,36 @@ self.addEventListener('activate', event => {
   })());
 });
 
+self.addEventListener('push', event => {
+  let payload = {};
+  try { payload = event.data?.json?.() || {}; } catch { payload = { body: event.data?.text?.() || '' }; }
+  event.waitUntil(self.registration.showNotification(String(payload.title || 'Ideal'), {
+    body: String(payload.body || payload.message || '收到一条新消息'),
+    icon: payload.icon || './assets/icons/ideal-orbit-day.png',
+    badge: payload.badge || './assets/icons/ideal-orbit-day.png',
+    tag: String(payload.tag || `ideal-message-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    renotify: true,
+    timestamp: Number(payload.timestamp || Date.now()),
+    data: { ...(payload.data || {}), url: payload.url || payload.data?.url || './', source: 'From Ideal' }
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const contactId = String(event.notification.data?.contactId || '');
+  const targetUrl = String(event.notification.data?.url || './');
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type:'window', includeUncontrolled:true });
+    const current = windows.find(client => new URL(client.url).origin === self.location.origin);
+    if (current) {
+      current.postMessage({ type:'ideal-open-chat', contactId });
+      await current.focus();
+      return;
+    }
+    await self.clients.openWindow(contactId ? `./?idealOpenChat=${encodeURIComponent(contactId)}` : targetUrl);
+  })());
+});
+
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;

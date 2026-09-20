@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "ideal-machine-push",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-20",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://qilily740.github.io,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+    "VAPID_PUBLIC_KEY": "BCh97ELjHDbnjMlAIelBKSy3cnhatqnKuH5bD0uVHUsjz5RsG4ONu77wzPV8FP1OlNadOE5B6TKLnedqfQMxcf0"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ideal-machine-push",
+      "database_id": "8e2f4023-24dd-4025-87c3-26a24b613b5e"
+    }
+  ]
+}
