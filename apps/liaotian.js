@@ -6302,25 +6302,46 @@ ${recentConversation}
     }
     return { value, end: source.length };
   }
-  function parseTaGroupReply(raw) {
+  function normalizeTaGroupReplyObject(value) {
+    if (!value) return [];
+    const list = Array.isArray(value) ? value : (Array.isArray(value.messages) ? value.messages : Array.isArray(value.replies) ? value.replies : Array.isArray(value.responses) ? value.responses : Array.isArray(value.dialogue) ? value.dialogue : [value]);
+    return list.map(item => {
+      if (typeof item === 'string') return { sender:'', text:item.trim() };
+      if (!item || typeof item !== 'object') return null;
+      return {
+        sender:String(item.sender ?? item.name ?? item.speaker ?? item.member ?? item.roleName ?? '').trim(),
+        text:String(item.text ?? item.content ?? item.message ?? item.reply ?? '').trim()
+      };
+    }).filter(item => item?.text);
+  }
+  function parseTaGroupReply(raw, fallbackSender = '') {
     const source = String(raw || '').replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+    if (!source) throw new Error('接口没有返回群聊内容，请重试');
     const candidate = source.match(/\{[\s\S]*\}/)?.[0] || source;
     try {
       const parsed = JSON.parse(candidate);
-      if (parsed && typeof parsed === 'object') return parsed;
+      const normalized = normalizeTaGroupReplyObject(parsed);
+      if (normalized.length) return { messages:normalized.map(item => ({ ...item, sender:item.sender || fallbackSender })) };
     } catch {}
     const messages = [];
     let cursor = 0;
     while (cursor < source.length) {
-      const sender = looseTaGroupJsonString(source, 'sender', cursor);
+      const sender = ['sender', 'name', 'speaker', 'member', 'roleName'].map(key => looseTaGroupJsonString(source, key, cursor)).filter(Boolean).sort((a, b) => a.end - b.end)[0];
       if (!sender) break;
-      const text = looseTaGroupJsonString(source, 'text', sender.end);
+      const text = ['text', 'content', 'message', 'reply'].map(key => looseTaGroupJsonString(source, key, sender.end)).filter(Boolean).sort((a, b) => a.end - b.end)[0];
       if (!text) break;
       if (sender.value.trim() && text.value.trim()) messages.push({ sender:sender.value.trim(), text:text.value.trim() });
       cursor = Math.max(text.end, sender.end + 1);
     }
     if (messages.length) return { messages };
-    throw new Error('群聊回复格式无效，请重试');
+    const lineMessages = source.split(/\n+/).map(line => line.trim().replace(/^[-*•\d.、]+\s*/, '')).filter(Boolean).map(line => {
+      const match = line.match(/^([^：:]{1,30})[：:]\s*(.+)$/);
+      return match ? { sender:match[1].trim(), text:match[2].trim() } : null;
+    }).filter(Boolean);
+    if (lineMessages.length) return { messages:lineMessages };
+    const plain = source.replace(/^\s*["']|["']\s*$/g, '').trim();
+    if (plain && !/^[\[{]/.test(plain)) return { messages:[{ sender:fallbackSender, text:plain }] };
+    throw new Error('接口返回内容不完整，请重试');
   }
   async function replyTaGroup() {
     const contact = taGroupContact();
@@ -6340,13 +6361,21 @@ ${recentConversation}
       const response = await (window.IdealMachineFetch || window.fetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.82, max_tokens:700, stream:false, messages:[{ role:'system', content:'你是群聊续写器，只返回合法 JSON。' }, { role:'user', content:prompt }] }), idealScope:'chat' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim();
-      const parsed = parseTaGroupReply(raw);
+      const responseContent = data.choices?.[0]?.message?.content ?? data.output_text ?? data.response ?? '';
+      const raw = Array.isArray(responseContent) ? responseContent.map(item => typeof item === 'string' ? item : item?.text || item?.content || '').join('\n') : String(responseContent || '');
+      const fallbackMember = members.find(member => member.id === contact.taRoleId) || members[0];
+      const parsed = parseTaGroupReply(raw, fallbackMember?.name || '');
       const byName = new Map(members.map(member => [member.name, member]));
-      (Array.isArray(parsed.messages) ? parsed.messages : []).filter(item => item?.text && !taGroupMessageNoise(item.text) && byName.has(item.sender)).slice(0, 3).forEach(item => {
-        const sender = byName.get(item.sender);
+      const normalizedName = value => String(value || '').replace(/^@/, '').replace(/[\s“”"'：:，,。.!！?？]+/g, '').toLowerCase();
+      const resolveMember = name => byName.get(name) || members.find(member => normalizedName(member.name) === normalizedName(name) || normalizedName(name).includes(normalizedName(member.name)) || normalizedName(member.name).includes(normalizedName(name))) || fallbackMember;
+      let appended = 0;
+      (Array.isArray(parsed.messages) ? parsed.messages : []).filter(item => item?.text && !taGroupMessageNoise(item.text)).slice(0, 3).forEach(item => {
+        const sender = resolveMember(item.sender);
+        if (!sender) return;
         window.IdealMachineTaGroups.appendMessage(contact.taRoleId, contact.taGroupId, { id:uid('message'), senderId:sender.id, senderName:sender.name, senderAvatar:sender.avatar, senderKind:sender.kind, role:'character', text:String(item.text).trim(), time:time(), createdAt:Date.now() });
+        appended += 1;
       });
+      if (!appended) throw new Error('接口没有返回可用的群聊消息，请重试');
     } catch (error) { window.alert(`群聊回复失败：${error.message}`); }
     finally { replyingContacts.delete(activeContact); state = read(); render(); }
   }
