@@ -8791,25 +8791,26 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 /* 群聊时间戳与气泡绑定，避免时间作为第三个 flex 子项抢占气泡宽度。 */
 .chat-group-conversation .chat-group-message-content {
   display:grid;
-  flex:0 1 auto;
-  width:fit-content;
+  flex:1 1 0;
+  width:0;
   min-width:0;
-  max-width:calc(100% - 52px);
+  max-width:none;
   gap:4px;
 }
 .chat-group-conversation .chat-group-bubble-row {
   display:flex;
   align-items:flex-end;
   gap:8px;
-  width:fit-content;
+  width:100%;
   min-width:0;
   max-width:100%;
+  justify-content:flex-start;
 }
 .chat-group-conversation .chat-group-bubble-row > .chat-bubble {
   flex:0 1 auto;
-  width:fit-content;
+  width:max-content;
   min-width:0;
-  max-width:100%;
+  max-width:min(78%, 340px);
 }
 .chat-group-conversation .chat-group-bubble-row > small {
   flex:0 0 auto;
