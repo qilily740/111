@@ -142,13 +142,50 @@
   function taGroupContact(contactId = activeContact) { const contact = state.contacts.find(item => item.id === contactId); return contact?.isGroup && contact.taGroupId && contact.taRoleId ? contact : null; }
   function taGroupMemberForMessage(message, contact) { if (!contact) return null; if (message.senderId === 'user' || message.role === 'user') { const profile = state.profiles.find(item => item.id === state.chats?.[contact.id]?.profileId); return { name:profile?.nickname || profile?.realName || '我', avatar:profile?.avatar || '' }; } return (contact.taGroupMembers || []).find(member => member.id === message.senderId) || { name:message.senderName || '群成员', avatar:message.senderAvatar || '' }; }
   function taGroupMessageNoise(text) { return /系统提示|对方账号已注销|消息无法送达|请先(?:绑定|配置|设置)|刷新(?:角色|聊天)?失败|回复失败|无法连接接口|Failed to fetch|NetworkError|提示词|HTTP\s*\d{3}/i.test(String(text || '')); }
+  function taGroupMessageHtml(message, contact, chat) {
+    if (message.senderKind === 'system') return `<div class="chat-group-system-event"><span>${esc(message.text || '')}</span></div>`;
+    const sender = taGroupMemberForMessage(message, contact);
+    const senderIdentity = sender?.identity && !/^(?:NPC|群主|群成员|用户)$/.test(sender.identity) ? `<em>${esc(sender.identity)}</em>` : '';
+    const senderMarkup = `<div class="chat-group-sender"><b>${esc(sender?.name || message.senderName || '群成员')}</b>${senderIdentity}</div>`;
+    const template = document.createElement('template');
+    template.innerHTML = messageHtml(message).trim();
+    const row = template.content.firstElementChild;
+    if (!row) return '';
+    row.classList.add(message.role === 'user' ? 'is-user' : 'is-character');
+    row.dataset.chatMessageId = message.id;
+    let line = row.querySelector(':scope > .chat-message-line');
+    if (!line) {
+      const original = Array.from(row.childNodes);
+      row.replaceChildren();
+      line = document.createElement('div');
+      line.className = 'chat-message-line';
+      if (!chatSettingsFor(chat).hideAvatar) line.insertAdjacentHTML('beforeend', avatarMarkup(sender, 'chat-message-avatar'));
+      const content = document.createElement('div');
+      content.className = 'chat-group-message-content';
+      content.insertAdjacentHTML('beforeend', senderMarkup);
+      original.forEach(node => content.appendChild(node));
+      line.appendChild(content);
+      row.appendChild(line);
+      return row.outerHTML;
+    }
+    line.querySelectorAll(':scope > .chat-message-avatar, :scope > .chat-avatar').forEach(node => node.remove());
+    if (!chatSettingsFor(chat).hideAvatar) line.insertAdjacentHTML('afterbegin', avatarMarkup(sender, 'chat-message-avatar'));
+    const bubble = line.querySelector(':scope > .chat-bubble');
+    if (!bubble) return row.outerHTML;
+    const content = document.createElement('div');
+    content.className = 'chat-group-message-content';
+    content.insertAdjacentHTML('beforeend', senderMarkup);
+    line.insertBefore(content, bubble);
+    content.appendChild(bubble);
+    return row.outerHTML;
+  }
   function taGroupConversation(contact, chat) {
     const joined = Boolean(contact.taGroupUserJoined);
     const profile = state.profiles.find(item => item.id === chat?.profileId);
     const messages = chat?.messages || [];
-    const rows = messages.length ? messages.map(message => { if (message.senderKind === 'system') return `<div class="chat-group-system-event"><span>${esc(message.text || '')}</span></div>`; const sender = taGroupMemberForMessage(message, contact); const isUser = message.role === 'user'; const isImage = ['image', 'sticker'].includes(message.type); const isSticker = Boolean(message.sticker || message.type === 'sticker'); const bubbleClass = isImage ? `image${isSticker ? ' sticker' : ''}` : ''; const body = isImage && message.text ? `<img src="${esc(message.text)}" data-sticker="${isSticker ? 'true' : 'false'}" alt="${isSticker ? '表情包' : '图片'}">` : esc(message.text || ''); const senderIdentity = sender?.identity && !/^(?:NPC|群主|群成员)$/.test(sender.identity) ? `<em>${esc(sender.identity)}</em>` : ''; return `<div class="chat-message ${isUser ? 'is-user' : 'is-character'}" data-chat-message-id="${esc(message.id)}"><div class="chat-message-line">${chatSettingsFor(chat).hideAvatar ? '' : avatarMarkup(sender, 'chat-message-avatar')}<div class="chat-group-message-content"><div class="chat-group-sender"><b>${esc(sender?.name || message.senderName || '群成员')}</b>${senderIdentity}</div><div class="chat-bubble ${bubbleClass}">${body}</div></div><small>${esc(message.time || '')}</small></div></div>`; }).join('') : '<div class="chat-hint">这个群聊还没有消息。</div>';
+    const rows = messages.length ? messages.map(message => taGroupMessageHtml(message, contact, chat)).join('') : '<div class="chat-hint">这个群聊还没有消息。</div>';
     const join = !joined ? `<button class="chat-group-join" data-chat-group-join type="button">请求加入群聊</button>` : '';
-    return `<div class="chat-conversation chat-group-conversation"><div class="chat-person"><div class="chat-avatar">群</div><div><b>${esc(contact.name)}</b><small>${esc(contact.identity || '群聊')} · ${(contact.taGroupMembers || []).length} 位成员</small></div>${join}</div><div class="chat-messages" id="chatMessages">${rows}</div>${joined ? `<div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入群消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${isContactReplying(activeContact) ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div>` : '<div class="chat-group-locked">加入群聊后才能发送消息</div>'}</div>`;
+    return `<div class="chat-conversation chat-group-conversation"><div class="chat-person"><div class="chat-avatar">群</div><div><b>${esc(contact.name)}</b><small>${esc(contact.identity || '群聊')} · ${(contact.taGroupMembers || []).length} 位成员</small></div>${join}</div>${messageEditBar()}<div class="chat-messages" id="chatMessages">${rows}</div>${joined ? `<div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入群消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${isContactReplying(activeContact) ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div>` : '<div class="chat-group-locked">加入群聊后才能发送消息</div>'}</div>`;
   }
   function uid(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
   function time() { return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); }
@@ -6275,6 +6312,16 @@ ${recentConversation}
     state.chats[activeContact] = { ...chat, messages:group.messages.map(message => ({ ...message, type:message.type || '' })) };
     save(); render();
     setTimeout(() => { const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = box.scrollHeight; }, 0);
+  };
+  const saveWithoutTaGroupMessageSync = save;
+  save = function() {
+    const result = saveWithoutTaGroupMessageSync();
+    const contact = taGroupContact();
+    const messages = contact ? state.chats?.[contact.id]?.messages : null;
+    if (contact && Array.isArray(messages) && window.IdealMachineTaGroups?.replaceMessages) {
+      window.IdealMachineTaGroups.replaceMessages(contact.taRoleId, contact.taGroupId, messages, { sync:false, notify:false });
+    }
+    return result;
   };
   function looseTaGroupJsonString(source, key, fromIndex = 0) {
     const matcher = new RegExp(`"${String(key)}"\\s*:\\s*"`, 'g');
