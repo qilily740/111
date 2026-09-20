@@ -70,11 +70,28 @@
 
   function tabIcon(type) { const paths = { today:'<circle cx="24" cy="24" r="15"/><path d="M24 15v10l7 4"/>', dates:'<path d="m24 39-14-13a9 9 0 0 1 13-13l1 1 1-1a9 9 0 0 1 13 13z"/>', secrets:'<path d="M9 12h30v23H20l-8 7v-7H9z"/><path d="M17 22h14M17 28h9"/>', us:'<rect x="8" y="10" width="32" height="29" rx="4"/><circle cx="18" cy="20" r="3"/><path d="m10 34 9-9 6 6 5-5 8 8"/>' }; return `<svg class="couple-tab-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type]}</svg>`; }
   function render() {
+    const archive = app.querySelector('.couple-archive-box');
+    const archiveWasOpen = archive?.open;
+    const archiveScroll = archive?.querySelector('.couple-archive-files')?.scrollLeft || 0;
+    const archiveOpenFiles = [...app.querySelectorAll('.couple-archive-files > details')].map(item => item.open);
     const page = app.querySelector('.couple-page');
     const { role, profile } = current();
     const titles = { today:['OUR FREQUENCY','心动'], dates:['OUR NEXT TIME','约会'], secrets:['JUST FOR YOU','心事'], us:['US, LATELY','我们'] };
     const [eyebrow, title] = titles[tab] || titles.today;
     page.innerHTML = `<header class="couple-header"><div><span>${eyebrow}</span><h1>${title}</h1></div><button data-couple-close type="button">×</button></header><main class="couple-main">${tab === 'dates' ? datesPage(role) : tab === 'secrets' ? secretsPage(role) : tab === 'us' ? usPage(role, profile) : todayPage(role, profile)}</main><nav class="couple-tabs couple-tabs-four"><button data-couple-tab="today" class="${tab === 'today' ? 'is-active' : ''}" type="button">${tabIcon('today')}<small>心动</small></button><button data-couple-tab="dates" class="${tab === 'dates' ? 'is-active' : ''}" type="button">${tabIcon('dates')}<small>约会</small></button><button data-couple-tab="secrets" class="${tab === 'secrets' ? 'is-active' : ''}" type="button">${tabIcon('secrets')}<small>心事</small></button><button data-couple-tab="us" class="${tab === 'us' ? 'is-active' : ''}" type="button">${tabIcon('us')}<small>我们</small></button></nav>${recordOpenMarkup()}${letterOpenMarkup()}`;
+    const history = app.querySelector('.couple-date-history');
+    if (history) {
+      const folders = [...history.querySelectorAll('.couple-date-folder')];
+      const box = document.createElement('details');
+      box.className = 'couple-archive-box';
+      box.open = !!archiveWasOpen;
+      box.innerHTML = `<summary><span class="couple-archive-object" aria-hidden="true"><i></i><i></i><i></i><b>♡</b></span><span class="couple-archive-caption"><b>约会收藏盒</b><small>${folders.length} 份约会 · 点击打开</small></span></summary><div class="couple-archive-inside"><small>左右滑动挑选 · 点击文件夹查看</small><div class="couple-archive-files"></div></div>`;
+      const files = box.querySelector('.couple-archive-files');
+      folders.forEach((folder,index) => { folder.open = !!archiveOpenFiles[index]; files.appendChild(folder); });
+      if (!folders.length) files.innerHTML = '<p class="couple-empty">完成的约会会收进这里。</p>';
+      history.replaceChildren(box);
+      files.scrollLeft = archiveScroll;
+    }
     bindWishDeck();
   }
   function bindWishDeck() {
