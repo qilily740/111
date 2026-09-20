@@ -8812,6 +8812,9 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   min-width:0;
   max-width:min(78%, 340px);
 }
+.chat-group-conversation .chat-message.is-character .chat-group-bubble-row > .chat-bubble {
+  max-width:calc(100% - 48px);
+}
 .chat-group-conversation .chat-group-bubble-row > small {
   flex:0 0 auto;
   align-self:flex-end;
