@@ -35,7 +35,8 @@
       stickerDescription: String(message.stickerDescription || '').trim(),
       text: String(message.text || message.media || message.content || '').trim(),
       time: String(message.time || '').trim(),
-      createdAt: Number(message.createdAt || Date.now())
+      createdAt: Number(message.createdAt || Date.now()),
+      unread: message.unread === true
     };
   }
 
@@ -128,7 +129,8 @@
       sticker: message.sticker,
       stickerDescription: message.stickerDescription,
       time: message.time,
-      createdAt: message.createdAt
+      createdAt: message.createdAt,
+      unread: message.unread === true
     };
   }
 
@@ -164,13 +166,24 @@
     };
     const index = state.contacts.findIndex(item => item.id === contactId);
     if (index >= 0) state.contacts[index] = contact; else state.contacts.unshift(contact);
+    const previousMessages = Array.isArray(state.chats?.[contactId]?.messages) ? state.chats[contactId].messages : [];
+    const previousById = new Map(previousMessages.map(message => [String(message.id), message]));
+    const visibleGroupName = document.querySelector('.chat-app.is-open .chat-group-conversation .chat-person b')?.textContent?.trim() || '';
+    const groupIsVisible = visibleGroupName === String(contact.name || '').trim();
+    const desktopMessages = group.messages.map(message => {
+      const converted = desktopMessage(message);
+      const previous = previousById.get(String(converted.id));
+      if (previous?.unread === true) converted.unread = true;
+      else if (!previous && converted.role !== 'user' && converted.senderKind !== 'system' && !groupIsVisible) converted.unread = true;
+      return converted;
+    });
     state.chats[contactId] = {
       ...(state.chats[contactId] || {}),
       profileId,
       isTaGroup: true,
       taGroupId: group.id,
       taRoleId: group.roleId,
-      messages: group.messages.map(desktopMessage)
+      messages: desktopMessages
     };
     localStorage.setItem('ideal-machine-chat', JSON.stringify(state));
     window.dispatchEvent(new CustomEvent('ideal-machine-chat-updated'));

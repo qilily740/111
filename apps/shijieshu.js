@@ -42,7 +42,7 @@
   function readJSON(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; } }
   function boundRoles(bookId) {
     const chat = readJSON(chatStorageKey, {});
-    return (Array.isArray(chat.contacts) ? chat.contacts : []).filter(contact => contact.worldbook === bookId);
+    return (Array.isArray(chat.contacts) ? chat.contacts : []).filter(contact => contact && !contact.isGroup && contact.worldbook === bookId);
   }
   function responseText(value) {
     if (Array.isArray(value)) return value.map(responseText).join('');

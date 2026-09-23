@@ -59,6 +59,10 @@
     return role?.nickname || role?.name || '未命名角色';
   }
 
+  function characterContacts(data = readChat()) {
+    return data.contacts.filter(contact => contact && !contact.isGroup);
+  }
+
   function avatar(role) {
     return role?.avatar ? `<img src="${esc(role.avatar)}" alt="">` : esc(roleName(role).slice(0, 1));
   }
@@ -129,15 +133,17 @@
 
   function home() {
     const data = readChat();
+    const roles = characterContacts(data);
     const offlineCount = state.entries.filter(item => item.type === 'offline').length;
     const chatCount = state.entries.filter(item => item.type === 'chat').length;
     const coreCount = Object.values(state.cores || {}).filter(item => item?.content).length;
-    return `<section class="memory-page"><header class="memory-header"><div><span>MEMORY ARCHIVE</span><h1>记忆库</h1><p>把聊过的、见过的，都好好记住。</p></div><button type="button" data-memory-theme-toggle>◐</button><button type="button" data-memory-close>×</button></header>${themePanel()}<main class="memory-main"><section class="memory-hero"><div><small>共保存</small><b>${state.entries.length}</b><span>段记忆</span></div><dl><div><dt>${chatCount}</dt><dd>长期</dd></div><div><dt>${coreCount}</dt><dd>核心</dd></div><div><dt>${offlineCount}</dt><dd>线下</dd></div></dl><button type="button" data-memory-refresh ${busy ? 'disabled' : ''}>${icon('refresh')}<span>${busy ? '正在整理…' : '整理新记忆'}</span></button></section><div class="memory-section-head"><div><span>按角色查看</span><small>${data.contacts.length} 位角色</small></div></div><section class="memory-role-list">${data.contacts.length ? data.contacts.map(role => { const entries = roleEntries(role.id); const hasCore = Boolean(roleCore(role.id)?.content); return `<button type="button" data-memory-role="${esc(role.id)}"><i>${avatar(role)}</i><span><b>${esc(roleName(role))}</b><small>${entries.length ? `${entries.length} 段记忆${hasCore ? ' · 已建立核心' : ''} · ${esc(entries[0].title)}` : '还没有整理过记忆'}</small></span><em>›</em></button>`; }).join('') : '<div class="memory-empty"><i>✦</i><p>请先在聊天 App 中添加角色。</p></div>'}</section></main></section>`;
+    return `<section class="memory-page"><header class="memory-header"><div><span>MEMORY ARCHIVE</span><h1>记忆库</h1><p>把聊过的、见过的，都好好记住。</p></div><button type="button" data-memory-theme-toggle>◐</button><button type="button" data-memory-close>×</button></header>${themePanel()}<main class="memory-main"><section class="memory-hero"><div><small>共保存</small><b>${state.entries.length}</b><span>段记忆</span></div><dl><div><dt>${chatCount}</dt><dd>长期</dd></div><div><dt>${coreCount}</dt><dd>核心</dd></div><div><dt>${offlineCount}</dt><dd>线下</dd></div></dl><button type="button" data-memory-refresh ${busy ? 'disabled' : ''}>${icon('refresh')}<span>${busy ? '正在整理…' : '整理新记忆'}</span></button></section><div class="memory-section-head"><div><span>按角色查看</span><small>${roles.length} 位角色</small></div></div><section class="memory-role-list">${roles.length ? roles.map(role => { const entries = roleEntries(role.id); const hasCore = Boolean(roleCore(role.id)?.content); return `<button type="button" data-memory-role="${esc(role.id)}"><i>${avatar(role)}</i><span><b>${esc(roleName(role))}</b><small>${entries.length ? `${entries.length} 段记忆${hasCore ? ' · 已建立核心' : ''} · ${esc(entries[0].title)}` : '还没有整理过记忆'}</small></span><em>›</em></button>`; }).join('') : '<div class="memory-empty"><i>✦</i><p>请先在聊天 App 中添加角色。</p></div>'}</section></main></section>`;
   }
 
   function rolePage() {
     const data = readChat();
-    const role = data.contacts.find(item => item.id === activeRoleId);
+    const role = characterContacts(data).find(item => item.id === activeRoleId);
+    if (!role) return home();
     const entries = filteredEntries(activeRoleId);
     const core = roleCore(activeRoleId);
     const coreMarkup = core?.content ? `<section class="memory-core-card"><header><span>CORE MEMORY</span><b>核心记忆 · 第 ${Number(core.version || 1)} 版</b></header><p>${esc(core.content)}</p><small>更新于 ${dateText(core.updatedAt)} · 每次聊天都会全量注入当前版本</small></section>` : `<section class="memory-core-card is-empty"><header><span>CORE MEMORY</span><b>核心记忆尚未建立</b></header><p>长期记忆达到聊天设置中的更新频率后，会自动整理成稳定的关系档案。</p></section>`;

@@ -117,17 +117,79 @@
   document.body.appendChild(notificationBanner);
   let notificationTimer = null;
   let notificationTarget = '';
+  let notificationAvatarRequest = 0;
   function notificationsEnabled() { return readSettings().notifications?.enabled !== false; }
   function hideMessageNotification() { clearTimeout(notificationTimer); notificationTimer = null; notificationBanner.classList.remove('is-visible'); }
   function idealAppIcon() { const source = document.querySelector('#idealMachineFavicon')?.href || 'assets/icons/ideal-orbit-day.png'; return source; }
+  function notificationIdentity(payload = {}) {
+    const identity = { ...payload, name:String(payload.name || '新消息'), avatar:String(payload.avatar || '').trim() };
+    if (!identity.contactId) return identity;
+    try {
+      const chatState = JSON.parse(localStorage.getItem('ideal-machine-chat') || '{}');
+      const contact = (Array.isArray(chatState.contacts) ? chatState.contacts : []).find(item => item?.id === identity.contactId);
+      const messages = Array.isArray(chatState.chats?.[identity.contactId]?.messages) ? chatState.chats[identity.contactId].messages : [];
+      const message = (identity.messageId && messages.find(item => String(item?.id || '') === String(identity.messageId))) || messages[messages.length - 1];
+      if (message?.role !== 'user') {
+        identity.name = String(message?.senderName || contact?.nickname || contact?.name || identity.name || '角色');
+        identity.avatar = String(message?.senderAvatar || contact?.avatar || identity.avatar || '').trim();
+      }
+    } catch {}
+    return identity;
+  }
+  async function resolveNotificationAvatar(value) {
+    let source = String(value || '').trim();
+    if (!source.startsWith('idb:image:')) return source;
+    try {
+      if (typeof window.IdealMachineGetImage === 'function') source = String(await window.IdealMachineGetImage(source) || '');
+      else if (window.IdealMachineImageAPI?.resolveAsset) source = String(await window.IdealMachineImageAPI.resolveAsset(source) || '');
+      else source = '';
+    } catch { source = ''; }
+    return source;
+  }
   function pushApiBase() { return String(window.IdealMachineConfig?.pushApiBase || '').replace(/\/$/, ''); }
   function pushClientId() { const key = 'ideal-machine-push-client-id'; let value = ''; try { value = localStorage.getItem(key) || ''; if (!value) { value = crypto.randomUUID?.() || `ideal-${Date.now()}-${Math.random().toString(36).slice(2)}`; localStorage.setItem(key, value); } } catch { value = `ideal-${Date.now()}-${Math.random().toString(36).slice(2)}`; } return value; }
   function urlBase64ToUint8Array(value) { const padding = '='.repeat((4 - String(value).length % 4) % 4); const base64 = String(value).replace(/-/g, '+').replace(/_/g, '/') + padding; const raw = atob(base64); return Uint8Array.from(raw, character => character.charCodeAt(0)); }
   async function subscribeToSystemPush() { const api = pushApiBase(); if (!api || !('serviceWorker' in navigator) || !('PushManager' in window)) return false; const registration = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register('./sw.js?v=20260920-system-push-5', { updateViaCache:'none' }); await navigator.serviceWorker.ready; const configResponse = await fetch(`${api}/config`, { idealScope:'notifications', timeout:12000 }); if (!configResponse.ok) throw new Error(`推送服务配置失败：HTTP ${configResponse.status}`); const config = await configResponse.json(); if (!config.publicKey) throw new Error('推送服务没有返回公钥。'); let subscription = await registration.pushManager.getSubscription(); if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(config.publicKey) }); const uploadResponse = await fetch(`${api}/subscribe`, { method:'POST', idealScope:'notifications', timeout:12000, headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ subscription, clientId:pushClientId() }) }); if (!uploadResponse.ok) throw new Error(`推送订阅上传失败：HTTP ${uploadResponse.status}`); return true; }
   async function requestSystemNotificationPermission() { if (!('Notification' in window)) throw new Error('当前浏览器不支持系统通知。'); if (!window.isSecureContext && !/^(localhost|127\.0\.0\.1)$/i.test(location.hostname)) throw new Error('系统通知需要 HTTPS 或本机开发环境。'); const result = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission(); if (result !== 'granted') throw new Error('你没有允许 Ideal 发送系统通知。'); try { await subscribeToSystemPush(); } catch (error) { console.warn('[Ideal] 系统推送订阅暂不可用，保留本机通知能力。', error); } return result; }
-  async function showSystemNotification({ contactId = '', name = '新消息', message = '', messageId = '', groupId = '' } = {}, force = false) { if (!force && !notificationsEnabled()) return false; if (!('Notification' in window) || Notification.permission !== 'granted') return false; const title = String(name || '新消息'); const body = String(message || '收到一条新消息'); const tag = `ideal-${groupId || contactId || 'chat'}-${messageId || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`; const payload = { body, icon:idealAppIcon(), badge:idealAppIcon(), tag, renotify:true, timestamp:Date.now(), data:{ contactId, messageId, groupId } }; try { let registration = await navigator.serviceWorker?.getRegistration?.(); if (!registration && navigator.serviceWorker && /^https?:$/.test(location.protocol)) registration = await navigator.serviceWorker.register('./sw.js?v=20260920-system-push-5', { updateViaCache:'none' }); if (registration?.showNotification) { await registration.showNotification(title, payload); return true; } } catch (error) { console.warn('[Ideal] Service Worker 通知失败。', error); } try { new Notification(title, payload); return true; } catch (error) { console.warn('[Ideal] 浏览器通知失败。', error); return false; } }
-  function showInternalNotification({ contactId = '', name = '新消息', message = '' } = {}) { notificationTarget = contactId; const avatarNode = notificationBanner.querySelector('.ideal-message-notification-avatar'); const nameNode = notificationBanner.querySelector('b'); const messageNode = notificationBanner.querySelector('small'); const source = idealAppIcon(); avatarNode.innerHTML = ''; if (source) { const image = document.createElement('img'); image.src = source; image.alt = 'Ideal 图标'; avatarNode.appendChild(image); } else avatarNode.textContent = String(name || '消').slice(0, 1); nameNode.textContent = name || '新消息'; messageNode.textContent = message || '收到一条新消息'; notificationBanner.classList.remove('is-visible'); requestAnimationFrame(() => notificationBanner.classList.add('is-visible')); clearTimeout(notificationTimer); notificationTimer = setTimeout(hideMessageNotification, 3000); return true; }
-  function showMessageNotification({ contactId = '', name = '新消息', avatar = '', message = '', messageId = '', groupId = '' } = {}, force = false) { if (!force && !notificationsEnabled()) return false; const pageVisible = document.visibilityState === 'visible' && !document.hidden; if (!pageVisible || force) { hideMessageNotification(); showSystemNotification({ contactId, name, message, messageId, groupId }, force); return true; } return showInternalNotification({ contactId, name, avatar, message }); }
+  async function showSystemNotification(payload = {}, force = false) {
+    if (!force && !notificationsEnabled()) return false;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return false;
+    const { contactId = '', message = '', messageId = '', groupId = '' } = payload;
+    const identity = notificationIdentity(payload);
+    const title = identity.name || '新消息';
+    const body = String(message || '收到一条新消息');
+    const tag = `ideal-${groupId || contactId || 'chat'}-${messageId || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+    const source = await resolveNotificationAvatar(identity.avatar) || idealAppIcon();
+    const options = { body, icon:source, badge:source, tag, renotify:true, timestamp:Date.now(), data:{ contactId, messageId, groupId } };
+    try { let registration = await navigator.serviceWorker?.getRegistration?.(); if (!registration && navigator.serviceWorker && /^https?:$/.test(location.protocol)) registration = await navigator.serviceWorker.register('./sw.js?v=20260920-system-push-5', { updateViaCache:'none' }); if (registration?.showNotification) { await registration.showNotification(title, options); return true; } } catch (error) { console.warn('[Ideal] Service Worker 通知失败。', error); }
+    try { new Notification(title, options); return true; } catch (error) { console.warn('[Ideal] 浏览器通知失败。', error); return false; }
+  }
+  function showInternalNotification(payload = {}) {
+    const identity = notificationIdentity(payload);
+    notificationTarget = identity.contactId || '';
+    const avatarRequest = ++notificationAvatarRequest;
+    const avatarNode = notificationBanner.querySelector('.ideal-message-notification-avatar');
+    const nameNode = notificationBanner.querySelector('b');
+    const messageNode = notificationBanner.querySelector('small');
+    avatarNode.replaceChildren();
+    avatarNode.textContent = String(identity.name || '消').slice(0, 1);
+    if (identity.avatar) resolveNotificationAvatar(identity.avatar).then(source => {
+      if (!source || avatarRequest !== notificationAvatarRequest) return;
+      const image = document.createElement('img');
+      image.src = source;
+      image.alt = `${identity.name || '角色'}头像`;
+      image.addEventListener('error', () => { avatarNode.replaceChildren(); avatarNode.textContent = String(identity.name || '消').slice(0, 1); }, { once:true });
+      avatarNode.replaceChildren(image);
+    });
+    nameNode.textContent = identity.name || '新消息';
+    messageNode.textContent = identity.message || '收到一条新消息';
+    notificationBanner.classList.remove('is-visible');
+    requestAnimationFrame(() => notificationBanner.classList.add('is-visible'));
+    clearTimeout(notificationTimer);
+    notificationTimer = setTimeout(hideMessageNotification, 3000);
+    return true;
+  }
+  function showMessageNotification(payload = {}, force = false) { if (!force && !notificationsEnabled()) return false; const identity = notificationIdentity(payload); const pageVisible = document.visibilityState === 'visible' && !document.hidden; if (!pageVisible || force) { hideMessageNotification(); showSystemNotification(identity, force); return true; } return showInternalNotification(identity); }
   notificationBanner.addEventListener('click', () => { const contactId = notificationTarget; hideMessageNotification(); if (contactId) window.dispatchEvent(new CustomEvent('ideal-machine-open-chat', { detail: { contactId } })); });
   window.IdealMachineNotifications = { show: showMessageNotification, showInternal: showInternalNotification, showSystem: showSystemNotification, requestPermission: requestSystemNotificationPermission, hide: hideMessageNotification, enabled: notificationsEnabled };
   window.IdealMachinePush = { subscribe: subscribeToSystemPush, clientId: pushClientId, apiBase: pushApiBase };

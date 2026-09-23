@@ -31,7 +31,6 @@
     { id:'widget-mist-rain-window', key:'mist-rain-window', name:'雾雨玻璃窗', description:'动态雨滴、雾夜灯光与轻纱窗景', selector:'.mist-rain-window-widget', size:'wide', columns:4, rows:2, defaultHidden:true },
     { id:'widget-search', key:'search', name:'搜索条', description:'桌面搜索入口', selector:'.search-wrap', size:'wide', columns:4, rows:1, defaultHidden:true },
     { id:'widget-photos', key:'photos', name:'三联照片', description:'三张竖版照片', selector:'.photo-group', size:'photos', columns:4, rows:2, defaultHidden:true },
-    { id:'widget-calendar', key:'calendar', name:'日期日历', description:'日期、寄语与滚动日历', selector:'.date-calendar-card', size:'wide', columns:4, rows:1, defaultHidden:true }
   ];
   const defaultLayoutVersion = 6;
   const defaultPages = [
@@ -70,7 +69,7 @@
       state.pages = defaultPages.map(items => [...items]);
       state.positions = Object.fromEntries(Object.entries(defaultPositions).map(([id, position]) => [id, { ...position }]));
       const shown = new Set(defaultPages.flat());
-      state.hiddenWidgets = [...new Set([...(state.hiddenWidgets || []), 'widget-todo', 'widget-photos', 'widget-calendar', 'widget-search'])].filter(id => !shown.has(id));
+      state.hiddenWidgets = [...new Set([...(state.hiddenWidgets || []), 'widget-todo', 'widget-photos', 'widget-search'])].filter(id => !shown.has(id));
       state.pageOneTopSlots = true;
       state.pageOneRaised = true;
     } else {
@@ -327,7 +326,6 @@
       grid.style.removeProperty('grid-template-rows');
       grid.style.removeProperty('--desktop-grid-row');
       grid.querySelectorAll('.desktop-search-before-photos').forEach(item => item.classList.remove('desktop-search-before-photos'));
-      grid.querySelectorAll('.desktop-calendar-compact').forEach(item => item.classList.remove('desktop-calendar-compact'));
       const items = [...grid.children].filter(item => item.dataset.desktopItem && itemPosition(item));
       const maxRow = items.reduce((maximum, item) => Math.max(maximum, itemPosition(item).row + itemSpan(item).rows - 1), 0);
       if (maxRow) {
@@ -360,8 +358,6 @@
       if (search && searchPosition && photoPosition && photoPosition.row === searchPosition.row + itemSpan(search).rows) {
         search.classList.add('desktop-search-before-photos');
       }
-      const calendar = [...grid.children].find(item => item.dataset.desktopWidget === 'calendar');
-      if (calendar) calendar.classList.add('desktop-calendar-compact');
     });
   }
   function normalizePagePositions() {
@@ -1496,6 +1492,9 @@
   restoreMissingCreativeFolderSources();
   registerItems();
   applyLayout();
+  // 初始化始终从当前默认三页的第一页开始，避免浏览器恢复到旧的日历源页。
+  desktop.scrollLeft = 0;
+  document.body.classList.remove('desktop-layout-pending');
   state.folders.forEach(folder => refreshFolderLauncher(folder));
   refreshCreativeFolderIcon();
   window.IdealMachineRefreshCreativeFolderIcon = refreshCreativeFolderIcon;

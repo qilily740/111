@@ -151,7 +151,7 @@
   }
 
   function chatContacts() {
-    try { const data = JSON.parse(localStorage.getItem('ideal-machine-chat') || '{}'); return Array.isArray(data.contacts) ? data.contacts : []; }
+    try { const data = JSON.parse(localStorage.getItem('ideal-machine-chat') || '{}'); return Array.isArray(data.contacts) ? data.contacts.filter(contact => contact && !contact.isGroup) : []; }
     catch { return []; }
   }
 

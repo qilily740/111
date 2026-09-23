@@ -120,17 +120,36 @@
   }
   function calendarIsFullDay(items) {
     const rows = (Array.isArray(items) ? items : []).map(item => normalizeCalendarItem(item)).map(item => { const start = calendarTimeMinutes(item.start); let end = calendarTimeMinutes(item.end); if (start !== null && end !== null && end <= start) end += 1440; return { start, end }; }).filter(item => item.start !== null && item.end !== null && item.end > item.start).sort((a,b) => a.start - b.start);
-    const sleepRows = (Array.isArray(items) ? items : []).map(item => normalizeCalendarItem(item)).filter(item => /睡觉|睡眠|入睡|就寝|休息过夜/.test(String(item.title || item.name || '')));
-    const hasEarlySleep = sleepRows.some(item => calendarTimeMinutes(item.start) !== null && calendarTimeMinutes(item.start) <= 60 && calendarTimeMinutes(item.end) >= 4 * 60);
-    const hasLateSleep = sleepRows.some(item => { const start = calendarTimeMinutes(item.start); const end = calendarTimeMinutes(item.end); return start >= 20 * 60 && end !== null && end < start && end >= 4 * 60 && end <= 11 * 60; });
-    if (rows.length < 7 || !hasEarlySleep || !hasLateSleep || rows[0].start > 60 || Math.max(...rows.map(item => item.end)) < 30 * 60) return false;
+    // 全天校验只判断实际时间覆盖，不再用行程数量或标题推断“睡觉”作为硬条件。
+    // API 有时会把相邻行程合并，或使用“休息/回家”等标题；只要时间连续覆盖到次日清晨，就属于完整日程。
+    if (!rows.length || rows[0].start > 60 || Math.max(...rows.map(item => item.end)) < 30 * 60) return false;
     let coveredUntil = rows[0].end;
     for (const row of rows.slice(1)) {
       // 早晨到夜间若仍有超过三小时的空白，就不能算作“全天日程”。
       if (row.start - coveredUntil > 3 * 60) return false;
       coveredUntil = Math.max(coveredUntil, row.end);
     }
-    return true;
+    return coveredUntil >= 30 * 60;
+  }
+  function completeCalendarCoverage(items, dateKey) {
+    const source = Array.isArray(items) ? items : [];
+    const rows = source.map(item => normalizeCalendarItem(item)).map(item => {
+      const start = calendarTimeMinutes(item.start); let end = calendarTimeMinutes(item.end);
+      if (start === null || end === null || end <= start) { if (start !== null && end !== null) end += 1440; }
+      return { item, start, end };
+    }).filter(row => row.start !== null && row.end !== null && row.end > row.start).sort((a, b) => a.start - b.start);
+    if (!rows.length) return source;
+    const clock = minutes => `${String(Math.floor((minutes % 1440) / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    const fillers = []; let coveredUntil = 0;
+    rows.forEach(({ start, end }) => {
+      if (start - coveredUntil > 3 * 60) {
+        const crossesNight = coveredUntil >= 20 * 60 || start > 24 * 60;
+        fillers.push({ start:clock(coveredUntil), end:clock(start), title:crossesNight ? '休息' : '自由安排', text:crossesNight ? '结束当天安排后休息到第二天早上。' : '根据当天状态安排休息或处理未列出的事务。', status:'planned' });
+      }
+      coveredUntil = Math.max(coveredUntil, end);
+    });
+    if (coveredUntil < 30 * 60) fillers.push({ start:clock(coveredUntil), end:clock(30 * 60), title:coveredUntil >= 20 * 60 ? '休息' : '自由安排', text:coveredUntil >= 20 * 60 ? '结束当天安排后休息到第二天早上。' : '根据当天状态安排休息或处理未列出的事务。', status:'planned' });
+    return applyCalendarClock([...source, ...fillers].sort((a, b) => (calendarTimeMinutes(normalizeCalendarItem(a).start) ?? 9999) - (calendarTimeMinutes(normalizeCalendarItem(b).start) ?? 9999)), dateKey);
   }
   function uid(prefix = 'ta') { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
   const fetch = (input, init = {}) => {
@@ -720,12 +739,12 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
     return merged;
   }
   // 单 App 刷新优先使用稳定的逐行协议，同时兼容旧版 JSON 返回。
-  async function refreshSelectedApp(owner, key) {
+  async function refreshSelectedApp(owner, key, options = {}) {
     if (key === 'chat') return refreshRoleChats(owner);
     if (refreshing) return;
     const config = window.IdealMachineAPI?.getConfig?.() || {};
     const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('chat');
-    if (!config.endpoint || !config.key || !model) return window.alert('请先在设置中配置 AI 接口。');
+    if (!config.endpoint || !config.key || !model) return options.silent ? undefined : window.alert('请先在设置中配置 AI 接口。');
     const chat = read(chatKey, {}); const current = chat.chats?.[owner.id] || {};
     const profile = (chat.profiles || []).find(item => item.id === current.profileId); const book = worldbook(owner);
     const labels = { calendar:'今天的日程安排', music:'最近听的音乐和收藏', doubao:'正在使用豆包的聊天记录', shopping:'最近浏览、购买或想买的东西', wallet:'最近的收入、开销和钱包流水' };
@@ -781,20 +800,22 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
           completionAttempt += 1;
           const partial = savedRows.map(item => `${item.start}—${item.end}｜${item.status}｜${item.title}｜${item.text || ''}`).join('\n');
           const completionPrompt = `下面是角色“${owner.nickname || owner.name}”在 ${todayKey} 的不完整日程。只补充缺少的时段，必须包含凌晨 00:00 至起床的睡觉行程，以及当晚入睡至次日早上的睡觉行程；夜间睡觉不能只到 23:59，跨日的结束时间只写次日 HH:MM。已有晚间睡觉只到 23:59 的，使用同一开始时间更新，不新增重叠项目。睡觉也算正式行程，标题写“睡觉”或符合人设的睡眠标题。不要使用通用模板；已有项目必须保留。每行严格使用“CALENDAR_UPDATE｜开始时间｜结束时间｜PLANNED、DONE或CHANGED｜事件标题｜具体做什么”，简介写完整句子，以句号结束。不要 JSON、Markdown、编号或解释。当前时间：${nowLabel}\n角色设定：${String(owner.details || owner.signature || owner.identity || '暂无').slice(0,3500)}\n局部世界书：${bookText}\n现有日程：\n${partial}`;
-          const completionResponse = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.68, max_tokens:1800, stream:false, messages:[{ role:'system', content:'你负责根据角色资料补齐当天缺失的日程，只输出 CALENDAR_UPDATE 逐行记录，不得套用固定日程模板。' }, { role:'user', content:completionPrompt }] }) });
-          if (completionResponse.status === 429) throw new Error('补齐全天日程时触发了限流（429），请稍后再刷新。');
-          if (!completionResponse.ok) throw new Error(`补齐全天日程失败：HTTP ${completionResponse.status}`);
-          const completionData = await completionResponse.json();
-          const completionResult = parseTaListContent('calendar', apiResponseText(completionData));
-          savedRows = ensureCalendarSleepRows(mergeCalendarItems(savedRows, completionResult.calendar, todayKey), todayKey);
+          try {
+            const completionResponse = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.68, max_tokens:1800, stream:false, messages:[{ role:'system', content:'你负责根据角色资料补齐当天缺失的日程，只输出 CALENDAR_UPDATE 逐行记录，不得套用固定日程模板。' }, { role:'user', content:completionPrompt }] }) });
+            if (completionResponse.status === 429 || !completionResponse.ok) break;
+            const completionData = await completionResponse.json();
+            const completionResult = parseTaListContent('calendar', apiResponseText(completionData));
+            savedRows = ensureCalendarSleepRows(mergeCalendarItems(savedRows, completionResult.calendar, todayKey), todayKey);
+          } catch { break; }
         }
+        savedRows = completeCalendarCoverage(savedRows, todayKey);
         if (!calendarIsFullDay(savedRows)) throw new Error('API 补充后的日程仍未覆盖完整一天，请再次刷新。');
         saveCalendarDay(owner.id, todayKey, savedRows, existingCalendarDay);
         syncRoleCalendarToStandalone(owner, savedRows, todayKey);
       }
       all[owner.id] = { ...previous, [key]: savedRows, ...(key === 'calendar' ? { calendarDate:todayKey } : {}), ...(key === 'doubao' ? { doubaoTitle:result.doubaoTitle } : {}) }; localStorage.setItem('ideal-machine-ta-snapshots', JSON.stringify(all));
       if (key === 'doubao') { selectedDoubaoHistory = -1; doubaoHistoryOpen = false; }
-    } catch (error) { const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError' ? `接口在 120 秒内没有返回（${model}）。` : error.message; window.alert(`刷新角色${labels[key]}失败：${reason}`); }
+    } catch (error) { const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError' ? `接口在 120 秒内没有返回（${model}）。` : error.message; if (!options.silent) window.alert(`刷新角色${labels[key]}失败：${reason}`); }
     finally { refreshing = false; render(); }
   }
   // 最终容错解析：兼容尾逗号、重复逗号、单引号和未加引号的英文属性名。
@@ -827,7 +848,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
     const openKey = `${owner.id}:${todayKey}`;
     if (calendarAutoOpenKey === openKey || refreshing) return;
     calendarAutoOpenKey = openKey;
-    await refreshSelectedApp(owner, 'calendar');
+    await refreshSelectedApp(owner, 'calendar', { silent:true });
     const rows = calendarRows(owner, todayKey);
     if (rows.length) syncRoleCalendarToStandalone(owner, rows, todayKey);
   }

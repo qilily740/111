@@ -38,7 +38,7 @@
   function save() { state.catalogue=catalogue;state.privateCatalogue=privateCatalogue;state.takeawayCatalogue=takeawayCatalogue; localStorage.setItem(key, JSON.stringify(state)); }
   function chatData() { try { const data=JSON.parse(localStorage.getItem(chatKey)||'{}'); return { profiles:Array.isArray(data.profiles)?data.profiles:[], contacts:Array.isArray(data.contacts)?data.contacts:[], chats:data.chats||{} }; } catch { return { profiles:[],contacts:[],chats:{} }; } }
   function profile() { const data=chatData(); if (!state.profileId || !data.profiles.some(item=>item.id===state.profileId)) state.profileId=data.profiles[0]?.id||''; return data.profiles.find(item=>item.id===state.profileId)||null; }
-  function roles() { const data=chatData(); return data.contacts.filter(role=>data.chats[role.id]?.profileId===state.profileId); }
+  function roles() { const data=chatData(); return data.contacts.filter(role=>!role?.isGroup&&data.chats[role.id]?.profileId===state.profileId); }
   function roleAwareRequest(input, init = {}) {
     let next = init;
     try {
