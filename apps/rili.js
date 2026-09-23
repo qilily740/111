@@ -8,7 +8,7 @@
   const esc = value => String(value || '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   const uid = () => `calendar-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const readEvents = () => { try { const events = JSON.parse(localStorage.getItem(eventsKey) || '[]'); return Array.isArray(events) ? events : []; } catch { return []; } };
-  const readChat = () => { try { const value = JSON.parse(localStorage.getItem(chatKey) || '{}'); return { contacts: value.contacts || [] }; } catch { return { contacts: [] }; } };
+  const readChat = () => { try { const value = JSON.parse(localStorage.getItem(chatKey) || '{}'); return { contacts: (value.contacts || []).filter(item => item && !item.isGroup) }; } catch { return { contacts: [] }; } };
   const saveEvents = events => { localStorage.setItem(eventsKey, JSON.stringify(events)); try { const couple = JSON.parse(localStorage.getItem(coupleKey) || '{}'); if (couple.spaces && typeof couple.spaces === 'object') Object.entries(couple.spaces).forEach(([roleId, space]) => { if (space && typeof space === 'object') space.events = events.filter(item => item.contactId === roleId || item.authorId === roleId || item.roleId === roleId); }); else couple.events = events; localStorage.setItem(coupleKey, JSON.stringify(couple)); } catch {} window.IdealMachineRenderCalendar?.(); window.IdealMachineRenderRoleCalendar?.(); };
   const roleName = id => { const role = readChat().contacts.find(item => item.id === id); return role?.name || role?.nickname || '未绑定角色'; };
   const roleContact = id => readChat().contacts.find(item => item.id === id) || {};

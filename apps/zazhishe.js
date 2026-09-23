@@ -17,6 +17,15 @@
   let busy = '';
   let previewIndex = 0;
   let previewTurnDirection = 1;
+  let homeIssueIndex = 0;
+  let homeSearchOpen = false;
+  let homeSearchQuery = '';
+  let homeScrollTop = 0;
+  let homeIndexScrollLeft = 0;
+  let magazineDockCollapsed = false;
+  let magazineDockPosition = null;
+  let magazineDockDrag = null;
+  let suppressMagazineDockExpand = false;
   let newDraft = blankDraft();
 
   function blankDraft() { return { title: '', theme: '', edition: 'VOL. 01', direction: '人物与生活', participantIds: [] }; }
@@ -24,13 +33,13 @@
   function esc(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char])); }
   function now() { return new Date().toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }); }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
-  function chatRoles() { try { const chat = JSON.parse(localStorage.getItem('ideal-machine-chat') || '{}'); return (chat.contacts || []).map(item => ({ id:item.id, name:item.name || item.nickname || '角色', nickname:item.nickname || '', realName:item.name || item.nickname || '', avatar:item.avatar || '', persona:item.details || item.signature || '', identity:item.identity || '', birthday:item.birthday || '', gender:item.gender || '', worldbook:item.worldbook || '' })).filter(item => item.id); } catch { return []; } }
+  function chatRoles() { try { const chat = JSON.parse(localStorage.getItem('ideal-machine-chat') || '{}'); return (chat.contacts || []).filter(item => item && !item.isGroup).map(item => ({ id:item.id, name:item.name || item.nickname || '角色', nickname:item.nickname || '', realName:item.name || item.nickname || '', avatar:item.avatar || '', persona:item.details || item.signature || '', identity:item.identity || '', birthday:item.birthday || '', gender:item.gender || '', worldbook:item.worldbook || '' })).filter(item => item.id); } catch { return []; } }
   function roleFrom(issue, id) { const saved = issue?.participants?.find(item => item.id === id) || {}; const live = chatRoles().find(item => item.id === id) || {}; return { ...saved, ...live, name:live.name || saved.realName || saved.name || '角色', realName:live.realName || saved.realName || saved.name || '' }; }
   function avatarMarkup(role) { return role?.avatar ? `<img data-magazine-asset="${esc(role.avatar)}" alt="">` : esc((role?.name || '角').slice(0,1)); }
   function normalizeIssue(item) {
     return {
       id: item?.id || uid('issue'), title: item?.title || '未命名刊物', theme: item?.theme || '', edition: item?.edition || 'VOL. 01', direction: item?.direction || '人物与生活', status: item?.status || '编辑中', createdAt: item?.createdAt || now(), updatedAt: item?.updatedAt || now(), publishedAt: item?.publishedAt || '',
-      participants: Array.isArray(item?.participants) ? item.participants : [],
+      participants: Array.isArray(item?.participants) ? item.participants.filter(participant => { try { const chat = JSON.parse(localStorage.getItem('ideal-machine-chat') || '{}'); const contact = (chat.contacts || []).find(entry => entry.id === participant?.id); return !contact?.isGroup; } catch { return true; } }) : [],
       sections: Array.isArray(item?.sections) ? item.sections : [],
       interviews: Array.isArray(item?.interviews) ? item.interviews.map(session => ({ ...session, turns:Array.isArray(session.turns) ? session.turns : [] })) : [],
       articles: Array.isArray(item?.articles) ? item.articles : [],
@@ -42,7 +51,7 @@
   function activeIssue() { return state.issues.find(item => item.id === activeId); }
   function sectionArticle(issue, sectionId) { return issue.articles.find(item => item.sectionId === sectionId); }
 
-  function openApp(fromCreativeFolder = false) { openedFromCreativeFolder = Boolean(fromCreativeFolder); state = readState(); page = 'home'; activeId = ''; activeTab = 'plan'; shell?.classList.remove('is-open'); shell?.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); app.classList.add('is-open'); app.setAttribute('aria-hidden', 'false'); render(); }
+  function openApp(fromCreativeFolder = false) { openedFromCreativeFolder = Boolean(fromCreativeFolder); state = readState(); page = 'home'; activeId = ''; activeTab = 'plan'; homeIssueIndex = 0; homeSearchOpen = false; homeSearchQuery = ''; homeScrollTop = 0; homeIndexScrollLeft = 0; magazineDockCollapsed = false; shell?.classList.remove('is-open'); shell?.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); app.classList.add('is-open'); app.setAttribute('aria-hidden', 'false'); render(); }
   function closeApp() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); }
   function backFolder() { app.classList.remove('is-open'); app.setAttribute('aria-hidden', 'true'); if (openedFromCreativeFolder) { folder?.classList.add('is-open'); folder?.setAttribute('aria-hidden', 'false'); } else { folder?.classList.remove('is-open'); folder?.setAttribute('aria-hidden', 'true'); } }
 
@@ -54,9 +63,75 @@
     return `<div class="magazine-cover ${compact ? 'is-compact' : ''}" style="--mag-cover:${esc(issue.cover.color)};--mag-ink:${esc(issue.cover.ink)}">${coverImage(issue, 'magazine-cover-image')}<div class="magazine-cover-shade"></div><div class="magazine-cover-copy"><span>${esc(issue.cover.kicker)}</span><small>${esc(issue.edition)}</small><h2>${esc(issue.cover.headline || issue.title)}</h2><p>${esc(issue.cover.subhead || issue.theme)}</p></div></div>`;
   }
 
+  function homeIcon(type) {
+    const paths = {
+      search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/>',
+      bell:'<path d="M7 17h10l-1.2-2.1V10a3.8 3.8 0 0 0-7.6 0v4.9z"/><path d="M10 20h4"/>',
+      more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+      close:'<path d="M6 6l12 12M18 6 6 18"/>',
+      home:'<path d="m4 11 8-7 8 7v9h-6v-6h-4v6H4z"/>',
+      topics:'<path d="M4 5.5c3-.8 5.7-.3 8 1.5v13c-2.3-1.8-5-2.3-8-1.5zm16 0c-3-.8-5.7-.3-8 1.5v13c2.3-1.8 5-2.3 8-1.5z"/>',
+      write:'<path d="M5 19c4-1 8-4 10-8l3-6 1 1-4 7c-2 3-5 5-9 6z"/><path d="m9 15 3 3"/>',
+      drafts:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+      user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c.7-4.2 3.3-6.5 8-6.5s7.3 2.3 8 6.5"/>',
+      publish:'<path d="M5 20h14"/><path d="M12 16V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/>',
+      arrow:'<path d="m9 5 7 7-7 7"/>'
+    };
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[type] || ''}</svg>`;
+  }
+  function magazineDockMarkup() {
+    if (magazineDockCollapsed) { const position = magazineDockPosition ? ` style="left:${magazineDockPosition.x}px;top:${magazineDockPosition.y}px;right:auto;bottom:auto"` : ''; return `<button class="magazine-dock-orb" data-magazine-dock-expand type="button" aria-label="展开导航栏"${position}>${homeIcon('more')}</button>`; }
+    const selected = page === 'home' ? 'home' : page === 'preview' ? 'design' : activeTab;
+    return `<nav class="magazine-home-dock" aria-label="杂志社导航"><button class="${selected === 'home' ? 'is-active' : ''}" data-magazine-home-nav="home" type="button">${homeIcon('home')}<span>首页</span></button><button class="${selected === 'plan' ? 'is-active' : ''}" data-magazine-home-jump="plan" type="button">${homeIcon('topics')}<span>选题</span></button><button class="${selected === 'interview' ? 'is-active' : ''}" data-magazine-home-jump="interview" type="button">${homeIcon('write')}<span>写作</span></button><button class="${selected === 'articles' ? 'is-active' : ''}" data-magazine-home-jump="articles" type="button">${homeIcon('drafts')}<span>稿件</span></button><button class="${selected === 'design' ? 'is-active' : ''}" data-magazine-home-jump="design" type="button">${homeIcon('publish')}<span>发布</span></button></nav>`;
+  }
+  function issueDateLabel(issue) {
+    const raw = String(issue.publishedAt || issue.updatedAt || issue.createdAt || '');
+    const match = raw.match(/(\d{1,2})[\/月-](\d{1,2})/);
+    if (!match) return raw || '未记录日期';
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    return `${months[Math.max(0, Math.min(11, Number(match[1]) - 1))]}. ${String(Number(match[2])).padStart(2, '0')}`;
+  }
+  function issueProgress(issue) {
+    if (issue.status === '已发布') return 100;
+    const sections = issue.sections.length;
+    const articleRatio = sections ? Math.min(1, issue.articles.length / sections) : 0;
+    const progress = (sections ? .25 : 0) + articleRatio * .35 + (issue.interviews.some(item => item.turns?.length) ? .15 : 0) + (issue.cover.image ? .25 : 0);
+    return Math.max(0, Math.min(99, Math.round(progress * 100)));
+  }
+  function homeIssueStatus(issue) {
+    if (issue.status === '已发布') return '已发布';
+    if (issue.articles.length) return '编辑中';
+    if (issue.sections.length) return '策划中';
+    return '草稿';
+  }
+  function homeDeskCounts(issues) {
+    return {
+      interview:issues.reduce((sum, issue) => sum + issue.participants.filter(person => !issue.interviews.some(session => session.roleId === person.id && session.turns?.some(turn => turn.role === 'role'))).length, 0),
+      writing:issues.reduce((sum, issue) => sum + issue.sections.filter(section => !sectionArticle(issue, section.id)).length, 0),
+      review:issues.reduce((sum, issue) => sum + (issue.status === '已发布' ? 0 : issue.articles.length), 0),
+      cover:issues.filter(issue => issue.status !== '已发布' && !issue.cover.image).length
+    };
+  }
+  function syncMagazineHomeSearch() {
+    if (page !== 'home') return;
+    const query = homeSearchQuery.trim().toLocaleLowerCase();
+    let visible = 0;
+    app.querySelectorAll('[data-magazine-home-search-text]').forEach(card => { const match = !query || card.dataset.magazineHomeSearchText.includes(query); card.hidden = !match; if (match) visible += 1; });
+    const empty = app.querySelector('[data-magazine-home-search-empty]');
+    if (empty) empty.hidden = visible > 0 || !query;
+  }
   function homePage() {
-    const cards = state.issues.slice().reverse().map(issue => `<article class="magazine-issue-card"><button class="magazine-book-trigger" data-magazine-open="${esc(issue.id)}" type="button"><div class="magazine-book-object">${coverMarkup(issue, true)}<i class="magazine-book-pages" aria-hidden="true"></i></div><div class="magazine-issue-meta"><span>${esc(issue.status)}</span><b>${esc(issue.title)}</b><small>${esc(issue.edition)} · ${issue.articles.length} 篇稿件 · ${esc(issue.updatedAt)}</small></div><div class="magazine-open-hint"><span>打开本期</span><b>↗</b></div></button><button data-magazine-delete="${esc(issue.id)}" class="magazine-card-delete" type="button">删除</button></article>`).join('');
-    return `<section class="magazine-page">${header('EDITORIAL STUDIO', '杂志社', '采访角色、编辑稿件，再把一期刊物真正做完。', 'data-magazine-folder')}<main class="magazine-main"><section class="magazine-hero"><div><span>MAKE AN ISSUE</span><h2>每一期，都从一个值得追问的主题开始。</h2><p>邀请角色成为受访者和专栏人物，完整保留选题、采访、稿件与封面。</p></div><button data-magazine-new type="button"><i>＋</i><b>创办新刊</b><small>建立本期编辑部</small></button></section><section class="magazine-library"><div class="magazine-section-head"><div><span>ARCHIVE</span><h2>刊物档案</h2></div><b>${state.issues.length} 期</b></div>${cards || '<div class="magazine-empty"><i>M</i><p>还没有刊物<br>先确定第一期想讨论的主题。</p></div>'}</section></main></section>`;
+    const issues = state.issues.slice().reverse();
+    homeIssueIndex = issues.length ? Math.max(0, Math.min(homeIssueIndex, issues.length - 1)) : 0;
+    const issue = issues[homeIssueIndex] || null;
+    const total = issues.length;
+    const number = value => String(value).padStart(2, '0');
+    const desk = homeDeskCounts(issues);
+    const current = issue ? `<section class="magazine-home-current"><div class="magazine-home-section-title"><span>CURRENT ISSUE</span><i></i><div><button data-magazine-home-cycle="prev" type="button" aria-label="上一期">‹</button><b>${number(homeIssueIndex + 1)}</b><em>/</em><small>${number(total)}</small><button data-magazine-home-cycle="next" type="button" aria-label="下一期">›</button></div></div><div class="magazine-home-current-copy"><h2>${esc(issue.title)}</h2><strong>${esc(issue.edition)} <i>·</i> ${esc(issueDateLabel(issue))}</strong><p>${esc(issue.theme || issue.direction || '尚未填写本期主题。')}</p><div class="magazine-home-progress"><b>编辑进度</b><i><span style="width:${issueProgress(issue)}%"></span></i><strong>${issueProgress(issue)}%</strong></div><div class="magazine-home-metrics"><span><b>${number(issue.sections.length)}</b><small>选题</small></span><span><b>${number(issue.articles.length)}</b><small>稿件</small></span><span><b>${number(issue.status === '已发布' ? 0 : issue.articles.length)}</b><small>待审</small></span><span><b>${number(issue.cover.image ? 1 : 0)}</b><small>封面</small></span></div><button class="magazine-home-enter" data-magazine-open="${esc(issue.id)}" type="button">进入本期编辑 ${homeIcon('arrow')}</button></div><button class="magazine-home-cover-button" data-magazine-open="${esc(issue.id)}" type="button" aria-label="打开${esc(issue.title)}">${coverMarkup(issue, true)}</button></section>` : `<section class="magazine-home-empty"><span>CURRENT ISSUE</span><h2>还没有正在制作的刊物</h2><p>从一个主题开始，建立你的第一期杂志。</p><button data-magazine-new type="button">＋ 新建刊物</button></section>`;
+    const query = homeSearchQuery.trim().toLocaleLowerCase();
+    const cards = issues.map((item, index) => { const searchText = `${item.title} ${item.theme} ${item.edition} ${item.direction} ${item.status}`.toLocaleLowerCase(); const hidden = query && !searchText.includes(query); return `<button class="magazine-home-issue-card ${index === homeIssueIndex ? 'is-current' : ''}" data-magazine-home-select="${esc(item.id)}" data-magazine-home-search-text="${esc(searchText)}" type="button" ${hidden ? 'hidden' : ''}><span class="magazine-home-index-cover">${coverMarkup(item, true)}</span><b>${number(index + 1)}</b><strong>${esc(item.title)}</strong><small>${esc(issueDateLabel(item))}</small><em class="is-${item.status === '已发布' ? 'published' : 'editing'}">${homeIssueStatus(item)}</em></button>`; }).join('');
+    const search = homeSearchOpen ? `<div class="magazine-home-search"><span>${homeIcon('search')}</span><input data-magazine-home-search-input value="${esc(homeSearchQuery)}" placeholder="搜索刊物" autocomplete="off"><button data-magazine-home-search-close type="button" aria-label="关闭搜索">×</button></div>` : '';
+    return `<section class="magazine-page magazine-home-page"><header class="magazine-home-header"><div class="magazine-home-brand"><div><span>EDITORIAL<br>STUDIO</span><i></i><span>MAGAZINE<br>PEOPLE / STORY / WORLD</span></div><h1>杂志社</h1><p>采访角色，编辑稿件，<br>再把一期刊物真正做完。</p></div><div class="magazine-home-actions"><button data-magazine-home-search-toggle type="button" aria-label="搜索">${homeIcon('search')}</button><button data-magazine-close type="button" aria-label="关闭杂志社">${homeIcon('close')}</button></div><blockquote>「在文字的缝隙里，<br>看见另一个世界。」<span>—</span><small>WRITE<br>ANOTHER WORLD.</small></blockquote></header>${search}<main class="magazine-home-main">${magazineBackgroundBanner()}${current}<section class="magazine-home-desk" data-magazine-home-desk><div class="magazine-home-section-title"><span>EDITORIAL DESK</span><i></i><small>真实工作进度</small></div><div><button data-magazine-home-jump="interview" type="button"><b>${number(desk.interview)}</b><span>待采访</span><small>INTERVIEW</small></button><button data-magazine-home-jump="articles" type="button"><b>${number(desk.writing)}</b><span>写作中</span><small>WRITING</small></button><button data-magazine-home-jump="articles" type="button"><b>${number(desk.review)}</b><span>待审稿</span><small>REVIEW</small></button><button data-magazine-home-jump="design" type="button"><b>${number(desk.cover)}</b><span>等待封面</span><small>COVER</small></button></div></section><section class="magazine-home-index"><div class="magazine-home-section-title"><span>ISSUE INDEX</span><i></i><small>ALL →</small></div><div class="magazine-home-index-list">${cards}<button class="magazine-home-new-issue" data-magazine-new type="button"><i>＋</i><b>${number(total + 1)}</b><span>下一期</span><small>尚未命名</small></button></div><p data-magazine-home-search-empty ${query && !issues.some(item => `${item.title} ${item.theme} ${item.edition} ${item.direction} ${item.status}`.toLocaleLowerCase().includes(query)) ? '' : 'hidden'}>没有找到相关刊物。</p></section></main><nav class="magazine-home-dock"><button class="is-active" data-magazine-home-nav="home" type="button">${homeIcon('home')}<span>首页</span></button><button data-magazine-home-jump="plan" type="button">${homeIcon('topics')}<span>选题</span></button><button data-magazine-home-jump="interview" type="button">${homeIcon('write')}<span>写作</span></button><button data-magazine-home-jump="articles" type="button">${homeIcon('drafts')}<span>稿件</span></button><button data-magazine-home-jump="design" type="button">${homeIcon('publish')}<span>发布</span></button></nav></section>`;
   }
 
   function roleChoices(selectedIds = [], mode = 'new') {
@@ -123,11 +198,19 @@
   }
 
   function render() {
-    const oldScroll = app.querySelector('.magazine-page')?.scrollTop || 0;
+    const currentHome = app.querySelector('.magazine-home-page');
+    if (currentHome) homeScrollTop = currentHome.scrollTop;
+    const currentIndex = app.querySelector('.magazine-home-index-list');
+    if (currentIndex) homeIndexScrollLeft = currentIndex.scrollLeft;
+    const oldScrollHost = app.querySelector('.magazine-page') || app;
+    const oldScroll = oldScrollHost.scrollTop || 0;
     const issue = activeIssue();
     if (page === 'studio' && issue?.status === '已发布') { page = 'preview'; previewIndex = 0; }
     app.innerHTML = page === 'home' ? homePage() : page === 'new' ? newPage() : page === 'preview' && issue ? previewPage(issue) : issue ? studioPage(issue) : homePage();
-    const next = app.querySelector('.magazine-page'); if (next && page !== 'preview') next.scrollTop = oldScroll;
+    const renderedDock = app.querySelector('.magazine-home-dock');
+    if (renderedDock) renderedDock.outerHTML = magazineDockMarkup(); else app.insertAdjacentHTML('beforeend', magazineDockMarkup());
+    const next = app.querySelector('.magazine-page'); const nextScroll = page === 'home' ? homeScrollTop : oldScroll; if (next && page !== 'preview') { next.scrollTop = nextScroll; requestAnimationFrame(() => { next.scrollTop = nextScroll; }); }
+    const nextIndex = app.querySelector('.magazine-home-index-list'); if (nextIndex) { nextIndex.scrollLeft = homeIndexScrollLeft; requestAnimationFrame(() => { nextIndex.scrollLeft = homeIndexScrollLeft; }); }
     requestAnimationFrame(hydrateImages);
   }
   function hydrateImages() { app.querySelectorAll('[data-magazine-asset]').forEach(async image => { if (image.dataset.hydrated) return; image.dataset.hydrated = 'true'; const source = window.IdealMachineGetImage ? await window.IdealMachineGetImage(image.dataset.magazineAsset) : image.dataset.magazineAsset; if (source) image.src = source; }); }
@@ -186,7 +269,7 @@
   function interviewToArticle() { const issue = activeIssue(); const session = issue?.interviews.find(item => item.roleId === activeInterviewRole); if (!issue || !session?.turns.length) return; let section = issue.sections.find(item => item.type === '人物采访' && !sectionArticle(issue,item.id)); if (!section) { const role = roleFrom(issue,activeInterviewRole); section = { id:uid('section'), type:'人物采访', title:`与${role?.name || '人物'}谈谈`, pitch:`围绕“${issue.theme}”整理本次采访。` }; issue.sections.push(section); save(); } generateArticle(section.id,activeInterviewRole); }
   function saveArticle(articleId) { const issue = activeIssue(); const article = issue?.articles.find(item=>item.id===articleId); if (!article) return; article.title = app.querySelector(`[data-magazine-article-title="${articleId}"]`)?.value.trim() || '未命名稿件'; article.deck = app.querySelector(`[data-magazine-article-deck="${articleId}"]`)?.value.trim() || ''; article.content = app.querySelector(`[data-magazine-article-content="${articleId}"]`)?.value || ''; article.updatedAt = now(); issue.updatedAt = now(); save(); render(); }
 
-  async function generateCover() { const issue = activeIssue(); if (!issue || busy) return; if (!window.IdealMachineImageAPI?.generate) return window.alert('请先在设置中配置生图 API。'); busy = 'cover'; render(); try { const people = issue.participants.map(item=>`${item.name}：${item.persona}`).join('\n'); const result = await window.IdealMachineImageAPI.generate({ purpose:'moments', count:1, prompt:`为一本人物杂志生成竖版封面摄影底图，不要生成任何文字、字母、数字、边框或排版。杂志主题：${issue.theme}。内容方向：${issue.direction}。${people ? `可能出现的人物设定：${people}` : '以主题相关的静物或环境为主体'}。构图需要为顶部刊名和下方大标题预留干净空间。` }); if (!result.assetId) throw new Error('没有返回图片'); issue.cover.image = result.assetId; issue.updatedAt = now(); save(); } catch (error) { window.alert(`封面生成失败：${error.message}`); } finally { busy=''; render(); } }
+  async function generateCover() { const issue = activeIssue(); if (!issue || busy || !window.IdealMachineImageAPI?.generate) return; busy = 'cover'; render(); try { const people = issue.participants.map(item=>`${item.name}：${item.persona}`).join('\n'); const result = await window.IdealMachineImageAPI.generate({ purpose:'moments', count:1, prompt:`为一本人物杂志生成竖版封面摄影底图，不要生成任何文字、字母、数字、边框或排版。杂志主题：${issue.theme}。内容方向：${issue.direction}。${people ? `可能出现的人物设定：${people}` : '以主题相关的静物或环境为主体'}。构图需要为顶部刊名和下方大标题预留干净空间。` }); if (!result.assetId) throw new Error('没有返回图片'); issue.cover.image = result.assetId; issue.updatedAt = now(); save(); } catch (error) { console.warn('magazine_cover_generation_failed', error); } finally { busy=''; render(); } }
   async function uploadCover(file) { const issue = activeIssue(); if (!issue || !file) return; const data = window.IdealMachineReadImage ? await window.IdealMachineReadImage(file,1500,.8) : await new Promise(resolve => { const reader=new FileReader(); reader.onload=()=>resolve(reader.result); reader.readAsDataURL(file); }); issue.cover.image = window.IdealMachinePutImage ? await window.IdealMachinePutImage(data) : data; issue.updatedAt=now(); save(); render(); }
 
   let batchProgress = 0;
@@ -199,6 +282,7 @@
   function persistMagazineIssue(issue) { const latest = readState(); const copy = normalizeIssue(clone(issue)); const index = latest.issues.findIndex(item => item.id === copy.id); if (index >= 0 && latest.issues[index].status === '已发布') { state = latest; return latest.issues[index]; } if (index >= 0) latest.issues[index] = copy; else latest.issues.push(copy); state = latest; save(); return copy; }
   function magazineBackgroundBanner() {
     const job = readMagazineJob(); if (!job) return '';
+    if (job.type === 'cover' && job.status === 'error') return '';
     const running = job.status === 'running'; const tone = running ? 'is-running' : job.status === 'error' ? 'is-error' : 'is-done';
     const progress = job.type === 'batch' && job.total ? ` · ${job.progress || 0}/${job.total}` : '';
     return `<section class="magazine-background-job ${tone}"><i>${running ? '✦' : job.status === 'error' ? '!' : '✓'}</i><div><b>${esc(running ? `${job.label || '后台生成中'}${progress}` : job.message || '后台生成已完成')}</b><small>${running ? '可以关闭杂志社，API 会继续运行；重新打开后可继续查看。' : '结果已经保存到本期刊物中。'}</small></div></section>`;
@@ -214,9 +298,6 @@
     newDraft.edition = `VOL. ${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}`;
     render();
   }
-
-  const baseMagazineHomePage = homePage;
-  homePage = function() { return baseMagazineHomePage().replace('<main class="magazine-main">', `<main class="magazine-main">${magazineBackgroundBanner()}`); };
 
   newPage = function() {
     return `<section class="magazine-page">${header('NEW PUBLICATION', '创办新刊', '先定下这一期的气质，也可以交给随机设定。')}<main class="magazine-main"><section class="magazine-form-card magazine-publication-card"><div class="magazine-form-title"><span>PUBLICATION</span><h2>刊物设定</h2><p>名称、主题和内容方向会成为整期杂志的编辑基调。</p></div><button class="magazine-random-button" data-magazine-randomize type="button">✦ 随机设定</button><label>刊物名称<input data-magazine-new-field="title" value="${esc(newDraft.title)}" placeholder="例如：未眠时刻"></label><label>本期主题<textarea data-magazine-new-field="theme" placeholder="这一期想记录、追问或讨论什么？">${esc(newDraft.theme)}</textarea></label><div class="magazine-form-grid"><label>刊号<input data-magazine-new-field="edition" value="${esc(newDraft.edition)}"></label><label>内容方向<select data-magazine-new-field="direction"><option ${newDraft.direction === '人物与生活' ? 'selected' : ''}>人物与生活</option><option ${newDraft.direction === '关系观察' ? 'selected' : ''}>关系观察</option><option ${newDraft.direction === '文化与潮流' ? 'selected' : ''}>文化与潮流</option><option ${newDraft.direction === '故事与世界' ? 'selected' : ''}>故事与世界</option><option ${newDraft.direction === '自由主题' ? 'selected' : ''}>自由主题</option></select></label></div></section><section class="magazine-form-card"><div class="magazine-number">02</div><div class="magazine-form-title"><span>CAST</span><h2>本期参与人物</h2><p>采访、写作和世界观读取都会以这里选择的人物为准。</p></div><div class="magazine-role-grid">${roleChoices(newDraft.participantIds)}</div></section><button class="magazine-create-button" data-magazine-create type="button">建立本期编辑部 <span>›</span></button></main></section>`;
@@ -274,8 +355,8 @@
   }
 
   generateCover = async function() {
-    const issue = activeIssue(); if (!issue || busy) return; if (!window.IdealMachineImageAPI?.generate) return window.alert('请先在设置中配置生图 API。'); busy = 'cover'; const jobId = beginMagazineJob('cover', issue.id, '正在生成封面摄影'); render();
-    try { const result = await window.IdealMachineImageAPI.generate({ purpose:'moments', count:1, prompt:`为一本中文人物杂志生成竖版封面摄影底图。不要生成任何文字、字母、数字、边框、水印或社交软件界面，顶部刊名和下方大标题要预留干净空间。${magazineEditorialContext(issue)}\n请将人物气质、时代背景和世界规则转化为自然可信的摄影场景。` }); if (!result.assetId) throw new Error('没有返回图片'); issue.cover.image = result.assetId; issue.updatedAt = now(); persistMagazineIssue(issue); finishMagazineJob(jobId, 'done', '封面摄影已生成'); } catch (error) { finishMagazineJob(jobId, 'error', `封面生成失败：${error.message}`); window.alert(`封面生成失败：${error.message}`); } finally { busy=''; render(); }
+    const issue = activeIssue(); if (!issue || busy || !window.IdealMachineImageAPI?.generate) return; busy = 'cover'; const jobId = beginMagazineJob('cover', issue.id, '正在生成封面摄影'); render();
+    try { const result = await window.IdealMachineImageAPI.generate({ purpose:'moments', count:1, prompt:`为一本中文人物杂志生成竖版封面摄影底图。不要生成任何文字、字母、数字、边框、水印或社交软件界面，顶部刊名和下方大标题要预留干净空间。${magazineEditorialContext(issue)}\n请将人物气质、时代背景和世界规则转化为自然可信的摄影场景。` }); if (!result.assetId) throw new Error('没有返回图片'); issue.cover.image = result.assetId; issue.updatedAt = now(); persistMagazineIssue(issue); finishMagazineJob(jobId, 'done', '封面摄影已生成'); } catch (error) { console.warn('magazine_cover_generation_failed', error); writeMagazineJob(null); } finally { busy=''; render(); }
   };
 
   askInterview = async function(question) {
@@ -290,6 +371,7 @@
 
   document.addEventListener('click', event => {
     if (!app.classList.contains('is-open')) return;
+    if (event.target.closest('[data-magazine-dock-expand]')) { if (suppressMagazineDockExpand) { suppressMagazineDockExpand = false; return; } magazineDockCollapsed = false; render(); return; }
     if (event.target.closest('[data-magazine-randomize]')) { randomMagazineSetting(); return; }
     if (event.target.closest('[data-magazine-generate-all-drafts]')) { generateAllDrafts(); return; }
   });
@@ -300,12 +382,21 @@
     if (!app.classList.contains('is-open')) return;
     if (event.target.closest('[data-magazine-close]')) { closeApp(); return; }
     if (event.target.closest('[data-magazine-folder]')) { backFolder(); return; }
+    if (event.target.closest('[data-magazine-home-search-toggle]')) { homeSearchOpen = true; render(); requestAnimationFrame(() => app.querySelector('[data-magazine-home-search-input]')?.focus()); return; }
+    if (event.target.closest('[data-magazine-home-search-close]')) { homeSearchOpen = false; homeSearchQuery = ''; render(); return; }
+    const cycle = event.target.closest('[data-magazine-home-cycle]');
+    if (cycle) { const total = state.issues.length; if (total) homeIssueIndex = (homeIssueIndex + (cycle.dataset.magazineHomeCycle === 'next' ? 1 : -1) + total) % total; render(); return; }
+    const homeSelect = event.target.closest('[data-magazine-home-select]');
+    if (homeSelect) { const issues = state.issues.slice().reverse(); const index = issues.findIndex(issue => issue.id === homeSelect.dataset.magazineHomeSelect); if (index >= 0) { homeIssueIndex = index; render(); } return; }
+    const homeJump = event.target.closest('[data-magazine-home-jump]');
+    if (homeJump) { const issue = activeIssue() || state.issues.slice().reverse()[homeIssueIndex]; if (!issue) { newDraft = blankDraft(); page = 'new'; render(); return; } activeId = issue.id; activeTab = homeJump.dataset.magazineHomeJump || 'plan'; activeInterviewRole = issue.participants[0]?.id || ''; page = issue.status === '已发布' ? 'preview' : 'studio'; render(); return; }
+    if (event.target.closest('[data-magazine-home-nav="home"]')) { if (page !== 'home') { page='home'; activeId=''; render(); } else app.querySelector('.magazine-home-page')?.scrollTo({ top:0, behavior:'smooth' }); return; }
     if (event.target.closest('[data-magazine-new]')) { newDraft=blankDraft(); page='new'; render(); return; }
     if (event.target.closest('[data-magazine-home]')) { page='home'; activeId=''; render(); return; }
     if (event.target.closest('[data-magazine-studio]')) { page='studio'; render(); return; }
     const pageTurn=event.target.closest('[data-magazine-page-turn]'); if(pageTurn){const issue=activeIssue();if(!issue)return;const sheets=previewSheets(issue);const delta=pageTurn.dataset.magazinePageTurn==='next'?1:-1;previewTurnDirection=delta;previewIndex=Math.min(Math.max(previewIndex+delta,0),sheets.length-1);render();return;}
     if (event.target.closest('[data-magazine-create]')) { createIssue(); return; }
-    const opened=event.target.closest('[data-magazine-open]'); if(opened){const card=opened.closest('.magazine-issue-card');card?.classList.add('is-opening');window.setTimeout(()=>{activeId=opened.dataset.magazineOpen;const issue=activeIssue();page=issue?.status==='已发布'?'preview':'studio';previewIndex=0;activeTab='plan';activeInterviewRole=issue?.participants[0]?.id||'';render();},220);return;}
+    const opened=event.target.closest('[data-magazine-open]'); if(opened){activeId=opened.dataset.magazineOpen;const issue=activeIssue();page=issue?.status==='已发布'?'preview':'studio';previewIndex=0;activeTab='plan';activeInterviewRole=issue?.participants[0]?.id||'';render();return;}
     const deleted=event.target.closest('[data-magazine-delete]'); if(deleted&&window.confirm('确定删除这期杂志和全部采访、稿件吗？')){state.issues=state.issues.filter(item=>item.id!==deleted.dataset.magazineDelete);save();render();return;}
     const tab=event.target.closest('[data-magazine-tab]'); if(tab){activeTab=tab.dataset.magazineTab;render();return;}
     if(event.target.closest('[data-magazine-generate-plan]')){generatePlan();return;}
@@ -321,8 +412,14 @@
     if(event.target.closest('[data-magazine-generate-cover]')){generateCover();return;}
     if(event.target.closest('[data-magazine-remove-cover]')){const issue=activeIssue();issue.cover.image='';save();render();return;}
     if(event.target.closest('[data-magazine-preview]')){previewIndex=0;page='preview';render();return;}
-    if(event.target.closest('[data-magazine-publish]')){const issue=activeIssue();if(!issue||issue.status==='已发布')return;issue.status='已发布';issue.publishedAt=now();issue.updatedAt=now();save();previewIndex=0;page='preview';render();}
+    if(event.target.closest('[data-magazine-publish]')){const issue=activeIssue();if(!issue||issue.status==='已发布')return;issue.status='已发布';issue.publishedAt=now();issue.updatedAt=now();save();previewIndex=0;page='preview';render();return;}
+    if (!magazineDockCollapsed && app.contains(event.target) && !event.target.closest('button,a,input,textarea,select,label,[contenteditable="true"],.magazine-home-dock')) { magazineDockCollapsed = true; render(); }
   });
+  document.addEventListener('pointerdown', event => { const orb = event.target.closest?.('[data-magazine-dock-expand]'); if (!orb || !app.classList.contains('is-open')) return; const rect = orb.getBoundingClientRect(); magazineDockDrag = { pointerId:event.pointerId, startX:event.clientX, startY:event.clientY, offsetX:event.clientX - rect.left, offsetY:event.clientY - rect.top, moved:false }; orb.setPointerCapture?.(event.pointerId); });
+  document.addEventListener('pointermove', event => { if (!magazineDockDrag || magazineDockDrag.pointerId !== event.pointerId) return; const distance = Math.hypot(event.clientX - magazineDockDrag.startX, event.clientY - magazineDockDrag.startY); if (distance > 3) magazineDockDrag.moved = true; if (!magazineDockDrag.moved) return; event.preventDefault(); const size = 54; const x = Math.max(8, Math.min(window.innerWidth - size - 8, event.clientX - magazineDockDrag.offsetX)); const y = Math.max(8, Math.min(window.innerHeight - size - 8, event.clientY - magazineDockDrag.offsetY)); magazineDockPosition = { x:Math.round(x), y:Math.round(y) }; const orb = app.querySelector('[data-magazine-dock-expand]'); if (orb) { orb.style.left = `${magazineDockPosition.x}px`; orb.style.top = `${magazineDockPosition.y}px`; orb.style.right = 'auto'; orb.style.bottom = 'auto'; } }, { passive:false });
+  document.addEventListener('pointerup', event => { if (!magazineDockDrag || magazineDockDrag.pointerId !== event.pointerId) return; suppressMagazineDockExpand = magazineDockDrag.moved; magazineDockDrag = null; if (suppressMagazineDockExpand) window.setTimeout(() => { suppressMagazineDockExpand = false; }, 0); });
+  document.addEventListener('pointercancel', () => { magazineDockDrag = null; suppressMagazineDockExpand = false; });
+  document.addEventListener('input', event => { const input = event.target.closest?.('[data-magazine-home-search-input]'); if (!input || !app.contains(input)) return; homeSearchQuery = input.value; syncMagazineHomeSearch(); });
   document.addEventListener('submit',event=>{if(!event.target.matches('[data-magazine-interview-form]'))return;event.preventDefault();const question=app.querySelector('[data-magazine-question]')?.value.trim();if(question)askInterview(question);});
   document.addEventListener('input',event=>{if(!app.classList.contains('is-open'))return;if(event.target.matches('[data-magazine-new-field]'))newDraft[event.target.dataset.magazineNewField]=event.target.value;if(event.target.matches('[data-magazine-issue-field]')){const issue=activeIssue();issue[event.target.dataset.magazineIssueField]=event.target.value;issue.updatedAt=now();save();}if(event.target.matches('[data-magazine-cover-field]')){const issue=activeIssue();issue.cover[event.target.dataset.magazineCoverField]=event.target.value;issue.updatedAt=now();save();const cover=app.querySelector('.magazine-cover-stage .magazine-cover');if(cover){const copy=cover.querySelector('.magazine-cover-copy');if(copy){copy.querySelector('span').textContent=issue.cover.kicker;copy.querySelector('h2').textContent=issue.cover.headline;copy.querySelector('p').textContent=issue.cover.subhead;}}}});
   document.addEventListener('change',event=>{if(!app.classList.contains('is-open'))return;if(event.target.matches('[data-magazine-new-role]')){const id=event.target.dataset.magazineNewRole;newDraft.participantIds=event.target.checked?[...new Set([...newDraft.participantIds,id])]:newDraft.participantIds.filter(item=>item!==id);}const issue=activeIssue();if(event.target.matches('[data-magazine-issue-role]')&&issue){const ids=[...app.querySelectorAll('[data-magazine-issue-role]:checked')].map(input=>input.dataset.magazineIssueRole);const roles=chatRoles();issue.participants=ids.map(id=>roles.find(role=>role.id===id)).filter(Boolean).map(clone);if(!ids.includes(activeInterviewRole))activeInterviewRole=ids[0]||'';issue.updatedAt=now();save();app.querySelector('.magazine-participant-chips').innerHTML=`<b>本期人物</b>${participantChips(issue)}`;}if(event.target.matches('[data-magazine-section-type]')){issue.sections.find(item=>item.id===event.target.dataset.magazineSectionType).type=event.target.value;save();}if(event.target.matches('[data-magazine-section-title]')){issue.sections.find(item=>item.id===event.target.dataset.magazineSectionTitle).title=event.target.value;save();}if(event.target.matches('[data-magazine-section-pitch]')){issue.sections.find(item=>item.id===event.target.dataset.magazineSectionPitch).pitch=event.target.value;save();}if(event.target.matches('[data-magazine-cover-file]')&&event.target.files[0])uploadCover(event.target.files[0]);});

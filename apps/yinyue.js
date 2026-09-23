@@ -32,8 +32,8 @@
   const getFile=id=>idb().then(db=>new Promise((resolve,reject)=>{const r=db.transaction('tracks').objectStore('tracks').get(id);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);}));
   const chat=()=>{try{const s=JSON.parse(localStorage.getItem(chatKey)||'{}');return {profiles:Array.isArray(s.profiles)?s.profiles:[],contacts:Array.isArray(s.contacts)?s.contacts:[],chats:s.chats||{}};}catch{return {profiles:[],contacts:[],chats:{}};}};
   const profile=()=>{const d=chat();if(!state.profileId||!d.profiles.some(x=>x.id===state.profileId))state.profileId=d.profiles[0]?.id||'';return d.profiles.find(x=>x.id===state.profileId)||null;};
-  const roles=()=>{const d=chat();return d.contacts.filter(x=>d.chats[x.id]?.profileId===state.profileId);};
-  const allRoles=()=>chat().contacts;
+  const roles=()=>{const d=chat();return d.contacts.filter(x=>!x?.isGroup&&d.chats[x.id]?.profileId===state.profileId);};
+  const allRoles=()=>chat().contacts.filter(x=>x&&!x.isGroup);
   const roleName=id=>{const x=allRoles().find(v=>v.id===id);return x?.nickname||x?.name||'角色';};
   const avatar=x=>x?.avatar?`<img src="${esc(x.avatar)}" alt="">`:esc((x?.nickname||x?.name||'♪').slice(0,1));
   const library=()=>state.library[state.profileId] ||= [];

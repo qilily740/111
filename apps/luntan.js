@@ -5,6 +5,7 @@
   const noticeKey = 'ideal-machine-forum-notices';
   const profileKey = 'ideal-machine-forum-profile';
   const settingsKey = 'ideal-machine-forum-settings';
+  const npcRotationKey = 'ideal-machine-forum-npc-rotation';
   let activeTab = 'home';
   let refreshBusy = false;
   let interactionBusy = false;
@@ -12,6 +13,7 @@
   let discoverFilter = 'all';
   let discoverQuery = '';
   let commentTargetId = '';
+  let commentReplyTargetId = '';
   const app = document.createElement('div');
   app.className = 'forum-app';
   app.innerHTML = '<div class="forum-page"><header class="forum-header"><div class="forum-brand"><span>FORUM</span><h1>论坛</h1></div><div class="forum-header-actions"><button class="forum-refresh" type="button" data-forum-refresh aria-label="刷新论坛动态"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M38 18a15 15 0 0 0-26-4L8 18M10 30a15 15 0 0 0 26 4l4-4"/><path d="M8 11v7h7M40 37v-7h-7"/></svg></button><button type="button" data-forum-profile aria-label="论坛账号设置"></button><button type="button" data-forum-close aria-label="关闭论坛">×</button></div></header><main class="forum-main"><section class="forum-feed" data-forum-feed></section></main><nav class="forum-tabs" aria-label="论坛导航"><button class="is-active" type="button" data-forum-tab="home"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m8 22 16-13 16 13v17H29V28h-10v11H8z"/></svg><small>首页</small></button><button type="button" data-forum-tab="search"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="21" cy="21" r="11"/><path d="m30 30 10 10"/></svg><small>发现</small></button><button class="forum-tab-compose" type="button" data-forum-compose aria-label="发帖"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 10v28M10 24h28"/></svg></button><button type="button" data-forum-tab="notice"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 34h24l-3-5V20a9 9 0 0 0-18 0v9zM20 39h8"/></svg><small>通知</small></button><button type="button" data-forum-tab="profile"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="16" r="7"/><path d="M11 39c1-8 5-12 13-12s12 4 13 12"/></svg><small>我的</small></button></nav></div><div class="forum-compose-sheet" data-forum-compose-sheet aria-hidden="true"></div><div class="forum-profile-sheet" data-forum-profile-sheet aria-hidden="true"></div>';
@@ -30,7 +32,7 @@
   const getNotices = () => { const value = read(noticeKey, []); return Array.isArray(value) ? value : []; };
   const addNotice = notice => { const list = getNotices(); list.unshift({ id: uid('forum-notice'), time: now(), read: false, ...notice }); save(noticeKey, list.slice(0, 100)); };
   const canDeletePost = post => post?.owner === getProfile().nickname && (post.ownerType === 'user' || !post.ownerType);
-  const getRoles = () => { const value = read('ideal-machine-chat', {}); return Array.isArray(value.contacts) ? value.contacts : []; };
+  const getRoles = () => { const value = read('ideal-machine-chat', {}); return Array.isArray(value.contacts) ? value.contacts.filter(role => role && !role.isGroup) : []; };
   const getBoundProfile = role => { const value = read('ideal-machine-chat', {}); const profileId = value.chats?.[role?.id]?.profileId || ''; return (Array.isArray(value.profiles) ? value.profiles : []).find(item => item.id === profileId) || {}; };
   const roleUserContext = role => window.IdealMachineRoleUserContext ? window.IdealMachineRoleUserContext(role || {}, getBoundProfile(role)) : `角色本人资料：${role?.details || role?.signature || '未填写（未知，不得推测）'}\n绑定用户资料：${getBoundProfile(role)?.persona || '未填写（未知，不得推测）'}`;
   const avatar = (source, name = '论') => source ? '<img src="' + esc(source) + '" alt="头像">' : '<span>' + esc(String(name).slice(0, 1)) + '</span>';
@@ -145,6 +147,26 @@
     getPosts().filter(post => post.ownerType === 'npc').forEach(post => add({ id:post.ownerId, name:post.nickname, avatar:post.avatar, identity:'论坛 NPC', ...(post.actorProfile || {}) }));
     return [...found.values()];
   }
+  function shuffled(items) { const result = items.slice(); for (let index = result.length - 1; index > 0; index -= 1) { const swapIndex = Math.floor(Math.random() * (index + 1)); [result[index], result[swapIndex]] = [result[swapIndex], result[index]]; } return result; }
+  function selectNpcCandidates(npcs) {
+    const unique = npcs.filter((npc, index, list) => npc?.id && list.findIndex(item => item.id === npc.id) === index);
+    if (!unique.length) return [];
+    const rotation = read(npcRotationKey, {});
+    const recent = Array.isArray(rotation.recent) ? rotation.recent : [];
+    const fresh = shuffled(unique.filter(npc => !recent.includes(npc.id)));
+    const pool = fresh.length ? fresh : shuffled(unique);
+    const targetCount = Math.min(pool.length, Math.max(2, Math.min(5, Math.ceil(unique.length * .65))));
+    return pool.slice(0, targetCount);
+  }
+  function rememberNpcPosts(ids, allNpcs) {
+    const used = ids.filter(Boolean);
+    if (!used.length) return;
+    const previous = read(npcRotationKey, {});
+    const recent = Array.isArray(previous.recent) ? previous.recent : [];
+    const maxRecent = Math.max(1, allNpcs.length - 1);
+    const next = [...used, ...recent].filter((id, index, list) => list.indexOf(id) === index).slice(0, maxRecent);
+    save(npcRotationKey, { recent: next, updatedAt: now() });
+  }
   function applyForumSettings() { const settings = getForumSettings(); const selectedFont = settings.fontPackages.find(item => item.id === settings.fontId) || settings.fontPackages[0]; const customSource = String(selectedFont?.source || '').replace(/["\\\r\n]/g, value => '\\' + value); customFontStyle.textContent = settings.fontFamily === 'custom' && customSource ? `@font-face{font-family:"IdealForumCustom";src:url("${customSource}")}` : ''; const font = settings.fontFamily === 'custom' && customSource ? "'IdealForumCustom', -apple-system, sans-serif" : settings.fontFamily === 'serif' ? "Georgia, 'Songti SC', serif" : settings.fontFamily === 'mono' ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"; app.style.setProperty('--forum-font-family', font); app.style.setProperty('--forum-font-size', `${Math.max(11, Math.min(24, settings.fontSize))}px`); }
   function renderMePage(feed) {
     const current = getProfile();
@@ -163,6 +185,7 @@
     if (!endpoint || !model) return window.alert('论坛还没有可用模型：请在设置中拉取模型并至少保留一个模型。');
     const worldbook = getForumBooks().find(book => book.id === getForumSettings().worldbookId);
     const npcs = getForumNpcs(worldbook, roles);
+    const npcCandidates = selectNpcCandidates(npcs);
     if (!roles.length && !npcs.length && !worldbook) return window.alert('请先选择可参与论坛的角色，或选择一本论坛世界书。');
     const rules = worldbook?.entries?.filter(entry => entry.enabled !== false).map(entry => `【${entry.name}】\n${entry.content}`).join('\n\n') || '未选择论坛世界书。';
     const chatData = read('ideal-machine-chat', {});
@@ -171,7 +194,7 @@
       const recent = messages.slice(-12).map(message => `${message.role === 'user' ? '用户' : role.nickname || role.name}：${message.text || ''}`).join('\n');
       return `角色ID：${role.id}\n网名：${role.nickname || role.name || '角色'}\n真实姓名：${role.name || ''}\n最近聊天：\n${recent || '暂无聊天记录'}`;
     }).join('\n\n');
-    const npcContext = npcs.map(npc => `NPC ID：${npc.id}\n姓名：${npc.name}\n身份：${npc.identity || 'NPC'}\n当前状态：${npc.status || npc.lifeStatus || '默认在世'}\n性格与说话方式：${npc.personality || '暂无'}\n动机：${npc.motivation || '暂无'}\n人物关系：${npc.reason || npc.relationToRole || npc.relationDescription || '暂无'}\n背景：${npc.description || npc.background || '暂无'}`).join('\n\n');
+    const npcContext = npcCandidates.map(npc => `NPC ID：${npc.id}\n姓名：${npc.name}\n身份：${npc.identity || 'NPC'}\n当前状态：${npc.status || npc.lifeStatus || '默认在世'}\n性格与说话方式：${npc.personality || '暂无'}\n动机：${npc.motivation || '暂无'}\n人物关系：${npc.reason || npc.relationToRole || npc.relationDescription || '暂无'}\n背景：${npc.description || npc.background || '暂无'}`).join('\n\n');
     const button = app.querySelector('[data-forum-refresh]');
     refreshBusy = true;
     button?.classList.add('is-loading');
@@ -180,7 +203,7 @@
         method: 'POST',
         headers,
         body: JSON.stringify({ model, temperature: .85, messages: [
-          { role: 'system', content: '你是论坛内容调度器。请让提供的角色和 NPC 都自然参与论坛，每位角色各生成一条，另选 1—3 位当前仍在世的 NPC 各生成一条。每个人的发言必须严格符合其身份、性格、动机、关系、经历和说话方式，不能使用统一口吻。若 NPC 名单为空但世界书明确写有当前在世人物，可从世界书识别，actorId 留空；不得凭空创造人物。任何已经去世、死亡、阵亡、牺牲或只存在于回忆中的人物绝对不能发帖，也不能以账号、幽灵、转述等方式出现。严格只返回 JSON 数组，每项格式为 {"actorType":"role或npc","actorId":"对应ID","actorName":"姓名","isAlive":true,"text":"帖子正文"}。不要 Markdown，不要解释。' },
+          { role: 'system', content: '你是论坛内容调度器。请让提供的角色和 NPC 都自然参与论坛，每位角色各生成一条，另选 1—3 位当前仍在世的 NPC 各生成一条。NPC 只能从本轮提供的 NPC 候选名单中选择，不能从名单外补充人物。每个人的发言必须严格符合其身份、性格、动机、关系、经历和说话方式，不能使用统一口吻。若 NPC 名单为空但世界书明确写有当前在世人物，可从世界书识别，actorId 留空；不得凭空创造人物。任何已经去世、死亡、阵亡、牺牲或只存在于回忆中的人物绝对不能发帖，也不能以账号、幽灵、转述等方式出现。每条帖子可以附带 0—2 个自然互动，互动者必须来自本轮可参与名单且不能给自己的帖子互动；action 只能是 like 或 reply，reply 必须填写简短评论。严格只返回 JSON 数组，每项格式为 {"actorType":"role或npc","actorId":"对应ID","actorName":"姓名","isAlive":true,"text":"帖子正文","interactions":[{"actorType":"role或npc","actorId":"互动者ID","action":"like或reply","text":"评论内容；点赞时为空"}]}。不要 Markdown，不要解释。' },
           { role: 'user', content: `论坛世界书规则：\n${rules}\n\n可参与角色：\n${roleContext || '无'}\n\n可参与 NPC：\n${npcContext || '无'}` }
         ] })
       });
@@ -191,19 +214,43 @@
       try { generated = JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0] || raw); } catch { generated = []; }
       if (!Array.isArray(generated)) generated = [];
       const list = getPosts();
+      const usedNpcIds = [];
+      const generatedPosts = [];
       generated.forEach(item => {
         const actorType = item.actorType === 'npc' ? 'npc' : 'role';
         const actor = actorType === 'npc'
-          ? npcs.find(entry => entry.id === item.actorId || entry.name === item.actorName)
+          ? npcCandidates.find(entry => entry.id === item.actorId || entry.name === item.actorName)
           : roles.find(entry => entry.id === (item.actorId || item.roleId) || entry.name === item.actorName || entry.nickname === item.actorName);
         const text = String(item.text || '').trim();
-        const resolvedActor = actor || (actorType === 'npc' && worldbook && item.actorName && item.isAlive === true ? { id:uid('forum-npc'), name:String(item.actorName).trim(), identity:'世界书 NPC', status:'在世' } : null);
+        const resolvedActor = actor;
         if (!resolvedActor || npcIsDeceased(resolvedActor) || !text) return;
+        if (actorType === 'npc') usedNpcIds.push(resolvedActor.id);
         const nickname = resolvedActor.nickname || resolvedActor.name || (actorType === 'npc' ? 'NPC' : '角色');
-        const post = { id: uid('forum-post'), nickname, handle: actorType, avatar: resolvedActor.avatar || '', voiceStyle: resolvedActor.forumVoiceStyle || '', actorProfile:actorType === 'npc' ? npcPersona(resolvedActor) : undefined, text, time: now(), likes: 0, comments: 0, reposts: 0, ownerType: actorType === 'npc' ? 'npc' : 'character', ownerId: resolvedActor.id };
+        const post = { id: uid('forum-post'), nickname, handle: actorType, avatar: resolvedActor.avatar || '', voiceStyle: resolvedActor.forumVoiceStyle || '', actorProfile:actorType === 'npc' ? npcPersona(resolvedActor) : undefined, text, time: now(), likes: 1 + Math.floor(Math.random() * 12), comments: 0, reposts: 0, ownerType: actorType === 'npc' ? 'npc' : 'character', ownerId: resolvedActor.id };
         list.unshift(post);
+        generatedPosts.push({ item, post });
         addNotice({ type: 'role', actor: post.nickname, avatar: post.avatar, title: post.nickname + '发布了新动态', text: post.text, postId: post.id });
       });
+      generatedPosts.forEach(({ item, post }) => {
+        const interactions = Array.isArray(item.interactions) ? item.interactions : [];
+        interactions.slice(0, 2).forEach(interaction => {
+          const actorType = interaction?.actorType === 'npc' ? 'npc' : 'role';
+          const actor = actorType === 'npc'
+            ? npcCandidates.find(entry => entry.id === interaction.actorId || entry.name === interaction.actorName)
+            : roles.find(entry => entry.id === interaction.actorId || entry.name === interaction.actorName || entry.nickname === interaction.actorName);
+          if (!actor || actor.id === post.ownerId || npcIsDeceased(actor)) return;
+          const action = interaction.action === 'reply' ? 'reply' : 'like';
+          const actorName = actor.nickname || actor.name || (actorType === 'npc' ? 'NPC' : '角色');
+          if (action === 'reply') {
+            const replyText = String(interaction.text || '').trim();
+            if (!replyText) return;
+            post.replies = Array.isArray(post.replies) ? post.replies : [];
+            post.replies.push({ id:uid('forum-reply'), nickname:actorName, avatar:actor.avatar || '', text:replyText, time:now(), ownerType:actorType === 'npc' ? 'npc' : 'character', ownerId:actor.id });
+            post.comments = post.replies.length;
+          } else post.likes = Number(post.likes || 0) + 1;
+        });
+      });
+      rememberNpcPosts(usedNpcIds, npcs);
       if (!generated.length || !list.some(post => generated.some(item => post.text === String(item.text || '').trim()))) throw new Error('返回内容不是有效的帖子数组');
       save(feedKey, list);
       activeTab = 'home';
@@ -320,8 +367,8 @@
   function postHtml(post) {
     const liked = post.liked === true;
     const replies = Array.isArray(post.replies) ? post.replies : [];
-    const replyHtml = replies.length ? '<div class="forum-post-replies">' + replies.map(reply => '<article class="' + (reply.replyTo ? 'is-nested' : '') + '"><span class="forum-post-reply-avatar">' + avatar(reply.avatar, reply.nickname) + '</span><p><b>' + esc(reply.nickname || '角色') + '</b>' + (reply.replyToName ? '<small>回复 @' + esc(reply.replyToName) + '</small>' : '') + '<span>' + esc(reply.text || '') + '</span></p></article>').join('') + '</div>' : '';
-    return '<article class="forum-post" data-forum-post="' + esc(post.id) + '"><div class="forum-post-avatar">' + avatar(post.avatar, post.nickname) + '</div><div class="forum-post-body"><header><div><b>' + esc(post.nickname || '论坛用户') + '</b><span>@' + esc(post.handle || 'user') + '</span></div><time>' + esc(post.time || '') + '</time></header><p class="forum-post-text">' + esc(post.text) + '</p>' + (post.voiceStyle ? '<small class="forum-post-style">发言方式：' + esc(post.voiceStyle) + '</small>' : '') + replyHtml + '<footer><button type="button" data-forum-comment aria-label="回复">' + forumIcon('reply') + '<span>' + Number(post.comments || 0) + '</span></button><button type="button" data-forum-repost aria-label="转发">' + forumIcon('repost') + '<span>' + Number(post.reposts || 0) + '</span></button><button class="' + (liked ? 'is-liked' : '') + '" type="button" data-forum-like aria-label="点赞">' + forumIcon('like') + '<span>' + Number(post.likes || 0) + '</span></button><button type="button" data-forum-interact aria-label="生成互动">' + forumIcon('share') + '</button><button type="button" data-forum-delete ' + (canDeletePost(post) ? '' : 'hidden') + '>删除</button></footer></div></article>';
+    const replyHtml = replies.length ? '<div class="forum-post-replies">' + replies.map(reply => '<article class="' + (reply.replyTo ? 'is-nested' : '') + '" data-forum-reply-id="' + esc(reply.id) + '" title="点击回复这条评论"><span class="forum-post-reply-avatar">' + avatar(reply.avatar, reply.nickname) + '</span><p><b>' + esc(reply.nickname || '角色') + '</b>' + (reply.replyToName ? '<small>回复 @' + esc(reply.replyToName) + '</small>' : '') + '<span>' + esc(reply.text || '') + '</span></p></article>').join('') + '</div>' : '';
+    return '<article class="forum-post" data-forum-post="' + esc(post.id) + '"><div class="forum-post-avatar">' + avatar(post.avatar, post.nickname) + '</div><div class="forum-post-body"><header><div><b>' + esc(post.nickname || '论坛用户') + '</b><span>@' + esc(post.handle || 'user') + '</span></div><time>' + esc(post.time || '') + '</time></header><p class="forum-post-text">' + esc(post.text) + '</p>' + (post.voiceStyle ? '<small class="forum-post-style">发言方式：' + esc(post.voiceStyle) + '</small>' : '') + replyHtml + '<footer><button type="button" data-forum-comment aria-label="评论帖子">' + forumIcon('reply') + '<span>' + Number(post.comments || 0) + '</span></button><button type="button" data-forum-repost aria-label="转发">' + forumIcon('repost') + '<span>' + Number(post.reposts || 0) + '</span></button><button class="' + (liked ? 'is-liked' : '') + '" type="button" data-forum-like aria-label="点赞">' + forumIcon('like') + '<span>' + Number(post.likes || 0) + '</span></button><button type="button" data-forum-interact aria-label="生成互动">' + forumIcon('share') + '</button><button type="button" data-forum-delete ' + (canDeletePost(post) ? '' : 'hidden') + '>删除</button></footer></div></article>';
   }
 
   function openCompose() {
@@ -330,15 +377,19 @@
     sheet.innerHTML = '<div class="forum-sheet-backdrop" data-forum-compose-close></div><section class="forum-compose-card"><header><div><span>NEW POST</span><h2>发布动态</h2></div><button type="button" data-forum-compose-close>×</button></header><div class="forum-compose-author"><div class="forum-post-avatar">' + avatar(current.avatar, current.nickname) + '</div><b>' + esc(current.nickname) + '</b></div><textarea data-forum-text maxlength="500" placeholder="分享此刻的想法…"></textarea><footer><small>最多 500 字</small><button type="button" data-forum-post-submit>发布</button></footer></section>';
     sheet.classList.add('is-open'); sheet.setAttribute('aria-hidden', 'false'); resolveStoredAvatars();
   }
-  function openComment(post) {
+  function openComment(post, reply = null) {
     const sheet = app.querySelector('[data-forum-compose-sheet]');
     const current = getProfile();
     commentTargetId = post.id;
-    sheet.innerHTML = '<div class="forum-sheet-backdrop" data-forum-compose-close></div><section class="forum-compose-card"><header><div><span>NEW COMMENT</span><h2>发表评论</h2></div><button type="button" data-forum-compose-close>×</button></header><div class="forum-compose-author"><div class="forum-post-avatar">' + avatar(current.avatar, current.nickname) + '</div><div><b>' + esc(current.nickname) + '</b><small> 回复 ' + esc(post.nickname || '论坛用户') + '</small></div></div><textarea data-forum-comment-text maxlength="500" placeholder="写下你的评论…"></textarea><footer><small>最多 500 字</small><button type="button" data-forum-comment-submit>发表</button></footer></section>';
+    commentReplyTargetId = reply?.id || '';
+    const title = reply ? '回复评论' : '发表评论';
+    const targetCopy = reply ? '回复 @' + (reply.nickname || '评论者') : '评论 ' + (post.nickname || '论坛用户');
+    const placeholder = reply ? '写下对这条评论的回复…' : '写下你的评论…';
+    sheet.innerHTML = '<div class="forum-sheet-backdrop" data-forum-compose-close></div><section class="forum-compose-card"><header><div><span>NEW COMMENT</span><h2>' + title + '</h2></div><button type="button" data-forum-compose-close>×</button></header><div class="forum-compose-author"><div class="forum-post-avatar">' + avatar(current.avatar, current.nickname) + '</div><div><b>' + esc(current.nickname) + '</b><small>' + esc(targetCopy) + '</small></div></div><textarea data-forum-comment-text maxlength="500" placeholder="' + placeholder + '"></textarea><footer><small>最多 500 字</small><button type="button" data-forum-comment-submit>发表</button></footer></section>';
     sheet.classList.add('is-open'); sheet.setAttribute('aria-hidden', 'false'); resolveStoredAvatars();
     requestAnimationFrame(() => sheet.querySelector('[data-forum-comment-text]')?.focus());
   }
-  function closeCompose() { const sheet = app.querySelector('[data-forum-compose-sheet]'); sheet.classList.remove('is-open'); sheet.setAttribute('aria-hidden', 'true'); sheet.innerHTML = ''; commentTargetId = ''; }
+  function closeCompose() { const sheet = app.querySelector('[data-forum-compose-sheet]'); sheet.classList.remove('is-open'); sheet.setAttribute('aria-hidden', 'true'); sheet.innerHTML = ''; commentTargetId = ''; commentReplyTargetId = ''; }
 
   function openProfile() {
     const current = getProfile();
@@ -397,13 +448,17 @@
       if (!item) { closeCompose(); return window.alert('这条帖子已经不存在。'); }
       const current = getProfile();
       item.replies = Array.isArray(item.replies) ? item.replies : [];
-      item.replies.push({ id:uid('forum-reply'), nickname:current.nickname, avatar:current.avatar, text, time:now(), ownerType:'user', owner:current.nickname });
+      const parent = commentReplyTargetId ? item.replies.find(reply => reply.id === commentReplyTargetId) : null;
+      if (commentReplyTargetId && !parent) { closeCompose(); return window.alert('这条评论已经不存在。'); }
+      item.replies.push({ id:uid('forum-reply'), nickname:current.nickname, avatar:current.avatar, text, time:now(), replyTo:parent?.id || '', replyToName:parent?.nickname || '', ownerType:'user', owner:current.nickname });
       item.comments = item.replies.length;
       save(feedKey, list); closeCompose(); render(); return;
     }
     const post = event.target.closest('[data-forum-post]'); if (!post) return;
     const list = getPosts(); const item = list.find(entry => entry.id === post.dataset.forumPost); if (!item) return;
     if (event.target.closest('[data-forum-like]')) { item.liked = !item.liked; item.likes = Math.max(0, Number(item.likes || 0) + (item.liked ? 1 : -1)); save(feedKey, list); render(); return; }
+    const replyTarget = event.target.closest('[data-forum-reply-id]');
+    if (replyTarget) { const reply = (Array.isArray(item.replies) ? item.replies : []).find(entry => entry.id === replyTarget.dataset.forumReplyId); if (reply) openComment(item, reply); return; }
     if (event.target.closest('[data-forum-comment]')) { openComment(item); return; }
     if (event.target.closest('[data-forum-repost]')) { item.reposts = Number(item.reposts || 0) + 1; save(feedKey, list); render(); return; }
     if (event.target.closest('[data-forum-interact]')) { generatePostInteraction(item); return; }
