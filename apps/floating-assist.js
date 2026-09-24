@@ -158,6 +158,44 @@
     return { inputTokens, outputTokens, totalTokens };
   }
 
+  const httpReason = status => ({
+    400:'请求内容或参数格式不符合接口要求',
+    401:'API 密钥无效、已过期，或没有完成身份验证',
+    403:'当前 API 密钥或账号没有访问该模型/功能的权限',
+    404:'接口地址、模型名称或请求的资源不存在',
+    408:'接口等待请求超时',
+    409:'请求与服务端当前状态冲突',
+    413:'发送的正文、图片或上下文超过接口大小限制',
+    422:'请求格式正确，但参数内容无法被接口处理',
+    429:'请求过于频繁、并发过高，或账号额度/余额已经用完',
+    500:'API 服务内部发生错误',
+    502:'API 网关没有收到上游模型服务的有效响应',
+    503:'API 服务暂时不可用，可能正在维护、过载或上游模型离线',
+    504:'API 网关等待上游模型响应超时'
+  }[Number(status)] || 'API 返回了失败状态');
+
+  function responseErrorText(payload) {
+    if (payload == null) return '';
+    if (typeof payload === 'string') return payload.trim();
+    const error = payload.error;
+    const candidates = [
+      typeof error === 'string' ? error : '', error?.message, error?.detail, error?.error,
+      payload.message, payload.detail, payload.reason, payload.error_description
+    ];
+    const message = candidates.find(value => typeof value === 'string' && value.trim());
+    const metadata = [error?.type || payload.type, error?.code || payload.code].filter(Boolean).map(String);
+    return [message, metadata.length ? `类型/代码：${metadata.join(' / ')}` : ''].filter(Boolean).join('\n');
+  }
+
+  async function readResponseError(response) {
+    try {
+      const text = (await response.clone().text()).trim();
+      if (!text) return '';
+      try { return responseErrorText(JSON.parse(text)); }
+      catch { return text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); }
+    } catch { return ''; }
+  }
+
   function addError(reason, source = '系统', extra = {}) {
     const message = cleanText(reason?.message || reason || '未知错误');
     if (!message || /AbortError|页面已关闭/i.test(message)) return;
@@ -206,7 +244,12 @@
         const response = await originalRequest(input, init);
         const call = { id:`call-${started}-${Math.random().toString(36).slice(2,7)}`, time:started, scope, purpose, model, isModelCall, host, status:response.status, ok:response.ok, duration:Date.now()-started, tokens:0, inputTokens:0, outputTokens:0 };
         calls.unshift(call); calls = calls.slice(0, 100); writeJson(callsKey, calls); renderSettingsPanels();
-        if (!response.ok) addError(`HTTP ${response.status} ${response.statusText || '请求失败'}`, purpose, { detail:host });
+        if (!response.ok) {
+          const providerReason = await readResponseError(response);
+          const summary = `HTTP ${response.status}：${httpReason(response.status)}`;
+          const detail = [`接口返回：${providerReason || '没有提供更具体的错误正文'}`, `服务：${host}`].join('\n');
+          addError(summary, purpose, { detail });
+        }
         try { response.clone().json().then(data => { const usage = usageParts(data?.usage || data?.data?.usage || {}); if (usage.totalTokens || usage.inputTokens || usage.outputTokens) { call.tokens = usage.totalTokens; call.inputTokens = usage.inputTokens; call.outputTokens = usage.outputTokens; writeJson(callsKey, calls); renderSettingsPanels(); renderPanel(); } }).catch(() => {}); } catch {}
         return response;
       } catch (error) {
