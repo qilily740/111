@@ -1486,6 +1486,15 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .debate-room-topic > span { color:#aaa; font-size:9px; letter-spacing:.15em; }
 .debate-room-topic h2 { margin-top:8px; font-size:19px; line-height:1.5; }
 .debate-room-sides { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:16px; }
+.debate-generating-status { display:flex; align-items:center; gap:10px; margin-top:12px; padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:15px; background:rgba(255,255,255,.72); box-shadow:0 5px 16px rgba(0,0,0,.04); }
+.debate-generating-status > i { flex:0 0 16px; width:16px; height:16px; border:2px solid rgba(0,0,0,.15); border-top-color:#555; border-radius:50%; animation:debate-spin .8s linear infinite; }
+.debate-generating-status.is-error { border-color:rgba(155,80,65,.22); background:rgba(255,247,244,.8); }
+.debate-generating-status.is-error > i { display:grid; place-items:center; border:0; background:#a66b60; color:#fff; font-size:10px; font-style:normal; animation:none; }
+.debate-generating-status.is-error small { color:#956c65; }
+.debate-generating-status > div { display:grid; gap:3px; min-width:0; }
+.debate-generating-status b { font-size:11px; }
+.debate-generating-status small { color:#999; font-size:9px; line-height:1.45; }
+@keyframes debate-spin { to { transform:rotate(360deg); } }
 .debate-room-side { display:grid; gap:5px; min-width:0; padding:11px 12px; border-radius:14px; background:#eeece9; }
 .debate-room-side.is-negative { background:#f0e8e6; }
 .debate-room-side b { overflow:hidden; color:#444; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
