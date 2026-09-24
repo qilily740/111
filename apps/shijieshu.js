@@ -337,7 +337,7 @@ ${entries || '暂无启用条目'}`;
       syncNpcContacts(book, result, roles);
     } catch (error) {
       const aborted = error?.name === 'AbortError' || /aborted|abort/i.test(String(error?.message || ''));
-      analysisResult = { error:aborted ? '分析请求被中断。请保持页面开启后重新分析；现在最长会等待 3 分钟。' : `分析失败：${error.message}` };
+      analysisResult = { error:aborted ? '分析请求被中断。切换理想机内的 App 不会中断请求；如果刷新或离开网页，请重新分析。' : `分析失败：${error.message}` };
     }
     analysisBusy = false; render();
   }

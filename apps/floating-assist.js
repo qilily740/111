@@ -408,17 +408,52 @@
   }
 
   let drag = null;
-  orb.addEventListener('pointerdown', event => { drag = { id:event.pointerId, x:event.clientX, y:event.clientY, moved:false }; orb.setPointerCapture(event.pointerId); root.classList.add('is-active'); });
+  orb.addEventListener('pointerdown', event => {
+    const rect = orb.getBoundingClientRect();
+    // 拖动过程中允许圆球跟随手指移动；松手时再吸附到最近的左右边缘。
+    orb.style.left = `${rect.left}px`;
+    orb.style.right = 'auto';
+    drag = { id:event.pointerId, x:event.clientX, y:event.clientY, offsetX:event.clientX-rect.left, offsetY:event.clientY-rect.top, moved:false };
+    orb.setPointerCapture(event.pointerId);
+    root.classList.add('is-active');
+  });
   orb.addEventListener('pointermove', event => {
     if (!drag || drag.id !== event.pointerId) return;
     if (Math.hypot(event.clientX-drag.x,event.clientY-drag.y) > 5) drag.moved = true;
-    if (drag.moved) { const size = orb.offsetWidth; settings.y = Math.max(12, Math.min(innerHeight-size-12,event.clientY-size/2))/innerHeight; root.style.setProperty('--assist-y', `${settings.y*innerHeight}px`); }
+    if (drag.moved) {
+      const size = orb.offsetWidth;
+      const x = Math.max(7, Math.min(innerWidth-size-7, event.clientX-drag.offsetX));
+      const y = Math.max(12, Math.min(innerHeight-size-12, event.clientY-drag.offsetY));
+      orb.style.left = `${x}px`;
+      orb.style.right = 'auto';
+      root.style.setProperty('--assist-y', `${y}px`);
+      settings.y = y / innerHeight;
+    }
   });
   orb.addEventListener('pointerup', event => {
     if (!drag || drag.id !== event.pointerId) return;
     const moved = drag.moved; drag = null; root.classList.remove('is-active');
-    if (moved) { settings.side = event.clientX < innerWidth/2 ? 'left' : 'right'; writeJson(settingsKey, settings); applySettings(); }
-    else root.classList.contains('is-open') ? dismissPanel() : openPanel();
+    if (moved) {
+      settings.side = event.clientX < innerWidth/2 ? 'left' : 'right';
+      orb.style.left = '';
+      orb.style.right = '';
+      writeJson(settingsKey, settings);
+      applySettings();
+    }
+    else {
+      orb.style.left = '';
+      orb.style.right = '';
+      positionOrb();
+      root.classList.contains('is-open') ? dismissPanel() : openPanel();
+    }
+  });
+  orb.addEventListener('pointercancel', event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    drag = null;
+    root.classList.remove('is-active');
+    orb.style.left = '';
+    orb.style.right = '';
+    positionOrb();
   });
   panel.addEventListener('click', event => {
     const copyErrorButton = event.target.closest('[data-assist-copy-error]');

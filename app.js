@@ -158,9 +158,9 @@
   };
   window.fetch = (input, init = {}) => window.IdealMachineFetch(input, init);
   window.addEventListener('pagehide', () => window.IdealMachineCancelAllRequests());
-  document.addEventListener('click', event => {
-    if (event.target.closest?.('[data-app-key]')) window.IdealMachineCancelAllRequests({ preserveScopes: ['chat', 'chat-background', 'chat-moments-background', 'chat-thought', 'chat-video-call', 'chat-video-call-summary', 'worldbook', 'ta', 'debate'] });
-  }, true);
+  // 切换理想机内的 App 只会隐藏当前界面，不应中断正在生成的 API。
+  // 请求会继续完成并把结果写回对应 App 的本地数据；真正离开/刷新页面时
+  // 仍由 pagehide 统一取消，避免浏览器页面销毁后留下悬挂请求。
   const assetDBPromise = typeof indexedDB === 'undefined' ? Promise.resolve(null) : new Promise(resolve => { const request = indexedDB.open('ideal-machine-assets', 1); request.onupgradeneeded = () => request.result.createObjectStore('images'); request.onsuccess = () => resolve(request.result); request.onerror = () => resolve(null); });
   function putImageAsset(value) { return assetDBPromise.then(db => new Promise(resolve => { if (!db) return resolve(value); const id = 'idb:image:' + Date.now() + ':' + Math.random().toString(36).slice(2); const transaction = db.transaction('images', 'readwrite'); transaction.objectStore('images').put(String(value || ''), id); transaction.oncomplete = () => resolve(id); transaction.onerror = () => resolve(value); })); }
   function getImageAsset(value) { if (!String(value || '').startsWith('idb:image:')) return Promise.resolve(value); return assetDBPromise.then(db => new Promise(resolve => { if (!db) return resolve(''); const request = db.transaction('images').objectStore('images').get(value); request.onsuccess = () => resolve(request.result || ''); request.onerror = () => resolve(''); })); }
