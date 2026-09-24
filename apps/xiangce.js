@@ -149,7 +149,7 @@
     if (!hasImageHost) throw new Error('尚未配置图床');
     const source = item.url.startsWith('idb:image:') && window.IdealMachineGetImage ? await window.IdealMachineGetImage(item.url) : item.url;
     if (!source) throw new Error('本地图片读取失败');
-    const response = await fetch(source);
+    const response = await fetch(source, { idealScope:'album', idealPurpose:'相册 App－读取待归档图片' });
     const blob = await response.blob();
     const file = new File([blob], item.name || 'image', { type:blob.type || item.type || 'image/png' });
     const url = await uploadToImageHost(file);

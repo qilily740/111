@@ -131,7 +131,7 @@
     }
     const headers = { 'Content-Type': 'application/json' };
     if (config.key) headers.Authorization = `Bearer ${config.key}`;
-    const response = await fetch(endpoint, { idealScope: purpose === 'chat' ? 'chat-background' : 'image', method: 'POST', headers, body: JSON.stringify(body) });
+    const response = await fetch(endpoint, { idealScope:purpose === 'chat' ? 'chat-image-generation' : 'image', idealPurpose:purpose === 'chat' ? '聊天 App－生成聊天图片' : '生图 App－生成图片', method:'POST', headers, body:JSON.stringify(body) });
     if (!response.ok) {
       let detail = '';
       try {
@@ -254,7 +254,7 @@
     try {
       const headers = {};
       if (config.key) headers.Authorization = `Bearer ${config.key}`;
-      const response = await fetch(endpoint, { headers });
+      const response = await fetch(endpoint, { idealScope:'image', idealPurpose:'生图 App－下载生成结果', headers });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
       const rows = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.models) ? payload.models : [];

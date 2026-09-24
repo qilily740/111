@@ -87,6 +87,30 @@
       .replace(/\bundefined\b/g, 'null').replace(/\bNaN\b/g, 'null')
       .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, body) => JSON.stringify(body.replace(/\\'/g, "'")));
   }
+  function repairTruncatedJSONSource(source) {
+    const firstObject = String(source || '').search(/[\[{]/);
+    if (firstObject < 0) return '';
+    let repaired = String(source).slice(firstObject).replace(/```[\s\S]*$/g, '').trim();
+    const stack = []; let quoted = false; let escaped = false;
+    for (const char of repaired) {
+      if (escaped) { escaped = false; continue; }
+      if (char === '\\' && quoted) { escaped = true; continue; }
+      if (char === '"') { quoted = !quoted; continue; }
+      if (quoted) continue;
+      if (char === '{' || char === '[') stack.push(char);
+      else if (char === '}' || char === ']') {
+        const expected = char === '}' ? '{' : '[';
+        if (stack[stack.length - 1] === expected) stack.pop();
+      }
+    }
+    if (!stack.length && !quoted) return repaired;
+    if (escaped) repaired = repaired.slice(0, -1);
+    if (quoted) repaired += '"';
+    repaired = repaired.replace(/,\s*$/, '');
+    if (/:\s*$/.test(repaired)) repaired += 'null';
+    while (stack.length) repaired += stack.pop() === '{' ? '}' : ']';
+    return repaired;
+  }
   function unwrapAnalysisValue(value, depth = 0) {
     if (depth > 3 || value == null) return value;
     if (typeof value === 'string') {
@@ -116,7 +140,7 @@
   function normalizeAnalysisShape(value) {
     const source = unwrapAnalysisValue(value);
     if (!source || typeof source !== 'object' || Array.isArray(source)) throw new Error('API 返回的分析格式不正确，请重新分析');
-    const worldSource = source.world || source.worldBackground || source.background || source.setting || source['世界背景'] || {};
+    const worldSource = source.world || source.worldBackground || source.background || source.setting || source['世界背景'] || source['世界观'] || source['世界设定'] || {};
     const world = typeof worldSource === 'string' ? { summary:worldSource } : { ...(worldSource || {}) };
     world.title = textValue(world.title || world.name || source.title || source['世界名称']);
     world.summary = textValue(world.summary || world.overview || world.description || world.content || source.summary || source['背景概括']);
@@ -126,9 +150,9 @@
     const asItems = value => Array.isArray(value) ? value : (value && typeof value === 'object' ? Object.entries(value).map(([key, item]) => ({ ...(item && typeof item === 'object' ? item : { description:item }), name:(item && typeof item === 'object' && item.name) || key })) : (value == null ? [] : [value]));
     const list = value => asItems(value).map(item => typeof item === 'object' ? textValue(item.text ?? item.description ?? item.content ?? item.name ?? item.title) : textValue(item)).filter(Boolean);
     world.rules = list(world.rules || world.laws || world.worldRules || source.rules || source['世界规则']);
-    const npcs = source.npcs || source.characters || source.people || source.cast || source.NPCs || source['人物'] || source['NPC'] || [];
-    const relations = source.relations || source.relationships || source.relationship || source.relationNetwork || source['人物关系'] || source['关系网'] || source['关系'] || [];
-    const conflicts = source.conflicts || source.openQuestions || source.questions || source.issues || source.gaps || source['冲突'] || source['待确认'] || source['问题'] || [];
+    const npcs = source.npcs || source.characters || source.people || source.cast || source.NPCs || source['人物'] || source['人物列表'] || source['角色'] || source['NPC'] || [];
+    const relations = source.relations || source.relationships || source.relationship || source.relationNetwork || source['人物关系'] || source['角色关系'] || source['关系网'] || source['关系'] || [];
+    const conflicts = source.conflicts || source.openQuestions || source.questions || source.issues || source.gaps || source['冲突'] || source['冲突与空白'] || source['待确认'] || source['问题'] || [];
     const normalizedNpcs = asItems(npcs).map(item => {
       if (typeof item === 'string') return { name:item };
       return { ...item, name:textValue(item?.name || item?.姓名 || item?.character || item?.person), identity:textValue(item?.identity || item?.role || item?.occupation || item?.身份), personality:textValue(item?.personality || item?.traits || item?.性格), motivation:textValue(item?.motivation || item?.goal || item?.动机), relationToRole:textValue(item?.relationToRole || item?.relation || item?.relationship || item?.与角色关系) };
@@ -137,7 +161,7 @@
       if (typeof item === 'string') return { description:item };
       return { ...item, source:textValue(item?.source || item?.from || item?.人物A || item?.主体), target:textValue(item?.target || item?.to || item?.人物B || item?.客体), relation:textValue(item?.relation || item?.type || item?.relationship || item?.关系), description:textValue(item?.description || item?.details || item?.说明) };
     }).filter(item => item.source && item.target);
-    const knownShape = source.world || source.worldBackground || source.background || source.setting || source.npcs || source.characters || source.people || source.relations || source.relationships || source.conflicts || source.openQuestions || source['世界背景'] || source['人物'] || source['人物关系'] || source['关系'];
+    const knownShape = source.world || source.worldBackground || source.background || source.setting || source.npcs || source.characters || source.people || source.relations || source.relationships || source.conflicts || source.openQuestions || source['世界背景'] || source['世界观'] || source['世界设定'] || source['人物'] || source['人物列表'] || source['角色'] || source['人物关系'] || source['角色关系'] || source['关系'];
     if (!knownShape) throw new Error('API 返回的分析格式不正确，请重新分析');
     return { ...source, world, npcs:normalizedNpcs, relations:normalizedRelations, conflicts:list(conflicts) };
   }
@@ -146,12 +170,18 @@
     const fenced = clean.match(/```(?:json|JSON)?\s*([\s\S]*?)```/i);
     const sourceText = (fenced ? fenced[1] : clean).trim();
     const candidates = balancedJSONCandidates(sourceText);
-    if (!candidates.length) throw new Error('API 没有返回完整的分析数据');
     for (const source of candidates) {
       try { return normalizeAnalysisShape(JSON.parse(source)); } catch {}
       try { return normalizeAnalysisShape(JSON.parse(looseJSONSource(source))); } catch {}
     }
-    throw new Error('API 返回的分析格式不正确，请重新分析');
+    // 某些模型会在人物或关系数组末尾达到输出上限。已经返回的主体内容仍然
+    // 有效时，在浏览器本地补齐字符串与括号，避免为修复格式再次调用 API。
+    const repaired = repairTruncatedJSONSource(sourceText);
+    if (repaired) {
+      try { return normalizeAnalysisShape(JSON.parse(repaired)); } catch {}
+      try { return normalizeAnalysisShape(JSON.parse(looseJSONSource(repaired))); } catch {}
+    }
+    throw new Error(candidates.length ? 'API 返回的分析格式不正确，请重新分析' : 'API 返回被截断，且现有内容不足以恢复分析结果');
   }
   function relationForRole(result, roleName, npcName) {
     return (Array.isArray(result?.relations) ? result.relations : []).find(item => {
@@ -281,12 +311,26 @@ ${entries || '暂无启用条目'}`;
       const requestAnalysis = async compact => {
         const compactRule = compact ? '\n请一次性完整返回紧凑 JSON：summary 不超过 180 字，rules 最多 8 条，NPC 最多 20 位，conflicts 最多 8 条；不得省略闭合括号。' : '';
         const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', idealScope:'worldbook', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature:compact ? 0.08 : 0.18, max_tokens:compact ? 4500 : 3500, stream:false, messages: [{ role: 'system', content: '你是严谨的世界观档案分析器，只返回完整合法 JSON。' }, { role: 'user', content:prompt + compactRule }] }) });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          let detail = ''; let errorText = '';
+          try { errorText = await response.text(); } catch {}
+          try {
+            const errorPayload = JSON.parse(errorText);
+            detail = textValue(errorPayload?.error?.message || errorPayload?.message || errorText);
+          } catch { detail = errorText.trim(); }
+          throw new Error(`HTTP ${response.status}${detail ? `：${detail.slice(0, 180)}` : ''}`);
+        }
         const payload = await response.json(); const message = payload.choices?.[0]?.message;
         return { raw:message?.content || message?.reasoning_content || payload.output_text || payload.output?.[0]?.content || payload.response || '', finish:payload.choices?.[0]?.finish_reason || '' };
       };
       // 世界书分析只发起一次请求；格式错误直接显示失败，避免“修复格式”再次消耗一次 API。
-      const answer = await requestAnalysis(true); const result = parseAnalysisJSON(answer.raw);
+      const answer = await requestAnalysis(true);
+      let result;
+      try { result = parseAnalysisJSON(answer.raw); }
+      catch (error) {
+        if (answer.finish === 'length') throw new Error(`模型输出达到长度上限；${error.message}`);
+        throw error;
+      }
       result.world ||= {}; result.npcs = Array.isArray(result.npcs) ? result.npcs : []; result.relations = Array.isArray(result.relations) ? result.relations : []; result.conflicts = Array.isArray(result.conflicts) ? result.conflicts : [];
       analysisResult = result;
       const analyses = readJSON(analysisStorageKey, {}); analyses[book.id] = { ...result, analyzedAt:Date.now() }; localStorage.setItem(analysisStorageKey, JSON.stringify(analyses));

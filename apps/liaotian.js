@@ -1927,7 +1927,10 @@ ${roundText}
     const button = event.target.closest?.('[data-chat-reply]');
     if (!button || !app.classList.contains('is-open')) return;
     const input = document.querySelector('#chatInput');
-    if (input && document.activeElement === input) input.blur();
+    // 输入法打开时不要先把焦点交给回复按钮。否则移动端会先关闭键盘，
+    // 聚焦态样式随即隐藏按钮，导致第一次点击无法触发回复。
+    // 阻止这次默认聚焦即可保留键盘，随后正常的 click 仍会执行回复。
+    if (input && document.activeElement === input) event.preventDefault();
   }, true);
   window.IdealMachineApps = window.IdealMachineApps || {}; window.IdealMachineApps.liaotian = { name: '聊天' };
   function renderContacts() { const groups = state.contactGroups; const manage = state.contactGroupManageOpen; const contactList = [...state.contacts].sort((first, second) => Number(Boolean(second.pinned)) - Number(Boolean(first.pinned))); const groupPanel = manage ? `<section class="chat-contact-group-panel"><header><div><span class="chat-kicker">MOMENTS GROUPS</span><h2>管理朋友圈分组</h2><p>点击角色头像即可加入或移出分组。分组只用于朋友圈可见范围。</p></div><button data-chat-group-manage type="button">完成</button></header>${groups.length ? groups.map(group => `<div class="chat-group-editor-row"><b>${esc(group.name)}</b><div class="chat-group-contacts-scroll">${state.contacts.length ? state.contacts.map(contact => `<label class="chat-group-contact-choice"><input type="checkbox" data-chat-group-toggle="${esc(group.id)}" data-chat-group-contact="${esc(contact.id)}" ${(contact.groupIds || []).includes(group.id) ? 'checked' : ''}><span>${avatarMarkup(contact, 'chat-group-avatar')}<small>${esc(contact.name || '未命名')}</small></span></label>`).join('') : '<small>还没有联系人</small>'}</div></div>`).join('') : '<p class="chat-group-empty">还没有分组，请先添加一个。</p>'}</section>` : ''; return `<div class="chat-contacts-page"><div class="chat-contacts-fixed-head"><div class="chat-subhead"><div><span>CHARACTERS</span></div><div class="chat-contact-head-actions"><button data-chat-group-add type="button">＋ 添加分组</button><button data-chat-group-manage type="button">${manage ? '完成' : '管理分组'}</button><button data-chat-add-contact type="button">＋ 添加角色</button></div></div><div class="chat-contact-groups"><button data-chat-contact-group="" class="${activeContactGroupId ? '' : 'is-active'}" type="button">全部 <small>${state.contacts.length}</small></button>${groups.map(group => `<button data-chat-contact-group="${esc(group.id)}" class="${activeContactGroupId === group.id ? 'is-active' : ''}" type="button">${esc(group.name)} <small>${state.contacts.filter(contact => (contact.groupIds || []).includes(group.id)).length}</small></button>`).join('')}</div>${groupPanel}</div><div class="chat-contact-list">${contactList.length ? contactList.map(contact => { const contactGroupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; const lastMessage = state.chats?.[contact.id]?.messages?.slice(-1)[0]; const preview = lastMessage?.text || (lastMessage?.type === 'image' ? '[图片]' : '还没有聊天记录'); const pinLabel = contact.pinned ? '取消置顶' : '置顶聊天'; return `<article class="chat-contact-card${contact.pinned ? ' is-pinned' : ''}"><div class="chat-contact-swipe-action"><button class="chat-contact-pin" data-chat-pin-contact="${esc(contact.id)}" type="button" aria-label="${pinLabel}" title="${pinLabel}">↑</button></div><div class="chat-contact-card-content">${avatarMarkup(contact)}<div><b>${esc(contact.nickname || contact.name)} <span class="chat-contact-real-name">${esc(contact.name || '未设置真实姓名')}</span></b><p>${esc(preview)}${contactGroupIds.length ? ` · ${contactGroupIds.map(id => esc(groups.find(group => group.id === id)?.name || '')).filter(Boolean).join('、')}` : ''}</p></div><div class="chat-contact-actions"><button data-chat-open="${contact.id}" type="button">聊天</button><button data-chat-edit-contact="${contact.id}" type="button">编辑</button><button data-chat-delete-contact="${contact.id}" type="button">删除</button></div></div></article>`; }).join('') : '<div class="chat-empty small"><div class="chat-empty-mark">◎</div><h2>还没有角色</h2><p>添加角色后，就可以为每段关系绑定不同的用户设定。</p></div>'}</div></div>`; }
@@ -3816,7 +3819,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       else {
         const imageMessage = { id: uid('message'), text: result.assetId, role: 'character', type: 'image', generated: true, generatedPrompt: prompt, time: time() };
         const contactId = contact?.id || Object.keys(state.chats || {}).find(id => state.chats[id] === targetChat) || '';
-        const viewingTargetChat = app.classList.contains('is-open') && chatAppIsForeground() && activeTab === 'chat' && activeContact === contactId;
+        const viewingTargetChat = isViewingChat(contactId);
         if (!viewingTargetChat) imageMessage.unread = true;
         targetChat.messages.push(imageMessage);
       }
@@ -4245,6 +4248,11 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const topElement = document.elementFromPoint(Math.max(1, window.innerWidth / 2), Math.max(1, window.innerHeight / 2));
     return topElement === app || Boolean(topElement && app.contains(topElement));
   }
+  function isViewingChat(contactId) {
+    return Boolean(contactId && app.classList.contains('is-open') && activeTab === 'chat' && activeContact === contactId && chatAppIsForeground());
+  }
+  window.IdealMachineChatView ||= {};
+  window.IdealMachineChatView.isViewing = isViewingChat;
   addMessage = async function(text, role = 'user', type = '', meta = {}) {
     const targetContactId = role === 'character' && backgroundReplyContactId ? backgroundReplyContactId : activeContact;
     const targetContact = state.contacts.find(item => item.id === targetContactId);
@@ -5790,7 +5798,7 @@ ${recentConversation}
     render();
     try {
       const request = window.IdealMachineFetch || window.fetch.bind(window);
-      const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'chat-background', timeout:45000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:1800, stream:false, messages:[{ role:'system', content:'你是朋友圈可见性与互动调度器。先执行可见范围过滤，再控制互动数量。只输出合法 JSON 数组。' }, { role:'user', content:prompt }] }) });
+      const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'chat-moments-background', timeout:45000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:1800, stream:false, messages:[{ role:'system', content:'你是朋友圈可见性与互动调度器。先执行可见范围过滤，再控制互动数量。只输出合法 JSON 数组。' }, { role:'user', content:prompt }] }) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       let results = parseMomentInteractionResults(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim());
@@ -5925,10 +5933,11 @@ ${recentConversation}
     chunks = mergeUnsafeCharacterChunks(chunks).map(cleanCharacterReplyText).filter(Boolean);
     for (const chunk of chunks) {
       if (!state.chats?.[contactId] || !state.contacts.some(item => item.id === contactId)) break;
-      const message = { id: uid('message'), text: cleanCharacterReplyText(chunk), role: 'character', type: '', time: time(), unread: activeContact !== contactId || !chatAppIsForeground() };
+      const viewingTargetChat = isViewingChat(contactId);
+      const message = { id: uid('message'), text: cleanCharacterReplyText(chunk), role: 'character', type: '', time: time(), unread: !viewingTargetChat };
       chat.messages.push(message);
       save();
-      if (!chatAppIsForeground() || activeContact !== contactId) {
+      if (!viewingTargetChat) {
         window.IdealMachineNotifications?.show?.({ contactId, name:contact?.nickname || contact?.name || '角色', avatar:contact?.avatar || '', message:message.text, messageId:message.id });
       }
       if (activeContact === contactId && app.classList.contains('is-open')) render();

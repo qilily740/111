@@ -62,38 +62,92 @@
   let settingsPanelView = 'api';
 
   function callPurpose(scope, rawUrl = '', init = {}) {
+    const explicitPurpose = cleanText(init?.idealPurpose || '');
+    if (explicitPurpose) return explicitPurpose;
+    const body = String(init?.body || '');
+    const match = (...patterns) => patterns.some(pattern => pattern.test(body));
+    if (scope === 'shared') {
+      if (/\/activation\/verify/.test(rawUrl)) return '系统 App－验证功能激活码';
+      if (/\/embeddings(?:\?|$)/.test(rawUrl)) return match(/连接测试|测试向量/) ? '设置 App－测试向量模型连接' : '记忆库 App－生成记忆语义向量';
+      if (/\/models(?:\?|$)/.test(rawUrl)) return '设置 App－读取 API 模型列表';
+      if (/\/config(?:\?|$)/.test(rawUrl)) return '设置 App－读取系统通知配置';
+      if (/\/subscribe(?:\?|$)/.test(rawUrl)) return '设置 App－订阅系统通知';
+      if (/archive\.org\/metadata/.test(rawUrl)) return '音乐 App－读取公共音乐目录';
+      if (/api\.audius\.co\/v1\/search/.test(rawUrl)) return '音乐 App－搜索 Audius 歌曲';
+      if (match(/同人文开篇|创作同人文开篇/)) return '同人文 App－创作故事开篇';
+      if (match(/续写下一章|沿用以下故事设定续写/)) return '同人文 App－续写下一章';
+      if (match(/重新创作下面这篇同人文|章节重写/)) return '同人文 App－重新生成章节';
+      if (match(/记忆压缩|核心记忆|长期记忆/)) return '记忆库 App－整理聊天摘要与核心记忆';
+      if (match(/平行时空|本时空生成预设/)) return 'if 时空 App－生成时空故事回复';
+      if (match(/角色日程生成器|CALENDAR｜/)) return 'Ta App－生成角色日程';
+      if (match(/顶号功能|Takeover Sender|takeoverMessages/)) return 'Ta App－生成角色顶号消息';
+      if (match(/查手机|查岗|SECRET CHECK/)) return 'Ta App－生成角色查手机剧情';
+      if (match(/豆包/)) return '豆包 App－生成聊天回复';
+      if (/^data:|^blob:|^idb:image:/.test(rawUrl)) return '相册 App－读取本地图片';
+      if (/\.(?:png|jpe?g|webp|gif)(?:\?|$)/i.test(rawUrl)) return '相册 App－导入网络图片';
+    }
     const labels = {
       chat:'聊天 App－生成角色回复、心声与音乐选择',
-      'chat-background':'聊天 App－后台生成角色回复、心声与音乐选择',
+      'chat-background':'聊天 App－后台生成角色回复',
+      'chat-moments-background':'聊天 App－后台生成朋友圈互动',
       'chat-thought':'聊天 App－单独补生成或重写角色心声',
       'chat-offline':'聊天 App－生成线下见面回复',
       'chat-video-call':'聊天 App－生成视频通话回复',
       'chat-video-call-summary':'聊天 App－整理视频通话总结',
+      'chat-image-generation':'聊天 App－生成聊天图片',
       'chat-music':'聊天 App－搜索并核验角色要分享的歌曲',
       'chat-music-play':'聊天 App－获取已分享歌曲的播放地址',
       debate:'辩论 App－生成辩论内容', ta:'Ta App－生成角色手机内容',
-      shopping:'购物 App－生成商品或陪逛内容', couple:'情侣空间－生成互动内容',
+      shopping:'购物 App－生成商品或陪逛内容', couple:'情侣空间 App－生成互动内容',
       ifshikong:'if 时空 App－生成平行时空内容',
       image:'生图 App－生成图片', album:'相册 App－处理图片',
-      vector:'记忆库－生成语义向量', 'magazine-background':'杂志社－生成杂志内容', worldbook:'世界书 App－AI 分析世界书',
+      vector:'记忆库 App－生成语义向量', 'magazine-background':'杂志社 App－生成杂志内容', worldbook:'世界书 App－AI 分析世界书',
       notifications:'设置 App－连接通知服务',
       forum:'论坛 App－生成论坛内容',
       'forum-interaction':'论坛 App－生成论坛帖子互动',
       'forum-discover':'论坛 App－生成发现页推荐'
     };
-    if (scope === 'music') return /\/song\//.test(rawUrl) ? '聊天 App－获取手动分享歌曲的播放地址' : '聊天 App－手动搜索要分享的歌曲';
+    if (scope === 'music') {
+      if (/\/song\//.test(rawUrl)) return '音乐 App－获取歌曲播放地址';
+      if (/\/search/.test(rawUrl)) return '音乐 App－搜索歌曲';
+      if (/\/lyric/.test(rawUrl)) return '音乐 App－同步歌词';
+      if (/\/user\/sync/.test(rawUrl)) return '音乐 App－同步网易云账号与歌单';
+      if (/\/auth\/qr/.test(rawUrl)) return '音乐 App－网易云扫码登录';
+      if (/\/auth\/logout/.test(rawUrl)) return '音乐 App－退出网易云账号';
+      return '音乐 App－连接音乐服务';
+    }
+    if (scope === 'notifications') return /\/subscribe(?:\?|$)/.test(rawUrl) ? '设置 App－订阅系统通知' : '设置 App－读取系统通知配置';
     if (scope === 'chat') {
-      const body = String(init?.body || '');
       if (/一起看书|阅读面板/.test(body)) return '聊天 App－生成一起看书讨论回复';
       if (/群聊|群成员|多人对话/.test(body)) return '聊天 App－生成群聊角色回复';
-      if (/朋友圈|动态/.test(body)) return '聊天 App－生成朋友圈内容或互动';
       return labels.chat;
     }
-    if (scope === 'chat-background') {
-      const body = String(init?.body || '');
-      if (/朋友圈|互动调度器|目标动态/.test(body)) return '聊天 App－后台生成朋友圈互动';
-      return labels['chat-background'];
+    if (scope === 'shopping') {
+      if (match(/即时外卖平台的搜索结果生成器/)) return '购物 App－搜索外卖';
+      if (match(/即时外卖平台的推荐策划/)) return '购物 App－随机推荐外卖';
+      if (match(/购物搜索商品生成器/)) return '购物 App－搜索商品';
+      if (match(/随机推荐策划/)) return '购物 App－随机推荐商品';
+      if (match(/购物推荐商品策划/)) return '购物 App－按角色喜好推荐商品';
+      if (match(/以角色身份送礼/)) return '购物 App－生成角色赠礼留言';
     }
+    if (scope === 'ta') {
+      if (match(/角色日程生成器|CALENDAR｜/)) return 'Ta App－生成角色日程';
+      if (match(/顶号功能|Takeover Sender|takeoverMessages/)) return 'Ta App－生成角色顶号消息';
+      if (match(/查手机|查岗|SECRET CHECK/)) return 'Ta App－生成角色查手机剧情';
+      if (match(/手机内容|手机页面|应用内容/)) return 'Ta App－生成角色手机内容';
+    }
+    if (scope === 'couple') {
+      if (match(/情书|信件/)) return '情侣空间 App－生成情书内容';
+      if (match(/愿望|心愿/)) return '情侣空间 App－生成心愿互动';
+      if (match(/纪念日/)) return '情侣空间 App－生成纪念日互动';
+      return '情侣空间 App－生成情侣互动回复';
+    }
+    if (scope === 'debate') {
+      if (match(/辩题|随机题目/)) return '辩论 App－生成辩题';
+      if (match(/裁判|判定|胜负/)) return '辩论 App－生成裁判结果';
+      return '辩论 App－生成本轮辩论发言';
+    }
+    if (scope === 'ifshikong') return match(/创建|开篇|世界前提/) ? 'if 时空 App－创建平行时空' : 'if 时空 App－生成时空故事回复';
     return labels[scope] || `${scope || '系统'}－调用服务`;
   }
 
