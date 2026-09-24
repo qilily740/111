@@ -228,6 +228,19 @@
     return group;
   }
 
+  function markRead(roleId, groupId) {
+    const groups = list(roleId);
+    const group = groups.find(item => item.id === groupId);
+    if (!group) return false;
+    let changed = false;
+    group.messages.forEach(message => {
+      if (message.unread === true) { message.unread = false; changed = true; }
+    });
+    // 由聊天页随后同步桌面状态，避免在 render() 期间触发递归通知事件。
+    if (changed) save(roleId, groups, { sync:false, notify:false });
+    return changed;
+  }
+
   function join(roleId, groupId, profile = {}) {
     const groups = list(roleId);
     const group = groups.find(item => item.id === groupId);
@@ -262,6 +275,6 @@
     return group;
   }
 
-  window.IdealMachineTaGroups = { storageKey, maxGroups, list, save, upsert, appendMessage, replaceMessages, join, leave, syncToDesktop, syncRole, normalizeGroup, normalizeMessage };
+  window.IdealMachineTaGroups = { storageKey, maxGroups, list, save, upsert, appendMessage, replaceMessages, markRead, join, leave, syncToDesktop, syncRole, normalizeGroup, normalizeMessage };
   Object.keys(readAll()).forEach(syncRole);
 })();
