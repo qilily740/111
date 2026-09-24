@@ -5746,6 +5746,11 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
   transform:none !important;
 }
 
+/* 键盘抬起时输入区会向上平移，消息列表要预留同等空间，避免最后一条气泡被输入区覆盖。 */
+.chat-app.is-chatting .chat-conversation > .chat-messages.is-keyboard-avoiding {
+  padding-bottom:calc(var(--chat-keyboard-bottom-space, 0px) + 17px) !important;
+}
+
 /* 世界书条目正文占满卡片宽度，编辑/删除操作单独放在正文下方。 */
 .worldbook-entry { display: block; }
 .worldbook-entry > .worldbook-entry-copy { width: 100%; max-width: none; }
