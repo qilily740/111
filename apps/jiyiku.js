@@ -18,6 +18,8 @@
   let memoryPressStart = null;
   let memorySuppressClick = false;
   const selectedMemoryIds = new Set();
+  const memoryScrollPositions = new Map();
+  let memoryHomeScrollTop = 0;
   const themeKey = 'ideal-machine-memory-theme';
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
@@ -156,9 +158,49 @@
     return `<section class="memory-page"><header class="memory-subheader"><button type="button" data-memory-role-back>${icon('back')}</button><div><span>${item.type === 'offline' ? 'OFFLINE MEMORY' : 'CHAT MEMORY'}</span><h1>记忆详情</h1></div><button type="button" data-memory-theme-toggle>◐</button><span></span></header>${themePanel()}<main class="memory-main memory-detail"><div class="memory-detail-symbol is-${item.type}">${icon(item.type === 'offline' ? 'offline' : 'spark')}</div><small>${dateText(item.createdAt)} · ${esc(item.roleName || '')}</small><h2>${esc(item.title)}</h2><p>${esc(item.summary)}</p>${item.emotion ? `<section><span>情绪脉络</span><p>${esc(item.emotion)}</p></section>` : ''}${item.keywords?.length ? `<div class="memory-tags">${item.keywords.map(word => `<i>${esc(word)}</i>`).join('')}</div>` : ''}<button class="memory-delete" type="button" data-memory-delete="${esc(item.id)}">删除这段记忆</button></main></section>`;
   }
 
+  function memoryScrollKey() {
+    return `${activeRoleId}|${filter}|${query}`;
+  }
+
+  function captureRoleScroll() {
+    const rolePage = app.querySelector('.memory-role-page');
+    const scrollPage = rolePage?.closest('.memory-page');
+    if (rolePage && scrollPage) memoryScrollPositions.set(memoryScrollKey(), scrollPage.scrollTop);
+  }
+
+  function captureHomeScroll() {
+    const homeHeader = app.querySelector('.memory-page > .memory-header');
+    const scrollPage = homeHeader?.closest('.memory-page');
+    if (scrollPage) memoryHomeScrollTop = scrollPage.scrollTop;
+  }
+
+  function restoreRoleScroll() {
+    if (page !== 'role') return;
+    const savedTop = memoryScrollPositions.get(memoryScrollKey());
+    if (!Number.isFinite(savedTop)) return;
+    requestAnimationFrame(() => {
+      const scrollPage = app.querySelector('.memory-role-page')?.closest('.memory-page');
+      if (scrollPage) scrollPage.scrollTop = savedTop;
+    });
+  }
+
+  function restoreHomeScroll() {
+    if (page !== 'home' || !Number.isFinite(memoryHomeScrollTop)) return;
+    requestAnimationFrame(() => {
+      const homePage = app.querySelector('.memory-page > .memory-header')?.closest('.memory-page');
+      if (homePage) homePage.scrollTop = memoryHomeScrollTop;
+    });
+  }
+
   function render() {
+    // render 会替换整个页面 DOM；先记住角色记忆列表的滚动位置，
+    // 这样从某段记忆详情返回时不会被重置到顶部。
+    captureRoleScroll();
+    captureHomeScroll();
     app.innerHTML = page === 'detail' ? detailPage() : page === 'role' ? rolePage() : home();
     applyTheme();
+    restoreRoleScroll();
+    restoreHomeScroll();
   }
 
   async function refreshMemories() {
