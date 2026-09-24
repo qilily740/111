@@ -78,7 +78,7 @@
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
       const stickerUrls = stickerImageUrls();
-      const items = Array.isArray(saved.items) ? saved.items.filter(item => item?.id && item?.url && !/表情包|聊天表情/.test(String(item.source || '')) && !stickerUrls.has(String(item.url))) : [];
+      const items = Array.isArray(saved.items) ? saved.items.filter(item => item?.id && item?.url && !/表情包|聊天表情|杂志社/.test(String(item.source || '')) && !stickerUrls.has(String(item.url))) : [];
       return { items, migratedExisting:saved.migratedExisting === true };
     } catch { return { items:[], migratedExisting:false }; }
   }
@@ -94,10 +94,6 @@
     state.items = nextItems;
     saveState();
     if (app.classList.contains('is-open')) render();
-  });
-  window.addEventListener('ideal-machine-magazine-updated', () => {
-    const changed = syncStoredImages();
-    if (changed && app.classList.contains('is-open')) render();
   });
   const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
   const uid = () => `album-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -242,22 +238,6 @@
       const matches = value.match(/idb:image:[^"'\\\s,}\]]+/g) || [];
       matches.forEach(url => addImage(url, { source:sourceLabels[key] || '已有数据' }));
     });
-    // Magazine covers may be public URLs or data URLs, so they are not
-    // necessarily discoverable by the generic idb:image scan above.
-    try {
-      const magazine = JSON.parse(localStorage.getItem('ideal-machine-magazine') || '{}');
-      const issues = Array.isArray(magazine.issues) ? magazine.issues : [];
-      issues.forEach(issue => {
-        const cover = issue?.cover?.image;
-        if (!cover) return;
-        addImage(cover, {
-          name:`${issue.title || '杂志'} · 封面`,
-          source:'杂志社',
-          createdAt:Number(issue.updatedAt) || Number(issue.createdAt) || Date.now(),
-          fingerprint:`magazine:${issue.id || cover}`
-        });
-      });
-    } catch {}
     if (changed) state.items.sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
     const needsMigrationMark = state.migratedExisting !== true;
     state.migratedExisting = true;
