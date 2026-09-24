@@ -50,10 +50,10 @@
   calls = calls.map(item => ({
     ...item,
     purpose: /^forum(?:-|$)/.test(String(item?.scope || '')) ? callPurpose(String(item?.scope || 'forum'), '', {}) : item?.purpose,
-    model: item?.model || ((item?.isModelCall || /^(?:chat(?:-|$)|debate$|ta$|ifshikong$|couple$|shopping$|magazine-background$|vector$)/.test(String(item?.scope || ''))) ? (() => { try { return cleanText(window.IdealMachineAPI?.getModel?.(item.scope) || window.IdealMachineAPI?.getModel?.('chat') || assignedModel(item.scope) || ''); } catch { return assignedModel(item.scope); } })() : ''),
+    model: item?.model || ((item?.isModelCall || /^(?:chat(?:-|$)|debate$|ta$|ifshikong$|couple$|shopping$|magazine-background$|worldbook$|vector$)/.test(String(item?.scope || ''))) ? (() => { try { return cleanText(window.IdealMachineAPI?.getModel?.(item.scope) || window.IdealMachineAPI?.getModel?.('chat') || assignedModel(item.scope) || ''); } catch { return assignedModel(item.scope); } })() : ''),
     isModelCall: typeof item?.isModelCall === 'boolean'
       ? item.isModelCall
-      : /^(?:chat(?:-|$)|debate$|ta$|ifshikong$|couple$|shopping$|magazine-background$|vector$)/.test(String(item?.scope || ''))
+      : /^(?:chat(?:-|$)|debate$|ta$|ifshikong$|couple$|shopping$|magazine-background$|worldbook$|vector$)/.test(String(item?.scope || ''))
         && !/^chat-music/.test(String(item?.scope || ''))
   }));
   let activeCalls = 0;
@@ -75,7 +75,7 @@
       shopping:'购物 App－生成商品或陪逛内容', couple:'情侣空间－生成互动内容',
       ifshikong:'if 时空 App－生成平行时空内容',
       image:'生图 App－生成图片', album:'相册 App－处理图片',
-      vector:'记忆库－生成语义向量', 'magazine-background':'杂志社－生成杂志内容',
+      vector:'记忆库－生成语义向量', 'magazine-background':'杂志社－生成杂志内容', worldbook:'世界书 App－AI 分析世界书',
       notifications:'设置 App－连接通知服务',
       forum:'论坛 App－生成论坛内容',
       'forum-interaction':'论坛 App－生成论坛帖子互动',
@@ -169,10 +169,46 @@
 
   const root = document.createElement('div');
   root.className = 'ideal-floating-assist';
-  root.innerHTML = `<section class="ideal-assist-panel" data-assist-panel aria-hidden="true"></section><button class="ideal-assist-orb" data-assist-orb type="button" aria-label="打开悬浮工具"><span class="ideal-assist-orb-inner" aria-hidden="true"></span><i data-assist-badge></i></button>`;
+  root.innerHTML = `<section class="ideal-assist-panel" data-assist-panel aria-hidden="true"></section><button class="ideal-assist-orb" data-assist-orb type="button" aria-label="打开悬浮工具"><span class="ideal-assist-orb-inner" aria-hidden="true"></span><img data-assist-orb-image alt=""><i data-assist-badge></i></button>`;
   document.body.appendChild(root);
   const orb = root.querySelector('[data-assist-orb]');
   const panel = root.querySelector('[data-assist-panel]');
+  let orbImageToken = 0;
+  let orbPreviewToken = 0;
+
+  async function resolveOrbImage(source) {
+    let resolved = String(source || '').trim();
+    if (resolved.startsWith('idb:image:') && window.IdealMachineGetImage) resolved = String(await window.IdealMachineGetImage(resolved).catch(() => '') || '');
+    return resolved;
+  }
+
+  async function applyOrbImage(source) {
+    const token = ++orbImageToken;
+    const image = root.querySelector('[data-assist-orb-image]');
+    const resolved = await resolveOrbImage(source);
+    if (token !== orbImageToken || !image) return;
+    image.src = resolved;
+    root.classList.toggle('has-custom-orb', Boolean(resolved));
+  }
+
+  async function syncOrbPreview(source) {
+    const token = ++orbPreviewToken;
+    const preview = floatingSettingsSection?.querySelector('[data-floating-orb-preview]');
+    const label = floatingSettingsSection?.querySelector('[data-floating-orb-preview-label]');
+    if (!preview || !label) return;
+    const resolved = await resolveOrbImage(source);
+    if (token !== orbPreviewToken) return;
+    preview.src = resolved;
+    preview.hidden = !resolved;
+    label.textContent = resolved ? '自定义样式' : '默认样式';
+  }
+
+  function saveOrbImage(source) {
+    const value = String(source || '').trim();
+    settings = { ...readSettings(), orbImage:value };
+    writeJson(settingsKey, settings);
+    applySettings();
+  }
 
   function applySettings() {
     settings = readSettings();
@@ -181,6 +217,7 @@
     root.dataset.mode = ['pill','grid','rail'].includes(settings.mode) ? settings.mode : 'pill';
     root.style.setProperty('--assist-idle-opacity', String(Math.max(.08, Math.min(.8, Number(settings.idleOpacity) || .18))));
     root.style.setProperty('--assist-size', `${Math.max(40, Math.min(62, Number(settings.size) || 60))}px`);
+    applyOrbImage(settings.orbImage);
     positionOrb(); renderPanel(); updateBadge();
   }
   function positionOrb() {
@@ -196,7 +233,7 @@
   }
   function appButton(key) {
     const item = appCatalog[key]; if (!item) return '';
-    return `<button class="ideal-assist-app" data-assist-app="${key}" type="button"><img src="${item[1]}" alt=""><span>${escapeHtml(item[0])}</span></button>`;
+    return `<button class="ideal-assist-app" data-assist-app="${key}" type="button"><span class="ideal-assist-app-icon"><img src="${item[1]}" alt=""></span><span>${escapeHtml(item[0])}</span></button>`;
   }
   function mainPanel() {
     const selected = (Array.isArray(settings.apps) ? settings.apps : defaults.apps).filter(key => appCatalog[key]).slice(0, 8);
@@ -293,9 +330,10 @@
     const settingsApp = document.querySelector('.settings-app');
     const anchor = settingsApp?.querySelector('.settings-notification-section, .settings-storage-section');
     if (!settingsApp || !anchor || settingsApp.querySelector('.settings-floating-section')) return;
-    anchor.insertAdjacentHTML('beforebegin', `<section class="settings-section settings-floating-section"><div class="settings-section-head"><div><span class="settings-eyebrow">QUICK ACCESS</span><h2>全局悬浮按键</h2><p>在理想机所有页面显示快捷入口、报错与 API 状态。</p></div><span class="settings-status" data-floating-status>已开启</span></div><div class="settings-notification-row"><div><b>显示悬浮按键</b><small>关闭后可随时回到这里重新开启</small></div><label class="settings-notification-switch"><input type="checkbox" data-floating-enabled><i></i></label></div><div class="settings-floating-config" data-floating-config><div class="settings-floating-controls"><label class="settings-floating-mode"><span>面板样式</span><select data-floating-mode><option value="pill">胶囊面板</option><option value="grid">网格面板</option><option value="rail">侧边栏</option></select></label><div class="settings-floating-number-row"><label><span>静止透明度</span><span class="settings-floating-number"><input data-floating-opacity type="number" inputmode="numeric" min="8" max="70" step="1"><i>%</i></span></label><label><span>按键大小</span><span class="settings-floating-number"><input data-floating-size type="number" inputmode="numeric" min="40" max="62" step="1"><i>px</i></span></label></div></div><div class="settings-floating-apps"><b>快捷 App</b><small>最多选择 8 个</small><div>${Object.entries(appCatalog).map(([key,item]) => `<label><input type="checkbox" value="${key}" data-floating-app><img src="${item[1]}" alt=""><span>${escapeHtml(item[0])}</span></label>`).join('')}</div></div></div><div class="settings-floating-disabled-panels" data-floating-disabled-panels><div class="settings-floating-panel-tabs" data-floating-settings-tabs><button type="button" data-floating-settings-view="api">API 调用</button><button type="button" data-floating-settings-view="errors">最近报错</button></div><div class="settings-floating-panel-host" data-floating-settings-panel></div></div></section>`);
+    anchor.insertAdjacentHTML('beforebegin', `<section class="settings-section settings-floating-section"><div class="settings-section-head"><div><span class="settings-eyebrow">QUICK ACCESS</span><h2>全局悬浮按键</h2><p>在理想机所有页面显示快捷入口、报错与 API 状态。</p></div><span class="settings-status" data-floating-status>已开启</span></div><div class="settings-notification-row"><div><b>显示悬浮按键</b><small>关闭后可随时回到这里重新开启</small></div><label class="settings-notification-switch"><input type="checkbox" data-floating-enabled><i></i></label></div><div class="settings-floating-config" data-floating-config><div class="settings-floating-controls"><label class="settings-floating-mode"><span>面板样式</span><select data-floating-mode><option value="pill">胶囊面板</option><option value="grid">网格面板</option><option value="rail">侧边栏</option></select></label><div class="settings-floating-number-row"><label><span>静止透明度</span><span class="settings-floating-number"><input data-floating-opacity type="number" inputmode="numeric" min="8" max="70" step="1"><i>%</i></span></label><label><span>按键大小</span><span class="settings-floating-number"><input data-floating-size type="number" inputmode="numeric" min="40" max="62" step="1"><i>px</i></span></label></div></div><div class="settings-floating-apps"><b>快捷 App</b><small>最多选择 8 个</small><div>${Object.entries(appCatalog).map(([key,item]) => `<label><input type="checkbox" value="${key}" data-floating-app><span class="settings-floating-app-icon"><img src="${item[1]}" alt=""></span><span>${escapeHtml(item[0])}</span></label>`).join('')}</div></div></div><div class="settings-floating-disabled-panels" data-floating-disabled-panels><div class="settings-floating-panel-tabs" data-floating-settings-tabs><button type="button" data-floating-settings-view="api">API 调用</button><button type="button" data-floating-settings-view="errors">最近报错</button></div><div class="settings-floating-panel-host" data-floating-settings-panel></div></div></section>`);
     const floatingSection = settingsApp.querySelector('.settings-floating-section');
     floatingSettingsSection = floatingSection;
+    floatingSection.querySelector('.settings-notification-row')?.insertAdjacentHTML('afterend', `<div class="settings-floating-orb-style"><b>悬浮球样式</b><small>可使用本地图片、图片 URL 或理想机相册中的图片。</small><div class="settings-floating-orb-preview"><img data-floating-orb-preview alt="悬浮球预览"><span data-floating-orb-preview-label>默认样式</span></div><div class="settings-floating-orb-actions"><label>本地图片<input type="file" accept="image/*" data-floating-orb-local></label><button type="button" data-floating-orb-url-open>图片 URL</button><button type="button" data-floating-orb-album>相册 App</button><button type="button" data-floating-orb-reset>恢复默认样式</button></div><div class="settings-floating-orb-url" data-floating-orb-url-panel hidden><input type="url" data-floating-orb-url placeholder="粘贴图片 URL"><button type="button" data-floating-orb-url-save>应用</button></div></div>`);
     const floatingHeader = floatingSection.querySelector('.settings-section-head');
     floatingSection.classList.add('settings-collapsible');
     floatingSection.id = 'settings-floating-section';
@@ -315,6 +353,8 @@
       settingsApp.querySelector('[data-floating-size]').value = settings.size;
       settingsApp.querySelector('[data-floating-status]').textContent = settings.enabled === false ? '已关闭' : '已开启';
       settingsApp.querySelectorAll('[data-floating-app]').forEach(input => input.checked = settings.apps.includes(input.value));
+      settingsApp.querySelector('[data-floating-orb-url]').value = /^https?:\/\//i.test(String(settings.orbImage || '')) ? settings.orbImage : '';
+      syncOrbPreview(settings.orbImage);
       renderSettingsPanels();
     };
     const saveFromControls = event => {
@@ -332,10 +372,32 @@
     settingsApp.addEventListener('click', event => {
       const panelView = event.target.closest('[data-floating-settings-view]');
       if (panelView) { settingsPanelView = panelView.dataset.floatingSettingsView === 'errors' ? 'errors' : 'api'; renderSettingsPanels(); return; }
+      if (event.target.closest('[data-floating-orb-url-open]')) { const panel = settingsApp.querySelector('[data-floating-orb-url-panel]'); if (panel) panel.hidden = !panel.hidden; return; }
+      if (event.target.closest('[data-floating-orb-url-save]')) {
+        const value = settingsApp.querySelector('[data-floating-orb-url]')?.value.trim() || '';
+        if (!/^(?:https?:\/\/|data:image\/)/i.test(value)) return window.alert('请输入有效的图片 URL。');
+        if (/^https?:\/\//i.test(value)) window.IdealMachineAlbum?.archiveUrl?.(value, '悬浮球图标');
+        saveOrbImage(value); return;
+      }
+      if (event.target.closest('[data-floating-orb-album]')) {
+        if (!window.IdealMachineAlbum?.pick) return window.alert('理想机相册 App 还没有准备好。');
+        window.IdealMachineAlbum.pick(value => { if (value) saveOrbImage(value); }); return;
+      }
+      if (event.target.closest('[data-floating-orb-reset]')) { saveOrbImage(''); return; }
       const copyButton = event.target.closest('[data-assist-copy-error]');
       if (copyButton) copyError(copyButton.dataset.assistCopyError, copyButton);
       const clearButton = event.target.closest('[data-assist-clear="errors"]');
       if (clearButton) { errors = []; writeJson(errorsKey, errors); updateBadge(); renderSettingsPanels(); renderPanel(); }
+    });
+    settingsApp.addEventListener('change', event => {
+      const input = event.target.closest('[data-floating-orb-local]');
+      const file = input?.files?.[0];
+      if (!file) return;
+      const read = window.IdealMachineReadImage
+        ? window.IdealMachineReadImage(file, 512, .82)
+        : new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => resolve(''); reader.readAsDataURL(file); });
+      read.then(value => { if (value) saveOrbImage(String(value)); else window.alert('这张图片无法读取，请换一张图片再试。'); });
+      input.value = '';
     });
     document.addEventListener('click', event => { if (event.target.closest('[data-app-key="shezhi"]')) setTimeout(sync); });
     sync();
