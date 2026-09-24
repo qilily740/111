@@ -4935,6 +4935,15 @@ ${recentConversation}
     bar.dataset.chatQuoteBar = '';
     bar.innerHTML = `<div><small>${esc(quoteMessageSpeaker(message))}</small><p>${esc(quoteMessageText(message))}</p></div><button type="button" data-chat-quote-cancel aria-label="取消引用">×</button>`;
     wrap.insertBefore(bar, wrap.querySelector('.chat-compose'));
+    // 引用栏会占用输入区上方的高度，消息列表需要重新贴到底部，
+    // 否则最后一条气泡会停在引用栏后面，被输入区遮住。
+    const scrollLatest = () => {
+      const messages = document.querySelector('#chatMessages');
+      if (messages) messages.scrollTop = messages.scrollHeight;
+    };
+    requestAnimationFrame(scrollLatest);
+    setTimeout(scrollLatest, 80);
+    setTimeout(scrollLatest, 180);
   }
   function chooseChatQuote(id) {
     const message = state.chats?.[activeContact]?.messages.find(item => item.id === id);
