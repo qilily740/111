@@ -19,7 +19,7 @@
 
   const app = document.createElement('div');
   app.className = 'worldbook-app';
-  app.innerHTML = `<div class="worldbook-page"><header class="worldbook-header"><div><div class="worldbook-kicker">KNOWLEDGE SYSTEM</div><h1>世界书</h1><p>将设定、关系与秩序，安静地收纳在一起。</p></div><button class="worldbook-close" data-world-close type="button">×</button></header><nav class="worldbook-tabs" aria-label="世界书分类">${Object.entries(categories).map(([key, label]) => `<button data-world-category="${key}" type="button">${label}</button>`).join('')}</nav><main class="worldbook-main"><section class="worldbook-books"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">LIBRARIES</span><h2 id="worldbookCategoryTitle"></h2></div><button class="worldbook-add-book" data-world-add-book type="button">＋ 新建</button></div><div class="worldbook-book-list" id="worldbookBookList"></div></section><section class="worldbook-entries"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">ENTRIES</span><h2 id="worldbookBookTitle">选择一本世界书</h2></div><div class="worldbook-entry-actions"><button class="worldbook-view-analysis" data-world-view-analysis type="button" hidden>查看世界</button><button class="worldbook-analyze" data-world-analyze type="button">AI 分析</button><button class="worldbook-add-entry" data-world-add-entry type="button">＋ 条目</button></div><small class="worldbook-api-hint" id="worldbookApiHint"></small></div><div class="worldbook-entry-list" id="worldbookEntryList"></div><section class="worldbook-analysis" id="worldbookAnalysis" hidden></section></section></main></div><section class="worldbook-analysis-page" id="worldbookAnalysisPage" aria-hidden="true"></section><div class="world-editor" id="worldEditor" aria-hidden="true"><div class="world-editor-backdrop" data-world-editor-close></div><section class="world-editor-sheet"><div class="world-editor-head"><div><span class="worldbook-eyebrow">EDIT</span><h2 id="worldEditorTitle">编辑世界书</h2></div><button type="button" data-world-editor-close>×</button></div><div id="worldEditorForm"></div><div class="world-editor-actions"><button type="button" class="world-editor-cancel" data-world-editor-close>取消</button><button type="button" class="world-editor-save" data-world-editor-save>保存</button></div></section></div>`;
+  app.innerHTML = `<div class="worldbook-page"><header class="worldbook-header"><div><div class="worldbook-kicker">KNOWLEDGE SYSTEM</div><h1>世界书</h1><p>将设定、关系与秩序，安静地收纳在一起。</p></div><button class="worldbook-close" data-world-close type="button">×</button></header><nav class="worldbook-tabs" aria-label="世界书分类">${Object.entries(categories).map(([key, label]) => `<button data-world-category="${key}" type="button">${label}</button>`).join('')}</nav><main class="worldbook-main"><section class="worldbook-books"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">LIBRARIES</span><h2 id="worldbookCategoryTitle"></h2></div><button class="worldbook-add-book" data-world-add-book type="button">＋ 新建</button></div><div class="worldbook-book-list" id="worldbookBookList"></div></section><section class="worldbook-entries"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">ENTRIES</span><h2 id="worldbookBookTitle">选择一本世界书</h2></div><div class="worldbook-entry-actions"><button class="worldbook-view-analysis" data-world-view-analysis type="button" hidden>查看世界</button><button class="worldbook-analyze" data-world-analyze type="button">AI 分析</button><div class="worldbook-entry-actions-stack"><button class="worldbook-add-entry" data-world-add-entry type="button">＋ 条目</button><button class="worldbook-scroll-top" data-world-scroll-top type="button">↑ 回顶</button></div></div><small class="worldbook-api-hint" id="worldbookApiHint"></small></div><div class="worldbook-entry-list" id="worldbookEntryList"></div><section class="worldbook-analysis" id="worldbookAnalysis" hidden></section></section></main></div><section class="worldbook-analysis-page" id="worldbookAnalysisPage" aria-hidden="true"></section><div class="world-editor" id="worldEditor" aria-hidden="true"><div class="world-editor-backdrop" data-world-editor-close></div><section class="world-editor-sheet"><div class="world-editor-head"><div><span class="worldbook-eyebrow">EDIT</span><h2 id="worldEditorTitle">编辑世界书</h2></div><button type="button" data-world-editor-close>×</button></div><div id="worldEditorForm"></div><div class="world-editor-actions"><button type="button" class="world-editor-cancel" data-world-editor-close>取消</button><button type="button" class="world-editor-save" data-world-editor-save>保存</button></div></section></div>`;
   document.body.appendChild(app);
   const worldbookTabs = app.querySelector('.worldbook-tabs');
   const worldbookAddBook = app.querySelector('[data-world-add-book]');
@@ -279,15 +279,14 @@ ${roleContext}
 ${entries || '暂无启用条目'}`;
     try {
       const requestAnalysis = async compact => {
-        const compactRule = compact ? '\n这是格式修复重试：输出必须紧凑，summary 不超过 180 字，rules 最多 8 条，NPC 最多 20 位，conflicts 最多 8 条；不得省略闭合括号。' : '';
-        const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature:compact ? 0.08 : 0.18, max_tokens:compact ? 4500 : 3500, stream:false, messages: [{ role: 'system', content: '你是严谨的世界观档案分析器，只返回完整合法 JSON。' }, { role: 'user', content:prompt + compactRule }] }) });
+        const compactRule = compact ? '\n请一次性完整返回紧凑 JSON：summary 不超过 180 字，rules 最多 8 条，NPC 最多 20 位，conflicts 最多 8 条；不得省略闭合括号。' : '';
+        const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', idealScope:'worldbook', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature:compact ? 0.08 : 0.18, max_tokens:compact ? 4500 : 3500, stream:false, messages: [{ role: 'system', content: '你是严谨的世界观档案分析器，只返回完整合法 JSON。' }, { role: 'user', content:prompt + compactRule }] }) });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json(); const message = payload.choices?.[0]?.message;
         return { raw:message?.content || message?.reasoning_content || payload.output_text || payload.output?.[0]?.content || payload.response || '', finish:payload.choices?.[0]?.finish_reason || '' };
       };
-      let answer = await requestAnalysis(false); let result;
-      try { result = parseAnalysisJSON(answer.raw); }
-      catch (firstError) { answer = await requestAnalysis(true); result = parseAnalysisJSON(answer.raw); }
+      // 世界书分析只发起一次请求；格式错误直接显示失败，避免“修复格式”再次消耗一次 API。
+      const answer = await requestAnalysis(true); const result = parseAnalysisJSON(answer.raw);
       result.world ||= {}; result.npcs = Array.isArray(result.npcs) ? result.npcs : []; result.relations = Array.isArray(result.relations) ? result.relations : []; result.conflicts = Array.isArray(result.conflicts) ? result.conflicts : [];
       analysisResult = result;
       const analyses = readJSON(analysisStorageKey, {}); analyses[book.id] = { ...result, analyzedAt:Date.now() }; localStorage.setItem(analysisStorageKey, JSON.stringify(analyses));
@@ -355,6 +354,13 @@ ${entries || '暂无启用条目'}`;
       return;
     }
     if (event.target.closest('[data-world-add-book]')) { activeBookId = null; openEditor('book'); return; }
+    if (event.target.closest('[data-world-scroll-top]')) {
+      ['.worldbook-main', '.worldbook-books', '.worldbook-entries'].forEach(selector => {
+        const target = app.querySelector(selector);
+        target?.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+      return;
+    }
     if (event.target.closest('[data-world-add-entry]')) { document.querySelector('#worldEditorForm').dataset.entryId = ''; openEditor('entry'); return; }
     if (event.target.closest('[data-world-view-analysis]')) { const cached = activeBookId ? readJSON(analysisStorageKey, {})[activeBookId] : null; if (cached) { analysisBookId = activeBookId; analysisResult = cached; analysisOpen = true; selectedAnalysisNpc = ''; render(); } return; }
     if (event.target.closest('[data-world-analyze]')) { analyzeBook(); return; }
