@@ -4249,7 +4249,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     return topElement === app || Boolean(topElement && app.contains(topElement));
   }
   function isViewingChat(contactId) {
-    return Boolean(contactId && app.classList.contains('is-open') && activeTab === 'chat' && activeContact === contactId && chatAppIsForeground());
+    // 键盘、悬浮球或临时浮层可能盖住视口中心，不能再用 elementFromPoint
+    // 判断用户是否正在阅读会话。只要页面可见且当前就是这个角色的聊天页，
+    // 此刻送达的角色消息就应直接算作已读。
+    return Boolean(contactId && app.classList.contains('is-open') && activeTab === 'chat' && activeContact === contactId && document.visibilityState === 'visible' && !document.hidden);
   }
   window.IdealMachineChatView ||= {};
   window.IdealMachineChatView.isViewing = isViewingChat;
@@ -4259,12 +4262,13 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const targetChat = targetContactId ? state.chats[targetContactId] : null;
     const beforeLength = targetChat?.messages?.length || 0;
     const result = await addMessageBeforeSystemNotification(text, role, type, meta);
-    const deliveryView = backgroundDeliveryView || { appOpen: app.classList.contains('is-open'), appForeground: chatAppIsForeground(), activeTab, activeContact };
-    const viewingTargetChat = deliveryView.appOpen && deliveryView.appForeground && deliveryView.activeTab === 'chat' && deliveryView.activeContact === targetContactId;
-    if (role === 'character' && !viewingTargetChat && targetChat && targetContact) {
+    const deliveryView = backgroundDeliveryView || { appOpen:app.classList.contains('is-open'), pageVisible:document.visibilityState === 'visible' && !document.hidden, activeTab, activeContact };
+    const viewingTargetChat = deliveryView.appOpen && deliveryView.pageVisible !== false && deliveryView.activeTab === 'chat' && deliveryView.activeContact === targetContactId;
+    if (role === 'character' && targetChat && targetContact) {
       const created = targetChat.messages.slice(beforeLength).filter(item => item.role === 'character');
-      created.forEach(message => { message.unread = true; });
+      created.forEach(message => { message.unread = !viewingTargetChat; });
       if (created.length) save();
+      if (viewingTargetChat) return result;
       created.forEach(message => {
         const preview = message?.type === 'image' ? (message.sticker ? `[表情包] ${message.stickerDescription || ''}`.trim() : '[图片]') : message?.type === 'voice' ? `[语音] ${message.text || ''}` : message?.type === 'location' ? `[位置] ${message.locationName || message.text || ''}` : message?.type === 'transfer' ? `[转账] ${message.note || ''}` : message?.text || String(text || '');
         window.IdealMachineNotifications?.show?.({ contactId: targetContactId, name: targetContact.nickname || targetContact.name || '角色', avatar: targetContact.avatar || '', message: preview, messageId: message.id });
@@ -4991,7 +4995,7 @@ ${recentConversation}
     const previousActiveContact = activeContact;
     const previousRender = render;
     const previousDeliveryView = backgroundDeliveryView;
-    backgroundDeliveryView = { appOpen: app.classList.contains('is-open'), appForeground: chatAppIsForeground(), activeTab, activeContact: previousActiveContact };
+    backgroundDeliveryView = { appOpen:app.classList.contains('is-open'), pageVisible:document.visibilityState === 'visible' && !document.hidden, activeTab, activeContact:previousActiveContact };
     activeContact = targetContactId;
     // Inner message handlers redraw after every split message. Suppress those
     // redraws so the visible page never jumps to the background conversation.

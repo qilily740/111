@@ -208,7 +208,10 @@
   async function copyError(errorId, button) {
     const item = errors.find(entry => entry.id === errorId);
     if (!item) return;
-    const text = [`${item.source || '系统'} · ${timeText(item.time)}`, item.message, item.detail].filter(Boolean).join('\n');
+    const detailLines = String(item.detail || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const reasonLines = detailLines.filter(line => !/^(?:服务|模型|请求\s*ID)[:：]/i.test(line) && !/^(?:[\w-]+\.)+[a-z]{2,}(?:\/\S*)?$/i.test(line));
+    const providerReason = reasonLines.join('\n').replace(/^接口返回[:：]\s*/i, '').trim();
+    const text = [String(item.message || '').trim(), providerReason].filter(Boolean).filter((value, index, list) => list.indexOf(value) === index).join('\n');
     try {
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
       else {
