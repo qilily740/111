@@ -47,7 +47,10 @@
     };
   }
   function readState() { try { const value = JSON.parse(localStorage.getItem(storageKey) || '{}'); return { issues:Array.isArray(value.issues) ? value.issues.map(normalizeIssue) : [] }; } catch { return { issues:[] }; } }
-  function save() { localStorage.setItem(storageKey, JSON.stringify(state)); }
+  function save() {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+    window.dispatchEvent(new CustomEvent('ideal-machine-magazine-updated'));
+  }
   function activeIssue() { return state.issues.find(item => item.id === activeId); }
   function sectionArticle(issue, sectionId) { return issue.articles.find(item => item.sectionId === sectionId); }
 

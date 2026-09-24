@@ -95,6 +95,10 @@
     saveState();
     if (app.classList.contains('is-open')) render();
   });
+  window.addEventListener('ideal-machine-magazine-updated', () => {
+    const changed = syncStoredImages();
+    if (changed && app.classList.contains('is-open')) render();
+  });
   const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
   const uid = () => `album-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const isImage = file => file && (String(file.type || '').startsWith('image/') || /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i.test(String(file.name || '')));
@@ -214,25 +218,51 @@
   }
 
   function syncStoredImages() {
-    if (state.migratedExisting) return;
     const known = new Set(state.items.map(item => item.url));
     const stickerUrls = stickerImageUrls();
     let changed = false;
+    const addImage = (value, metadata = {}) => {
+      const url = String(value || '').trim();
+      if (!url || stickerUrls.has(url) || known.has(url)) return;
+      known.add(url);
+      state.items.push({
+        id:uid(), url,
+        name:metadata.name || '已保存的图片',
+        source:metadata.source || '已有数据',
+        createdAt:Number(metadata.createdAt) || Date.now(),
+        size:0, type:'image/*', width:0, height:0,
+        fingerprint:metadata.fingerprint || '',
+        hosting:isPublicImageUrl(url) ? 'public' : 'local'
+      });
+      changed = true;
+    };
     Object.keys(localStorage).forEach(key => {
-      if (key === storageKey) return;
+      if (key === storageKey || key === 'ideal-machine-magazine') return;
       const value = localStorage.getItem(key) || '';
       const matches = value.match(/idb:image:[^"'\\\s,}\]]+/g) || [];
-      matches.forEach(url => {
-        if (stickerUrls.has(url)) return;
-        if (known.has(url)) return;
-        known.add(url);
-        state.items.push({ id:uid(), url, name:'已保存的图片', source:sourceLabels[key] || '已有数据', createdAt:Date.now(), size:0, type:'image/*', width:0, height:0, fingerprint:'' });
-        changed = true;
-      });
+      matches.forEach(url => addImage(url, { source:sourceLabels[key] || '已有数据' }));
     });
+    // Magazine covers may be public URLs or data URLs, so they are not
+    // necessarily discoverable by the generic idb:image scan above.
+    try {
+      const magazine = JSON.parse(localStorage.getItem('ideal-machine-magazine') || '{}');
+      const issues = Array.isArray(magazine.issues) ? magazine.issues : [];
+      issues.forEach(issue => {
+        const cover = issue?.cover?.image;
+        if (!cover) return;
+        addImage(cover, {
+          name:`${issue.title || '杂志'} · 封面`,
+          source:'杂志社',
+          createdAt:Number(issue.updatedAt) || Number(issue.createdAt) || Date.now(),
+          fingerprint:`magazine:${issue.id || cover}`
+        });
+      });
+    } catch {}
     if (changed) state.items.sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+    const needsMigrationMark = state.migratedExisting !== true;
     state.migratedExisting = true;
-    saveState();
+    if (changed || needsMigrationMark) saveState();
+    return changed;
   }
 
   function filteredItems() {
