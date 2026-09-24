@@ -12304,3 +12304,9 @@ button.fanfic-home-row-main:active { opacity:.58; }
 .chat-app.is-chatting.chat-wallpaper-light .chat-conversation > .chat-compose-wrap .chat-compose input { border-color:#dedede !important; background:#fff !important; box-shadow:none !important; }
 .chat-app.is-chatting.chat-wallpaper-dark .chat-conversation > .chat-compose-wrap .chat-compose input { border-color:#dedede !important; background:#fff !important; color:#333 !important; caret-color:#333 !important; text-shadow:none !important; box-shadow:none !important; }
 .chat-app.is-chatting.chat-wallpaper-dark .chat-conversation > .chat-compose-wrap .chat-compose input::placeholder { color:#777 !important; text-shadow:none !important; }
+@media (max-width:600px) {
+  .chat-app.is-chatting.is-menu-open .chat-conversation > .chat-compose-wrap > .chat-tools {
+    bottom:calc(100% + 8px) !important;
+    flex-wrap:nowrap !important;
+  }
+}
