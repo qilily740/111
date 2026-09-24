@@ -12,10 +12,20 @@
     shezhi:['设置','assets/icons/default-ios17/shezhi.png'], debate:['辩论','assets/icons/default-ios17/debate.png'],
     fanfic:['同人文','assets/icons/default-ios17/fanfic.png'], magazine:['杂志社','assets/icons/default-ios17/magazine.png']
   };
-  const defaults = { enabled:true, idleOpacity:.18, size:48, mode:'pill', apps:['liaotian','ta','jiyiku','shezhi'], side:'right', y:.56 };
+  const defaults = { enabled:true, idleOpacity:.18, size:60, mode:'pill', apps:['liaotian','ta','jiyiku','shezhi'], side:'right', y:.56 };
   const readJson = (key, fallback) => { try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value ?? fallback; } catch { return fallback; } };
   const writeJson = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
-  const readSettings = () => ({ ...defaults, ...readJson(settingsKey, {}) });
+  const readSettings = () => {
+    const stored = readJson(settingsKey, {});
+    const next = { ...defaults, ...stored };
+    // 将旧版的默认 48px 迁移到新的默认 60px；迁移后用户仍可自行输入其他尺寸。
+    if (stored.size === 48 && stored.sizeMigration !== '60px-v1') {
+      next.size = 60;
+      next.sizeMigration = '60px-v1';
+      writeJson(settingsKey, next);
+    }
+    return next;
+  };
   function assignedModel(scope = '') {
     try {
       const api = readSettings().api || {};
@@ -170,11 +180,11 @@
     root.dataset.side = settings.side === 'left' ? 'left' : 'right';
     root.dataset.mode = ['pill','grid','rail'].includes(settings.mode) ? settings.mode : 'pill';
     root.style.setProperty('--assist-idle-opacity', String(Math.max(.08, Math.min(.8, Number(settings.idleOpacity) || .18))));
-    root.style.setProperty('--assist-size', `${Math.max(40, Math.min(62, Number(settings.size) || 48))}px`);
+    root.style.setProperty('--assist-size', `${Math.max(40, Math.min(62, Number(settings.size) || 60))}px`);
     positionOrb(); renderPanel(); updateBadge();
   }
   function positionOrb() {
-    const size = Math.max(40, Math.min(62, Number(settings.size) || 48));
+    const size = Math.max(40, Math.min(62, Number(settings.size) || 60));
     const top = Math.max(12, Math.min(innerHeight - size - 12, Number(settings.y || .56) * innerHeight));
     root.style.setProperty('--assist-y', `${top}px`);
   }
@@ -311,7 +321,7 @@
       if (!event.target.closest('.settings-floating-section')) return;
       const chosen = [...settingsApp.querySelectorAll('[data-floating-app]:checked')].map(input => input.value).slice(0,8);
       const opacity = Math.max(8, Math.min(70, Number(settingsApp.querySelector('[data-floating-opacity]').value) || 18));
-      const size = Math.max(40, Math.min(62, Number(settingsApp.querySelector('[data-floating-size]').value) || 48));
+      const size = Math.max(40, Math.min(62, Number(settingsApp.querySelector('[data-floating-size]').value) || 60));
       settings = { ...readSettings(), enabled:settingsApp.querySelector('[data-floating-enabled]').checked, mode:settingsApp.querySelector('[data-floating-mode]').value, idleOpacity:opacity/100, size, apps:chosen };
       writeJson(settingsKey, settings); sync(); applySettings();
     };

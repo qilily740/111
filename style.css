@@ -9796,7 +9796,7 @@ select,
 }
 
 /* 全局悬浮工具 */
-.ideal-floating-assist { --assist-size:48px; --assist-y:56vh; --assist-idle-opacity:.18; position:fixed; z-index:99990; inset:0; pointer-events:none; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; }
+.ideal-floating-assist { --assist-size:60px; --assist-y:56vh; --assist-idle-opacity:.18; position:fixed; z-index:99990; inset:0; pointer-events:none; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; }
 .ideal-floating-assist[hidden] { display:none !important; }
 .ideal-assist-orb { position:absolute; top:var(--assist-y); display:grid; place-items:center; width:var(--assist-size); height:var(--assist-size); padding:0; border:0; border-radius:50%; outline:0; background:#202024; box-shadow:0 7px 18px rgba(0,0,0,.2); opacity:var(--assist-idle-opacity); pointer-events:auto; touch-action:none; transition:opacity .25s ease,transform .2s ease,left .22s ease,right .22s ease; }
 .ideal-floating-assist[data-side="right"] .ideal-assist-orb { right:7px; }.ideal-floating-assist[data-side="left"] .ideal-assist-orb { left:7px; }
