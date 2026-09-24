@@ -82,6 +82,15 @@
   function participantById(id) { return participants().find(item => item.id === id) || { id, name: participantName(id), type: id === 'self' ? 'user' : 'character' }; }
   function participantAvatar(participant) { return participant?.avatar ? `<img src="${esc(participant.avatar)}" alt="">` : esc((participant?.name || '我').slice(0, 1)); }
   function nameFor(participant) { return participant?.name || '开放席位'; }
+  function debateParticipantSnapshot(participant) {
+    const value = participant || {};
+    return {
+      id:value.id || uid('participant'), name:value.name || '未命名参与者', type:value.type || 'user',
+      identity:String(value.identity || '').slice(0, 240), gender:String(value.gender || '').slice(0, 80),
+      details:String(value.details || '').slice(0, 5000), signature:String(value.signature || '').slice(0, 1200),
+      personality:String(value.personality || '').slice(0, 3000), voiceStyle:String(value.voiceStyle || '').slice(0, 1200)
+    };
+  }
   function liveParticipant(participant) {
     if (!participant || participant.type === 'user') return participant;
     const current = participants().find(item => item.id === participant.id);
@@ -281,7 +290,7 @@
     if (!topic) return window.alert('请先生成或填写一个辩题。');
     if (draft.affirmative.length !== 4 || draft.negative.length !== 4) return window.alert('请先为正方和反方各安排 4 人。');
     const all = participants();
-    const findPeople = side => draft[side].map(id => all.find(item => item.id === id)).filter(Boolean).map(item => ({ ...item }));
+    const findPeople = side => draft[side].map(id => all.find(item => item.id === id)).filter(Boolean).map(debateParticipantSnapshot);
     const debate = normalizeDebate({ id: uid(), topic, createdAt: now(), updatedAt: now(), status: '进行中', currentRound: 0, openSides: { affirmative: true, negative: true }, sides: { affirmative: findPeople('affirmative'), negative: findPeople('negative') }, turns: [] });
     if (debate.sides.affirmative.some(first => debate.sides.negative.some(second => first.id === second.id))) return window.alert('同一个参与者不能同时安排到正方和反方。');
     state.debates.push(debate); save(); activeId = debate.id; page = 'room'; composerSide = 'affirmative'; render();
@@ -302,12 +311,14 @@
     if (event.target.closest('[data-debate-manage-cancel]')) { manageRecords = false; selectedDebateIds.clear(); render(); return; }
     if (event.target.closest('[data-debate-select-all]')) { const ids = state.debates.map(item => item.id); if (ids.length && ids.every(id => selectedDebateIds.has(id))) selectedDebateIds.clear(); else selectedDebateIds = new Set(ids); render(); return; }
     if (event.target.closest('[data-debate-delete-selected]')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       const ids = new Set([...selectedDebateIds].filter(id => state.debates.some(item => item.id === id)));
       if (!ids.size) return;
       if (!window.confirm(`确定删除选中的 ${ids.size} 条辩论记录吗？完整发言也会一并删除。`)) return;
       state.debates = state.debates.filter(item => !ids.has(item.id));
       selectedDebateIds.clear();
-      manageRecords = false;
+      if (!state.debates.length) manageRecords = false;
       save();
       render();
       return;
