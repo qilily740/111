@@ -227,8 +227,34 @@
   }
 
   function textApi() { const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('magazine') || window.IdealMachineAPI?.getModel?.('fanfic') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !model) throw new Error('请先在设置中为杂志社配置文字 API 模型'); return { ...config, model }; }
-  async function complete(system, prompt, temperature = .8) { const config = textApi(); const headers = { 'Content-Type':'application/json' }; if (config.key) headers.Authorization = `Bearer ${config.key}`; const request = window.IdealMachineFetch || window.fetch.bind(window); const response = await request(`${config.endpoint.replace(/\/$/,'')}/chat/completions`, { idealScope:'magazine-background', timeout:120000, method:'POST', headers, body:JSON.stringify({ model:config.model, temperature, messages:[{ role:'system', content:system },{ role:'user', content:prompt }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload = await response.json(); return String(payload.choices?.[0]?.message?.content || '').trim(); }
-  function parseJson(raw) { return JSON.parse(String(raw).replace(/```json|```/gi,'').trim()); }
+  function cleanModelText(raw) { return String(raw ?? '').replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/^```(?:json|markdown|md)?\s*|\s*```$/gi, '').trim(); }
+  function apiResponseText(payload) {
+    const content = payload?.choices?.[0]?.message?.content;
+    if (Array.isArray(content)) return content.map(item => typeof item === 'string' ? item : item?.text || item?.content || '').join('').trim();
+    return String(content || payload?.choices?.[0]?.text || payload?.output_text || payload?.response || '').trim();
+  }
+  async function complete(system, prompt, temperature = .8) {
+    const config = textApi(); const headers = { 'Content-Type':'application/json' }; if (config.key) headers.Authorization = `Bearer ${config.key}`;
+    const request = window.IdealMachineFetch || window.fetch.bind(window);
+    const response = await request(`${config.endpoint.replace(/\/$/,'')}/chat/completions`, { idealScope:'magazine-background', timeout:120000, method:'POST', headers, body:JSON.stringify({ model:config.model, temperature, messages:[{ role:'system', content:system },{ role:'user', content:prompt }] }) });
+    if (!response.ok) { let detail = ''; try { const data = await response.clone().json(); detail = data?.error?.message || data?.message || ''; } catch {} throw new Error(detail ? `HTTP ${response.status}：${detail}` : `HTTP ${response.status}`); }
+    const payload = await response.json(); const text = apiResponseText(payload); if (!text) throw new Error('API 没有返回文字内容'); return text;
+  }
+  function parseJson(raw) { const text = cleanModelText(raw); try { return JSON.parse(text); } catch { const start = text.indexOf('{'); const end = text.lastIndexOf('}'); if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1)); throw new Error('API 返回的 JSON 格式不完整'); } }
+  function parseArticleDraft(raw, section) {
+    const text = cleanModelText(raw);
+    try {
+      const result = parseJson(text);
+      const content = String(result.content || result.body || result.article || result.text || '').trim();
+      if (content) return { title:String(result.title || section.title).trim(), deck:String(result.deck || result.summary || section.pitch || '').trim(), content };
+    } catch {}
+    const title = text.match(/(?:【标题】|^标题\s*[：:])\s*([^\n]+)/m)?.[1]?.trim();
+    const deck = text.match(/(?:【导语】|^导语\s*[：:])\s*([^\n]+)/m)?.[1]?.trim();
+    const bodyMarker = text.match(/(?:【正文】|^正文\s*[：:])\s*([\s\S]+)$/m)?.[1]?.trim();
+    const content = bodyMarker || text.replace(/^(?:【标题】|标题\s*[：:]).*\n?/m, '').replace(/^(?:【导语】|导语\s*[：:]).*\n?/m, '').replace(/^(?:【正文】|正文\s*[：:])\s*/m, '').trim();
+    if (!content) throw new Error('API 没有返回初稿正文');
+    return { title:title || section.title, deck:deck || section.pitch || '', content };
+  }
 
   function magazineLiveRole(issue, id) {
     const saved = issue?.participants?.find(item => item.id === id) || {};
@@ -240,13 +266,15 @@
       const data = JSON.parse(localStorage.getItem('ideal-machine-worldbooks') || '{}');
       const book = (data.local || []).find(item => item.id === role?.worldbook);
       if (!book) return '未绑定局部世界书。';
-      const entries = (book.entries || []).filter(entry => entry.enabled !== false && String(entry.content || '').trim());
-      return entries.length ? `绑定局部世界书：${book.name}\n${entries.map(entry => `${entry.name}：${entry.content}`).join('\n')}` : `绑定局部世界书：${book.name}\n当前没有启用的世界书条目。`;
+      const entries = (book.entries || []).filter(entry => entry.enabled !== false && String(entry.content || '').trim()).slice(0, 24);
+      if (!entries.length) return `绑定局部世界书：${book.name}\n当前没有启用的世界书条目。`;
+      const content = entries.map(entry => `${entry.name}：${String(entry.content || '').slice(0, 1800)}`).join('\n');
+      return `绑定局部世界书：${book.name}\n${content}`.slice(0, 7000);
     } catch { return '未绑定局部世界书。'; }
   }
   function magazineEditorialContext(issue) {
-    const people = (issue?.participants || []).map(item => magazineLiveRole(issue, item.id)).filter(item => item.id || item.name);
-    const cast = people.length ? people.map(role => `【${role.name}】\n身份：${role.identity || '未填写'}\n生日：${role.birthday || '未填写'}\n性别：${role.gender || '未填写'}\n人物设定：${role.persona || '暂无人物设定'}\n${magazineRoleWorldbook(role)}`).join('\n\n') : '本期暂未选择受访人物。';
+    const people = (issue?.participants || []).map(item => magazineLiveRole(issue, item.id)).filter(item => item.id || item.name).slice(0, 6);
+    const cast = people.length ? people.map(role => `【${role.name}】\n身份：${role.identity || '未填写'}\n生日：${role.birthday || '未填写'}\n性别：${role.gender || '未填写'}\n人物设定：${String(role.persona || '暂无人物设定').slice(0, 4000)}\n${magazineRoleWorldbook(role)}`).join('\n\n').slice(0, 28000) : '本期暂未选择受访人物。';
     return `【本期刊物】\n刊物名称：${issue?.title || '未命名刊物'}\n本期主题：${issue?.theme || '未填写'}\n内容方向：${issue?.direction || '自由主题'}\n\n【本期人物与世界观】\n${cast}`;
   }
 
@@ -322,8 +350,8 @@
       const role = magazineLiveRole(issue, session.roleId);
       return `【${role?.name || '人物'}采访】\n${session.turns.map(turn => `${turn.role === 'editor' ? '主编' : role?.name || '受访者'}：${turn.text}`).join('\n')}`;
     }).join('\n\n');
-    const raw = await complete('你是资深中文杂志撰稿人与文字编辑。你必须尊重人物设定、世界观和采访事实，只输出合法 JSON，不要 Markdown。', `${magazineEditorialContext(issue)}\n\n【当前栏目】\n栏目类型：${section.type}\n栏目标题：${section.title}\n内容角度：${section.pitch || '围绕本期主题建立具体观察。'}\n\n【真实采访记录】\n${interviews || '暂无采访记录。此时只能写观察性或编辑说明，不得伪造人物说过的话。'}\n\n请写一篇可以继续人工修改的中文杂志初稿。文章要有明确视角、具体细节和自然节奏；人物采访稿只能使用记录中确实出现的内容，不得补写不存在的直接引语，不得让人物做出违背设定或世界规则的行为。只返回：{"title":"标题","deck":"导语","content":"正文"}。`, .84);
-    const result = parseJson(raw);
+    const raw = await complete('你是资深中文杂志撰稿人与文字编辑。你必须尊重人物设定、世界观和采访事实。不要输出分析过程，不要使用 Markdown 代码块。', `${magazineEditorialContext(issue)}\n\n【当前栏目】\n栏目类型：${section.type}\n栏目标题：${section.title}\n内容角度：${section.pitch || '围绕本期主题建立具体观察。'}\n\n【真实采访记录】\n${interviews || '暂无采访记录。此时只能写观察性或编辑说明，不得伪造人物说过的话。'}\n\n请写一篇可以继续人工修改的中文杂志初稿。文章要有明确视角、具体细节和自然节奏；人物采访稿只能使用记录中确实出现的内容，不得补写不存在的直接引语，不得让人物做出违背设定或世界规则的行为。请严格按以下分段返回，不要使用 JSON：\n【标题】栏目标题\n【导语】一段简洁导语\n【正文】\n完整正文`, .84);
+    const result = parseArticleDraft(raw, section);
     let article = sectionArticle(issue, section.id);
     if (!article) { article = { id:uid('article'), sectionId:section.id, createdAt:now() }; issue.articles.push(article); }
     Object.assign(article, { type:section.type, title:result.title || section.title, deck:result.deck || '', content:result.content || '', updatedAt:now() });
@@ -342,7 +370,7 @@
     const isBatch = batch || busy === 'batch'; const storedJob = readMagazineJob(); const issue = activeIssue() || (isBatch ? state.issues.find(item => item.id === storedJob?.issueId) : null); const section = issue?.sections.find(item => item.id === sectionId); if (!issue || !section || (busy && !isBatch)) return;
     const jobId = !isBatch ? beginMagazineJob('article', issue.id, `正在生成「${section.title}」`) : storedJob?.id || '';
     if (!isBatch) { busy = 'article'; render(); }
-    try { await generateMagazineArticleDraft(issue, section, interviewRoleId); issue.updatedAt = now(); persistMagazineIssue(issue); if (!isBatch) { finishMagazineJob(jobId, 'done', `「${section.title}」初稿已生成`); activeTab = 'articles'; } else updateMagazineJob(jobId, { progress:batchProgress }); } catch (error) { if (!isBatch) finishMagazineJob(jobId, 'error', `稿件生成失败：${error.message}`); window.alert(`稿件生成失败：${error.message}`); } finally { if (!isBatch) busy = ''; render(); }
+    try { await generateMagazineArticleDraft(issue, section, interviewRoleId); issue.updatedAt = now(); persistMagazineIssue(issue); if (!isBatch) { finishMagazineJob(jobId, 'done', `「${section.title}」初稿已生成`); activeTab = 'articles'; } else updateMagazineJob(jobId, { progress:batchProgress }); return true; } catch (error) { if (!isBatch) { finishMagazineJob(jobId, 'error', `稿件生成失败：${error.message}`); window.alert(`稿件生成失败：${error.message}`); } else console.warn('magazine_article_generation_failed', section.id, error); return false; } finally { if (!isBatch) busy = ''; render(); }
   };
 
   async function generateAllDrafts() {
@@ -350,8 +378,9 @@
     if (!issue.sections.length) { await generatePlan(); issue = state.issues.find(item => item.id === issueId) || readState().issues.find(item => item.id === issueId); }
     const sections = issue?.sections.slice(0, 4) || []; if (!sections.length) return window.alert('请先生成或添加栏目。');
     busy = 'batch'; batchProgress = 0; const jobId = beginMagazineJob('batch', issue.id, '正在生成 01—04 栏目初稿'); updateMagazineJob(jobId, { total:sections.length }); render();
-    for (const section of sections) { batchProgress += 1; updateMagazineJob(jobId, { progress:batchProgress, label:`正在生成 ${String(batchProgress).padStart(2, '0')} 号栏目初稿` }); render(); await generateArticle(section.id, '', true); }
-    finishMagazineJob(jobId, 'done', `已生成 ${sections.length} 篇栏目初稿`); busy = ''; activeTab = 'articles'; batchProgress = 0; render();
+    let completed = 0;
+    for (const section of sections) { batchProgress += 1; updateMagazineJob(jobId, { progress:batchProgress, label:`正在生成 ${String(batchProgress).padStart(2, '0')} 号栏目初稿` }); render(); if (await generateArticle(section.id, '', true)) completed += 1; }
+    const failed = sections.length - completed; finishMagazineJob(jobId, failed ? 'error' : 'done', failed ? `已生成 ${completed} 篇，${failed} 篇失败` : `已生成 ${completed} 篇栏目初稿`); busy = ''; activeTab = completed ? 'articles' : 'plan'; batchProgress = 0; render(); if (failed) window.alert(`初稿生成完成：成功 ${completed} 篇，失败 ${failed} 篇。请查看 API 配置或稍后重试。`);
   }
 
   generateCover = async function() {
