@@ -12260,7 +12260,7 @@ button.fanfic-home-row-main:active { opacity:.58; }
 .magazine-home-dock button.is-active { color:#111; }
 .magazine-home-dock svg { width:23px; height:23px; fill:none; stroke:currentColor; stroke-width:1.45; stroke-linecap:round; stroke-linejoin:round; }
 .magazine-home-dock button.is-active svg { fill:#111; stroke:#111; }
-.magazine-dock-orb { position:fixed; right:max(18px,calc((100vw - 760px)/2 + 18px)); bottom:max(14px,env(safe-area-inset-bottom)); z-index:13; display:grid; place-items:center; width:54px; height:54px; padding:0; border:1px solid rgba(255,255,255,.76); border-radius:50%; background:rgba(255,255,255,.5); color:#222; box-shadow:0 12px 30px rgba(42,35,29,.15),inset 0 1px 0 rgba(255,255,255,.88); cursor:grab; touch-action:none; user-select:none; -webkit-backdrop-filter:blur(22px) saturate(1.45); backdrop-filter:blur(22px) saturate(1.45); }
+.magazine-dock-orb { position:fixed; right:max(18px,calc((100vw - 760px)/2 + 18px)); bottom:max(64px,calc(env(safe-area-inset-bottom) + 52px)); z-index:13; display:grid; place-items:center; width:54px; height:54px; padding:0; border:1px solid rgba(255,255,255,.76); border-radius:50%; background:rgba(255,255,255,.5); color:#222; box-shadow:0 12px 30px rgba(42,35,29,.15),inset 0 1px 0 rgba(255,255,255,.88); cursor:grab; touch-action:none; user-select:none; -webkit-backdrop-filter:blur(22px) saturate(1.45); backdrop-filter:blur(22px) saturate(1.45); }
 .magazine-dock-orb:active { cursor:grabbing; }
 .magazine-dock-orb svg { width:24px; height:24px; fill:currentColor; stroke:none; }
 
