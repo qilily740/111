@@ -29,7 +29,7 @@
     const button = portal().querySelector('[data-activation-submit]');
     if (button) { button.disabled = true; button.textContent = '验证中…'; }
     try {
-      const response = await fetch(`${base}/activation/verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceCode: deviceCode(), activationCode: code, feature }) });
+      const response = await fetch(`${base}/activation/verify`, { idealScope:'activation', idealPurpose:'系统 App－验证功能激活码', method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceCode: deviceCode(), activationCode: code, feature }) });
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || '激活码无效');
       state.license = { ...data.license, feature, status: 'active' }; save(); close(true); window.dispatchEvent(new CustomEvent('ideal-machine-activation-changed', { detail: state.license })); window.alert('激活成功，现在可以导入酒馆角色卡了。');

@@ -237,7 +237,7 @@
     const config = window.IdealMachineAPI?.getConfig?.() || {};
     const model = window.IdealMachineAPI?.getModel?.('doubao') || config.models?.[0];
     if (!config.endpoint || !config.key || !model) return fallbackText ? fallback(fallbackText) : '';
-    const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:.75, messages:messagesToSend }) });
+    const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'doubao', idealPurpose:'豆包 App－生成聊天回复', method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:.75, messages:messagesToSend }) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     return data.choices?.[0]?.message?.content || data.choices?.[0]?.text || '模型没有返回内容。';

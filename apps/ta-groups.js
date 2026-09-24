@@ -169,7 +169,9 @@
     const previousMessages = Array.isArray(state.chats?.[contactId]?.messages) ? state.chats[contactId].messages : [];
     const previousById = new Map(previousMessages.map(message => [String(message.id), message]));
     const visibleGroupName = document.querySelector('.chat-app.is-open .chat-group-conversation .chat-person b')?.textContent?.trim() || '';
-    const groupIsVisible = visibleGroupName === String(contact.name || '').trim();
+    const groupIsVisible = typeof window.IdealMachineChatView?.isViewing === 'function'
+      ? window.IdealMachineChatView.isViewing(contactId)
+      : visibleGroupName === String(contact.name || '').trim();
     const desktopMessages = group.messages.map(message => {
       const converted = desktopMessage(message);
       const previous = previousById.get(String(converted.id));
