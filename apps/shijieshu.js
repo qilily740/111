@@ -310,7 +310,7 @@ ${entries || '暂无启用条目'}`;
     try {
       const requestAnalysis = async compact => {
         const compactRule = compact ? '\n请一次性完整返回紧凑 JSON：summary 不超过 180 字，rules 最多 8 条，NPC 最多 20 位，conflicts 最多 8 条；不得省略闭合括号。' : '';
-        const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', idealScope:'worldbook', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature:compact ? 0.08 : 0.18, max_tokens:compact ? 4500 : 3500, stream:false, messages: [{ role: 'system', content: '你是严谨的世界观档案分析器，只返回完整合法 JSON。' }, { role: 'user', content:prompt + compactRule }] }) });
+        const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', idealScope:'worldbook', idealPurpose:'世界书 App－AI 分析世界书内容', timeout:180000, headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:compact ? 0.08 : 0.18, max_tokens:compact ? 4500 : 3500, stream:false, messages:[{ role:'system', content:'你是严谨的世界观档案分析器，只返回完整合法 JSON。' }, { role:'user', content:prompt + compactRule }] }) });
         if (!response.ok) {
           let detail = ''; let errorText = '';
           try { errorText = await response.text(); } catch {}
@@ -335,7 +335,10 @@ ${entries || '暂无启用条目'}`;
       analysisResult = result;
       const analyses = readJSON(analysisStorageKey, {}); analyses[book.id] = { ...result, analyzedAt:Date.now() }; localStorage.setItem(analysisStorageKey, JSON.stringify(analyses));
       syncNpcContacts(book, result, roles);
-    } catch (error) { analysisResult = { error:`分析失败：${error.message}` }; }
+    } catch (error) {
+      const aborted = error?.name === 'AbortError' || /aborted|abort/i.test(String(error?.message || ''));
+      analysisResult = { error:aborted ? '分析请求被中断。请保持页面开启后重新分析；现在最长会等待 3 分钟。' : `分析失败：${error.message}` };
+    }
     analysisBusy = false; render();
   }
 
