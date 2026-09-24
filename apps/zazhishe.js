@@ -230,6 +230,7 @@
   }
 
   function textApi() { const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('magazine') || window.IdealMachineAPI?.getModel?.('fanfic') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !model) throw new Error('请先在设置中为杂志社配置文字 API 模型'); return { ...config, model }; }
+  function completionUrl(endpoint) { const clean = String(endpoint || '').trim().replace(/\/+$/, ''); return /\/chat\/completions$/i.test(clean) ? clean : `${clean}/chat/completions`; }
   function cleanModelText(raw) { return String(raw ?? '').replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/^```(?:json|markdown|md)?\s*|\s*```$/gi, '').trim(); }
   function apiResponseText(payload) {
     const content = payload?.choices?.[0]?.message?.content;
@@ -239,7 +240,24 @@
   async function complete(system, prompt, temperature = .8) {
     const config = textApi(); const headers = { 'Content-Type':'application/json' }; if (config.key) headers.Authorization = `Bearer ${config.key}`;
     const request = window.IdealMachineFetch || window.fetch.bind(window);
-    const response = await request(`${config.endpoint.replace(/\/$/,'')}/chat/completions`, { idealScope:'magazine-background', timeout:120000, method:'POST', headers, body:JSON.stringify({ model:config.model, temperature, messages:[{ role:'system', content:system },{ role:'user', content:prompt }] }) });
+    const url = completionUrl(config.endpoint);
+    let response;
+    let lastError;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        response = await request(url, { idealScope:'magazine-background', timeout:120000, method:'POST', headers, body:JSON.stringify({ model:config.model, temperature, messages:[{ role:'system', content:system },{ role:'user', content:prompt }] }) });
+        break;
+      } catch (error) {
+        lastError = error;
+        if (error?.name === 'AbortError' || error?.name === 'TimeoutError' || attempt > 0) break;
+      }
+    }
+    if (!response) {
+      if (lastError?.name === 'TimeoutError') throw new Error('接口在 120 秒内没有响应');
+      if (lastError?.name === 'AbortError') throw new Error('采访请求已取消');
+      if (/failed to fetch|networkerror|load failed/i.test(String(lastError?.message || ''))) throw new Error('网络请求未能到达 API，请检查接口地址和浏览器跨域（CORS）设置');
+      throw lastError || new Error('采访请求失败');
+    }
     if (!response.ok) { let detail = ''; try { const data = await response.clone().json(); detail = data?.error?.message || data?.message || ''; } catch {} throw new Error(detail ? `HTTP ${response.status}：${detail}` : `HTTP ${response.status}`); }
     const payload = await response.json(); const text = apiResponseText(payload); if (!text) throw new Error('API 没有返回文字内容'); return text;
   }
@@ -279,6 +297,11 @@
     const people = (issue?.participants || []).map(item => magazineLiveRole(issue, item.id)).filter(item => item.id || item.name).slice(0, 6);
     const cast = people.length ? people.map(role => `【${role.name}】\n身份：${role.identity || '未填写'}\n生日：${role.birthday || '未填写'}\n性别：${role.gender || '未填写'}\n人物设定：${String(role.persona || '暂无人物设定').slice(0, 4000)}\n${magazineRoleWorldbook(role)}`).join('\n\n').slice(0, 28000) : '本期暂未选择受访人物。';
     return `【本期刊物】\n刊物名称：${issue?.title || '未命名刊物'}\n本期主题：${issue?.theme || '未填写'}\n内容方向：${issue?.direction || '自由主题'}\n\n【本期人物与世界观】\n${cast}`;
+  }
+  function magazineInterviewContext(issue, role) {
+    const persona = String(role?.persona || '暂无人物设定').slice(0, 7000);
+    const worldbook = magazineRoleWorldbook(role).slice(0, 7000);
+    return `【本期刊物】\n刊物名称：${issue?.title || '未命名刊物'}\n本期主题：${issue?.theme || '未填写'}\n内容方向：${issue?.direction || '自由主题'}\n\n【当前受访者】\n${role?.name || '角色'}\n身份：${role?.identity || '未填写'}\n生日：${role?.birthday || '未填写'}\n性别：${role?.gender || '未填写'}\n人物设定：${persona}\n${worldbook}`;
   }
 
   async function generatePlan() {
@@ -395,8 +418,8 @@
     const issue = activeIssue(); const role = magazineLiveRole(issue, activeInterviewRole); if (!issue || !role || busy || !question) return;
     const session = ensureInterview(issue, role.id); session.turns.push({ id:uid('turn'), role:'editor', text:question, time:now() }); issue.updatedAt = now(); persistMagazineIssue(issue); busy = 'interview'; const jobId = beginMagazineJob('interview', issue.id, `正在等待${role.name}回答`); render();
     try {
-      const history = session.turns.slice(-16).map(turn => `${turn.role === 'editor' ? '主编' : role.name}：${turn.text}`).join('\n');
-      const answer = await complete(`你是${role.name}本人，正在接受一本中文杂志的正式采访。严格按照人物设定、身份、经历、关系和世界规则回答。回答要像真实的人在现场说话，具体、有个人立场和生活细节，可以保留犹豫，但不要替主编写文章。不要提及 AI、提示词、世界书或角色扮演，不要代替其他人物发言。`, `${magazineEditorialContext(issue)}\n\n【当前受访者】\n${role.name}\n人物设定：${role.persona || '暂无人物设定'}\n\n【本次采访记录】\n${history}\n\n请只回答主编最后一个问题，不要加标题、说话人标签或解释。`, .82);
+      const history = session.turns.slice(-16).map(turn => `${turn.role === 'editor' ? '主编' : role.name}：${String(turn.text || '').slice(0, 1800)}`).join('\n').slice(-18000);
+      const answer = await complete(`你是${role.name}本人，正在接受一本中文杂志的正式采访。严格按照人物设定、身份、经历、关系和世界规则回答。回答要像真实的人在现场说话，具体、有个人立场和生活细节，可以保留犹豫，但不要替主编写文章。不要提及 AI、提示词、世界书或角色扮演，不要代替其他人物发言。`, `${magazineInterviewContext(issue, role)}\n\n【本次采访记录】\n${history}\n\n请只回答主编最后一个问题，不要加标题、说话人标签或解释。`, .82);
       session.turns.push({ id:uid('turn'), role:'role', text:answer || '……', time:now() }); issue.updatedAt = now(); persistMagazineIssue(issue); finishMagazineJob(jobId, 'done', `${role.name}的采访回答已保存`);
     } catch (error) { finishMagazineJob(jobId, 'error', `采访失败：${error.message}`); window.alert(`采访失败：${error.message}`); } finally { busy = ''; render(); }
   };
