@@ -114,7 +114,6 @@
     } catch(error) { if(error?.name!=='AbortError')window.alert(`推荐生成失败：${error.message||'未知错误'}`); }
     finally { recommending=false;render(); }
   }
-  document.addEventListener('click',event=>{if(event.target.closest?.('[data-shop-close]'))window.IdealMachineCancelRequests?.('shopping');},true);
   document.addEventListener('click',event=>{if(!app.classList.contains('is-open')||!event.target.closest('[data-shop-takeaway-recommend]'))return;event.preventDefault();event.stopImmediatePropagation();recommendTakeaway();});
   document.addEventListener('click',event=>{if(!app.classList.contains('is-open')||!event.target.closest('[data-shop-recommend]'))return;event.stopImmediatePropagation();randomRecommend();});
   document.addEventListener('click',event=>{if(!app.classList.contains('is-open')||!event.target.closest('[data-shop-private-toggle]'))return;event.stopImmediatePropagation();if(!state.adultConfirmed){if(!window.confirm('私密购买区仅限已满 18 岁的成年人。确认你已成年并继续吗？'))return;state.adultConfirmed=true;}state.privateModes=state.privateModes||{};state.privateModes[state.profileId]=!privateMode();search='';productId='';save();render();});

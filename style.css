@@ -5717,6 +5717,35 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
   .chat-message-quote { background: rgba(255,255,255,.12); }
 }
 
+/* 引用预览属于底部输入区本身：和聊天气泡一样位于消息列表下方、输入框上方，
+   不再以绝对定位浮在消息内容上。这样键盘抬升时整组输入区也会一起移动。 */
+.chat-app.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote {
+  display:flex !important;
+  flex-direction:column !important;
+  flex-basis:auto !important;
+  height:auto !important;
+  min-height:96px !important;
+  padding-top:10px !important;
+  padding-bottom:8px !important;
+  overflow:visible !important;
+}
+.chat-app.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote > .chat-quote-bar {
+  position:relative !important;
+  inset:auto !important;
+  order:0 !important;
+  flex:0 0 auto !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+  margin:0 0 8px !important;
+}
+.chat-app.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote > .chat-compose {
+  order:1 !important;
+  flex:0 0 44px !important;
+  height:44px !important;
+  min-height:44px !important;
+  transform:none !important;
+}
+
 /* 世界书条目正文占满卡片宽度，编辑/删除操作单独放在正文下方。 */
 .worldbook-entry { display: block; }
 .worldbook-entry > .worldbook-entry-copy { width: 100%; max-width: none; }
@@ -8228,6 +8257,10 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   white-space:nowrap;
   text-shadow:0 1px 2px rgba(255,255,255,.72);
 }
+.music-desktop-lyrics.is-orb[data-lyrics-side="right"] { flex-direction:row-reverse; }
+.music-desktop-lyrics.is-orb[data-lyrics-side="right"] .music-desktop-lyrics-line { text-align:right; }
+.music-desktop-lyrics.is-orb[data-lyrics-side="left"] { flex-direction:row; }
+.music-desktop-lyrics.is-orb[data-lyrics-side="left"] .music-desktop-lyrics-line { text-align:left; }
 .music-desktop-lyrics.is-orb[data-lyrics-tone="light"] .music-desktop-lyrics-orb { background:#17171a; color:#fff; }
 .music-desktop-lyrics.is-orb[data-lyrics-tone="light"] .music-desktop-lyrics-line { color:#17171a; text-shadow:0 1px 2px rgba(255,255,255,.78); }
 .music-desktop-lyrics.is-orb[data-lyrics-tone="dark"] .music-desktop-lyrics-orb { background:#fff; color:#17171a; }
@@ -9807,6 +9840,7 @@ select,
 .ideal-floating-assist { --assist-size:60px; --assist-y:56vh; --assist-idle-opacity:.18; position:fixed; z-index:99990; inset:0; pointer-events:none; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; }
 .ideal-floating-assist[hidden] { display:none !important; }
 .ideal-assist-orb { position:absolute; top:var(--assist-y); display:grid; place-items:center; width:var(--assist-size); height:var(--assist-size); padding:0; border:0; border-radius:50%; outline:0; background:#202024; box-shadow:0 7px 18px rgba(0,0,0,.2); opacity:var(--assist-idle-opacity); pointer-events:auto; touch-action:none; transition:opacity .25s ease,transform .2s ease,left .22s ease,right .22s ease; }
+.ideal-floating-assist.is-active .ideal-assist-orb { transition:opacity .25s ease,transform .2s ease; }
 .ideal-floating-assist[data-side="right"] .ideal-assist-orb { right:7px; }.ideal-floating-assist[data-side="left"] .ideal-assist-orb { left:7px; }
 .ideal-assist-orb:hover,.ideal-floating-assist.is-open .ideal-assist-orb,.ideal-floating-assist.is-active .ideal-assist-orb { opacity:.96; transform:scale(1.04); }
 .ideal-assist-orb-inner { position:relative; display:grid; place-items:center; width:70%; height:70%; border-radius:50%; background:#5b5b60; box-shadow:0 0 0 max(2px,calc(var(--assist-size) * .045)) #414146; }
