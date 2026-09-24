@@ -238,7 +238,9 @@
         try { model = cleanText(window.IdealMachineAPI?.getModel?.(scope) || window.IdealMachineAPI?.getModel?.('chat') || assignedModel(scope) || ''); } catch { model = assignedModel(scope); }
       }
       let host = 'API';
+      let endpointPath = '';
       try { host = new URL(rawUrl, location.href).host || '本机'; } catch {}
+      try { endpointPath = new URL(rawUrl, location.href).pathname || ''; } catch {}
       activeCalls += 1; updateBadge();
       try {
         const response = await originalRequest(input, init);
@@ -247,7 +249,13 @@
         if (!response.ok) {
           const providerReason = await readResponseError(response);
           const summary = `HTTP ${response.status}：${httpReason(response.status)}`;
-          const detail = [`接口返回：${providerReason || '没有提供更具体的错误正文'}`, `服务：${host}`].join('\n');
+          const requestId = response.headers.get('x-request-id') || response.headers.get('request-id') || response.headers.get('cf-ray') || '';
+          const detail = [
+            `接口返回：${providerReason || '没有提供更具体的错误正文'}`,
+            `服务：${host}${endpointPath}`,
+            model ? `模型：${model}` : '',
+            requestId ? `请求 ID：${requestId}` : ''
+          ].filter(Boolean).join('\n');
           addError(summary, purpose, { detail });
         }
         try { response.clone().json().then(data => { const usage = usageParts(data?.usage || data?.data?.usage || {}); if (usage.totalTokens || usage.inputTokens || usage.outputTokens) { call.tokens = usage.totalTokens; call.inputTokens = usage.inputTokens; call.outputTokens = usage.outputTokens; writeJson(callsKey, calls); renderSettingsPanels(); renderPanel(); } }).catch(() => {}); } catch {}
