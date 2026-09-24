@@ -33,6 +33,7 @@
   function esc(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char])); }
   function now() { return new Date().toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }); }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function setPage(nextPage) { page = nextPage; magazineDockCollapsed = nextPage !== 'home'; }
   function chatRoles() { try { const chat = JSON.parse(localStorage.getItem('ideal-machine-chat') || '{}'); return (chat.contacts || []).filter(item => item && !item.isGroup).map(item => ({ id:item.id, name:item.name || item.nickname || '角色', nickname:item.nickname || '', realName:item.name || item.nickname || '', avatar:item.avatar || '', persona:item.details || item.signature || '', identity:item.identity || '', birthday:item.birthday || '', gender:item.gender || '', worldbook:item.worldbook || '' })).filter(item => item.id); } catch { return []; } }
   function roleFrom(issue, id) { const saved = issue?.participants?.find(item => item.id === id) || {}; const live = chatRoles().find(item => item.id === id) || {}; return { ...saved, ...live, name:live.name || saved.realName || saved.name || '角色', realName:live.realName || saved.realName || saved.name || '' }; }
   function avatarMarkup(role) { return role?.avatar ? `<img data-magazine-asset="${esc(role.avatar)}" alt="">` : esc((role?.name || '角').slice(0,1)); }
@@ -205,7 +206,7 @@
     const oldScrollHost = app.querySelector('.magazine-page') || app;
     const oldScroll = oldScrollHost.scrollTop || 0;
     const issue = activeIssue();
-    if (page === 'studio' && issue?.status === '已发布') { page = 'preview'; previewIndex = 0; }
+    if (page === 'studio' && issue?.status === '已发布') { setPage('preview'); previewIndex = 0; }
     app.innerHTML = page === 'home' ? homePage() : page === 'new' ? newPage() : page === 'preview' && issue ? previewPage(issue) : issue ? studioPage(issue) : homePage();
     const renderedDock = app.querySelector('.magazine-home-dock');
     if (renderedDock) renderedDock.outerHTML = magazineDockMarkup(); else app.insertAdjacentHTML('beforeend', magazineDockMarkup());
@@ -223,7 +224,7 @@
     const roles = chatRoles();
     const participants = newDraft.participantIds.map(id => roles.find(role => role.id === id)).filter(Boolean).map(clone);
     const issue = normalizeIssue({ id:uid('issue'), title:newDraft.title, theme:newDraft.theme, edition:newDraft.edition || 'VOL. 01', direction:newDraft.direction, participants, sections:[{ id:uid('section'), type:'封面故事', title:newDraft.theme, pitch:'从本期主题出发，建立核心观察。' },{ id:uid('section'), type:'人物采访', title:participants[0] ? `与${participants[0].name}谈谈` : '人物谈话', pitch:'通过具体问题呈现人物的真实立场与生活细节。' }] });
-    state.issues.push(issue); save(); activeId = issue.id; activeTab = 'plan'; activeInterviewRole = issue.participants[0]?.id || ''; page = 'studio'; render();
+    state.issues.push(issue); save(); activeId = issue.id; activeTab = 'plan'; activeInterviewRole = issue.participants[0]?.id || ''; setPage('studio'); render();
   }
 
   function textApi() { const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('magazine') || window.IdealMachineAPI?.getModel?.('fanfic') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !model) throw new Error('请先在设置中为杂志社配置文字 API 模型'); return { ...config, model }; }
@@ -441,14 +442,14 @@
     const homeSelect = event.target.closest('[data-magazine-home-select]');
     if (homeSelect) { const issues = state.issues.slice().reverse(); const index = issues.findIndex(issue => issue.id === homeSelect.dataset.magazineHomeSelect); if (index >= 0) { homeIssueIndex = index; render(); } return; }
     const homeJump = event.target.closest('[data-magazine-home-jump]');
-    if (homeJump) { const issue = activeIssue() || state.issues.slice().reverse()[homeIssueIndex]; if (!issue) { newDraft = blankDraft(); page = 'new'; render(); return; } activeId = issue.id; activeTab = homeJump.dataset.magazineHomeJump || 'plan'; activeInterviewRole = issue.participants[0]?.id || ''; page = issue.status === '已发布' ? 'preview' : 'studio'; render(); return; }
-    if (event.target.closest('[data-magazine-home-nav="home"]')) { if (page !== 'home') { page='home'; activeId=''; render(); } else app.querySelector('.magazine-home-page')?.scrollTo({ top:0, behavior:'smooth' }); return; }
-    if (event.target.closest('[data-magazine-new]')) { newDraft=blankDraft(); page='new'; render(); return; }
-    if (event.target.closest('[data-magazine-home]')) { page='home'; activeId=''; render(); return; }
-    if (event.target.closest('[data-magazine-studio]')) { page='studio'; render(); return; }
+    if (homeJump) { const issue = activeIssue() || state.issues.slice().reverse()[homeIssueIndex]; if (!issue) { newDraft = blankDraft(); setPage('new'); render(); return; } activeId = issue.id; activeTab = homeJump.dataset.magazineHomeJump || 'plan'; activeInterviewRole = issue.participants[0]?.id || ''; setPage(issue.status === '已发布' ? 'preview' : 'studio'); render(); return; }
+    if (event.target.closest('[data-magazine-home-nav="home"]')) { if (page !== 'home') { setPage('home'); activeId=''; render(); } else app.querySelector('.magazine-home-page')?.scrollTo({ top:0, behavior:'smooth' }); return; }
+    if (event.target.closest('[data-magazine-new]')) { newDraft=blankDraft(); setPage('new'); render(); return; }
+    if (event.target.closest('[data-magazine-home]')) { setPage('home'); activeId=''; render(); return; }
+    if (event.target.closest('[data-magazine-studio]')) { setPage('studio'); render(); return; }
     const pageTurn=event.target.closest('[data-magazine-page-turn]'); if(pageTurn){const issue=activeIssue();if(!issue)return;const sheets=previewSheets(issue);const delta=pageTurn.dataset.magazinePageTurn==='next'?1:-1;previewTurnDirection=delta;previewIndex=Math.min(Math.max(previewIndex+delta,0),sheets.length-1);render();return;}
     if (event.target.closest('[data-magazine-create]')) { createIssue(); return; }
-    const opened=event.target.closest('[data-magazine-open]'); if(opened){activeId=opened.dataset.magazineOpen;const issue=activeIssue();page=issue?.status==='已发布'?'preview':'studio';previewIndex=0;activeTab='plan';activeInterviewRole=issue?.participants[0]?.id||'';render();return;}
+    const opened=event.target.closest('[data-magazine-open]'); if(opened){activeId=opened.dataset.magazineOpen;const issue=activeIssue();setPage(issue?.status==='已发布'?'preview':'studio');previewIndex=0;activeTab='plan';activeInterviewRole=issue?.participants[0]?.id||'';render();return;}
     const deleted=event.target.closest('[data-magazine-delete]'); if(deleted&&window.confirm('确定删除这期杂志和全部采访、稿件吗？')){state.issues=state.issues.filter(item=>item.id!==deleted.dataset.magazineDelete);save();render();return;}
     const tab=event.target.closest('[data-magazine-tab]'); if(tab){activeTab=tab.dataset.magazineTab;render();return;}
     if(event.target.closest('[data-magazine-generate-plan]')){generatePlan();return;}
@@ -463,8 +464,8 @@
     const color=event.target.closest('[data-magazine-cover-color]');if(color){const issue=activeIssue();issue.cover.color=color.dataset.magazineCoverColor;issue.cover.ink=color.dataset.magazineCoverInk;save();render();return;}
     if(event.target.closest('[data-magazine-generate-cover]')){generateCover();return;}
     if(event.target.closest('[data-magazine-remove-cover]')){const issue=activeIssue();issue.cover.image='';save();render();return;}
-    if(event.target.closest('[data-magazine-preview]')){previewIndex=0;page='preview';render();return;}
-    if(event.target.closest('[data-magazine-publish]')){const issue=activeIssue();if(!issue||issue.status==='已发布')return;issue.status='已发布';issue.publishedAt=now();issue.updatedAt=now();save();previewIndex=0;page='preview';render();return;}
+    if(event.target.closest('[data-magazine-preview]')){previewIndex=0;setPage('preview');render();return;}
+    if(event.target.closest('[data-magazine-publish]')){const issue=activeIssue();if(!issue||issue.status==='已发布')return;issue.status='已发布';issue.publishedAt=now();issue.updatedAt=now();save();previewIndex=0;setPage('preview');render();return;}
     if (!magazineDockCollapsed && app.contains(event.target) && !event.target.closest('button,a,input,textarea,select,label,[contenteditable="true"],.magazine-home-dock')) { magazineDockCollapsed = true; render(); }
   });
   document.addEventListener('pointerdown', event => { const orb = event.target.closest?.('[data-magazine-dock-expand]'); if (!orb || !app.classList.contains('is-open')) return; const rect = orb.getBoundingClientRect(); magazineDockDrag = { pointerId:event.pointerId, startX:event.clientX, startY:event.clientY, offsetX:event.clientX - rect.left, offsetY:event.clientY - rect.top, moved:false }; orb.setPointerCapture?.(event.pointerId); });
