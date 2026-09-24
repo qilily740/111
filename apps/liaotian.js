@@ -2867,7 +2867,7 @@ ${roundText}
   document.addEventListener('pointerdown', event => { const text = event.target.closest('[data-chat-reading-text]'); if (!text) return; clearTimeout(readingLongPressTimer); readingLongPressTimer = setTimeout(() => { readingQuote = window.getSelection()?.toString().trim() || text.textContent.trim().slice(0, 100); const actions = document.querySelector('[data-chat-reading-actions]'); if (actions) actions.hidden = false; }, 600); }, true);
   document.addEventListener('pointerup', () => clearTimeout(readingLongPressTimer), true);
   async function replyReadingChat() { const input = document.querySelector('[data-chat-reading-input]'); if (!input?.value.trim()) return; readingChatMessages.push({ role: 'user', text: input.value.trim() }); input.value = ''; const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); const contact = state.contacts.find(item => item.id === activeContact) || {}; if (!config?.endpoint || !config.key || !model) { readingChatMessages.push({ role: 'character', text: '请先在设置中配置聊天 API。' }); const modal = document.querySelector('[data-chat-reading]'); if (modal) renderReadingChat(modal); return; } try { const response = await fetch(config.endpoint.replace(/\/$/, '') + '/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + config.key }, body: JSON.stringify({ model, messages: [{ role: 'system', content: '你正在和用户一起阅读书籍，请结合角色性格简短回应。角色：' + (contact.name || '角色') }, ...readingChatMessages.map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text }))] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); readingChatMessages.push({ role: 'character', text: requireCharacterReplyText(data) }); } catch (error) { readingChatMessages.push({ role: 'character', text: `回复失败：${error.message}` }); } const modal = document.querySelector('[data-chat-reading]'); if (modal) renderReadingChat(modal); }
-  document.addEventListener('click', event => { const open = event.target.closest('[data-chat-open]'); if (!open || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); if (!backgroundReplyContactId) state = read(); activeContact = open.dataset.chatOpen; activeTab = 'chat'; menuOpen = false; emojiOpen = false; profilePickerOpen = false; settingsProfilePickerOpen = false; chatMessageEditMode = false; selectedChatMessageIds.clear(); markChatRead(activeContact); render(); const scrollLatest = () => { const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = box.scrollHeight; }; requestAnimationFrame(scrollLatest); setTimeout(scrollLatest, 0); setTimeout(scrollLatest, 50); setTimeout(scrollLatest, 160); setTimeout(scrollLatest, 320); }, true);
+  document.addEventListener('click', event => { const open = event.target.closest('[data-chat-open]'); if (!open || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); const contactId = open.dataset.chatOpen; refreshConversationFromStorage(contactId); activeContact = contactId; activeTab = 'chat'; menuOpen = false; emojiOpen = false; profilePickerOpen = false; settingsProfilePickerOpen = false; chatMessageEditMode = false; selectedChatMessageIds.clear(); markChatRead(activeContact); chatScrollToLatestPending = true; clearTimeout(chatScrollToLatestTimer); render(); const scrollLatest = () => { const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = box.scrollHeight; }; requestAnimationFrame(scrollLatest); setTimeout(scrollLatest, 0); setTimeout(scrollLatest, 50); setTimeout(scrollLatest, 160); setTimeout(scrollLatest, 320); }, true);
   let readingChapterIndex = 0;
   function ensureBookChapters(book) { if (Array.isArray(book.chapters) && book.chapters.length) return book.chapters; const lines = String(book.content || '').split(/\r?\n/); const indexes = []; lines.forEach((line, index) => { if (/^\s*(第\s*[^\s]{1,12}\s*[章节回]|chapter\s+\d+)/i.test(line.trim())) indexes.push(index); }); if (!indexes.length) book.chapters = [{ title: '全文', content: String(book.content || '') }]; else book.chapters = indexes.map((start, index) => ({ title: lines[start].trim(), content: lines.slice(start + 1, indexes[index + 1] || lines.length).join('\n') })); return book.chapters; }
   function renderChapterPicker(modal, book) { const chapters = ensureBookChapters(book); modal.innerHTML = '<header class="chat-reading-header"><button data-chat-reading-shelf type="button">‹</button><div><span class="chat-kicker">CHAPTERS</span><h1>选择章节</h1></div><button data-chat-reading-close type="button">×</button></header><main class="chat-reading-shelf"><div class="chat-reading-intro"><span>' + esc(bookName(book)) + '</span><p>选择要和角色一起阅读的章节。</p></div><div class="chat-reading-chapters">' + chapters.map((chapter, index) => '<button data-chat-reading-chapter="' + index + '" type="button"><span>' + (index + 1) + '</span><b>' + esc(chapter.title || ('第 ' + (index + 1) + ' 章')) + '</b><i>›</i></button>').join('') + '</div></main>'; }
@@ -4399,7 +4399,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const contactId = event.detail?.contactId;
     if (!contactId) return;
     document.querySelectorAll('body > div[class*="-app"].is-open').forEach(element => { if (element !== app) element.classList.remove('is-open'); });
-    state = read();
+    refreshConversationFromStorage(contactId);
     activeTab = 'chat';
     activeContact = state.contacts.some(item => item.id === contactId) ? contactId : null;
     menuOpen = false;
@@ -4911,6 +4911,14 @@ ${recentConversation}
       : 0;
     wrap.style.setProperty('--chat-keyboard-inset', `${Math.ceil(keyboardInset)}px`);
     wrap.classList.toggle('is-keyboard-lifted', keyboardInset > 8);
+    const messages = conversation.querySelector('#chatMessages');
+    if (messages) {
+      messages.style.setProperty('--chat-keyboard-bottom-space', `${Math.ceil(keyboardInset)}px`);
+      messages.classList.toggle('is-keyboard-avoiding', keyboardInset > 8);
+      if (keyboardInset > 8 && wrap.classList.contains('has-chat-quote')) {
+        requestAnimationFrame(() => { messages.scrollTop = messages.scrollHeight; });
+      }
+    }
   }
   function scheduleChatKeyboardPosition() {
     if (chatKeyboardPositionFrame) return;
@@ -4935,6 +4943,8 @@ ${recentConversation}
     bar.dataset.chatQuoteBar = '';
     bar.innerHTML = `<div><small>${esc(quoteMessageSpeaker(message))}</small><p>${esc(quoteMessageText(message))}</p></div><button type="button" data-chat-quote-cancel aria-label="取消引用">×</button>`;
     wrap.insertBefore(bar, wrap.querySelector('.chat-compose'));
+    // 引用栏改变了输入区高度，立即重新计算键盘抬升占位，再把列表贴到底部。
+    scheduleChatKeyboardPosition();
     // 引用栏会占用输入区上方的高度，消息列表需要重新贴到底部，
     // 否则最后一条气泡会停在引用栏后面，被输入区遮住。
     const scrollLatest = () => {
@@ -5077,6 +5087,27 @@ ${recentConversation}
     return backgroundReplyContactId || replyingContacts.size ? state : readBeforeBackgroundReply();
   };
 
+  // 打开会话前只刷新目标会话，避免后台回复进行中时替换整个 state 对象，
+  // 同时确保列表页停留期间由通知/其他页面写入的最新消息能够显示出来。
+  function refreshConversationFromStorage(contactId) {
+    if (!contactId || backgroundReplyContactId === contactId || replyingContacts.has(contactId)) return;
+    const persisted = readBeforeBackgroundReply();
+    const persistedContact = persisted.contacts?.find(item => item.id === contactId);
+    if (persistedContact) {
+      const index = state.contacts.findIndex(item => item.id === contactId);
+      if (index >= 0) state.contacts[index] = persistedContact;
+      else state.contacts.push(persistedContact);
+    }
+    const persistedChat = persisted.chats?.[contactId];
+    const liveMessages = state.chats?.[contactId]?.messages;
+    const persistedMessages = persistedChat?.messages;
+    // 本地内存里可能刚追加了一条尚未完成持久化的消息，不能因为刷新而回退；
+    // 只有持久化记录至少同样新（消息数不少于当前内存）时才替换目标会话。
+    if (persistedChat && (!Array.isArray(liveMessages) || !Array.isArray(persistedMessages) || persistedMessages.length >= liveMessages.length)) {
+      state.chats[contactId] = persistedChat;
+    }
+  }
+
   // Handle real photo uploads before the legacy FileReader listener. Images are
   // resized for a practical vision payload and stored outside localStorage when
   // IndexedDB is available.
@@ -5167,13 +5198,13 @@ ${recentConversation}
     target.querySelector?.('.chat-unread-badge')?.remove();
     // 后台回复可能在当前页面状态之外完成；进入具体聊天前重新读取已保存记录，
     // 避免通知栏已经有新消息，但聊天页仍使用旧的 state。
-    if (!backgroundReplyContactId) state = read();
+    refreshConversationFromStorage(contactId);
     markChatRead(contactId);
     requestAnimationFrame(() => {
       if (activeTab !== 'chat' || activeContact !== contactId) return;
       // 主点击处理器会先切换 activeContact；在下一帧重新读取并清理一次，
       // 覆盖群聊同步事件与渲染顺序造成的竞态。
-      state = read();
+      refreshConversationFromStorage(contactId);
       markChatRead(contactId);
       render();
     });
@@ -5585,7 +5616,7 @@ ${recentConversation}
 
   window.IdealMachineChat = window.IdealMachineChat || {};
   window.IdealMachineChat.openConversation = function(contactId) {
-    state = read();
+    refreshConversationFromStorage(contactId);
     activeContact = state.contacts.some(item => item.id === contactId) ? contactId : null;
     activeTab = 'chat';
     menuOpen = false;
