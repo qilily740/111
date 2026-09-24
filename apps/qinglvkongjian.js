@@ -271,7 +271,15 @@
     paperTexturePromise ||= new Promise((resolve, reject) => {
       const texture = new Image();
       texture.onload = () => resolve(texture);
-      texture.onerror = reject;
+      let fallbackTried = false;
+      texture.onerror = () => {
+        if (!fallbackTried) {
+          fallbackTried = true;
+          texture.src = 'assets/ui/couple-paper/white-crumpled-sheet.png';
+          return;
+        }
+        reject(new Error('纸张纹理加载失败'));
+      };
       texture.src = 'assets/ui/couple-paper/white-crumpled-sheet.webp';
     });
     paperTexturePromise.then(texture => {
@@ -394,7 +402,7 @@
     const person = esc(roleName(role));
     const caseFile = mysteryCaseList().find(item => item.id === mysteryCaseId);
     const header = `<header class="couple-mystery-header"><button data-mystery-back type="button" ${caseFile ? '' : 'hidden'} aria-label="返回案件列表">‹</button><div><small>ARCHIVE OF SECRETS</small><b>古籍悬案</b></div><button data-mystery-close type="button" aria-label="关闭游戏">×</button></header>`;
-    if (!caseFile) return `<section class="couple-mystery" role="dialog" aria-modal="true" aria-label="古籍悬案">${header}<main class="couple-mystery-main"><div class="couple-mystery-section-title"><b>待查案卷</b><small>${mysteryCases.filter(item => mysteryProgress(item.id).solved).length} / ${mysteryCases.length} 已破 · 左右滑动</small></div><div class="couple-mystery-case-list">${mysteryCases.map(item => { const progress = mysteryProgress(item.id); return `<button class="couple-mystery-case-card" data-mystery-case="${item.id}" type="button"><span class="couple-mystery-scroll-art" aria-hidden="true"><img src="assets/ui/game-covers/ancient-case-scroll-v1.webp" alt="古代卷轴" draggable="false"><span class="couple-mystery-scroll-writing"><small>案 ${item.number} · ${esc(item.tag)}</small><b>${esc(item.title)}</b><i>${esc(item.source)}</i><em>${progress.solved ? '已破案 ✓' : progress.investigated?.length ? '继续查案' : '展开案卷'} →</em></span></span><span class="couple-mystery-closed-label"><small>案 ${item.number}</small><b>${esc(item.title)}</b><em>${progress.solved ? '已破案 ✓' : progress.investigated?.length ? '继续查案' : '点击展开'}</em></span></button>`; }).join('')}</div></main></section>`;
+    if (!caseFile) return `<section class="couple-mystery" role="dialog" aria-modal="true" aria-label="古籍悬案">${header}<main class="couple-mystery-main"><div class="couple-mystery-section-title"><b>待查案卷</b><small>${mysteryCases.filter(item => mysteryProgress(item.id).solved).length} / ${mysteryCases.length} 已破 · 左右滑动</small></div><div class="couple-mystery-case-list">${mysteryCases.map(item => { const progress = mysteryProgress(item.id); return `<button class="couple-mystery-case-card" data-mystery-case="${item.id}" type="button"><span class="couple-mystery-scroll-art" aria-hidden="true"><img src="assets/ui/game-covers/ancient-case-scroll-v1.webp" onerror="this.onerror=null;this.src='assets/ui/game-covers/ancient-case-scroll-v1.png'" alt="古代卷轴" draggable="false"><span class="couple-mystery-scroll-writing"><small>案 ${item.number} · ${esc(item.tag)}</small><b>${esc(item.title)}</b><i>${esc(item.source)}</i><em>${progress.solved ? '已破案 ✓' : progress.investigated?.length ? '继续查案' : '展开案卷'} →</em></span></span><span class="couple-mystery-closed-label"><small>案 ${item.number}</small><b>${esc(item.title)}</b><em>${progress.solved ? '已破案 ✓' : progress.investigated?.length ? '继续查案' : '点击展开'}</em></span></button>`; }).join('')}</div></main></section>`;
     const progress = mysteryProgress(caseFile.id);
     const clues = mysteryClues(caseFile);
     const viewed = Array.isArray(progress.viewed) ? progress.viewed : [];
@@ -617,7 +625,7 @@
   function games(role, profile) {
     const categories = [['🏁', '竞速'], ['🧩', '益智解谜'], ['♠', '娱乐场'], ['☀', '云游戏'], ['🎯', '策略']];
     const chips = categories.map(([icon, label], index) => `<button class="couple-games-chip" type="button" disabled><i class="couple-games-chip-icon chip-icon-${index + 1}" aria-hidden="true"></i><span>${label}</span></button>`).join('');
-    const installed = Array.from({ length: 3 }, (_, index) => index === 0 ? '<article class="couple-games-installed-card is-filled"><img class="couple-games-installed-cover" src="assets/ui/game-covers/flower-roulette-cover-photo-v2.webp" alt="花朵轮盘游戏封面"><div class="couple-games-installed-copy"><i>双人心理博弈</i><b>花朵轮盘</b><span>谁被鲜花打中，谁就输</span><button data-flower-roulette-open type="button">打开</button></div></article>' : index === 1 ? '<article class="couple-games-installed-card is-filled couple-mystery-cover"><div class="couple-mystery-cover-art"><img src="assets/ui/game-covers/ancient-mystery-cover-v2.webp" alt="古籍悬案游戏封面"></div><div class="couple-games-installed-copy"><i>和 TA 一起读案推理</i><b>古籍悬案</b><span>翻开案卷，找出真相</span><button data-mystery-open type="button">打开</button></div></article>' : '<article class="couple-games-installed-card is-filled stock-cover"><img class="couple-games-installed-cover" src="assets/ui/game-covers/stock-sort-cover-v1.webp" alt="分类理货游戏封面"><div class="couple-games-installed-copy"><i>轻巧分类益智</i><b>分类理货</b><span>整理货堆，完成今日订单</span><button data-stock-open type="button">打开</button></div></article>').join('');
+    const installed = Array.from({ length: 3 }, (_, index) => index === 0 ? '<article class="couple-games-installed-card is-filled"><img class="couple-games-installed-cover" src="assets/ui/game-covers/flower-roulette-cover-photo-v2.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/flower-roulette-cover-photo-v2.png\'" alt="花朵轮盘游戏封面"><div class="couple-games-installed-copy"><i>双人心理博弈</i><b>花朵轮盘</b><span>谁被鲜花打中，谁就输</span><button data-flower-roulette-open type="button">打开</button></div></article>' : index === 1 ? '<article class="couple-games-installed-card is-filled couple-mystery-cover"><div class="couple-mystery-cover-art"><img src="assets/ui/game-covers/ancient-mystery-cover-v2.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/ancient-mystery-cover-v2.png\'" alt="古籍悬案游戏封面"></div><div class="couple-games-installed-copy"><i>和 TA 一起读案推理</i><b>古籍悬案</b><span>翻开案卷，找出真相</span><button data-mystery-open type="button">打开</button></div></article>' : '<article class="couple-games-installed-card is-filled stock-cover"><img class="couple-games-installed-cover" src="assets/ui/game-covers/stock-sort-cover-v1.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/stock-sort-cover-v1.png\'" alt="分类理货游戏封面"><div class="couple-games-installed-copy"><i>轻巧分类益智</i><b>分类理货</b><span>整理货堆，完成今日订单</span><button data-stock-open type="button">打开</button></div></article>').join('');
     const rows = Array.from({ length: 4 }, () => '<article class="couple-games-row" aria-label="未安装游戏待定"><i class="couple-games-row-icon"></i><div><b></b><span></span></div><div class="couple-games-row-action"><button type="button" aria-label="获取">获取</button><small>App 内购买</small></div></article>').join('');
     return `<section class="couple-games-shell"><div class="couple-games-category-row">${chips}</div><section class="couple-games-installed-row" aria-label="已安装游戏">${installed}</section><section class="couple-games-list-slot"><header><div><h2>近期佳作</h2><span>向左滑动查看更多</span></div><button type="button" disabled>查看全部</button></header>${rows}</section></section>`;
   }
@@ -768,7 +776,8 @@
     const gunImage = actor === 'role'
       ? (flowerShot ? 'gun-bouquet-front-cutout.webp' : 'gun-front-cutout.webp')
       : (flowerShot ? 'gun-bouquet-diagonal-cutout.webp' : 'gun-diagonal-cutout.webp');
-    return `<div class="flower-gun-stage is-${actor} ${flowerShot ? 'is-flower-shot' : ''}" aria-label="共用鲜花枪，枪口朝向${actor === 'user' ? esc(flowerRouletteRoleName()) : '你'}"><div class="flower-gun ${firing ? 'is-firing' : ''}" style="--shot-delay:-${elapsed}ms"><img src="assets/flower-roulette/${gunImage}?v=${assetVersion}" alt="鲜花轮盘左轮枪" draggable="false"></div></div>${firing && !shot.flower ? `<div class="flower-shot-effect is-${shot.actor} is-empty" style="--shot-delay:-${elapsed}ms" aria-hidden="true"><span>咔哒</span></div>` : ''}`;
+    const gunFallback = gunImage.replace('.webp', '.png');
+    return `<div class="flower-gun-stage is-${actor} ${flowerShot ? 'is-flower-shot' : ''}" aria-label="共用鲜花枪，枪口朝向${actor === 'user' ? esc(flowerRouletteRoleName()) : '你'}"><div class="flower-gun ${firing ? 'is-firing' : ''}" style="--shot-delay:-${elapsed}ms"><img src="assets/flower-roulette/${gunImage}?v=${assetVersion}" onerror="this.onerror=null;this.src='assets/flower-roulette/${gunFallback}?v=${assetVersion}'" alt="鲜花轮盘左轮枪" draggable="false"></div></div>${firing && !shot.flower ? `<div class="flower-shot-effect is-${shot.actor} is-empty" style="--shot-delay:-${elapsed}ms" aria-hidden="true"><span>咔哒</span></div>` : ''}`;
   }
   function legacyGamesV3() {
     const { role } = current();
