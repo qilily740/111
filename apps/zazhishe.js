@@ -243,7 +243,7 @@
     let lastError;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        response = await request(url, { idealScope:'magazine-background', timeout:120000, method:'POST', headers, body:JSON.stringify({ model:config.model, temperature, messages:[{ role:'system', content:system },{ role:'user', content:prompt }] }) });
+        response = await request(url, { idealScope:'magazine-background', timeout:180000, method:'POST', headers, body:JSON.stringify({ model:config.model, temperature, messages:[{ role:'system', content:system },{ role:'user', content:prompt }] }) });
         break;
       } catch (error) {
         lastError = error;
@@ -251,7 +251,7 @@
       }
     }
     if (!response) {
-      if (lastError?.name === 'TimeoutError') throw new Error('接口在 120 秒内没有响应');
+    if (lastError?.name === 'TimeoutError') throw new Error('接口在 180 秒内没有响应');
       if (lastError?.name === 'AbortError') throw new Error('采访请求已取消');
       if (/failed to fetch|networkerror|load failed/i.test(String(lastError?.message || ''))) throw new Error('网络请求未能到达 API，请检查接口地址和浏览器跨域（CORS）设置');
       throw lastError || new Error('采访请求失败');

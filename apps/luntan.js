@@ -56,10 +56,10 @@
     const request = window.IdealMachineFetch || window.fetch.bind(window);
     let lastError;
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      try { return await request(url, { ...options, idealScope:scope, timeout:120000 }); }
+      try { return await request(url, { ...options, idealScope:scope, timeout:180000 }); }
       catch (error) { lastError = error; if (error?.name === 'AbortError' || error?.name === 'TimeoutError' || attempt > 0) break; }
     }
-    if (lastError?.name === 'TimeoutError') throw new Error('接口在 120 秒内没有响应');
+    if (lastError?.name === 'TimeoutError') throw new Error('接口在 180 秒内没有响应');
     if (lastError?.name === 'AbortError') throw new Error('互动请求已取消');
     if (/failed to fetch|networkerror|load failed/i.test(String(lastError?.message || ''))) throw new Error('网络请求未能到达 API。请确认接口支持浏览器跨域访问（CORS），或稍后重试');
     throw lastError;
