@@ -1413,6 +1413,36 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .calendar-editor footer { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
 .calendar-editor footer button { min-height:35px; padding:0 14px; border:0; border-radius:10px; background:#eee; color:#555; font:inherit; font-size:11px; cursor:pointer; }
 .calendar-editor footer button:last-child { background:#222; color:#fff; }
+.calendar-refresh-picker { position:fixed; inset:0; z-index:12; display:grid; place-items:center; padding:20px; }
+.calendar-refresh-backdrop { position:absolute; inset:0; width:100%; height:100%; border:0; background:rgba(0,0,0,.28); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); cursor:pointer; }
+.calendar-refresh-picker > section { position:relative; display:flex; flex-direction:column; width:min(100%,390px); max-height:min(82vh,620px); overflow:hidden; padding:18px; border:1px solid rgba(255,255,255,.82); border-radius:22px; background:rgba(250,250,250,.98); box-shadow:0 20px 60px rgba(0,0,0,.22); }
+.calendar-refresh-picker header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.calendar-refresh-picker header > div { min-width:0; }
+.calendar-refresh-picker header span { color:#999; font-size:9px; font-weight:700; letter-spacing:.16em; }
+.calendar-refresh-picker header h2 { margin-top:5px; font-size:18px; }
+.calendar-refresh-picker header p { margin-top:7px; color:#888; font-size:11px; line-height:1.5; }
+.calendar-refresh-picker header p b { color:#222; }
+.calendar-refresh-picker header > button { flex:0 0 28px; width:28px; height:28px; border:0; border-radius:50%; background:rgba(0,0,0,.07); color:#666; font-size:18px; cursor:pointer; }
+.calendar-refresh-all { display:flex; align-items:center; gap:8px; width:100%; margin-top:14px; padding:10px 11px; border:1px solid rgba(0,0,0,.08); border-radius:12px; background:rgba(0,0,0,.035); color:#444; font:inherit; font-size:11px; text-align:left; cursor:pointer; }
+.calendar-refresh-all i { display:grid; flex:0 0 18px; place-items:center; width:18px; height:18px; border:1px solid #c9c9c9; border-radius:5px; color:#fff; font-size:12px; font-style:normal; }
+.calendar-refresh-all i.is-checked { border-color:#222; background:#222; }
+.calendar-refresh-all small { margin-left:auto; color:#999; font-size:10px; }
+.calendar-refresh-picker main { min-height:0; overflow-y:auto; margin-top:8px; }
+.calendar-refresh-role { display:flex; align-items:center; gap:10px; width:100%; min-height:55px; padding:8px 5px; border:0; border-bottom:1px solid rgba(0,0,0,.07); background:transparent; color:#333; font:inherit; text-align:left; cursor:pointer; }
+.calendar-refresh-role:last-child { border-bottom:0; }
+.calendar-refresh-avatar { display:grid; flex:0 0 34px; place-items:center; width:34px; height:34px; overflow:hidden; border-radius:50%; background:#ddd; color:#fff; font-size:12px; font-weight:700; }
+.calendar-refresh-avatar img, .calendar-refresh-avatar > span { display:block; width:100%; height:100%; object-fit:cover; }
+.calendar-refresh-avatar > span { display:grid; place-items:center; }
+.calendar-refresh-role > span:nth-child(2) { display:grid; flex:1; min-width:0; gap:3px; }
+.calendar-refresh-role b { overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.calendar-refresh-role small { overflow:hidden; color:#999; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.calendar-refresh-role em { display:grid; flex:0 0 20px; place-items:center; width:20px; height:20px; border:1px solid #c9c9c9; border-radius:50%; color:#fff; font-size:12px; font-style:normal; }
+.calendar-refresh-role.is-selected em { border-color:#222; background:#222; }
+.calendar-refresh-empty { padding:22px 4px; color:#999; font-size:11px; text-align:center; }
+.calendar-refresh-picker footer { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid rgba(0,0,0,.07); }
+.calendar-refresh-picker footer button { min-height:35px; padding:0 13px; border:0; border-radius:10px; background:#eee; color:#555; font:inherit; font-size:11px; cursor:pointer; }
+.calendar-refresh-picker footer button.is-primary { background:#222; color:#fff; }
+.calendar-refresh-picker footer button:disabled { cursor:default; opacity:.45; }
 @media (prefers-color-scheme:dark) {
   .calendar-app { background:#202020; color:#eee; }
   .calendar-app-header { border-color:rgba(255,255,255,.12); background:rgba(32,32,32,.86); }
@@ -1428,6 +1458,17 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
   .calendar-editor > section { border-color:rgba(255,255,255,.14); background:rgba(35,35,35,.97); }
   .calendar-editor input, .calendar-editor select, .calendar-editor textarea { border-color:rgba(255,255,255,.14); background:rgba(0,0,0,.22); color:#eee; }
   .calendar-editor footer button { background:rgba(255,255,255,.1); color:#ddd; }
+  .calendar-refresh-picker > section { border-color:rgba(255,255,255,.14); background:rgba(35,35,35,.97); }
+  .calendar-refresh-picker header p, .calendar-refresh-picker header p b { color:#aaa; }
+  .calendar-refresh-picker header > button { background:rgba(255,255,255,.1); color:#ddd; }
+  .calendar-refresh-all { border-color:rgba(255,255,255,.12); background:rgba(255,255,255,.07); color:#ddd; }
+  .calendar-refresh-all i, .calendar-refresh-role em { border-color:rgba(255,255,255,.28); }
+  .calendar-refresh-all i.is-checked, .calendar-refresh-role.is-selected em { border-color:#eee; background:#eee; color:#111; }
+  .calendar-refresh-role { border-color:rgba(255,255,255,.1); color:#eee; }
+  .calendar-refresh-role small, .calendar-refresh-all small, .calendar-refresh-empty { color:#aaa; }
+  .calendar-refresh-picker footer { border-color:rgba(255,255,255,.1); }
+  .calendar-refresh-picker footer button { background:rgba(255,255,255,.1); color:#ddd; }
+  .calendar-refresh-picker footer button.is-primary { background:#eee; color:#111; }
 }
 
 /* 辩论：API 出题、双方安排与可回看的本地辩论记录。 */
@@ -1677,8 +1718,26 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .settings-section h2 { margin-top: 6px; font-size: 19px; letter-spacing: -.02em; }
 .settings-status, .settings-storage-total { flex:0 0 auto; max-width:42%; min-width:58px; overflow:visible; color:#888; font-size:11px; line-height:1.35; overflow-wrap:anywhere; text-align:right; white-space:normal; }
 .settings-profile-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.settings-profile-bar select { flex: 1 1 auto; min-width: 0; height: 34px; padding: 0 9px; border: 1px solid rgba(0,0,0,.1); border-radius: 9px; background: rgba(255,255,255,.62); color: #444; font: inherit; font-size: 11px; }
-.settings-profile-bar button { display: inline-flex; flex: 0 0 auto; flex-direction: row; align-items: center; justify-content: center; width: max-content; min-width: max-content; height: 34px; padding: 0 11px; border: 1px solid rgba(0,0,0,.11); border-radius: 9px; background: rgba(255,255,255,.5); color: #555; font: inherit; font-size: 11px; line-height: 1; white-space: nowrap; writing-mode: horizontal-tb; cursor: pointer; }
+.settings-profile-picker { position: relative; flex: 1 1 auto; min-width: 0; }
+.settings-profile-trigger { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; height:34px; padding:0 11px; border:1px solid rgba(0,0,0,.1); border-radius:10px; background:rgba(255,255,255,.74); box-shadow:0 2px 8px rgba(0,0,0,.035); color:#444; font:inherit; font-size:11px; text-align:left; cursor:pointer; }
+.settings-profile-trigger span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.settings-profile-trigger i { flex:0 0 auto; color:#888; font-size:14px; font-style:normal; line-height:1; }
+.settings-profile-menu { position:absolute; top:calc(100% + 7px); right:0; left:0; z-index:8; max-height:260px; overflow-y:auto; padding:6px; border:1px solid rgba(0,0,0,.08); border-radius:15px; background:rgba(255,255,255,.98); box-shadow:0 14px 32px rgba(0,0,0,.13); }
+.settings-profile-menu[hidden] { display:none; }
+.settings-profile-item-row { display:flex; align-items:stretch; gap:5px; padding:2px; border-radius:11px; }
+.settings-profile-item-row + .settings-profile-item-row { margin-top:2px; }
+.settings-profile-item { display:flex; flex:1; align-items:center; min-width:0; padding:9px 10px; border:0; border-radius:9px; background:transparent; color:#444; font:inherit; text-align:left; cursor:pointer; }
+.settings-profile-item:hover, .settings-profile-item.is-active { background:rgba(0,0,0,.055); }
+.settings-profile-item > span { display:grid; min-width:0; gap:3px; }
+.settings-profile-item b, .settings-profile-item small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.settings-profile-item b { font-size:11px; }
+.settings-profile-item small { color:#999; font-size:9px; }
+.settings-profile-delete { align-self:center; flex:0 0 auto; min-height:27px; padding:0 8px; border:1px solid transparent; border-radius:8px; background:transparent; color:#999; font:inherit; font-size:10px; cursor:pointer; }
+.settings-profile-delete:hover { border-color:rgba(190,70,70,.18); background:rgba(190,70,70,.08); color:#b25555; }
+.settings-profile-empty { padding:18px 10px; color:#999; font-size:10px; text-align:center; }
+.settings-profile-bar > button { display: inline-flex; flex: 0 0 auto; flex-direction: row; align-items: center; justify-content: center; width: max-content; min-width: max-content; height: 34px; padding: 0 11px; border: 1px solid rgba(0,0,0,.11); border-radius: 9px; background: rgba(255,255,255,.5); color: #555; font: inherit; font-size: 11px; line-height: 1; white-space: nowrap; writing-mode: horizontal-tb; cursor: pointer; }
+.settings-profile-bar .settings-profile-trigger { display:flex; flex:1 1 auto; width:100%; min-width:0; }
+.settings-profile-bar .settings-profile-picker { flex:1 1 auto; }
 .settings-api-form { display: grid; grid-template-columns: .9fr 1.2fr 1fr auto; align-items: end; gap: 9px; }
 .settings-api-form label { display: grid; gap: 7px; color: #777; font-size: 11px; }
 .settings-api-form input { width: 100%; height: 38px; padding: 0 11px; border: 1px solid rgba(0,0,0,.11); border-radius: 10px; outline: 0; background: rgba(255,255,255,.68); color: #222; font: inherit; font-size: 12px; }
@@ -1746,7 +1805,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 @media (max-width: 600px) { .settings-main { width: calc(100% - 28px); padding-top: 16px; }.settings-api-form { grid-template-columns: 1fr 1fr; }.settings-api-form label:first-child, .settings-api-form label:nth-child(2) { grid-column: 1 / -1; }.settings-primary { grid-column: 2; }.settings-model-list { grid-template-columns: 1fr; }.settings-section { padding: 17px; }.settings-prompt-variables { grid-template-columns:1fr; } }
 @media (max-width:600px) { .settings-vector-form { grid-template-columns:1fr; }.settings-vector-actions { display:grid; grid-template-columns:1fr 1fr; }.settings-vector-actions button.is-primary { grid-column:1/-1; }.settings-vector-section .settings-section-head { align-items:flex-start; }.settings-vector-section .settings-status { max-width:110px; text-align:right; white-space:normal; } }
 @media (max-width:600px) { .settings-api-section .settings-section-head { display:flex; gap:12px; }.settings-api-section .settings-status { flex:0 0 auto; max-width:40%; overflow:hidden; line-height:1.45; text-align:right; text-overflow:ellipsis; white-space:nowrap; } }
-@media (prefers-color-scheme: dark) { .settings-app { background: #202020; color: #eee; }.settings-header { border-color: rgba(255,255,255,.12); background: rgba(28,28,28,.88); }.settings-close { background: rgba(255,255,255,.1); color: #ddd; }.settings-section { border-color: rgba(255,255,255,.13); background: rgba(255,255,255,.07); }.settings-api-form input, .settings-assignment-item select, .settings-profile-bar select, .settings-prompt-label textarea { border-color: rgba(255,255,255,.14); background: rgba(0,0,0,.22); color: #eee; }.settings-profile-bar button { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.08); color: #ddd; }.settings-model-panel, .settings-assignment { border-color: rgba(255,255,255,.12); }.settings-model-option, .settings-data-actions button, .settings-import-label { border-color: rgba(255,255,255,.13); background: rgba(255,255,255,.07); color: #ddd; }.settings-primary, .settings-save-api { background: #eee; color: #111; }.settings-storage-dot { background: #eee; }.settings-storage-dot.dot-1 { background: #aaa; }.settings-storage-dot.dot-2 { background: #777; }.settings-storage-dot.dot-3 { background: #555; }.settings-storage-dot.dot-4 { background: #ccc; }.settings-danger { border-color: rgba(220,120,120,.3); background: rgba(180,70,70,.12); color: #e0a1a1; }.settings-reset-confirm > section { border-color: rgba(255,255,255,.14); background: rgba(35,35,35,.97); }.settings-reset-confirm h2 { color: #f1f1f1; }.settings-reset-confirm p { color: #aaa; }.settings-reset-cancel { background: rgba(255,255,255,.1); color: #eee; }.settings-reset-confirm-ok { background: #f1f1f1; color: #111; }.settings-prompt-actions button { border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.08); color:#ddd; }.settings-prompt-actions button.is-primary { border-color:#eee; background:#eee; color:#111; }.settings-prompt-subhead b, .settings-prompt-variables code { color:#eee; }.settings-prompt-variables { border-color:rgba(255,255,255,.12); background:rgba(0,0,0,.12); }.settings-prompt-variables button { color:#aaa; } }
+@media (prefers-color-scheme: dark) { .settings-app { background: #202020; color: #eee; }.settings-header { border-color: rgba(255,255,255,.12); background: rgba(28,28,28,.88); }.settings-close { background: rgba(255,255,255,.1); color: #ddd; }.settings-section { border-color: rgba(255,255,255,.13); background: rgba(255,255,255,.07); }.settings-api-form input, .settings-assignment-item select, .settings-profile-bar select, .settings-prompt-label textarea { border-color: rgba(255,255,255,.14); background: rgba(0,0,0,.22); color: #eee; }.settings-profile-bar > button { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.08); color: #ddd; }.settings-profile-trigger { border-color:rgba(255,255,255,.14); background:rgba(0,0,0,.22); color:#eee; }.settings-profile-menu { border-color:rgba(255,255,255,.14); background:rgba(35,35,35,.98); }.settings-profile-item { color:#eee; }.settings-profile-item:hover, .settings-profile-item.is-active { background:rgba(255,255,255,.1); }.settings-profile-item small { color:#aaa; }.settings-profile-delete { border:1px solid transparent; background:transparent; color:#aaa; }.settings-profile-delete:hover { border-color:rgba(220,120,120,.25); background:rgba(220,120,120,.16); color:#e0a1a1; }.settings-profile-empty { color:#aaa; }.settings-model-panel, .settings-assignment { border-color: rgba(255,255,255,.12); }.settings-model-option, .settings-data-actions button, .settings-import-label { border-color: rgba(255,255,255,.13); background: rgba(255,255,255,.07); color: #ddd; }.settings-primary, .settings-save-api { background: #eee; color: #111; }.settings-storage-dot { background: #eee; }.settings-storage-dot.dot-1 { background: #aaa; }.settings-storage-dot.dot-2 { background: #777; }.settings-storage-dot.dot-3 { background: #555; }.settings-storage-dot.dot-4 { background: #ccc; }.settings-danger { border-color: rgba(220,120,120,.3); background: rgba(180,70,70,.12); color: #e0a1a1; }.settings-reset-confirm > section { border-color: rgba(255,255,255,.14); background: rgba(35,35,35,.97); }.settings-reset-confirm h2 { color: #f1f1f1; }.settings-reset-confirm p { color: #aaa; }.settings-reset-cancel { background: rgba(255,255,255,.1); color: #eee; }.settings-reset-confirm-ok { background: #f1f1f1; color: #111; }.settings-prompt-actions button { border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.08); color:#ddd; }.settings-prompt-actions button.is-primary { border-color:#eee; background:#eee; color:#111; }.settings-prompt-subhead b, .settings-prompt-variables code { color:#eee; }.settings-prompt-variables { border-color:rgba(255,255,255,.12); background:rgba(0,0,0,.12); }.settings-prompt-variables button { color:#aaa; } }
 @media (prefers-color-scheme:dark) { .settings-vector-form input { border-color:rgba(255,255,255,.14); background:rgba(0,0,0,.22); color:#eee; }.settings-vector-actions button { border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.08); color:#ddd; }.settings-vector-actions button.is-primary { border-color:#eee; background:#eee; color:#111; }.settings-vector-note { border-color:rgba(255,255,255,.1); background:rgba(255,255,255,.05); }.settings-vector-note b { color:#ddd; }.settings-vector-note p { color:#aaa; }.settings-vector-section code { background:rgba(255,255,255,.1); } }
 .settings-notification-row { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:16px; padding:13px 14px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:rgba(255,255,255,.56); }
 .settings-notification-row > div { display:grid; gap:4px; }
@@ -12460,3 +12519,188 @@ button.fanfic-home-row-main:active { opacity:.58; }
 @media (max-width:600px) {
   .chat-app.is-chatting.is-menu-open .chat-conversation > .chat-compose-wrap > .chat-tools { flex-wrap:nowrap !important; }
 }
+
+/* Ta 各页面改用紧凑列表，去掉占据大面积的主卡片外框，内容与点击操作保持不变。 */
+.ta-role-app-main > .ta-role-intro,
+.ta-role-app-main > .ta-role-card {
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.ta-role-app-main > .ta-role-intro {
+  margin-bottom:14px;
+  padding:0 0 12px;
+  border-bottom:1px solid #e5e8ed;
+}
+.ta-role-app-main > .ta-role-card {
+  margin-bottom:0;
+  padding:11px 0 12px;
+  border-bottom:1px solid #e5e8ed;
+}
+.ta-role-app-main > .ta-day-plan .ta-day-timeline article > div {
+  margin-bottom:0;
+  padding:8px 0 12px;
+  border:0;
+  border-bottom:1px solid #e5e8ed;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.ta-role-app-main > .ta-day-plan .ta-day-timeline article:last-child > div { border-bottom:0; }
+.ta-role-app-main > .ta-recent-playlist > div {
+  overflow:visible;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+.ta-role-app-main > .ta-order-list > article {
+  overflow:visible;
+  border:0;
+  border-bottom:1px solid #e5e8ed;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.ta-role-app-main > .ta-order-list > article:last-child { border-bottom:0; }
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance {
+  min-height:0;
+  margin-bottom:0;
+  padding:0 0 14px !important;
+  border:0 !important;
+  border-bottom:1px solid #e5e8ed !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  color:#202734 !important;
+  box-shadow:none !important;
+}
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance::before,
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance::after { display:none; }
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance > small { color:#8993a2 !important; }
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance > strong { color:#202734 !important; text-shadow:none; }
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance > div { margin-bottom:0; color:#8993a2 !important; }
+.ta-role-app-main > .ta-wallet-page .ta-wallet-list { gap:0; }
+.ta-role-app-main > .ta-wallet-page .ta-wallet-list article {
+  padding:10px 0;
+  border:0;
+  border-bottom:1px solid #e5e8ed;
+  border-radius:0;
+  background:transparent;
+}
+.ta-role-app-main > .ta-wallet-page .ta-wallet-list article:last-child { border-bottom:0; }
+
+@media (prefers-color-scheme:dark) {
+  .ta-role-app-main > .ta-role-intro,
+  .ta-role-app-main > .ta-role-card,
+  .ta-role-app-main > .ta-day-plan .ta-day-timeline article > div,
+  .ta-role-app-main > .ta-order-list > article,
+  .ta-role-app-main > .ta-wallet-page .ta-wallet-balance,
+  .ta-role-app-main > .ta-wallet-page .ta-wallet-list article { border-color:#353e4c !important; }
+  .ta-role-app-main > .ta-recent-playlist > div { background:transparent; }
+  .ta-role-app-main > .ta-wallet-page .ta-wallet-balance,
+  .ta-role-app-main > .ta-wallet-page .ta-wallet-balance > strong { color:#f1f3f7 !important; }
+  .ta-role-app-main > .ta-wallet-page .ta-wallet-balance > div,
+  .ta-role-app-main > .ta-wallet-page .ta-wallet-balance > small { color:#aeb8c6 !important; }
+}
+
+/* Ta 的“TA 看我”页面同样不使用整块主卡片，改为页面内分隔区。 */
+.ta-reverse-page > main > .ta-reverse-hero {
+  max-width:none;
+  padding:0 0 14px;
+  border:0;
+  border-bottom:1px solid rgba(0,0,0,.1);
+  border-radius:0;
+  background:transparent;
+  color:inherit;
+  box-shadow:none;
+}
+.ta-reverse-page > main > .ta-reverse-hero small { color:#927f89; }
+.ta-reverse-page > main > .ta-reverse-hero p { color:#777078; }
+.ta-reverse-page > main > .ta-reverse-hero > button { background:#30272d; color:#fff; }
+.ta-reverse-page > main > .ta-reverse-caught {
+  width:100%;
+  margin:28px auto 0;
+  padding:18px 0;
+  border:0;
+  border-bottom:1px solid rgba(0,0,0,.1);
+  border-radius:0;
+  background:transparent;
+  color:inherit;
+  box-shadow:none;
+}
+.ta-reverse-page > main > .ta-reverse-caught p { color:#777078; }
+.ta-reverse-page > main > .ta-reverse-caught b { color:#8d6574; }
+.ta-reverse-page > main > .ta-reverse-result article {
+  padding:11px 0;
+  border:0;
+  border-bottom:1px solid rgba(0,0,0,.1);
+  border-radius:0;
+  background:transparent;
+}
+.ta-reverse-page > main > .ta-reverse-result article:last-child { border-bottom:0; }
+.ta-reverse-page > main > .ta-reverse-result > footer,
+.ta-reverse-page > main > .ta-reverse-final {
+  padding:12px 0;
+  border:0;
+  border-top:1px solid rgba(0,0,0,.1);
+  border-radius:0;
+  background:transparent;
+}
+.ta-reverse-page > main > .ta-reverse-browser,
+.ta-reverse-page.is-live > main > .ta-reverse-browser {
+  width:100%;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.ta-reverse-page > main > .ta-reverse-browser > header { background:transparent; }
+.ta-reverse-page > main > .ta-reverse-browser > main { background:transparent; }
+@media (prefers-color-scheme:dark) {
+  .ta-reverse-page > main > .ta-reverse-hero,
+  .ta-reverse-page > main > .ta-reverse-caught,
+  .ta-reverse-page > main > .ta-reverse-result article,
+  .ta-reverse-page > main > .ta-reverse-result > footer,
+  .ta-reverse-page > main > .ta-reverse-final { border-color:rgba(255,255,255,.14); }
+  .ta-reverse-page > main > .ta-reverse-hero small,
+  .ta-reverse-page > main > .ta-reverse-hero p,
+  .ta-reverse-page > main > .ta-reverse-caught p { color:#b9adb4; }
+  .ta-reverse-page > main > .ta-reverse-hero > button { background:#eee; color:#222; }
+}
+
+/* 钱包页保留银行卡卡片，其他 Ta 页面仍使用紧凑列表。 */
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance {
+  position:relative;
+  isolation:isolate;
+  min-height:190px;
+  overflow:hidden;
+  padding:24px !important;
+  border:0 !important;
+  border-radius:22px !important;
+  background:linear-gradient(135deg,#17191f 0%,#303747 58%,#15171c 100%) !important;
+  color:#fff !important;
+  box-shadow:0 15px 34px rgba(20,24,32,.24) !important;
+}
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance::before {
+  display:block;
+  width:40px;
+  height:29px;
+  margin-bottom:15px;
+  border:1px solid rgba(255,255,255,.38);
+  border-radius:7px;
+  background:linear-gradient(135deg,#e8d9a3,#aa9360);
+  box-shadow:inset 0 0 0 5px rgba(255,255,255,.13);
+  content:"";
+}
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance::after {
+  position:absolute;
+  right:22px;
+  bottom:19px;
+  color:rgba(255,255,255,.7);
+  font:600 10px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.13em;
+  content:attr(data-card-number);
+}
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance > small { color:rgba(255,255,255,.68) !important; }
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance > strong { color:#fff !important; text-shadow:0 2px 8px rgba(0,0,0,.2); }
+.ta-role-app-main > .ta-wallet-page .ta-wallet-balance > div { margin-bottom:25px; color:rgba(255,255,255,.78) !important; }

@@ -114,7 +114,8 @@
   }
   window.IdealMachineFetch = async function idealMachineFetch(input, init = {}) {
     const scope = String(init.idealScope || 'shared');
-    const timeout = Math.max(1000, Number(init.timeout) || 45000);
+    // 所有外部请求统一至少保留 180 秒，批量生成等场景仍可传入更长时限。
+    const timeout = Math.max(180000, Number(init.timeout) || 180000);
     const controller = new AbortController();
     const externalSignal = init.signal;
     const abortFromExternal = () => controller.abort(externalSignal?.reason);

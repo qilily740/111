@@ -61,6 +61,25 @@
   let floatingSettingsSection = null;
   let settingsPanelView = 'api';
 
+  // 调用面板只记录真正的 API/模型请求；图片、脚本、样式和本地资源读取不属于 API 调用。
+  function shouldTrackRequest(scope, rawUrl, init, purpose, isModelCall, endpointPath) {
+    const url = String(rawUrl || '');
+    const path = String(endpointPath || '');
+    let accept = '';
+    try { accept = new Headers(init?.headers || {}).get('accept') || ''; } catch {}
+    if (/^(?:data:|blob:|idb:)/i.test(url)) return false;
+    if (/image\//i.test(accept)) return false;
+    if (/(?:读取|加载|导入|下载).*(?:图片|图像|封面|头像|壁纸|贴纸|资源)|下载生成结果/.test(String(purpose || ''))) return false;
+    if (!isModelCall && /\.(?:png|jpe?g|gif|webp|svg|ico|css|js|mjs|woff2?|ttf)(?:[?#]|$)/i.test(path)) return false;
+    const knownApiEndpoint = /\/(?:chat\/completions|embeddings|responses|models|config|subscribe|activation\/verify|images)(?:[/?]|$)/i.test(path)
+      || /(?:archive\.org\/metadata|api\.audius\.co\/v1\/)/i.test(url);
+    if (!isModelCall && !knownApiEndpoint && /(?:^|\/)(?:assets?|static|images?|avatars?|wallpapers?|stickers?|covers?|icons?)(?:\/|$)/i.test(path)) return false;
+    return Boolean(isModelCall || init?.idealPurpose || scope !== 'shared' || knownApiEndpoint);
+  }
+
+  calls = calls.filter(item => !/(?:读取|加载|导入|下载).*(?:图片|图像|封面|头像|壁纸|贴纸|资源)|下载生成结果/.test(String(item?.purpose || '')));
+  writeJson(callsKey, calls);
+
   function callPurpose(scope, rawUrl = '', init = {}) {
     const explicitPurpose = cleanText(init?.idealPurpose || '');
     if (explicitPurpose) return explicitPurpose;
@@ -244,6 +263,7 @@
       let endpointPath = '';
       try { host = new URL(rawUrl, location.href).host || '本机'; } catch {}
       try { endpointPath = new URL(rawUrl, location.href).pathname || ''; } catch {}
+      if (!shouldTrackRequest(scope, rawUrl, init, purpose, isModelCall, endpointPath)) return originalRequest(input, init);
       activeCalls += 1; updateBadge();
       try {
         const response = await originalRequest(input, init);

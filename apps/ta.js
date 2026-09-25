@@ -6,7 +6,7 @@
   const apps = [['liaotian','聊天','chat','#8bb8f1'],['luntan','论坛','forum','#f1a66f'],['rili','日历','calendar','#ee9b9b'],['qinglvkongjian','情侣空间','couple','#dc91b7'],['yinyue','音乐','music','#9e9ae9'],['doubao','豆包','doubao','#8ec8c2'],['gouwu','购物','shop','#e5b27d'],['qianbao','钱包','wallet','#78a889']];
   const beautyApp = ['meihua','美化','beauty','#9ba9c8'];
   const desktopApps = [...apps, beautyApp];
-  let state = readState(); let activeApp = ''; let activeChatTarget = ''; let activeDetail = null; let activeCalendarDate = localDateKey(new Date()); let calendarAutoOpenKey = ''; let npcBusy = false; let refreshing = false; let refreshPickerOpen = false; let appearanceOpen = false; let appearanceDraft = null; let appearanceSwapKey = ''; let reverseOpen = false; let reverseBusy = false; let reverseLive = null; let reverseForceCaught = false; let reverseRateOpen = false; let reverseViewer = null; let reverseAppearance = {wallpaper:'',icons:{},names:{}}; let reverseStep = 0; let selectedRefreshApps = new Set(); let doubaoHistoryOpen = false; let selectedDoubaoHistory = -1; let groupLongPressTimer = 0; let suppressGroupEntryClick = false;
+  let state = readState(); let activeApp = ''; let activeChatTarget = ''; let activeDetail = null; let activeCalendarDate = localDateKey(new Date()); let calendarAutoOpenKey = ''; let npcBusy = false; let refreshing = false; let taRefreshTimeout = 180000; let refreshPickerOpen = false; let appearanceOpen = false; let appearanceDraft = null; let appearanceSwapKey = ''; let reverseOpen = false; let reverseBusy = false; let reverseLive = null; let reverseForceCaught = false; let reverseRateOpen = false; let reverseViewer = null; let reverseAppearance = {wallpaper:'',icons:{},names:{}}; let reverseStep = 0; let selectedRefreshApps = new Set(); let doubaoHistoryOpen = false; let selectedDoubaoHistory = -1; let groupLongPressTimer = 0; let suppressGroupEntryClick = false;
   function readState() { try { const value=JSON.parse(localStorage.getItem(storageKey) || '{}'); return { roleId:value.roleId || '', appearance:{ wallpaper:value.appearance?.wallpaper || '', icons:value.appearance?.icons && typeof value.appearance.icons === 'object' ? value.appearance.icons : {} } }; } catch { return { roleId:'', appearance:{ wallpaper:'', icons:{} } }; } }
   function saveState() { localStorage.setItem(storageKey, JSON.stringify(state)); }
   let groupManageOpen = false;
@@ -166,7 +166,9 @@
         next = { ...init, body:JSON.stringify(payload) };
       }
     } catch {}
-    return window.IdealMachineFetch ? window.IdealMachineFetch(input, { ...next, idealScope:'ta', timeout:next.timeout || 120000 }) : window.fetch(input, next);
+    const requestedTimeout = Number(next.timeout) || 180000;
+    const effectiveTimeout = requestedTimeout < taRefreshTimeout ? taRefreshTimeout : requestedTimeout;
+    return window.IdealMachineFetch ? window.IdealMachineFetch(input, { ...next, idealScope:'ta', timeout:effectiveTimeout }) : window.fetch(input, next);
   };
   // 关闭或离开 Ta 只隐藏页面，不取消正在进行的刷新；结果完成后仍会写入本地数据。
   function roles() { const data = read(chatKey, {}); return Array.isArray(data.contacts) ? data.contacts.filter(item => !item?.isGroup) : []; }
@@ -428,7 +430,23 @@
   async function refreshPhone(owner) { if (refreshing) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('worldbook') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) return window.alert('请先在设置中配置 AI 接口。'); const chat = read(chatKey, {}); const current = chat.chats?.[owner.id] || {}; const profile = (chat.profiles || []).find(item => item.id === current.profileId); const book = worldbook(owner); refreshing = true; render(); try { const prompt = `请刷新角色“${owner.nickname || owner.name}”手机中的七个 App 内容。根据角色设定、绑定用户和局部世界书生成自然、具体、彼此一致的内容。只返回 JSON，不要 Markdown，格式为：{"npcs":[{"name":"","identity":"","reason":""}],"forum":[{"title":"","text":"","time":""}],"calendar":[{"title":"","text":"","date":""}],"couple":[{"title":"","text":"","date":""}],"music":[{"title":"","text":"","artist":""}],"doubao":[{"role":"user或assistant","text":""}],"shopping":[{"title":"","text":"","price":""}]}。豆包数组是角色本人和豆包的真实聊天顺序：role=user 代表角色本人向豆包提问，role=assistant 代表豆包回答。不要编造与世界书完全无关的重要人物；没有内容的数组返回空数组。\n角色设定：${owner.details || owner.signature || '暂无'}\n绑定用户：${profile?.persona || profile?.nickname || '暂无'}\n局部世界书：${book ? (book.entries || []).map(item => `【${item.name}】${item.content}`).join('\n') : '未绑定局部世界书'}\n已有聊天摘要：${(current.messages || []).slice(-8).map(item => item.text || item.content || '').join('；') || '暂无'}`; const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({model, temperature:.8, messages:[{role:'system',content:'你是角色手机内容刷新器，只返回合法 JSON。'},{role:'user',content:prompt}]}) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi,'').trim(); const result = JSON.parse(raw); const previous = read('ideal-machine-ta-snapshots', {})[owner.id]; saveDoubaoHistory(owner.id, previous); const all = read('ideal-machine-ta-snapshots', {}); all[owner.id] = result; localStorage.setItem('ideal-machine-ta-snapshots', JSON.stringify(all)); const npcs = read('ideal-machine-ta-npcs', {}); npcs[owner.id] = Array.isArray(result.npcs) ? result.npcs : []; localStorage.setItem('ideal-machine-ta-npcs', JSON.stringify(npcs)); } catch (error) { window.alert(`刷新角色手机失败：${error.message}`); } finally { refreshing = false; render(); } }
   async function refreshDoubaoChat(owner) { if (refreshing) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) return window.alert('请先在设置中配置 AI 接口。'); const chat = read(chatKey, {}); const current = chat.chats?.[owner.id] || {}; const profile = (chat.profiles || []).find(item => item.id === current.profileId); const book = worldbook(owner); refreshing = true; render(); try { const bookText = book ? (book.entries || []).map(item => `【${item.name}】${item.content}`).join('\n').slice(-6000) : '未绑定局部世界书'; const recentText = (current.messages || []).slice(-6).map(item => item.text || item.content || '').join('；') || '暂无'; const prompt = `请模拟角色“${owner.nickname || owner.name}”正在使用豆包。只返回 JSON：{"doubao":[{"role":"user或assistant","text":"消息内容"}]}。role=user 是角色本人，role=assistant 是豆包。生成 1—3 轮真实、简洁、长短自然的聊天，符合角色设定和世界书，不要提及 AI、系统或提示词。\n角色设定：${String(owner.details || owner.signature || '暂无').slice(0,3000)}\n绑定用户设定：${String(profile?.persona || profile?.nickname || '暂无').slice(0,1500)}\n局部世界书：${bookText}\n角色最近聊天：${recentText}`; const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({model, temperature:.82, max_tokens:600, stream:false, messages:[{role:'system',content:'你是角色手机里的豆包聊天记录生成器，只返回合法 JSON。'},{role:'user',content:prompt}]}) }); if (response.status === 429) throw new Error('接口已接通，但当前触发了限流（429）。请等待几十秒后再刷新，或检查服务商的额度和并发限制。'); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi,'').trim(); const result = JSON.parse(raw); const dialogue = Array.isArray(result.doubao) ? result.doubao.filter(item => item && item.text).map(item => ({ role:item.role === 'assistant' ? 'assistant' : 'user', text:String(item.text) })) : []; if (!dialogue.length) throw new Error('API 没有返回有效聊天记录'); const all = read('ideal-machine-ta-snapshots', {}); const previous = all[owner.id]; saveDoubaoHistory(owner.id, previous); all[owner.id] = { ...(previous || {}), doubao:dialogue }; localStorage.setItem('ideal-machine-ta-snapshots', JSON.stringify(all)); } catch (error) { const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError' ? `接口在 120 秒内没有返回（${model}），请检查接口地址、网络和模型服务状态。` : error.message; window.alert(`刷新角色豆包失败：${reason}`); } finally { refreshing = false; render(); } }
   async function refreshSelectedApp(owner, key) { if (refreshing) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) return window.alert('请先在设置中配置 AI 接口。'); const chat = read(chatKey, {}); const current = chat.chats?.[owner.id] || {}; const profile = (chat.profiles || []).find(item => item.id === current.profileId); const book = worldbook(owner); const labels = { calendar:'角色今天的日程安排', music:'角色最近听的音乐和收藏', doubao:'角色正在使用豆包的聊天记录', shopping:'角色最近浏览、购买或想买的东西' }; const schemas = { calendar:'{"calendar":[{"title":"行程标题","text":"具体安排","date":"日期或时间"}]}', music:'{"music":[{"title":"歌曲名","text":"角色为什么听或收藏","artist":"歌手"}]}', doubao:'{"doubao":[{"role":"user或assistant","text":"消息内容"}]}', shopping:'{"shopping":[{"title":"商品名","text":"购买或想买的原因","price":"价格"}]}' }; refreshing = true; refreshPickerOpen = false; render(); try { const prompt = `请只生成${labels[key]}，不要生成其他 App 内容。只返回 JSON，不要 Markdown，格式为：${schemas[key]}。内容必须符合角色设定、当前日期和局部世界书，具体自然，不要提及 AI、系统、提示词或你在生成手机内容。${key === 'calendar' ? '日历必须是角色本人一天内真实可能发生的行程，按时间顺序排列，不能写成泛泛的待办清单。' : ''}${key === 'doubao' ? 'role=user 是角色本人，role=assistant 是豆包；消息交替出现，生成 1—3 轮，短句和稍长句自然混合。' : ''}\n角色：${owner.nickname || owner.name}\n角色设定：${String(owner.details || owner.signature || '暂无').slice(0,3000)}\n绑定用户设定：${String(profile?.persona || profile?.nickname || '暂无').slice(0,1200)}\n局部世界书：${book ? (book.entries || []).map(item => `【${item.name}】${item.content}`).join('\n').slice(-5000) : '未绑定局部世界书'}\n最近聊天：${(current.messages || []).slice(-5).map(item => item.text || item.content || '').join('；') || '暂无'}`; const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({model, temperature:.78, max_tokens:key === 'doubao' ? 600 : 450, stream:false, messages:[{role:'system',content:'你是角色手机 App 内容生成器，只返回合法 JSON。'},{role:'user',content:prompt}]}) }); if (response.status === 429) throw new Error('接口已接通，但当前触发了限流（429）。请稍后再试，或检查服务商额度和并发限制。'); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi,'').trim(); const result = JSON.parse(raw); if (!Array.isArray(result[key])) throw new Error('API 返回的数据格式不正确'); const all = read('ideal-machine-ta-snapshots', {}); const previous = all[owner.id] || {}; if (key === 'doubao') saveDoubaoHistory(owner.id, previous); all[owner.id] = { ...previous, [key]:result[key] }; localStorage.setItem('ideal-machine-ta-snapshots', JSON.stringify(all)); if (key === 'doubao') { selectedDoubaoHistory = -1; doubaoHistoryOpen = false; } } catch (error) { const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError' ? `接口在 120 秒内没有返回（${model}），请检查接口地址、网络和模型服务状态。` : error.message; window.alert(`刷新角色${labels[key]}失败：${reason}`); } finally { refreshing = false; render(); } }
-  async function refreshSelectedApps(owner, keys) { for (const key of keys) await refreshSelectedApp(owner, key); selectedRefreshApps.clear(); }
+  async function refreshSelectedApps(owner, keys) {
+    if (refreshing) return;
+    const previousTaRefreshTimeout = taRefreshTimeout;
+    const bulkTimeout = 240000;
+    const failures = [];
+    taRefreshTimeout = Math.max(previousTaRefreshTimeout, bulkTimeout);
+    try {
+      for (const key of keys) {
+        const success = await refreshSelectedApp(owner, key, { timeout:bulkTimeout, silent:true, bulk:true });
+        if (success === false) failures.push(key);
+      }
+    } finally {
+      taRefreshTimeout = previousTaRefreshTimeout;
+      selectedRefreshApps.clear();
+    }
+    if (failures.length) window.alert(`批量刷新已完成，但以下 App 失败：${failures.join('、')}。可以单独打开对应 App 再刷新。`);
+  }
   async function analyzeNpcs(owner) { if (npcBusy) return; const book = worldbook(owner); if (!book) return window.alert('这个角色还没有绑定局部世界书。'); const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('worldbook') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) return window.alert('请先在设置中配置 AI 接口。'); npcBusy = true; render(); try { const prompt = `请分析角色“${owner.nickname || owner.name}”绑定的局部世界书，提取其中与角色有关、可能出现在角色手机聊天列表里的 NPC。只返回 JSON 数组，每项格式为 {"name":"NPC名称","identity":"身份","reason":"与角色的关系或出现依据"}。不要编造世界书没有依据的重要人物。\n角色设定：${owner.details || owner.signature || '暂无'}\n局部世界书：${(book.entries || []).map(item => `【${item.name}】${item.content}`).join('\n')}`; const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({model, temperature:.35, messages:[{role:'system',content:'你是角色手机联系人分析器，只输出合法 JSON。'},{role:'user',content:prompt}]}) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi,'').trim(); const parsed = JSON.parse(raw); const cache = read('ideal-machine-ta-npcs', {}); cache[owner.id] = Array.isArray(parsed) ? parsed : []; localStorage.setItem('ideal-machine-ta-npcs', JSON.stringify(cache)); } catch (error) { window.alert(`NPC 分析失败：${error.message}`); } finally { npcBusy = false; render(); } }
   function apiResponseText(data) {
     const message = data?.choices?.[0]?.message || {};
@@ -575,11 +593,11 @@
     });
     return [...groupsByName.values()];
   }
-  async function refreshRoleChats(owner) {
-    if (refreshing) return;
+  async function refreshRoleChats(owner, options = {}) {
+    if (refreshing) return false;
     const config = window.IdealMachineAPI?.getConfig?.() || {};
     const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('chat');
-    if (!config.endpoint || !config.key || !model) return window.alert('请先在设置中配置 AI 接口。');
+    if (!config.endpoint || !config.key || !model) { if (!options.silent) window.alert('请先在设置中配置 AI 接口。'); return false; }
     const chat = read(chatKey, {}); const current = chat.chats?.[owner.id] || {};
     const profile = (chat.profiles || []).find(item => item.id === current.profileId); const book = worldbook(owner);
     const existing = npcCache(owner);
@@ -614,7 +632,7 @@ GROUP_MESSAGE｜群名称｜发送者姓名｜时间｜群消息
 ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? existing.map(item => `${item.name}（${item.identity || item.reason || '关系未知'}）`).join('；') : '暂无'}`;
     refreshing = true; refreshPickerOpen = false; render();
     try {
-      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.76, max_tokens:6500, stream:false, messages:[{ role:'system', content:'你是角色手机聊天记录生成器。只按指定的 CONTACT、OWNER_MESSAGE、NPC_MESSAGE、GROUP、GROUP_MESSAGE 格式输出，不要返回 JSON、Markdown 或解释。' }, { role:'user', content:prompt }] }) });
+      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:options.timeout || 120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.76, max_tokens:6500, stream:false, messages:[{ role:'system', content:'你是角色手机聊天记录生成器。只按指定的 CONTACT、OWNER_MESSAGE、NPC_MESSAGE、GROUP、GROUP_MESSAGE 格式输出，不要返回 JSON、Markdown 或解释。' }, { role:'user', content:prompt }] }) });
       if (response.status === 429) throw new Error('接口已接通，但当前触发了限流（429），请稍后再试。');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json(); let result = parseRoleChatContent(apiResponseText(data), existing);
@@ -644,7 +662,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
 已有群名和类别（都不能重复）：${[...existingGroups, ...acceptedNewGroups].map(group => `${groupCategoryForUse(group)}｜${group.name}`).join('、') || '暂无'}
 角色设定：${String(owner.details || owner.signature || owner.identity || '暂无').slice(0,2200)}
 可用 NPC：${existing.map(item => `${item.name}（${item.identity || item.reason || '关系未知'}）`).join('；') || '根据角色设定选择确实有关的人物'}`;
-          const rescueResponse = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:Math.min(6500, 1500 + missingCount * 1100), stream:false, messages:[{ role:'system', content:'你只负责补齐真实群聊，严格输出 GROUP 和 GROUP_MESSAGE 行。' }, { role:'user', content:rescuePrompt }] }) });
+          const rescueResponse = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:options.timeout || 120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:Math.min(6500, 1500 + missingCount * 1100), stream:false, messages:[{ role:'system', content:'你只负责补齐真实群聊，严格输出 GROUP 和 GROUP_MESSAGE 行。' }, { role:'user', content:rescuePrompt }] }) });
           if (!rescueResponse.ok) continue;
           const rescueData = await rescueResponse.json();
           collectNewGroups(parseGroupsOnly(apiResponseText(rescueData)));
@@ -707,12 +725,14 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
       if (nextGroups.length) saveRoleGroups(owner, nextGroups);
     } catch (error) {
       const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError'
-        ? `接口在 120 秒内没有返回（${model}）。`
+        ? `接口在 ${Math.round((Number(options.timeout) || 120000) / 1000)} 秒内没有返回（${model}）。`
         : /Failed to fetch|Load failed|NetworkError/i.test(String(error?.message || error))
           ? `无法连接接口：${config.endpoint}。请检查接口地址、网络、CORS 或本地 AI 代理是否可用。`
           : error.message;
-      window.alert(`刷新角色聊天失败：${reason}`);
+      if (!options.silent) window.alert(`刷新角色聊天失败：${reason}`);
+      return false;
     } finally { refreshing = false; render(); }
+    return true;
   }
   async function completeWalletRows(owner, config, model, rows) {
     let merged=Array.isArray(rows)?rows.slice():[];
@@ -740,13 +760,14 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
   }
   // 单 App 刷新优先使用稳定的逐行协议，同时兼容旧版 JSON 返回。
   async function refreshSelectedApp(owner, key, options = {}) {
-    if (key === 'chat') return refreshRoleChats(owner);
+    if (key === 'chat') return refreshRoleChats(owner, options);
     if (refreshing) return;
     const config = window.IdealMachineAPI?.getConfig?.() || {};
     const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('chat');
-    if (!config.endpoint || !config.key || !model) return options.silent ? undefined : window.alert('请先在设置中配置 AI 接口。');
+    if (!config.endpoint || !config.key || !model) { if (!options.silent) window.alert('请先在设置中配置 AI 接口。'); return false; }
     const chat = read(chatKey, {}); const current = chat.chats?.[owner.id] || {};
     const profile = (chat.profiles || []).find(item => item.id === current.profileId); const book = worldbook(owner);
+    const requestTimeout = Number(options.timeout) || 120000;
     const labels = { calendar:'今天的日程安排', music:'最近听的音乐和收藏', doubao:'正在使用豆包的聊天记录', shopping:'最近浏览、购买或想买的东西', wallet:'最近的收入、开销和钱包流水' };
     const bookText = book ? (book.entries || []).map(item => `【${item.name}】${item.content}`).join('\n').slice(-5000) : '未绑定局部世界书';
     const todayKey = localDateKey(new Date());
@@ -815,8 +836,9 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
       }
       all[owner.id] = { ...previous, [key]: savedRows, ...(key === 'calendar' ? { calendarDate:todayKey } : {}), ...(key === 'doubao' ? { doubaoTitle:result.doubaoTitle } : {}) }; localStorage.setItem('ideal-machine-ta-snapshots', JSON.stringify(all));
       if (key === 'doubao') { selectedDoubaoHistory = -1; doubaoHistoryOpen = false; }
-    } catch (error) { const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError' ? `接口在 120 秒内没有返回（${model}）。` : error.message; if (!options.silent) window.alert(`刷新角色${labels[key]}失败：${reason}`); }
+    } catch (error) { const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError' ? `接口在 ${Math.round(requestTimeout / 1000)} 秒内没有返回（${model}）。` : error.message; if (!options.silent) window.alert(`刷新角色${labels[key]}失败：${reason}`); return false; }
     finally { refreshing = false; render(); }
+    return true;
   }
   // 最终容错解析：兼容尾逗号、重复逗号、单引号和未加引号的英文属性名。
   function parseApiJSON(value) {
@@ -978,7 +1000,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
     const refreshButton = activeApp === 'liaotian'
       ? `<button class="ta-app-header-refresh ${refreshing ? 'is-refreshing' : ''}" type="button" data-ta-chat-refresh aria-label="刷新聊天" ${refreshing ? 'disabled' : ''}>↻</button>`
       : pageRefreshKey ? `<button class="ta-app-header-refresh ${refreshing ? 'is-refreshing' : ''}" type="button" data-ta-page-refresh="${pageRefreshKey}" aria-label="刷新${meta[1]}" ${refreshing ? 'disabled' : ''}>↻</button>` : '';
-    return `<section class="ta-role-app-page"><header class="ta-role-app-header"><button type="button" data-ta-home>‹</button><div><small>${esc(owner.nickname || owner.name)} 的手机</small><h1>${meta[1]}</h1></div>${refreshButton}</header><main class="ta-role-app-main"><div class="ta-role-perspective"><span>ROLE VIEW</span><b>正在查看 ${esc(owner.nickname || owner.name)} 的${meta[1]}</b><small>这是角色手机中的内容，不是用户视角</small></div>${roleContent(activeApp, owner)}</main>${roleDetailSheet(owner)}</section>`;
+    return `<section class="ta-role-app-page"><header class="ta-role-app-header"><button type="button" data-ta-home>‹</button><div><small>${esc(owner.nickname || owner.name)} 的手机</small><h1>${meta[1]}</h1></div>${refreshButton}</header><main class="ta-role-app-main">${roleContent(activeApp, owner)}</main>${roleDetailSheet(owner)}</section>`;
   }
   function clearGroupLongPress() { if (groupLongPressTimer) { window.clearTimeout(groupLongPressTimer); groupLongPressTimer = 0; } }
   document.addEventListener('pointerdown', event => {
@@ -1218,15 +1240,18 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
   }
   window.IdealMachineApps = window.IdealMachineApps || {}; window.IdealMachineApps.ta = { name: 'Ta' };
   window.IdealMachineAutoRefreshRoleCalendar = () => autoRefreshRoleCalendar(role());
-  window.IdealMachineSyncAllRoleCalendars = async dateKey => {
+  window.IdealMachineSyncAllRoleCalendars = async (dateKey, roleIds = null) => {
     const targetDate = /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : localDateKey(new Date());
-    const owners = roles();
+    const selectedIds = Array.isArray(roleIds) ? new Set(roleIds.map(String)) : null;
+    const owners = roles().filter(owner => !selectedIds || selectedIds.has(String(owner.id)));
     if (!owners.length) throw new Error('还没有添加角色');
     const failed = [];
     for (const owner of owners) {
       try {
-        let rows = calendarDayRecord(owner.id, targetDate)?.items || [];
-        if (!rows.length) rows = read('ideal-machine-calendar-events', []).filter(item => item.date === targetDate && item.author === 'role' && (item.authorId === owner.id || item.contactId === owner.id || item.ownerId === owner.id)).map(item => ({ ...item, date:item.time || '', text:item.note || item.text || '' }));
+        // 日历 App 的手动刷新明确要求每个选中的角色各调用一次 API；
+        // 未指定角色时保留旧的“已有当天记录则复用”行为。
+        let rows = selectedIds ? [] : (calendarDayRecord(owner.id, targetDate)?.items || []);
+        if (!selectedIds && !rows.length) rows = read('ideal-machine-calendar-events', []).filter(item => item.date === targetDate && item.author === 'role' && (item.authorId === owner.id || item.contactId === owner.id || item.ownerId === owner.id)).map(item => ({ ...item, date:item.time || '', text:item.note || item.text || '' }));
         if (!rows.length) {
             const config = window.IdealMachineAPI?.getConfig?.() || {};
             const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('chat');
@@ -1251,6 +1276,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
     }
     if (failed.length) throw new Error(failed.join('；'));
   };
+  window.IdealMachineSyncSelectedRoleCalendars = async (roleIds, dateKey) => window.IdealMachineSyncAllRoleCalendars(dateKey, roleIds);
   function taDoubaoActionImage(type) { return `<img src="assets/ui/doubao-action-${type}.jpeg" alt="">`; }
   doubaoActionIcon = taDoubaoActionImage;
   function cleanTakeoverBubble(value) {

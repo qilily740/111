@@ -7,6 +7,8 @@
     key: '',
     model: '',
     availableModels: [],
+    profiles: [],
+    activeProfileId: '',
     protocol: 'openai',
     chatSize: '1024x1024',
     momentSize: '1024x1024',
@@ -22,6 +24,13 @@
       const config = { ...defaults, ...(saved && typeof saved === 'object' ? saved : {}) };
       if (config.negativePrompt === previousBuiltInNegativePrompt) config.negativePrompt = '';
       config.availableModels = Array.isArray(config.availableModels) ? config.availableModels : [];
+      config.profiles = Array.isArray(config.profiles) ? config.profiles : [];
+      if (!config.profiles.length && config.endpoint) {
+        const id = `image-profile-${Date.now()}`;
+        config.profiles = [{ id, name: config.endpoint, endpoint: config.endpoint, key: config.key, model: config.model, availableModels: config.availableModels, protocol: config.protocol, chatSize: config.chatSize, momentSize: config.momentSize, quality: config.quality, count: config.count, positivePrompt: config.positivePrompt, negativePrompt: config.negativePrompt }];
+        config.activeProfileId = id;
+      }
+      config.activeProfileId = config.profiles.some(profile => profile.id === config.activeProfileId) ? config.activeProfileId : (config.profiles[0]?.id || '');
       delete config.chatDailyLimit;
       delete config.stylePrompt;
       delete config.steps;
@@ -41,6 +50,7 @@
 
   function saveConfig(config) {
     const value = { ...defaults, ...config };
+    value.profiles = Array.isArray(value.profiles) ? value.profiles : [];
     delete value.chatDailyLimit;
     delete value.stylePrompt;
     delete value.steps;
@@ -181,6 +191,7 @@
         <div><span class="settings-eyebrow">VISUAL ENGINE</span><h2>生图 API</h2><p>用于聊天角色主动发图和角色朋友圈配图，配置独立于文字模型。</p></div>
         <span class="settings-status" data-image-api-status>未配置</span>
       </div>
+      <div class="settings-profile-bar settings-image-profile-bar"><div class="settings-profile-picker"><button class="settings-profile-trigger" data-image-profile-toggle type="button"><span id="settingsImageProfileCurrent">选择已保存的生图配置</span><i>⌄</i></button><div class="settings-profile-menu" id="settingsImageProfileMenu" hidden></div></div><button data-image-new-profile type="button">＋ 新配置</button></div>
       <div class="settings-image-grid settings-image-connection">
         <label class="is-wide">接口地址<input data-image-setting="endpoint" type="url" placeholder="https://api.example.com/v1"></label>
         <label>API Key<input data-image-setting="key" type="password" placeholder="仅保存在本机浏览器"></label>
@@ -215,8 +226,34 @@
     element.dataset.state = state;
   }
 
+  let imageProfileMenuOpen = false;
+  let imageEditingProfileId = null;
+
+  function imageProfileValues(config) {
+    const keys = ['endpoint', 'key', 'model', 'availableModels', 'protocol', 'chatSize', 'momentSize', 'quality', 'count', 'positivePrompt', 'negativePrompt'];
+    return keys.reduce((result, key) => { result[key] = config[key]; return result; }, {});
+  }
+
+  function renderImageProfiles(config) {
+    const active = config.profiles.find(profile => profile.id === config.activeProfileId);
+    const current = document.querySelector('#settingsImageProfileCurrent');
+    const menu = document.querySelector('#settingsImageProfileMenu');
+    if (current) {
+      current.textContent = active ? `${active.name} · ${active.endpoint}` : (config.profiles.length ? '选择已保存的生图配置' : '暂无已保存的生图配置');
+      current.title = active ? active.endpoint || '' : '';
+    }
+    if (menu) {
+      menu.innerHTML = config.profiles.length ? config.profiles.map(profile => `<div class="settings-profile-item-row"><button class="settings-profile-item ${profile.id === config.activeProfileId ? 'is-active' : ''}" data-image-profile-select="${escapeHtml(profile.id)}" type="button"><span><b>${escapeHtml(profile.name)}</b><small>${escapeHtml(profile.endpoint)}</small></span></button><button class="settings-profile-delete" data-image-profile-delete="${escapeHtml(profile.id)}" type="button" aria-label="删除 ${escapeHtml(profile.name)}">删除</button></div>`).join('') : '<div class="settings-profile-empty">暂无已保存的生图配置</div>';
+      menu.hidden = !imageProfileMenuOpen;
+    }
+  }
+
   function renderSettings() {
     const config = readConfig();
+    if (imageEditingProfileId === null) imageEditingProfileId = config.activeProfileId;
+    if (imageEditingProfileId && !config.profiles.some(profile => profile.id === imageEditingProfileId)) imageEditingProfileId = config.activeProfileId;
+    config.activeProfileId = imageEditingProfileId;
+    renderImageProfiles(config);
     document.querySelectorAll('[data-image-setting]').forEach(field => {
       const key = field.dataset.imageSetting;
       if (field.type === 'checkbox') field.checked = Boolean(config[key]);
@@ -240,7 +277,66 @@
       else if (field.type === 'number') config[key] = Number(field.value);
       else config[key] = field.value.trim();
     });
+    if (imageEditingProfileId !== null) config.activeProfileId = imageEditingProfileId;
     return config;
+  }
+
+  function saveImageProfile(showStatus = true) {
+    const config = collectSettings();
+    if (!config.endpoint || !config.model) return setStatus('请填写生图接口地址和模型', 'error');
+    const profiles = Array.isArray(config.profiles) ? [...config.profiles] : [];
+    const id = config.activeProfileId || `image-profile-${Date.now()}`;
+    const previous = profiles.find(profile => profile.id === id);
+    const profile = { id, name: previous?.name || config.endpoint, ...imageProfileValues(config) };
+    const index = profiles.findIndex(item => item.id === id);
+    if (index >= 0) profiles[index] = profile;
+    else profiles.push(profile);
+    config.profiles = profiles;
+    config.activeProfileId = id;
+    imageEditingProfileId = id;
+    saveConfig(config);
+    imageProfileMenuOpen = false;
+    renderSettings();
+    if (showStatus) setStatus('已保存生图配置', 'ready');
+    return true;
+  }
+
+  function switchImageProfile(id) {
+    const config = readConfig();
+    const profile = config.profiles.find(item => item.id === id);
+    imageProfileMenuOpen = false;
+    if (!profile) return renderSettings();
+    imageEditingProfileId = profile.id;
+    saveConfig({ ...config, ...imageProfileValues(profile), activeProfileId: profile.id, profiles: config.profiles });
+    renderSettings();
+    setStatus(`已切换：${profile.name}`, 'ready');
+  }
+
+  function deleteImageProfile(id) {
+    const config = readConfig();
+    const profile = config.profiles.find(item => item.id === id);
+    if (!profile || !window.confirm(`确定删除生图配置“${profile.name}”吗？`)) return;
+    const profiles = config.profiles.filter(item => item.id !== id);
+    const wasActive = config.activeProfileId === id;
+    const draft = collectSettings();
+    if (wasActive) {
+      const next = profiles[0];
+      imageEditingProfileId = next?.id || '';
+      if (next) Object.assign(config, imageProfileValues(next), { activeProfileId: next.id });
+      else Object.assign(config, imageProfileValues(defaults), { activeProfileId: '' });
+    }
+    config.profiles = profiles;
+    imageProfileMenuOpen = false;
+    saveConfig(config);
+    renderSettings();
+    if (!wasActive) {
+      document.querySelectorAll('[data-image-setting]').forEach(field => {
+        const key = field.dataset.imageSetting;
+        if (field.type === 'checkbox') field.checked = Boolean(draft[key]);
+        else field.value = draft[key] ?? '';
+      });
+    }
+    setStatus(wasActive ? (profiles.length ? `已切换：${profiles[0].name}` : '已删除生图配置') : `已删除：${profile.name}`, 'ready');
   }
 
   async function fetchImageModels() {
@@ -264,6 +360,8 @@
       models.sort((a, b) => Number(imagePattern.test(b)) - Number(imagePattern.test(a)) || a.localeCompare(b));
       config.availableModels = models;
       if (!config.model) config.model = models.find(model => imagePattern.test(model)) || models[0];
+      const activeIndex = config.profiles.findIndex(profile => profile.id === config.activeProfileId);
+      if (activeIndex >= 0) config.profiles[activeIndex] = { ...config.profiles[activeIndex], ...imageProfileValues(config) };
       saveConfig(config);
       renderModelOptions(models);
       const input = document.querySelector('[data-image-model-input]');
@@ -279,7 +377,44 @@
 
   document.addEventListener('click', async event => {
     if (event.target.closest('[data-app-key="shezhi"]')) {
+      imageEditingProfileId = null;
       requestAnimationFrame(renderSettings);
+      return;
+    }
+    const toggle = event.target.closest?.('[data-image-profile-toggle]');
+    if (toggle) {
+      imageProfileMenuOpen = !imageProfileMenuOpen;
+      const menu = document.querySelector('#settingsImageProfileMenu');
+      if (menu) menu.hidden = !imageProfileMenuOpen;
+      return;
+    }
+    const remove = event.target.closest?.('[data-image-profile-delete]');
+    if (remove) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      deleteImageProfile(remove.dataset.imageProfileDelete);
+      return;
+    }
+    const select = event.target.closest?.('[data-image-profile-select]');
+    if (select) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      switchImageProfile(select.dataset.imageProfileSelect);
+      return;
+    }
+    if (event.target.closest('[data-image-new-profile]')) {
+      imageEditingProfileId = '';
+      imageProfileMenuOpen = false;
+      document.querySelectorAll('[data-image-setting]').forEach(field => {
+        const key = field.dataset.imageSetting;
+        if (field.type === 'checkbox') field.checked = Boolean(defaults[key]);
+        else field.value = defaults[key] ?? '';
+      });
+      const current = document.querySelector('#settingsImageProfileCurrent');
+      if (current) { current.textContent = '新建生图配置'; current.title = ''; }
+      const menu = document.querySelector('#settingsImageProfileMenu');
+      if (menu) menu.hidden = true;
+      setStatus('请输入新的生图配置');
       return;
     }
     if (event.target.closest('[data-image-model-fetch]')) {
@@ -288,9 +423,7 @@
     }
     const saveButton = event.target.closest('[data-image-api-save]');
     if (!saveButton) return;
-    const config = collectSettings();
-    saveConfig(config);
-    setStatus('已保存', 'ready');
+    saveImageProfile(true);
   });
 
   renderSettings();
