@@ -121,7 +121,7 @@
     const hero = shell.querySelector('[data-folder-app-hero]');
     hero.className = `folder-app-icon ${item.className}`;
     const sourceIcon = folder.querySelector(`[data-folder-app="${key}"] .folder-app-icon`);
-    hero.innerHTML = sourceIcon?.innerHTML || `<img class="default-app-icon" src="assets/icons/default-ios17/${key}.png" alt="">`;
+    hero.innerHTML = sourceIcon?.innerHTML || `<img class="default-app-icon" src="assets/icons/default-ios17/${key}.webp" alt="">`;
     shell.classList.add('is-open');
     shell.setAttribute('aria-hidden', 'false');
     shell.querySelector('[data-folder-app-back]')?.focus();

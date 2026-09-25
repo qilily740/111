@@ -28,13 +28,10 @@
   let mysteryFreeDraft = '';
   let mysteryFreeBusy = false;
   let stockGameOpen = false;
-  let stockGame = null;
-  let stockSelected = -1;
-  let stockDrag = null;
-  let stockNotice = '';
-  let stockShipping = [];
-  let stockShipTimer = 0;
-  let stockIgnoreClickUntil = 0;
+  let stockGameState = null;
+  let stockGameNotice = '';
+  let stockGameNoticeTimer = 0;
+  let gamesScrollLeft = 0;
   let flowerRouletteStarted = false;
   let flowerRouletteFirstActor = '';
   let flowerRouletteUserAction = '';
@@ -115,6 +112,8 @@
 
   function tabIcon(type) { const paths = { today:'<path d="M4.5 7.3h14M15.6 4.5l2.9 2.8-2.9 2.8M19.5 16.7h-14M8.4 13.9l-2.9 2.8 2.9 2.8"/><path d="m10.2 10.6 1.8 1.8 1.8-1.8"/>', dates:'<path d="M12 21s6.3-5.8 6.3-11.3a6.3 6.3 0 1 0-12.6 0C5.7 15.2 12 21 12 21Z"/><path d="M9.7 9.3h4.6M12 7v4.6"/>', games:'<path d="M7.5 9.2h9a3.8 3.8 0 0 1 3.65 4.85l-1.05 3.6a2.2 2.2 0 0 1-4.05.45L13.8 16h-3.6l-1.25 2.1a2.2 2.2 0 0 1-4.05-.45l-1.05-3.6A3.8 3.8 0 0 1 7.5 9.2Z"/><path d="M8 12v3M6.5 13.5h3M16 13h.01M18 15h.01"/>', secrets:'<path d="M12 3v3.8M7 7.2h10l1.8 2.5v10H5.2v-10Z"/><path d="M8.2 12h7.6M8.2 15.2h5"/><circle cx="12" cy="6.8" r="1.1"/>', us:'<circle cx="8" cy="8.2" r="2.5"/><circle cx="16" cy="8.2" r="2.5"/><path d="M3.8 19.2c.3-3.6 1.9-5.6 4.2-5.6 1.7 0 3 .9 4 2.6 1-1.7 2.3-2.6 4-2.6 2.3 0 3.9 2 4.2 5.6"/><path d="m10.4 14.3 1.6 1.6 1.6-1.6"/>' }; return `<svg class="couple-tab-icon" viewBox="0 0 24 24" aria-hidden="true">${paths[type]}</svg>`; }
   function render() {
+    const gamesRowBefore = app.querySelector('.couple-games-installed-row');
+    if (gamesRowBefore) gamesScrollLeft = gamesRowBefore.scrollLeft;
     const mysteryScrollTop = app.querySelector('.couple-mystery')?.scrollTop || 0;
     const archive = app.querySelector('.couple-date-history .couple-archive-box');
     const archiveWasOpen = archive?.open;
@@ -132,7 +131,9 @@
     page.className = `couple-page${tab === 'games' ? ' couple-page-games' : ''}`;
     const titles = { today:['OUR FREQUENCY','心动'], dates:['OUR NEXT TIME','约会'], games:['PLAY TOGETHER','游戏'], secrets:['JUST FOR YOU','心事'], us:['US, LATELY','我们'] };
     const [eyebrow, title] = titles[tab] || titles.today;
-    page.innerHTML = `<header class="couple-header"><div><span>${eyebrow}</span><h1>${title}</h1></div><div class="couple-header-side"><button data-couple-close type="button">×</button></div></header><main class="couple-main">${tab === 'games' ? games(role, profile) : tab === 'dates' ? datesPage(role) : tab === 'secrets' ? secretsPage(role) : tab === 'us' ? usPage(role, profile) : todayPage(role, profile)}</main><nav class="couple-tabs couple-tabs-four couple-tabs-five"><button data-couple-tab="today" class="${tab === 'today' ? 'is-active' : ''}" type="button">${tabIcon('today')}<small>心动</small></button><button data-couple-tab="dates" class="${tab === 'dates' ? 'is-active' : ''}" type="button">${tabIcon('dates')}<small>约会</small></button><button data-couple-tab="games" class="${tab === 'games' ? 'is-active' : ''}" type="button">${tabIcon('games')}<small>游戏</small></button><button data-couple-tab="secrets" class="${tab === 'secrets' ? 'is-active' : ''}" type="button">${tabIcon('secrets')}<small>心事</small></button><button data-couple-tab="us" class="${tab === 'us' ? 'is-active' : ''}" type="button">${tabIcon('us')}<small>我们</small></button></nav>${recordOpenMarkup()}${letterOpenMarkup()}${mysteryOpen ? mysteryMarkup(role) : ''}${stockGameOpen ? stockGameMarkup(role) : ''}`;
+    page.innerHTML = `<header class="couple-header"><div><span>${eyebrow}</span><h1>${title}</h1></div><div class="couple-header-side"><button data-couple-close type="button">×</button></div></header><main class="couple-main">${tab === 'games' ? games(role, profile) : tab === 'dates' ? datesPage(role) : tab === 'secrets' ? secretsPage(role) : tab === 'us' ? usPage(role, profile) : todayPage(role, profile)}</main><nav class="couple-tabs couple-tabs-four couple-tabs-five"><button data-couple-tab="today" class="${tab === 'today' ? 'is-active' : ''}" type="button">${tabIcon('today')}<small>心动</small></button><button data-couple-tab="dates" class="${tab === 'dates' ? 'is-active' : ''}" type="button">${tabIcon('dates')}<small>约会</small></button><button data-couple-tab="games" class="${tab === 'games' ? 'is-active' : ''}" type="button">${tabIcon('games')}<small>游戏</small></button><button data-couple-tab="secrets" class="${tab === 'secrets' ? 'is-active' : ''}" type="button">${tabIcon('secrets')}<small>心事</small></button><button data-couple-tab="us" class="${tab === 'us' ? 'is-active' : ''}" type="button">${tabIcon('us')}<small>我们</small></button></nav>${recordOpenMarkup()}${letterOpenMarkup()}${mysteryOpen ? mysteryMarkup(role) : ''}${stockGameOpen ? stockGameMarkup() : ''}`;
+    const gamesRowAfter = app.querySelector('.couple-games-installed-row');
+    if (gamesRowAfter) requestAnimationFrame(() => { if (gamesRowAfter.isConnected) gamesRowAfter.scrollLeft = gamesScrollLeft; });
     app.querySelector('.couple-flower-roulette')?.remove();
     if (flowerRouletteOpen) app.insertAdjacentHTML('beforeend', flowerRouletteMarkup(role));
     const mysteryPage = app.querySelector('.couple-mystery');
@@ -446,6 +447,85 @@
       if (requestId === mysteryRequest && store.contactId === roleId) mysteryFeedback = `讨论暂时失败：${error.message}`;
     } finally { if (requestId === mysteryRequest) { mysteryBusy = false; render(); } }
   }
+  const stockDesserts = [
+    { id:'rose-millefeuille', name:'玫瑰覆盆子千层', image:'assets/ui/game-items/stock-sort/stock-sort-item-01-rose-millefeuille.webp' },
+    { id:'lychee-vanilla', name:'荔枝香草冰淇淋杯', image:'assets/ui/game-items/stock-sort/stock-sort-item-02-lychee-vanilla.webp' },
+    { id:'matcha-pistachio', name:'抹茶开心果蛋糕', image:'assets/ui/game-items/stock-sort/stock-sort-item-03-matcha-pistachio.webp' },
+    { id:'chocolate-hazelnut', name:'巧克力榛果慕斯', image:'assets/ui/game-items/stock-sort/stock-sort-item-04-chocolate-hazelnut.webp' },
+    { id:'lemon-choux', name:'柠檬泡芙', image:'assets/ui/game-items/stock-sort/stock-sort-item-05-lemon-choux.webp' },
+    { id:'blueberry-jelly', name:'蓝莓果冻蛋糕', image:'assets/ui/game-items/stock-sort/stock-sort-item-06-blueberry-jelly.webp' },
+    { id:'purple-berry', name:'紫莓马卡龙千层', image:'assets/ui/game-items/stock-sort/stock-sort-item-07-purple-berry.webp' },
+    { id:'cookies-cream', name:'奥利奥奶油蛋糕', image:'assets/ui/game-items/stock-sort/stock-sort-item-08-cookies-cream.webp' }
+  ];
+  const stockShuffle = list => { const next = list.slice(); for (let index = next.length - 1; index > 0; index -= 1) { const target = Math.floor(Math.random() * (index + 1)); [next[index], next[target]] = [next[target], next[index]]; } return next; };
+  const stockDessert = id => stockDesserts.find(item => item.id === id) || stockDesserts[0];
+  function stockMakeOrder() {
+    const count = 2 + Math.floor(Math.random() * 3);
+    return stockShuffle(stockDesserts).slice(0, count).map(item => ({ type:item.id, need:1 + Math.floor(Math.random() * 3), got:0 }));
+  }
+  function stockMakeGame() {
+    return { batch:0, orders:Array.from({ length:3 }, stockMakeOrder), shelves:stockShuffle(stockDesserts).map(item => item.id), basket:{}, done:false, transitioning:false };
+  }
+  function stockCurrentOrder() { return stockGameState?.orders?.[stockGameState.batch] || null; }
+  function stockOrderLine(type) { return stockCurrentOrder()?.find(item => item.type === type) || null; }
+  function stockMissingTypes(game = stockGameState) { const order = game?.orders?.[game.batch] || []; return order.filter(item => item.got < item.need && !game.shelves.includes(item.type)).map(item => item.type); }
+  function stockRefillAvailable(game = stockGameState) { return !!game && !game.done && !game.transitioning && (game.shelves.some(item => !item) || stockMissingTypes(game).length > 0); }
+  function stockNotice(message) {
+    stockGameNotice = message;
+    if (stockGameNoticeTimer) window.clearTimeout(stockGameNoticeTimer);
+    stockGameNoticeTimer = window.setTimeout(() => { stockGameNotice = ''; render(); }, 1500);
+    render();
+  }
+  function stockRefill() {
+    const game = stockGameState;
+    if (!game || game.done || game.transitioning) return;
+    const empty = game.shelves.map((item, index) => item ? -1 : index).filter(index => index >= 0);
+    const missing = [...new Set(stockMissingTypes(game))];
+    if (!empty.length && !missing.length) { stockNotice('货架已满，当前订单需要的甜品都在货架上'); return; }
+    const replacement = empty.slice();
+    const candidateSlots = stockShuffle(game.shelves.map((item, index) => index).filter(index => !replacement.includes(index) && !missing.includes(game.shelves[index])));
+    while (replacement.length < missing.length && candidateSlots.length) replacement.push(candidateSlots.shift());
+    const choices = [...missing, ...stockShuffle(stockDesserts.filter(item => !missing.includes(item.id))).map(item => item.id)];
+    replacement.forEach((slot, index) => { game.shelves[slot] = choices[index % choices.length]; });
+    stockNotice(`补货完成，新增 ${replacement.length} 份甜品`);
+  }
+  function stockCollect(slotIndex) {
+    const game = stockGameState;
+    const type = game?.shelves?.[slotIndex];
+    if (!game || game.done || game.transitioning || !type) return;
+    const line = stockOrderLine(type);
+    if (!line) { stockNotice('这批订单暂时不需要这款甜品'); return; }
+    if (line.got >= line.need) { stockNotice('这款甜品已经拿够了'); return; }
+    game.shelves[slotIndex] = null;
+    line.got += 1;
+    game.basket[type] = (game.basket[type] || 0) + 1;
+    if (stockCurrentOrder().every(item => item.got >= item.need)) {
+      game.transitioning = true;
+      render();
+      window.setTimeout(() => {
+        if (!stockGameState || stockGameState !== game) return;
+        game.transitioning = false;
+        game.basket = {};
+        if (game.batch >= game.orders.length - 1) game.done = true;
+        else game.batch += 1;
+        render();
+      }, 700);
+      return;
+    }
+    render();
+  }
+  function stockGameMarkup() {
+    const game = stockGameState;
+    const progress = game ? (game.done ? '全部完成' : `第 ${game.batch + 1} / 3 批`) : 'READY';
+    const header = `<header><button data-stock-close type="button" aria-label="返回">‹</button><div><small>STOCK SORT</small><b>分类理货</b></div><div class="stock-game-progress">${progress}</div><button data-stock-close type="button" aria-label="关闭">×</button></header>`;
+    const scene = `<img class="stock-game-scene" src="assets/ui/game-covers/stock-sort-shelf-v1.webp" onerror="this.onerror=null;this.src='assets/ui/game-covers/stock-sort-cover-v1.webp'" alt="甜品店货架场景">`;
+    if (!game) return `<section class="stock-game" role="dialog" aria-modal="true" aria-label="分类理货"><div class="stock-game-backdrop" aria-hidden="true"></div>${header}<div class="stock-game-stage">${scene}<div class="stock-start-panel"><small>甜品柜已经准备好了</small><b>开始今天的理货</b><p>完成 3 批订单，把需要的甜品放进餐盘。</p><button data-stock-start type="button">开始游戏</button></div></div></section>`;
+    const order = stockCurrentOrder() || [];
+    const basketItems = Object.entries(game.basket).map(([type, count]) => { const item = stockDessert(type); return `<div class="stock-tray-item"><img src="${item.image}" alt=""><b>×${count}</b></div>`; }).join('');
+    const orderItems = order.map(item => { const dessert = stockDessert(item.type); return `<div class="stock-order-item ${item.got >= item.need ? 'is-done' : ''}"><img src="${dessert.image}" alt=""><div><b>${esc(dessert.name)}</b><small>${item.got}/${item.need}</small></div></div>`; }).join('');
+    const shelves = game.shelves.map((type, index) => { if (!type) return `<span class="stock-slot stock-slot-${index + 1} is-empty" aria-hidden="true"></span>`; const item = stockDessert(type); const line = order.find(entry => entry.type === type); const remaining = line ? Math.max(0, line.need - line.got) : 0; return `<button class="stock-slot stock-slot-${index + 1}" data-stock-item="${index}" type="button" aria-label="拿取${esc(item.name)}${remaining ? `，还需要${remaining}份` : '，本批暂不需要'}"><img src="${item.image}" alt="">${remaining ? `<span class="stock-slot-badge">×${remaining}</span>` : ''}</button>`; }).join('');
+    return `<section class="stock-game" role="dialog" aria-modal="true" aria-label="分类理货"><div class="stock-game-backdrop" aria-hidden="true"></div>${header}<div class="stock-game-stage">${scene}<section class="stock-order-panel"><div class="stock-order-heading"><small>${game.done ? 'ALL ORDERS READY' : 'TODAY’S ORDER'}</small><b>${game.done ? '今日订单全部完成' : '请按订单取货'}</b></div><div class="stock-order-items">${orderItems}</div></section><div class="stock-shelf-items">${shelves}</div><section class="stock-tray" aria-label="餐盘"><div class="stock-tray-label"><small>TRAY</small><b>${game.done ? '完成' : '已取甜品'}</b></div><div class="stock-tray-items">${basketItems || '<span class="stock-tray-empty">点击货架上的甜品放入餐盘</span>'}</div><button class="stock-refill" data-stock-refill type="button" ${stockRefillAvailable(game) ? '' : 'disabled'}><span>补货</span><small>随机补款</small></button></section>${stockGameNotice ? `<p class="stock-game-notice" role="status">${esc(stockGameNotice)}</p>` : ''}${game.transitioning ? '<div class="stock-game-toast">订单完成，准备下一批…</div>' : ''}${game.done ? '<div class="stock-game-finish"><small>THREE ORDERS COMPLETE</small><b>今天的甜品都整理好了</b><button data-stock-restart type="button">再来一局</button></div>' : ''}</div></section>`;
+  }
   const mysteryCaseConfig = {
     rouge:{ subtitle:'绣鞋、误认与两次夜访', characters:[['胭脂','卞氏之女，心事被邻妇窥见'],['鄂生','被误认的秀才，案发后被拘'],['宿介','与王氏相识，曾在夜里出现'],['毛大','巷中游荡者，曾多次接近王氏']], initialFacts:['卞氏夜里受伤，翌日不治。','墙下找到一只绣鞋，众人认作胭脂之物。','有人声称看见鄂生在卞家附近出现。'], investigations:[{id:'r_scene',title:'复查卞氏伤口',content:'仵作确认创口来自正面冲撞，卞氏临死前曾抓住来人的衣袖。伤口形状只能证明争斗发生过，不能证明来人身份。',requirements:[],obtainedClues:['r_wound'],unlockInvestigations:['r_wang']},{id:'r_shoe',title:'检查墙下绣鞋',content:'鞋底沾着墙根湿泥，鞋内没有胭脂的脚印。鞋是被人强行扯下后带走的，后来才落在命案现场。',requirements:[],obtainedClues:['r_shoe'],unlockInvestigations:['r_night']},{id:'r_wang',title:'询问王氏',content:'王氏承认曾拿鄂生打趣胭脂，也承认宿介听过这段话。她坚持说自己没有见过宿介当夜出门。',requirements:['r_shoe'],obtainedClues:['r_wang'],unlockInvestigations:['r_reask']},{id:'r_night',title:'核对夜间目击',content:'邻人只看见一个白衣身影翻墙，却没有看清脸。时间记录显示，白衣身影出现前后，巷口曾有两次脚步声。',requirements:['r_shoe'],obtainedClues:['r_night'],unlockInvestigations:['r_reask']},{id:'r_reask',title:'再次询问王氏与宿介',content:'两人的说法在绣鞋何时丢失一事上对不上：宿介说离开时鞋还在袖中，王氏却说他进门时已经空手。',requirements:['r_wang','r_night'],obtainedClues:['r_flow','r_contradiction'],unlockInvestigations:[]}], clues:{r_wound:{type:'物证',name:'异常创口',description:'死者胸口有正面冲撞留下的伤口，曾抓住来人衣袖。',source:'仵作复验',doubt:'伤口能证明争斗，不能证明凶手身份。'},r_shoe:{type:'物证',name:'墙下绣鞋',description:'鞋底有墙根湿泥，鞋内没有胭脂的脚印，像是被人扯下后带走。',source:'命案现场',doubt:'鞋属于谁，和谁最后拿过它，并不是一回事。'},r_wang:{type:'证词',name:'王氏传话',description:'胭脂的心事经王氏传到宿介耳中；鄂生本人并不知道有人会借他的名义夜访。',source:'王氏口供',doubt:'王氏对宿介当夜行踪仍有隐瞒。'},r_night:{type:'时间',name:'两次脚步声',description:'邻人只看见白衣身影，巷口却留下两次前后相接的脚步声。',source:'邻人补述',doubt:'目击者把两个夜客当成了一个人。'},r_flow:{type:'物证',name:'绣鞋流转',description:'绣鞋先在一次夜访后遗失，后来才被另一人捡走并利用。',source:'交叉询问',doubt:'物证经过两个人的手。'},r_contradiction:{type:'证词',name:'鞋子时间矛盾',description:'宿介和王氏关于绣鞋何时离手的说法无法同时成立。',source:'再次询问',doubt:'矛盾指向一次被刻意掩盖的冒名。'}}, reasoningQuestions:[{id:'r_q1',label:'证词矛盾',prompt:'哪组线索最能证明夜访者不止一人？',options:['绣鞋流转 ＋ 两次脚步声','异常创口 ＋ 王氏传话','墙下绣鞋 ＋ 异常创口'],answer:0,hint:'要证明身份错位，先看物证经过谁的手，再看时间是否容得下两个人。',explain:'绣鞋在一次夜访后遗失，巷口又留下两次脚步声，说明众人把两名夜客误认成了同一个人。'},{id:'r_q2',label:'经过还原',prompt:'哪一条经过最符合目前证据？',options:['宿介冒名遗鞋 → 毛大拾鞋 → 毛大再次冒名','毛大先拾鞋 → 宿介冒名遗鞋 → 鄂生入夜','鄂生夜访 → 宿介拾鞋 → 毛大制造伤口'],answer:0,hint:'先有遗失，才会出现后来捡到并利用绣鞋的人。',explain:'两次夜访和绣鞋流转必须按先后排列，不能把后来拿鞋的人倒置到前面。'},{id:'r_q3',label:'断案',prompt:'真正应对命案负责的人是谁？',options:['鄂生，因胭脂倾心于他','宿介，因他最先冒名夜访','毛大，因他利用绣鞋再次冒名并引发命案'],answer:2,hint:'别只看谁被看见；看谁拥有绣鞋，又利用了这件物证。',explain:'鄂生只是被借名，宿介是前一场冒名者；真正把绣鞋变成接近卞家的工具并引发命案的是毛大。'}],truthData:{culprit:'毛大',method:'拾取宿介遗失的绣鞋后再次冒名接近卞家，争斗中杀死卞氏。',turn:'众人把两次夜访拼成了一次，鄂生因此成为替罪者。'},ending:'真正的凶手不是最先被喊出名字的人，而是藏在物证流转里的第二个夜客。',archiveText:'绣鞋入卷，误认得解；两次夜访，终于各归其名。'},
     gengniang:{ subtitle:'同舟、沉尸与借来的身份', characters:[['庚娘','金家新妇，冷静而隐忍'],['王十八','自称愿意护送金家的陌生人'],['舟人','掌握行船、停靠与江上进退'],['唐氏','被困在另一重身份中的女子']], initialFacts:['金家一家随王十八登船渡江。','船到芦苇深处后，金家人相继失踪。','庚娘后来也被认为已经死去，但江上仍有人见过相似身影。'], investigations:[{id:'g_boat',title:'查阅渡船记录',content:'船并非临时雇来，王十八提前与舟人谈过价，目的地也改过一次。',requirements:[],obtainedClues:['g_boat'],unlockInvestigations:['g_wang']},{id:'g_wang',title:'询问王十八同行者',content:'同行者承认王十八一路都在观察庚娘，却把这解释成热心照看。没有人能说明他为何坚持夜间停船。',requirements:['g_boat'],obtainedClues:['g_wang'],unlockInvestigations:['g_river']},{id:'g_river',title:'重画江上路线',content:'停船处远离渡口，四周只有芦苇和浅滩。舟人若不配合，王十八无法让一家人同时离开船舱。',requirements:['g_boat'],obtainedClues:['g_river'],unlockInvestigations:['g_reask']},{id:'g_reask',title:'重新询问幸存者',content:'幸存者说王十八先邀请金家父子出舱，舟人随后用篙阻拦求救声。两人的动作并非偶然重合。',requirements:['g_wang','g_river'],obtainedClues:['g_team','g_contradiction'],unlockInvestigations:[]}], clues:{g_boat:{type:'记录',name:'改过的渡船记录',description:'王十八提前约船，目的地在出发前被改向芦苇深处。',source:'船行记录',doubt:'临时改向是谁决定的？'},g_wang:{type:'证词',name:'过度殷勤',description:'王十八一路观察庚娘，却把夜间停船解释成照料众人。',source:'同行者口供',doubt:'热心说法解释不了停船时机。'},g_river:{type:'时间',name:'芦苇深处的停泊点',description:'停船处远离渡口，舟人掌握唯一的退路。',source:'路线复原',doubt:'一个乘客无法独立控制船与所有求救声。'},g_team:{type:'证词',name:'篙声与求救声',description:'王十八邀人出舱后，舟人用篙阻断求救，动作先后紧密相接。',source:'幸存者补述',doubt:'两人对彼此的配合避而不谈。'},g_contradiction:{type:'异常现象',name:'被借来的身份',description:'江上出现过与庚娘相似的女子，死亡信息与身份信息互相冲突。',source:'尹家记录',doubt:'有人利用了“庚娘已死”的消息。'}}, reasoningQuestions:[{id:'g_q1',label:'矛盾',prompt:'哪组证据最能反驳“王十八独自作案”？',options:['改过的渡船记录 ＋ 芦苇深处的停泊点','过度殷勤 ＋ 被借来的身份','篙声与求救声 ＋ 过度殷勤'],answer:0,hint:'先确认谁能决定船的方向和停靠，再判断谁有能力完成陷阱。',explain:'王十八能诱引金家上船，却不能独自控制船行与求救声；改向记录和停泊点指向舟人的配合。'},{id:'g_q2',label:'经过还原',prompt:'哪条顺序最符合陷阱形成的过程？',options:['王十八提前约船改向 → 夜间停在芦苇深处 → 邀金家出舱 → 舟人阻断求救','舟人先阻断求救 → 王十八才改目的地 → 庚娘登船','庚娘先逃生 → 王十八邀约 → 舟人临时加入'],answer:0,hint:'陷阱要先准备好地点，才会在船上发生。',explain:'改向与停泊是预谋的准备，王十八负责把人带入，舟人负责让他们无法求救。'},{id:'g_q3',label:'断案',prompt:'这场江上陷阱的主要责任应归于谁？',options:['庚娘，因为她隐瞒了真实计划','王十八与舟人，因为两人共同制造了陷阱','唐氏，因为她后来借用了庚娘的身份'],answer:1,hint:'区分受害者的隐忍、事后的身份混乱，以及最初制造陷阱的人。',explain:'庚娘的顺从是求生，唐氏的身份出现在事后；王十八和舟人共同完成了诱引与封锁。'}],truthData:{culprit:'王十八与舟人',method:'以护送为名改向偏僻水域，王十八诱出金家人，舟人配合阻断求救。',turn:'庚娘并未死在最初传闻里，后来出现的身份混乱遮住了她的复仇。'},ending:'江面看似只有一条船，真正把人困住的却是两个人的默契。',archiveText:'同舟非同心，芦苇深处留下的不是风声，而是合谋。'},
@@ -582,50 +662,14 @@
     const reasoning = Object.keys(progress.reasoning || {}).join('、') || '尚未提交';
     try { const reply=await requestCoupleAI(`你正在与用户合作调查《${caseFile.title}》。你是用户选择的角色本人，保持角色人设。案件真相保存在 truthData 中，禁止在用户未完成调查与断案前主动透露真凶、完整作案经过、最终反转或未获得的线索。只能使用本次提供的 playerKnownData：案件引子、涉案人物、已知事实、已获得线索、已完成调查、当前可调查内容、断案阶段。玩家直接问“凶手是谁”时，要求他先核对矛盾并给出下一步调查建议。可以提出怀疑、反问和温和提示，但不能替玩家下结论。回复 1—3 句，自然像探案搭档。\n案件引子：${caseFile.intro}\n人物：${caseFile.characters.map(x=>x[0]).join('、')}\n已知事实：${caseFile.initialFacts.join('；')}\n已获得线索：${known||'暂无'}\n已完成调查：${investigations||'暂无'}\n当前可调查：${available||'暂无'}\n自由调查记录：${freeHistory||'暂无'}\n已完成的推理层：${reasoning}\n最近讨论：${recentDiscussion||'暂无'}\n当前阶段：${mysteryView}`,`玩家说：${message}`,.65); if(requestId!==mysteryRequest||!mysteryOpen||store.contactId!==roleId||mysteryCaseId!==caseFile.id)return; const latest=mysteryProgress(caseFile.id); latest.discussion.push({who:'role',text:reply.slice(0,280)}); latest.discussion=latest.discussion.slice(-12); state.mysteryCases[caseFile.id]=latest; save(); } catch(error){ if(requestId===mysteryRequest)mysteryFeedback=`求助失败：${error.message}`; } finally { if(requestId===mysteryRequest){ mysteryBusy=false; render(); } }
   }
-  const stockTypes={dog:{label:'小狗',icon:'🐶',color:'#ff9b73'},rabbit:{label:'兔子',icon:'🐰',color:'#f2a5c4'},cat:{label:'小猫',icon:'🐱',color:'#72cbbb'},bear:{label:'小熊',icon:'🐻',color:'#e4b45f'}};
-  const stockLevelData={id:'stock-01',shipCount:8,capacity:8,types:['dog','rabbit','cat','bear'],customers:[{name:'森森',orders:{dog:8,rabbit:8}},{name:'米粒',orders:{cat:8,bear:8}}]};
-  function makeStockLevel(){
-    const level=stockLevelData,four=type=>Array(4).fill(type);const stacks=[[...four('rabbit'),...four('dog')],[...four('rabbit'),...four('dog')],[...four('bear'),...four('cat')],[...four('bear'),...four('cat')],[],[],[],[]];
-    const reverseSolution=[{source:0,target:4},{source:0,target:4},{source:1,target:4},{source:0,target:5},{source:0,target:5},{source:1,target:5},{source:2,target:6},{source:2,target:6},{source:3,target:6},{source:2,target:7},{source:2,target:7},{source:3,target:7}];
-    return {levelId:level.id,shipCount:level.shipCount,capacity:level.capacity,stacks,customers:level.customers.map(customer=>({name:customer.name,orders:{...customer.orders}})),customerIndex:0,moves:0,helps:3,helpUsed:0,history:[],won:false,reverseSolution};
-  }
-  const stockClone=value=>JSON.parse(JSON.stringify(value));
-  const stockTop=stack=>stack?.[stack.length-1]||'';
-  function stockTopRun(stack){const type=stockTop(stack);let count=0;for(let index=stack.length-1;index>=0&&stack[index]===type;index-=1)count+=1;return {type,count};}
-  function stockLegalMove(game,source,target){if(!game||source===target||source<0||target<0)return null;const from=game.stacks[source],to=game.stacks[target];if(!from?.length||!to||to.length>=game.capacity)return null;const run=stockTopRun(from),targetType=stockTop(to);if(targetType&&targetType!==run.type)return null;const count=targetType===run.type?Math.min(run.count,game.capacity-to.length):1;return count>0?{source,target,type:run.type,count}:null;}
-  function stockAllMoves(game){const moves=[];game.stacks.forEach((_,source)=>game.stacks.forEach((__,target)=>{const move=stockLegalMove(game,source,target);if(move)moves.push(move);}));return moves;}
-  function stockCurrentCustomer(game){return game.customers[game.customerIndex]||null;}
-  function stockAutoShip(game,animate=true){
-    const shipped=[];let changed=true;
-    while(changed){changed=false;const customer=stockCurrentCustomer(game);if(!customer){game.won=true;break;}
-      for(let index=0;index<game.stacks.length;index+=1){const stack=game.stacks[index],run=stockTopRun(stack);if(run.count<game.shipCount||(customer.orders[run.type]||0)<=0)continue;stack.splice(stack.length-game.shipCount,game.shipCount);customer.orders[run.type]=Math.max(0,customer.orders[run.type]-game.shipCount);shipped.push({stack:index,type:run.type});changed=true;}
-      if(Object.values(customer.orders).every(value=>value<=0)){game.customerIndex+=1;changed=true;}
-    }
-    if(animate&&shipped.length){stockShipping=shipped;if(stockShipTimer)window.clearTimeout(stockShipTimer);stockShipTimer=window.setTimeout(()=>{stockShipping=[];stockShipTimer=0;if(stockGameOpen)render();},760);}
-    return shipped;
-  }
-  function stockIsStuck(game){return !game.won&&!stockAllMoves(game).length;}
-  function stockMove(source,target){
-    const game=stockGame,move=stockLegalMove(game,source,target);if(!move||game.won)return false;
-    game.history.push(stockClone({stacks:game.stacks,customers:game.customers,customerIndex:game.customerIndex,moves:game.moves,won:game.won}));game.history=game.history.slice(-40);
-    const moved=game.stacks[source].splice(game.stacks[source].length-move.count,move.count);game.stacks[target].push(...moved);game.moves+=1;stockSelected=-1;stockNotice=move.count>1?`连续整理了 ${move.count} 个${stockTypes[move.type].label}`:'已放到新货位';stockAutoShip(game,true);if(stockIsStuck(game))stockNotice='好像理不动了……';render();return true;
-  }
-  function stockUndo(){const snapshot=stockGame?.history.pop();if(!snapshot)return;Object.assign(stockGame,stockClone(snapshot));stockNotice='已撤回上一步';stockSelected=-1;stockShipping=[];render();}
-  function stockHint(game){
-    const moves=stockAllMoves(game);if(!moves.length)return null;const customer=stockCurrentCustomer(game);let best=null,bestScore=-Infinity;
-    moves.forEach(move=>{const probe=stockClone(game),before=probe.customerIndex,from=probe.stacks[move.source];const reveal=from[from.length-move.count-1]||'';const moved=probe.stacks[move.source].splice(-move.count);probe.stacks[move.target].push(...moved);const shipped=stockAutoShip(probe,false);let score=shipped.length*100+(stockTop(game.stacks[move.target])===move.type?24:0)+(customer?.orders?.[reveal]>0?12:0)-(game.stacks[move.target].length?0:4)+(probe.customerIndex>before?80:0);if(score>bestScore){bestScore=score;best=move;}});return best;
-  }
-  function useStockHint(){if(!stockGame||stockGame.helps<=0||stockGame.won)return;const move=stockHint(stockGame);if(!move){stockNotice='当前没有可推荐的移动';render();return;}stockGame.helps-=1;stockGame.helpUsed+=1;stockSelected=move.source;stockGame.hintTarget=move.target;stockNotice=`试着把${stockTypes[move.type].label}移到高亮货位`;render();}
-  function stockGameMarkup(role){
-    stockGame ||= makeStockLevel();const game=stockGame,customer=stockCurrentCustomer(game);const orderMarkup=customer?Object.entries(customer.orders).map(([type,left])=>`<div class="stock-order-item ${left<=0?'is-done':''}"><i style="--item-color:${stockTypes[type].color}">${stockTypes[type].icon}</i><span>${stockTypes[type].label}<b>× ${left}</b></span></div>`).join(''):'<div class="stock-order-complete">所有订单完成</div>';
-    const stacks=game.stacks.map((stack,index)=>{const top=stockTop(stack),selected=index===stockSelected,hint=index===game.hintTarget;return `<button class="stock-stack${selected?' is-selected':''}${hint?' is-hint-target':''}" data-stock-stack="${index}" type="button" aria-label="货位${index+1}，${stack.length?`${stack.length}个货物，顶部是${stockTypes[top].label}`:'空货位'}"><span class="stock-stack-items">${stack.map((type,itemIndex)=>`<i class="stock-chip is-${type}${itemIndex===stack.length-1?' is-top':''}" data-stock-top="${itemIndex===stack.length-1?'true':'false'}" style="--level:${itemIndex};--item-color:${stockTypes[type].color}"><em>${itemIndex===stack.length-1?stockTypes[type].icon:''}</em></i>`).join('')}</span><span class="stock-tray"></span><small>${stack.length}/${game.capacity}</small></button>`;}).join('');
-    const shipping=stockShipping.map(item=>`<i class="stock-shipping is-${item.type}" style="--ship-left:${item.stack%4*25+8}%;--ship-bottom:${Math.floor(item.stack/4)?17:67}%;--item-color:${stockTypes[item.type].color}">${stockTypes[item.type].icon}</i>`).join('');
-    return `<section class="stock-game" role="dialog" aria-modal="true" aria-label="分类理货"><header><button data-stock-close type="button" aria-label="关闭">‹</button><div><small>STOCK SORT · ${game.customerIndex+1}/${game.customers.length}</small><b>分类理货</b></div><button data-stock-reset type="button">重整</button></header><main><section class="stock-customer"><div class="stock-customer-face">${customer?'🛍️':'✨'}</div><div><small>${customer?`${esc(customer.name)} 的订单`:'今日订单'}</small><div class="stock-orders">${orderMarkup}</div></div></section><div class="stock-meta"><span>移动 <b>${game.moves}</b></span><p>${esc(stockNotice||'整理顶部货物，凑满后自动出货')}</p><span>求助 <b>${game.helps}</b></span></div><section class="stock-board">${stacks}${shipping}</section>${stockIsStuck(game)?'<div class="stock-stuck"><b>好像理不动了……</b><span>可以撤回、求助或重新整理</span></div>':''}${game.won?`<div class="stock-win"><small>ALL ORDERS READY</small><b>理货完成</b><span>${game.moves} 步 · 求助 ${game.helpUsed} 次</span><button data-stock-reset type="button">重新挑战</button></div>`:''}</main><footer><button data-stock-undo type="button" ${game.history.length?'':'disabled'}>撤回</button><button data-stock-help type="button" ${game.helps&&!game.won?'':'disabled'}>求助</button><small>点击货堆再点目标，或直接拖动顶部圆片</small></footer></section>`;
-  }
   function games(role, profile) {
     const categories = [['🏁', '竞速'], ['🧩', '益智解谜'], ['♠', '娱乐场'], ['☀', '云游戏'], ['🎯', '策略']];
     const chips = categories.map(([icon, label], index) => `<button class="couple-games-chip" type="button" disabled><i class="couple-games-chip-icon chip-icon-${index + 1}" aria-hidden="true"></i><span>${label}</span></button>`).join('');
-    const installed = Array.from({ length: 3 }, (_, index) => index === 0 ? '<article class="couple-games-installed-card is-filled"><img class="couple-games-installed-cover" src="assets/ui/game-covers/flower-roulette-cover-photo-v2.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/flower-roulette-cover-photo-v2.png\'" alt="花朵轮盘游戏封面"><div class="couple-games-installed-copy"><i>双人心理博弈</i><b>花朵轮盘</b><span>谁被鲜花打中，谁就输</span><button data-flower-roulette-open type="button">打开</button></div></article>' : index === 1 ? '<article class="couple-games-installed-card is-filled couple-mystery-cover"><div class="couple-mystery-cover-art"><img src="assets/ui/game-covers/ancient-mystery-cover-v2.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/ancient-mystery-cover-v2.png\'" alt="古籍悬案游戏封面"></div><div class="couple-games-installed-copy"><i>和 TA 一起读案推理</i><b>古籍悬案</b><span>翻开案卷，找出真相</span><button data-mystery-open type="button">打开</button></div></article>' : '<article class="couple-games-installed-card is-filled stock-cover"><img class="couple-games-installed-cover" src="assets/ui/game-covers/stock-sort-cover-v1.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/stock-sort-cover-v1.png\'" alt="分类理货游戏封面"><div class="couple-games-installed-copy"><i>轻巧分类益智</i><b>分类理货</b><span>整理货堆，完成今日订单</span><button data-stock-open type="button">打开</button></div></article>').join('');
+    const installed = [
+      '<article class="couple-games-installed-card is-filled"><img class="couple-games-installed-cover" src="assets/ui/game-covers/flower-roulette-cover-photo-v2.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/flower-roulette-cover-photo-v2.png\'" alt="花朵轮盘游戏封面"><div class="couple-games-installed-copy"><i>双人心理博弈</i><b>花朵轮盘</b><span>谁被鲜花打中，谁就输</span><button data-flower-roulette-open type="button">打开</button></div></article>',
+      '<article class="couple-games-installed-card is-filled couple-mystery-cover"><div class="couple-mystery-cover-art"><img src="assets/ui/game-covers/ancient-mystery-cover-v2.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/ancient-mystery-cover-v2.png\'" alt="古籍悬案游戏封面"></div><div class="couple-games-installed-copy"><i>和 TA 一起读案推理</i><b>古籍悬案</b><span>翻开案卷，找出真相</span><button data-mystery-open type="button">打开</button></div></article>',
+      '<article class="couple-games-installed-card is-filled stock-cover"><img class="couple-games-installed-cover" src="assets/ui/game-covers/stock-sort-cover-v1.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/stock-sort-cover-v1.png\'" alt="分类理货游戏封面"><div class="couple-games-installed-copy"><i>轻巧分类益智</i><b>分类理货</b><span>整理货堆，完成今日订单</span><button data-stock-open type="button">打开</button></div></article>'
+    ].join('');
     const rows = Array.from({ length: 4 }, () => '<article class="couple-games-row" aria-label="未安装游戏待定"><i class="couple-games-row-icon"></i><div><b></b><span></span></div><div class="couple-games-row-action"><button type="button" aria-label="获取">获取</button><small>App 内购买</small></div></article>').join('');
     return `<section class="couple-games-shell"><div class="couple-games-category-row">${chips}</div><section class="couple-games-installed-row" aria-label="已安装游戏">${installed}</section><section class="couple-games-list-slot"><header><div><h2>近期佳作</h2><span>向左滑动查看更多</span></div><button type="button" disabled>查看全部</button></header>${rows}</section></section>`;
   }
@@ -894,13 +938,12 @@
     const puzzleChoice = event.target.closest('[data-mystery-contradiction],[data-mystery-order],[data-mystery-answer]');
     if (puzzleChoice) { const caseFile = mysteryCases.find(item => item.id === mysteryCaseId); if (!caseFile) return; const progress = mysteryProgress(caseFile.id); const puzzle = legacyMysteryPuzzles[caseFile.id]; const index = Number(puzzleChoice.dataset.mysteryContradiction ?? puzzleChoice.dataset.mysteryOrder ?? puzzleChoice.dataset.mysteryAnswer); if (!Number.isInteger(index)) return; if (puzzleChoice.hasAttribute('data-mystery-contradiction')) { if (progress.viewed?.length < mysteryClues(caseFile).length || progress.contradictionDone) return; if (index === puzzle.contradiction.answer) { progress.contradictionDone = true; mysteryChoice = -1; mysteryFeedback = ''; } else mysteryFeedback = '这两条证据还不足以证明关键矛盾，再核对人物和时间。'; } else if (puzzleChoice.hasAttribute('data-mystery-order')) { if (!progress.contradictionDone || progress.orderDone) return; if (index === puzzle.order.answer) { progress.orderDone = true; mysteryChoice = -1; mysteryFeedback = ''; } else mysteryFeedback = puzzle.order.hint; } else { if (!progress.orderDone) return; mysteryChoice = index; mysteryFeedback = ''; } state.mysteryCases[caseFile.id] = progress; save(); render(); return; }
     if (event.target.closest('[data-mystery-submit]')) { const caseFile = mysteryCases.find(item => item.id === mysteryCaseId); if (!caseFile || mysteryChoice < 0 || !mysteryProgress(caseFile.id).orderDone) return; const progress = mysteryProgress(caseFile.id); progress.attempts = (Number(progress.attempts) || 0) + 1; if (mysteryChoice === caseFile.answer) { progress.solved = true; mysteryFeedback = ''; } else mysteryFeedback = `还差一步：${caseFile.hint}`; state.mysteryCases[caseFile.id] = progress; save(); render(); return; }
-    if (event.target.closest('[data-stock-open]')) { stockGameOpen=true;stockGame=makeStockLevel();stockSelected=-1;stockNotice='';stockShipping=[];render();return; }
-    if (event.target.closest('[data-stock-close]')) { stockGameOpen=false;stockSelected=-1;stockShipping=[];if(stockShipTimer)window.clearTimeout(stockShipTimer);stockShipTimer=0;render();return; }
-    if (event.target.closest('[data-stock-reset]')) { stockGame=makeStockLevel();stockSelected=-1;stockNotice='';stockShipping=[];if(stockShipTimer)window.clearTimeout(stockShipTimer);stockShipTimer=0;render();return; }
-    if (event.target.closest('[data-stock-undo]')) { stockUndo();return; }
-    if (event.target.closest('[data-stock-help]')) { useStockHint();return; }
-    const stockStackButton=event.target.closest('[data-stock-stack]');
-    if(stockStackButton&&Date.now()>=stockIgnoreClickUntil){const index=Number(stockStackButton.dataset.stockStack);if(stockSelected<0){if(stockGame?.stacks[index]?.length){stockSelected=index;stockGame.hintTarget=-1;stockNotice=`已拿起${stockTypes[stockTop(stockGame.stacks[index])].label}`;render();}}else if(index===stockSelected){stockSelected=-1;stockNotice='已取消选择';render();}else if(!stockMove(stockSelected,index)){if(stockGame?.stacks[index]?.length){stockSelected=index;stockGame.hintTarget=-1;stockNotice='这里不能叠放，已改选这个货堆';render();}else{stockNotice='这个位置不能放';render();}}return;}
+    if (event.target.closest('[data-stock-open]')) { stockGameState = null; stockGameNotice = ''; stockGameOpen = true; render(); return; }
+    if (event.target.closest('[data-stock-close]')) { stockGameOpen = false; stockGameState = null; stockGameNotice = ''; render(); return; }
+    if (event.target.closest('[data-stock-start]')) { stockGameState = stockMakeGame(); stockGameNotice = ''; render(); return; }
+    if (event.target.closest('[data-stock-restart]')) { stockGameState = stockMakeGame(); stockGameNotice = ''; render(); return; }
+    if (event.target.closest('[data-stock-refill]')) { stockRefill(); return; }
+    const stockItem = event.target.closest('[data-stock-item]'); if (stockItem) { stockCollect(Number(stockItem.dataset.stockItem)); return; }
     if (event.target.closest('[data-flower-roulette-open]')) { flowerRouletteOpen = true; resetFlowerRouletteRound(); render(); return; }
     if (event.target.closest('[data-flower-roulette-close]')) { flowerRouletteOpen = false; resetFlowerRouletteRound(); render(); return; }
     if (event.target.closest('[data-flower-start]')) { startFlowerRouletteGame(); return; }
@@ -908,7 +951,7 @@
     if (event.target.closest('[data-flower-retry]')) { chooseFlowerRouletteRole(); return; }
     const flowerAction = event.target.closest('[data-flower-action]'); if (flowerAction) { chooseFlowerRouletteAction(flowerAction.dataset.flowerAction); return; }
     if (event.target.closest('[data-flower-probe]')) { testFlowerRouletteRole(); return; }
-    if (event.target.closest('[data-couple-close]')) { flowerRouletteOpen = false; mysteryOpen = false; stockGameOpen=false;stockSelected=-1;stockShipping=[];if(stockShipTimer)window.clearTimeout(stockShipTimer);stockShipTimer=0;resetFlowerRouletteRound(); app.classList.remove('is-open'); return; }
+    if (event.target.closest('[data-couple-close]')) { flowerRouletteOpen = false; mysteryOpen = false; stockGameOpen = false; stockGameState = null; stockGameNotice = ''; resetFlowerRouletteRound(); app.classList.remove('is-open'); return; }
     if (event.target.closest('[data-couple-paper-close]')) { const paper = app.querySelector('.couple-paper-overlay'); if (paper) { paper.classList.add('is-closing'); window.setTimeout(() => paper.remove(), 280); } return; }
     const pieceCard = event.target.closest('[data-couple-piece]'); if (pieceCard) { const type = pieceCard.dataset.couplePiece; const id = pieceCard.dataset.couplePieceId; const item = type === 'thought' ? state.relationshipReviewHistory?.find(entry => entry.id === id) : state.memories.find(entry => entry.id === id); if (!item) return; app.querySelector('.couple-paper-overlay')?.remove(); app.querySelector('.couple-page').insertAdjacentHTML('beforeend', memoryPaperMarkup(type, item)); const overlay = app.querySelector('.couple-paper-overlay'); requestAnimationFrame(() => { if (overlay?.isConnected) animateMemoryPaper(overlay); }); return; }
     if (event.target.closest('[data-couple-home]')) { tab = 'today'; render(); return; }
@@ -953,10 +996,6 @@
     const delEvent = event.target.closest('[data-couple-delete-event]'); if (delEvent) { state.events = state.events.filter(item => item.id !== delEvent.dataset.coupleDeleteEvent); save(true); render(); return; }
     if (event.target.closest('[data-couple-save-answer]')) { const question = dailyQuestion(); const value = app.querySelector('#coupleAnswer')?.value.trim(); if (value) { state.answers[question] = value; state.roleAnswers ||= {}; state.roleAnswers[question] = `我看到你的回答了。${value.length > 12 ? '你的想法我会好好记住。' : '我也这样想。'} 下次我们一起去实现，好吗？`; save(); render(); } return; }
   });
-  app.addEventListener('pointerdown',event=>{const chip=event.target.closest('.stock-chip.is-top');const stack=chip?.closest('[data-stock-stack]');if(!chip||!stack||!stockGameOpen)return;const source=Number(stack.dataset.stockStack);event.preventDefault();stockDrag={pointerId:event.pointerId,chip,source,startX:event.clientX,startY:event.clientY,moved:false};chip.setPointerCapture?.(event.pointerId);chip.classList.add('is-dragging');app.querySelectorAll('[data-stock-stack]').forEach(element=>{const target=Number(element.dataset.stockStack);element.classList.toggle('is-legal-target',!!stockLegalMove(stockGame,source,target));});});
-  app.addEventListener('pointermove',event=>{const drag=stockDrag;if(!drag||drag.pointerId!==event.pointerId)return;event.preventDefault();const x=event.clientX-drag.startX,y=event.clientY-drag.startY;if(Math.abs(x)+Math.abs(y)>7)drag.moved=true;drag.chip.style.setProperty('--drag-x',`${x}px`);drag.chip.style.setProperty('--drag-y',`${y}px`);});
-  const finishStockDrag=event=>{const drag=stockDrag;if(!drag||drag.pointerId!==event.pointerId)return;stockDrag=null;drag.chip.classList.remove('is-dragging');drag.chip.style.removeProperty('--drag-x');drag.chip.style.removeProperty('--drag-y');app.querySelectorAll('[data-stock-stack]').forEach(element=>element.classList.remove('is-legal-target'));if(!drag.moved)return;stockIgnoreClickUntil=Date.now()+350;const targetElement=document.elementFromPoint(event.clientX,event.clientY)?.closest?.('[data-stock-stack]');const target=Number(targetElement?.dataset.stockStack);if(!Number.isInteger(target)||!stockMove(drag.source,target)){stockNotice='只能放到空货位或同类货堆';render();}};
-  app.addEventListener('pointerup',finishStockDrag);app.addEventListener('pointercancel',finishStockDrag);
   app.querySelector('.couple-hidden-file').addEventListener('change', event => { const file = event.target.files?.[0]; if (!file) return finishMemory(''); const read = window.IdealMachineReadImage ? window.IdealMachineReadImage(file, 900, .72) : new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(file); }); read.then(value => finishMemory(value)); event.target.value = ''; });
   app.addEventListener('input', event => { if (event.target.matches('[data-mystery-input]')) mysteryDraft = event.target.value; if (event.target.matches('[data-mystery-free-input]')) mysteryFreeDraft = event.target.value; });
   app.addEventListener('keydown', event => { if (event.key === 'Enter' && event.target.matches('[data-mystery-input]')) { event.preventDefault(); mysteryTalk(); } if (event.key === 'Enter' && event.target.matches('[data-mystery-free-input]')) { event.preventDefault(); mysteryFreeInvestigate(); } });

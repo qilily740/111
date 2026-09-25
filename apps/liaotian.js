@@ -1,7 +1,7 @@
 (() => {
   const key = 'ideal-machine-chat';
   const initial = { contacts: [], profiles: [], chats: {}, moments: [], contactGroups: [], emojis: { groups: [{ id: 'emoji-default', name: '默认', items: [] }] } };
-  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let momentCoverEditorOpen = false; let momentCoverDraftSource = ''; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineRequestLocked = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0; let chatGroupLongPressTimer = 0; let suppressChatGroupEntryClick = false;
+  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtTranslation = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let momentCoverEditorOpen = false; let momentCoverDraftSource = ''; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineRequestLocked = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0; let chatGroupLongPressTimer = 0; let suppressChatGroupEntryClick = false;
   let activeContactGroupId = '';
   let momentBusyPostId = '';
   const app = document.createElement('div'); app.className = 'chat-app';
@@ -203,6 +203,12 @@
       const contact = state.contacts.find(item => item.id === contactId) || {};
       const chat = state.chats?.[contactId] || {};
       const profile = state.profiles.find(item => item.id === chat.profileId) || {};
+      const isChatGeneration = ['chat', 'chat-background', 'chat-thought'].includes(init.idealScope) || String(system?.content || '').includes('理想机角色扮演协议');
+      if (system && isChatGeneration && init.idealScope !== 'chat-translation') {
+        const languageRule = roleLanguageInstruction(contact, chat);
+        if (languageRule && !String(system.content || '').includes('【角色原文语言】') && !String(system.content || '').includes('【自动翻译输出格式】')) system.content = `${system.content || ''}${languageRule}`;
+        next = { ...init, body: JSON.stringify(payload) };
+      }
       if (system && window.IdealMachineRoleUserContext && !String(system.content || '').includes('【第一优先：角色本人')) {
         system.content = `${window.IdealMachineRoleUserContext(contact, profile)}\n\n${system.content}`;
         next = { ...init, body: JSON.stringify(payload) };
@@ -427,7 +433,10 @@
       const transcript = rows.map(item => `${item.role === 'assistant' ? '豆包' : '用户'}：${String(item.content || '').trim()}`).join('\n');
       return withTime(`[用户与豆包的聊天记录]\n这是现实用户分享给角色查看的完整豆包对话，不是角色本人此前与豆包的对话。角色必须先读完记录，再用角色自己的身份回应用户。\n主题：${String(message.sharedDoubaoTitle || '未命名对话').trim()}\n${transcript}\n[用户与豆包的聊天记录结束]`);
     }
-    return withTime(String(message.text || '').trim());
+    const plainText = isCharacterChatMessage(message)
+      ? cleanCharacterVisibleText(message.originalText || message.text || '')
+      : String(message.text || '').trim();
+    return withTime(plainText);
   }
   function pendingVisionImages(chat) {
     const messages = Array.isArray(chat?.messages) ? chat.messages : [];
@@ -758,6 +767,7 @@
     const roleDisplayName = contact?.nickname || roleName;
     const userName = profile?.nickname || profile?.realName || profile?.name || '用户';
     const roleDetails = contact?.details || contact?.signature || '暂无角色设定';
+    const languageInstruction = roleLanguageInstruction(contact, chat);
     const roleFacts = [
       contact?.identity ? `身份：${contact.identity}` : '',
       contact?.gender ? `性别：${contact.gender}` : '',
@@ -821,6 +831,8 @@ ${timeAwareness}
 
 【绑定的局部世界书】
 ${boundWorldbookContext(contact)}
+
+${languageInstruction}
 
 世界书中的内容是角色所处世界的背景规则。只有在相关时使用，不要主动提到“世界书”，也不要为了展示设定而强行引用。当前聊天记录由系统作为后续消息提供，必须结合最近对话回应，而不是只重复角色资料。聊天记录中的每条消息都带有消息时间；严格区分今天、昨天、前天和更早以前。除非消息时间明确是今天且距离当前很近，否则不要说“刚刚”“刚才”；没有保存具体日期的旧消息只能按历史内容理解，不能自行假定发生在今天。
 
@@ -1010,19 +1022,23 @@ ${boundWorldbookContext(contact)}
   function cleanThoughtText(value) { return String(value || '').replace(/^```[\s\S]*?\n|```$/g, '').replace(/^(?:心声|内心独白|角色心声)\s*[:：]\s*/i, '').replace(/\n{2,}/g, '\n').trim(); }
   function extractCombinedThought(value) {
     let source = String(value || '');
-    const match = source.match(/\[\[THOUGHT\]\]([\s\S]*?)(?:\[\[\/THOUGHT\]\]|$)/i);
-    const thought = cleanThoughtText(match?.[1] || '');
+    const match = source.match(/\[\[\s*THOUGHT\s*\]\]([\s\S]*?)(?:\[\[\s*\/\s*THOUGHT\s*\]\]|$)/i);
+    const thoughtParts = extractCharacterTranslation(match?.[1] || '');
+    const thought = cleanThoughtText(thoughtParts.text);
+    const thoughtTranslation = cleanThoughtText(thoughtParts.translation);
     if (match) source = source.replace(match[0], ' ').trim();
-    return { reply:source, thought };
+    return { reply:source, thought, thoughtTranslation };
   }
-  function saveCombinedThought(chat, value) {
+  function saveCombinedThought(chat, value, translation = '') {
     const text = cleanThoughtText(value);
     if (!chat || !text) return;
+    const translatedRaw = cleanThoughtText(translation);
+    const translated = thoughtTextComparable(text) === thoughtTextComparable(translatedRaw) ? '' : translatedRaw;
     const key = currentThoughtKey(chat);
     chat.thoughts ||= [];
     const saved = chat.thoughts.find(item => item.key === key);
-    if (saved) { saved.text = text; saved.createdAt = Date.now(); }
-    else chat.thoughts.push({ key, text, createdAt:Date.now() });
+    if (saved) { saved.text = text; if (translated) saved.translation = translated; else delete saved.translation; saved.createdAt = Date.now(); }
+    else chat.thoughts.push({ key, text, ...(translated ? { translation:translated } : {}), createdAt:Date.now() });
     save();
   }
   function thoughtLooksIncomplete(value, finishReason = '') {
@@ -1036,6 +1052,16 @@ ${boundWorldbookContext(contact)}
     const order = new Map((chat?.messages || []).map((message, index) => [String(message.id || ''), index]));
     return saved.slice().sort((a, b) => (order.get(String(a.key)) ?? Number.MAX_SAFE_INTEGER) - (order.get(String(b.key)) ?? Number.MAX_SAFE_INTEGER));
   }
+  function thoughtDisplayMarkup(text, translation = '') {
+    const original = cleanThoughtText(text);
+    const translated = cleanThoughtText(translation);
+    if (!translated) return esc(original);
+    // 模型偶尔会把原文和译文都返回成中文，或只在空格/标点上有差异；
+    // 这种情况下只显示一份，避免心声面板出现上下重复的两段文字。
+    if (thoughtTextComparable(original) && thoughtTextComparable(original) === thoughtTextComparable(translated)) return esc(original);
+    return `<span class="chat-translation-original">${esc(original)}</span><span class="chat-translation-text">${esc(translated)}</span>`;
+  }
+  function thoughtTextComparable(value) { return String(value || '').replace(/[\s，。！？!?、；;：“”"'‘’（）()【】\[\]…·]/g, '').toLowerCase(); }
   function chatApiConfig(chat = currentChat()) { try { const settings = JSON.parse(localStorage.getItem('ideal-machine-settings') || '{}').api || {}; const profile = settings.profiles?.find(item => item.id === chat?.apiProfileId); return profile ? { endpoint: profile.endpoint, key: profile.key } : window.IdealMachineAPI?.getConfig?.(); } catch { return window.IdealMachineAPI?.getConfig?.(); } }
   function thoughtModelsFor(chat) {
     let api = {};
@@ -1067,10 +1093,10 @@ ${boundWorldbookContext(contact)}
     const latestKey = currentThoughtKey();
     const key = thoughtRecords().some(item => item.key === thoughtKey) ? thoughtKey : latestKey;
     const records = thoughtRecords();
-    if (thoughtKey !== key && !thoughtLoading) thoughtText = records.find(item => item.key === key)?.text || '';
-    const content = thoughtLoading ? '正在读取这一轮的心声……' : (thoughtText || '点击角色网名，读取这一轮的心声。');
+    if (thoughtKey !== key && !thoughtLoading) { const record = records.find(item => item.key === key); thoughtText = record?.text || ''; thoughtTranslation = record?.translation || ''; }
+    const content = thoughtLoading ? '正在读取这一轮的心声……' : (thoughtText ? thoughtDisplayMarkup(thoughtText, thoughtTranslation) : '点击角色网名，读取这一轮的心声。');
     const index = records.findIndex(item => item.key === key); const previous = index > 0; const next = index >= 0 && index < records.length - 1;
-    panel.innerHTML = `<div class="chat-thought-backdrop" data-chat-thought-close></div><section class="chat-thought-card"><header><span class="chat-kicker">INNER VOICE</span><button data-chat-thought-close type="button">×</button></header><p>${esc(content)}</p><footer class="chat-thought-actions"><button type="button" data-chat-thought-prev ${previous ? '' : 'disabled'}>‹</button><button type="button" data-chat-thought-reroll ${thoughtLoading || replying ? 'disabled' : ''}>重roll</button><button type="button" data-chat-thought-next ${next ? '' : 'disabled'}>›</button></footer></section>`;
+    panel.innerHTML = `<div class="chat-thought-backdrop" data-chat-thought-close></div><section class="chat-thought-card"><header><span class="chat-kicker">INNER VOICE</span><button data-chat-thought-close type="button">×</button></header><p>${content}</p><footer class="chat-thought-actions"><button type="button" data-chat-thought-prev ${previous ? '' : 'disabled'}>‹</button><button type="button" data-chat-thought-reroll ${thoughtLoading || replying ? 'disabled' : ''}>重roll</button><button type="button" data-chat-thought-next ${next ? '' : 'disabled'}>›</button></footer></section>`;
   }
   async function rerollCurrentChatRound() {
     const chat = currentChat();
@@ -1094,6 +1120,7 @@ ${boundWorldbookContext(contact)}
     save();
     thoughtRequestId += 1;
     thoughtText = '';
+    thoughtTranslation = '';
     thoughtKey = '';
     thoughtOpen = false;
     renderThought();
@@ -1112,6 +1139,7 @@ ${boundWorldbookContext(contact)}
     if (!force && savedThought?.text) {
       thoughtKey = key;
       thoughtText = savedThought.text;
+      thoughtTranslation = savedThought.translation || '';
       renderThought();
       return;
     }
@@ -1121,15 +1149,22 @@ ${boundWorldbookContext(contact)}
     const config = thoughtApi.config;
     const model = thoughtApi.model;
     if (!config?.endpoint || !config.key || !model) {
-      thoughtText = '请先在设置中配置聊天 API。'; thoughtKey = key; renderThought(); return;
+      thoughtText = '请先在设置中配置聊天 API。'; thoughtTranslation = ''; thoughtKey = key; renderThought(); return;
     }
     const requestId = ++thoughtRequestId;
-    thoughtLoading = true; thoughtText = ''; thoughtKey = key; renderThought();
+    thoughtLoading = true; thoughtText = ''; thoughtTranslation = ''; thoughtKey = key; renderThought();
     const messages = Array.isArray(chat.messages) ? chat.messages.slice(-12) : [];
     const lastUserIndex = messages.map(item => item.role).lastIndexOf('user');
     const round = lastUserIndex >= 0 ? messages.slice(lastUserIndex) : messages.slice(-4);
     const conversation = messages.map(item => `${item.role === 'user' ? '用户' : (contact.nickname || contact.name || '角色')}：${thoughtMessageText(item)}`).join('\n') || '暂无聊天记录。';
     const roundText = round.map(item => `${item.role === 'user' ? '用户' : (contact.nickname || contact.name || '角色')}：${thoughtMessageText(item)}`).join('\n') || '本轮还没有聊天内容。';
+    const thoughtLanguageProfile = roleLanguageProfile(contact);
+    const thoughtLanguageRule = thoughtLanguageProfile.code
+      ? `角色来自${thoughtLanguageProfile.country}，心声正文必须使用${thoughtLanguageProfile.language}自然表达，不要改成普通话。`
+      : '';
+    const thoughtTranslationRule = chatSettingsFor(chat).autoTranslate
+      ? `如果心声不是自然的现代普通话，必须在心声正文末尾紧接着追加 [[TRANSLATION]]普通话译文[[/TRANSLATION]]；普通话心声不要追加该标记。译文仍属于这一次心声生成，不要另起请求。`
+      : '不要输出翻译标记。';
     const thoughtPrompt = `你现在只需要写出角色“${contact.nickname || contact.name || '角色'}”此刻真实的内心想法。
 
 角色设定：${contact.details || contact.signature || '暂无角色设定'}
@@ -1152,6 +1187,8 @@ ${roundText}
 4. 不要编造聊天中没有发生的事实，也不要重复整段聊天内容。
 5. 每句话必须完整结束；如果想法很短就只写一句，不要输出写到一半的残句或以“从……”“因为……”等未完成句式结尾。
 6. 最多 80 个汉字，优先写一个具体反应、犹豫或打算，不要为了凑长度扩写。
+${thoughtLanguageRule}
+${thoughtTranslationRule}
 现在只输出心声正文。`;
     try {
       const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
@@ -1160,28 +1197,22 @@ ${roundText}
         body: JSON.stringify({ model, temperature: .65, max_tokens: 1024, messages: [{ role: 'system', content: thoughtPrompt }] })
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      let data = await response.json();
-      let choice = data.choices?.[0] || {};
-      if (thoughtLooksIncomplete(choice.message?.content, choice.finish_reason)) {
-        const retryResponse = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
-          idealScope: 'chat-thought', method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` },
-          body: JSON.stringify({ model, temperature: .55, max_tokens: 4096, messages: [{ role: 'system', content: `${thoughtPrompt}\n\n上一版心声被截断了。这次请从头重新写一条完整心声，必须以完整句子结束。` }] })
-        });
-        if (!retryResponse.ok) throw new Error(`HTTP ${retryResponse.status}`);
-        data = await retryResponse.json();
-        choice = data.choices?.[0] || {};
-      }
+      const data = await response.json();
+      const choice = data.choices?.[0] || {};
       if (requestId === thoughtRequestId) {
-        const completeThought = cleanThoughtText(choice.message?.content);
+        const thoughtParts = extractCharacterTranslation(choice.message?.content || '');
+        const completeThought = cleanThoughtText(thoughtParts.text);
         thoughtText = thoughtLooksIncomplete(completeThought, choice.finish_reason) ? '这条心声没有生成完整，请点击重roll再试。' : completeThought;
+        thoughtTranslation = thoughtText.startsWith('这条心声没有生成完整') ? '' : cleanThoughtText(thoughtParts.translation);
+        if (thoughtTextComparable(thoughtText) && thoughtTextComparable(thoughtText) === thoughtTextComparable(thoughtTranslation)) thoughtTranslation = '';
         chat.thoughts ||= [];
         const saved = chat.thoughts.find(item => item.key === key);
-        if (saved) saved.text = thoughtText; else chat.thoughts.push({ key, text: thoughtText, createdAt: Date.now() });
+        if (saved) { saved.text = thoughtText; if (thoughtTranslation) saved.translation = thoughtTranslation; else delete saved.translation; }
+        else chat.thoughts.push({ key, text: thoughtText, ...(thoughtTranslation ? { translation:thoughtTranslation } : {}), createdAt: Date.now() });
         save();
       }
     } catch (error) {
-      if (requestId === thoughtRequestId) thoughtText = `心声读取失败：${error.message}`;
+      if (requestId === thoughtRequestId) { thoughtText = `心声读取失败：${error.message}`; thoughtTranslation = ''; }
     } finally {
       if (requestId === thoughtRequestId) { thoughtLoading = false; renderThought(); }
     }
@@ -1189,6 +1220,7 @@ ${roundText}
   async function rerollThoughtOnly() {
     if (thoughtLoading || isContactReplying(activeContact) || !thoughtOpen) return;
     thoughtText = '';
+    thoughtTranslation = '';
     thoughtKey = '';
     await loadCurrentThought(true);
   }
@@ -1196,10 +1228,10 @@ ${roundText}
     const records = thoughtRecords(); const displayedKey = records.some(item => item.key === thoughtKey) ? thoughtKey : currentThoughtKey(); const index = records.findIndex(item => item.key === displayedKey);
     const target = records[index + direction];
     if (!target) return;
-    thoughtKey = target.key; thoughtText = target.text || '';
+    thoughtKey = target.key; thoughtText = target.text || ''; thoughtTranslation = target.translation || '';
     const panel = document.querySelector('#chatThought');
     const text = panel?.querySelector('.chat-thought-card p');
-    if (text) text.textContent = thoughtText || '这一轮还没有心声。';
+    if (text) text.innerHTML = thoughtText ? thoughtDisplayMarkup(thoughtText, thoughtTranslation) : '这一轮还没有心声。';
     const prev = panel?.querySelector('[data-chat-thought-prev]');
     const next = panel?.querySelector('[data-chat-thought-next]');
     if (prev) prev.disabled = index + direction <= 0;
@@ -1445,10 +1477,8 @@ ${roundText}
     if (!/^https?:\/\//i.test(source)) return;
     image.dataset.emojiNoReferrerRetried = 'true';
     image.referrerPolicy = 'no-referrer';
-    image.removeAttribute('src');
     requestAnimationFrame(async () => {
       if (!image.isConnected) return;
-      image.src = source;
       try {
         const response = await nativeChatFetch(source, { mode:'cors', credentials:'omit', cache:'no-store', referrerPolicy:'no-referrer' });
         if (!response.ok) return;
@@ -1563,6 +1593,75 @@ ${roundText}
   const singleRoleMomentGenerator = generateRoleMoment;
   generateRoleMoment = async (contactId, targetPost = null) => { if (targetPost) return singleRoleMomentGenerator(contactId, targetPost); const eligibleContacts = state.contacts.filter(contact => !momentActorIsDeceased(contact)); const selectedIds = roleMomentTargets.filter(id => eligibleContacts.some(contact => contact.id === id)); const shuffled = eligibleContacts.slice().sort(() => Math.random() - .5); const ids = roleMomentMode === 'select' ? selectedIds : shuffled.slice(0, Math.min(roleMomentCount, shuffled.length)).map(contact => contact.id); if (!ids.length) return window.alert('当前没有仍在世的角色可以参与朋友圈。'); for (const id of ids) await singleRoleMomentGenerator(id); };
   function boundWorldbookContext(contact) { try { const data = JSON.parse(localStorage.getItem('ideal-machine-worldbooks') || '{}'); const book = (data.local || []).find(item => item.id === contact?.worldbook); if (!book) return '未绑定局部世界书。'; const entries = (book.entries || []).filter(entry => entry.enabled !== false); return entries.length ? `绑定局部世界书：${book.name}\n${entries.map(entry => `${entry.name}：${entry.content}`).join('\n')}` : `绑定局部世界书：${book.name}\n当前没有启用的世界书条目。`; } catch { return '未绑定局部世界书。'; } }
+  const roleLanguageRules = [
+    { country:'韩国', language:'韩语', code:'ko', patterns:/韩国|南韩|韩籍|韩国人|首尔|釜山|大韩民国|朝鲜族|韩语|korea|korean|한국어|한국인|대한민국|서울|부산/i },
+    { country:'日本', language:'日语', code:'ja', patterns:/日本|日籍|日本人|东京|大阪|京都|日本国籍|日语|japan|japanese|日本語/i },
+    { country:'香港/澳门/广东', language:'粤语', code:'yue', patterns:/香港|澳门|广东话|粤语|粤籍|广东人|cantonese|hong\s*kong|macau|廣東話/i },
+    { country:'法国', language:'法语', code:'fr', patterns:/法国|法籍|法国人|巴黎|法语|france|french|français|francais/i },
+    { country:'德国', language:'德语', code:'de', patterns:/德国|德籍|德国人|柏林|德语|germany|german|deutsch/i },
+    { country:'西班牙/拉丁美洲', language:'西班牙语', code:'es', patterns:/西班牙|西籍|西班牙人|墨西哥|阿根廷|拉丁美洲|spain|spanish|mexico|argentina|español|西语/i },
+    { country:'意大利', language:'意大利语', code:'it', patterns:/意大利|意籍|意大利人|罗马|italy|italian|italiano|意语/i },
+    { country:'葡萄牙/巴西', language:'葡萄牙语', code:'pt', patterns:/葡萄牙|巴西|葡籍|巴西人|里斯本|圣保罗|portugal|portuguese|brazil|brazilian|português|葡语/i },
+    { country:'俄罗斯', language:'俄语', code:'ru', patterns:/俄罗斯|俄籍|俄国人|莫斯科|russia|russian|русский|俄语/i },
+    { country:'乌克兰', language:'乌克兰语', code:'uk', patterns:/乌克兰|乌籍|乌克兰人|基辅|ukraine|ukrainian|українська|乌语/i },
+    { country:'土耳其', language:'土耳其语', code:'tr', patterns:/土耳其|土籍|土耳其人|伊斯坦布尔|turkey|turkish|türkçe|土语/i },
+    { country:'希腊', language:'希腊语', code:'el', patterns:/希腊|希籍|希腊人|雅典|greece|greek|ελληνικά|希语/i },
+    { country:'荷兰/比利时', language:'荷兰语', code:'nl', patterns:/荷兰|比利时|荷籍|荷兰人|阿姆斯特丹|netherlands|dutch|belgium|nederlands|荷语/i },
+    { country:'波兰', language:'波兰语', code:'pl', patterns:/波兰|波籍|波兰人|华沙|poland|polish|polski|波语/i },
+    { country:'罗马尼亚', language:'罗马尼亚语', code:'ro', patterns:/罗马尼亚|罗籍|罗马尼亚人|布加勒斯特|romania|romanian|română|罗语/i },
+    { country:'瑞典/挪威/丹麦', language:'北欧语言', code:'sv-no-da', patterns:/瑞典|挪威|丹麦|瑞典人|挪威人|丹麦人|斯德哥尔摩|奥斯陆|哥本哈根|sweden|swedish|norway|norwegian|denmark|danish|svenska|norsk|dansk/i },
+    { country:'泰国', language:'泰语', code:'th', patterns:/泰国|泰籍|泰国人|曼谷|thailand|thai|ภาษาไทย|泰语/i },
+    { country:'越南', language:'越南语', code:'vi', patterns:/越南|越籍|越南人|河内|vietnam|vietnamese|tiếng việt|越语/i },
+    { country:'印度', language:'英语/印地语', code:'en-hi', patterns:/印度|印籍|印度人|新德里|india|indian|hindi|हिन्दी|印地语/i },
+    { country:'阿拉伯国家', language:'阿拉伯语', code:'ar', patterns:/阿拉伯|沙特|埃及|阿联酋|迪拜|卡塔尔|伊拉克|约旦|阿拉伯语|arabic|saudi|egypt|uae|qatar|العربية|阿语/i },
+    { country:'以色列', language:'希伯来语', code:'he', patterns:/以色列|以籍|以色列人|耶路撒冷|israel|israeli|hebrew|עברית|希伯来语/i },
+    { country:'印度尼西亚/马来西亚', language:'印尼语/马来语', code:'id-ms', patterns:/印度尼西亚|印尼|马来西亚|马来人|雅加达|吉隆坡|indonesia|indonesian|malaysia|malay|bahasa indonesia|印尼语|马来语/i },
+    { country:'菲律宾', language:'菲律宾语/英语', code:'fil-en', patterns:/菲律宾|菲籍|菲律宾人|马尼拉|philippines|filipino|tagalog|菲律宾语/i },
+    { country:'韩国（由语言内容识别）', language:'韩语', code:'ko', patterns:/[\uac00-\ud7af]{3,}/ },
+    { country:'日本（由语言内容识别）', language:'日语', code:'ja', patterns:/[\u3040-\u30ff]{2,}/ },
+    { country:'阿拉伯语地区（由语言内容识别）', language:'阿拉伯语', code:'ar', patterns:/[\u0600-\u06ff]{3,}/ },
+    { country:'泰语地区（由语言内容识别）', language:'泰语', code:'th', patterns:/[\u0e00-\u0e7f]{3,}/ },
+    { country:'印度（由语言内容识别）', language:'印地语', code:'hi', patterns:/[\u0900-\u097f]{3,}/ },
+    { country:'希伯来语地区（由语言内容识别）', language:'希伯来语', code:'he', patterns:/[\u0590-\u05ff]{3,}/ },
+    { country:'希腊（由语言内容识别）', language:'希腊语', code:'el', patterns:/[\u0370-\u03ff]{3,}/ },
+    { country:'俄罗斯/乌克兰等斯拉夫语地区（由语言内容识别）', language:'斯拉夫语言', code:'ru-uk', patterns:/[\u0400-\u04ff]{3,}/ },
+    { country:'英国/美国等英语国家', language:'英语', code:'en', patterns:/英国|英籍|英国人|美国|美籍|美国人|加拿大|澳大利亚|新西兰|english|british|american|england|united\s*kingdom|united\s*states|canada|australia|new\s*zealand/i },
+    { country:'中国大陆/台湾', language:'普通话', code:'zh', patterns:/中国|大陆|中国人|台湾|台籍|台湾人|普通话|国语|mandarin|china|chinese|taiwan/i }
+  ];
+  function roleLanguageSource(contact) {
+    let analysis = '';
+    try {
+      const analyses = JSON.parse(localStorage.getItem('ideal-machine-worldbook-analyses') || '{}');
+      const result = contact?.worldbook ? analyses?.[contact.worldbook] : null;
+      analysis = result ? JSON.stringify(result.world || result) : '';
+    } catch {}
+    return [contact?.identity, contact?.details, contact?.signature, boundWorldbookContext(contact), analysis].filter(Boolean).join('\n');
+  }
+  function roleLanguageProfile(contact) {
+    const stored = contact?.languageProfile && typeof contact.languageProfile === 'object' ? contact.languageProfile : null;
+    const source = roleLanguageSource(contact);
+    const detected = roleLanguageRules.find(rule => rule.patterns.test(source));
+    if (detected) {
+      const next = { country:detected.country, language:detected.language, code:detected.code, source:'角色资料/世界书', detectedAt:Date.now() };
+      if (!stored || stored.code !== next.code || stored.country !== next.country || stored.language !== next.language) {
+        contact.languageProfile = next;
+        try { save(); } catch {}
+      }
+      return next;
+    }
+    return stored?.code ? stored : { country:'', language:'', code:'', source:'', detectedAt:0 };
+  }
+  function roleLanguageInstruction(contact, chat) {
+    const profile = roleLanguageProfile(contact);
+    if (!profile.code) return '';
+    if (!chatSettingsFor(chat).autoTranslate) {
+      return `\n\n【角色原文语言】已从角色资料和绑定世界书识别：角色来自${profile.country}，正文和心声都必须使用${profile.language}自然表达；不要改写成普通话，不要附带语言说明，不要把语言名称写进消息。`;
+    }
+    const languageRule = profile.code
+      ? `已从角色资料和绑定世界书识别：角色来自${profile.country}，正文和心声优先使用${profile.language}自然表达。`
+      : '如果角色按人设应使用外语或粤语，正文和心声使用对应语言自然表达。';
+    return `\n\n【自动翻译输出格式】${languageRule}不要先写普通话，不要附带语言说明，不要把语言名称写进消息。每一条角色消息都必须单独判断并单独翻译：非自然现代普通话消息必须在该条正文末尾紧接着追加 [[TRANSLATION]]普通话译文[[/TRANSLATION]]，然后才能使用 [[MSG]] 开始下一条；普通话消息的 translation 留空。严禁把多条原文合并后只在最后一条追加译文，也严禁让一条译文同时对应前面的多条消息。译文必须准确保留该条原文的人名、语气、情绪和信息，只作为同一次聊天回复的一部分返回，不要另起请求。`;
+  }
   const offlineWritingStyleKey = 'ideal-machine-if-writing-styles';
   const offlineWritingStyles = {
     natural: { name:'自然细腻', prompt:'[CRAFT REFERENCES] Draw only on broad, non-copying techniques: Wang Zengqi\'s use of food, objects, weather, and local routines to make a setting credible, with feeling carried by what people do; and Chekhov\'s use of hesitation, self-correction, ineffective gestures, and material circumstances to reveal contradiction without diagnosing the character. [BLENDING METHOD] Select two or three concrete details already present in the scene, then let action and dialogue change the relationship. Narrate only what the viewpoint character can presently perceive. Do not name an emotion when behavior can carry it. Vary sentence length with the speed of action. End on a specific change that remains open to response.' },
@@ -2684,6 +2783,15 @@ ${roundText}
   function renderChatSettings() { const panel = document.querySelector('#chatSettings'); if (!panel) return; panel.classList.toggle('is-open', chatSettingsOpen); panel.setAttribute('aria-hidden', String(!chatSettingsOpen)); if (!chatSettingsOpen) { panel.innerHTML = ''; return; } const contact = state.contacts.find(item => item.id === activeContact); const chat = currentChat(); const settings = chatSettingsFor(chat); const profile = state.profiles.find(item => item.id === chat?.profileId); const colorInput = (label, key, fallback, placeholder) => `<label>${label}<div class="chat-color-control"><input type="text" data-chat-color="${key}" value="${esc(settings[key])}" placeholder="${placeholder}"><input type="color" data-chat-color-picker="${key}" value="${/^#[0-9a-f]{6}$/i.test(settings[key]) ? settings[key] : fallback}"></div></label>`; panel.innerHTML = `<div class="chat-settings-page"><header><button data-chat-settings-close type="button">${actionIcon('back')}</button><h1>聊天设置</h1><span></span></header><main><section><span class="chat-kicker">CONVERSATION</span><h2>${esc(contact?.nickname || contact?.name || '')}</h2><p>管理这段关系的聊天显示与气泡样式。</p></section><button class="chat-settings-row" data-chat-bind type="button"><span>${profile ? '换绑用户设定' : '绑定用户设定'}</span><b>${esc(profile?.nickname || profile?.realName || '未绑定')}</b></button>${settingsProfilePickerOpen ? profilePicker() : ''}<section class="chat-display-settings"><label class="chat-setting-toggle"><span>隐藏头像<small>隐藏聊天内容旁的双方头像</small></span><input type="checkbox" data-chat-setting-toggle="hideAvatar" ${settings.hideAvatar ? 'checked' : ''}></label><label class="chat-setting-toggle"><span>隐藏时间戳<small>隐藏每条消息下方的发送时间</small></span><input type="checkbox" data-chat-setting-toggle="hideTimestamp" ${settings.hideTimestamp ? 'checked' : ''}></label></section><section class="chat-wallpaper-settings"><h3>聊天壁纸</h3><div class="chat-wallpaper-preview" style="${settings.wallpaper ? `background-image:url("${esc(settings.wallpaper)}")` : ''}"></div><input class="chat-wallpaper-url" data-chat-wallpaper-url type="url" value="${esc(settings.wallpaper?.startsWith('data:') ? '' : settings.wallpaper)}" placeholder="粘贴图片 URL"><div class="chat-wallpaper-actions"><label class="chat-file-button">选择本地图片<input type="file" accept="image/*" data-chat-wallpaper-file></label><button type="button" data-chat-wallpaper-reset>恢复默认</button></div></section><section class="chat-color-settings"><h3>气泡设置</h3><div class="chat-bubble-preview"><span>聊天预览</span><div class="chat-preview-row is-character"><div class="chat-preview-bubble" style="background:${esc(settings.characterBubbleColor)};color:${esc(settings.characterBubbleTextColor)}">${esc(contact?.nickname || '角色')}：你好</div></div><div class="chat-preview-row is-user"><div class="chat-preview-bubble" style="background:${esc(settings.userBubbleColor)};color:${esc(settings.userBubbleTextColor)}">${esc(profile?.nickname || profile?.realName || '我')}：收到</div></div></div>${colorInput('用户气泡', 'userBubbleColor', '#222222', '#222222 或 rgba(...)')}${colorInput('用户文字', 'userBubbleTextColor', '#ffffff', '#ffffff 或 rgba(...)')}${colorInput('角色气泡', 'characterBubbleColor', '#ffffff', '#ffffff 或 rgba(...)')}${colorInput('角色文字', 'characterBubbleTextColor', '#111111', '#111111 或 rgba(...)')}<small>可分别设置双方气泡与气泡内文字颜色，预览会同步更新。</small></section><button class="chat-settings-row danger" data-chat-block-contact type="button"><span>拉黑角色</span><b>拉黑</b></button><button class="chat-settings-row danger" data-chat-delete-contact type="button"><span>删除角色</span><b>删除</b></button><button class="chat-settings-row danger" data-chat-clear type="button"><span>清空聊天记录</span><b>清空</b></button></main></div>`; }
   document.addEventListener('change', event => { const file = event.target.closest('[data-chat-wallpaper-file]'); const url = event.target.closest('[data-chat-wallpaper-url]'); if (!file && !url) return; const chat = currentChat(); if (!chat) return; const settings = chatSettingsFor(chat); if (url) { settings.wallpaper = url.value.trim(); window.IdealMachineAlbum?.archiveUrl?.(settings.wallpaper, '聊天壁纸'); save(); render(); chatSettingsOpen = true; renderChatSettings(); return; } const image = file.files?.[0]; if (!image) return; const read = window.IdealMachineReadImage ? window.IdealMachineReadImage(image, 900, .68) : new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(image); }); read.then(value => { settings.wallpaper = value; save(); render(); chatSettingsOpen = true; renderChatSettings(); }); });
   document.addEventListener('click', event => { if (!event.target.closest('[data-chat-wallpaper-reset]')) return; const chat = currentChat(); if (!chat) return; chatSettingsFor(chat).wallpaper = ''; save(); render(); chatSettingsOpen = true; renderChatSettings(); });
+  // 壁纸统一由 applyChatWallpaper 绘制到稳定的 app 容器。不要把远程图床
+  // URL 再写进每次都会重建的聊天节点，否则浏览器会在每轮回复时重新合成一层。
+  const renderChatWithStableWallpaper = renderChat;
+  renderChat = function() {
+    return renderChatWithStableWallpaper().replace(
+      /(class="chat-conversation"\s+style=")background-image:url\([^;]*\);/,
+      '$1',
+    );
+  };
   function resolveChatWallpaperSource(source) {
     const value = String(source || '').trim();
     if (/^idb:image:/i.test(value) && typeof window.IdealMachineGetImage === 'function') {
@@ -2691,24 +2799,53 @@ ${roundText}
     }
     return Promise.resolve(value);
   }
+  let chatWallpaperSource = '';
+  let chatWallpaperResolvedSource = '';
+  let chatWallpaperImageSource = '';
+  let chatWallpaperPendingSource = '';
   function applyChatWallpaper() {
     const chat = activeContact ? state.chats?.[activeContact] : null;
     const conversation = document.querySelector('.chat-conversation');
     const wallpaper = conversation ? String(chatSettingsFor(chat).wallpaper || '').trim() : '';
     const paint = imageSource => {
       if (activeContact && String(chatSettingsFor(state.chats?.[activeContact]).wallpaper || '').trim() !== wallpaper) return;
-      [app, conversation].forEach(element => {
+      chatWallpaperResolvedSource = wallpaper;
+      chatWallpaperImageSource = String(imageSource || '');
+      const visibleConversation = document.querySelector('.chat-conversation');
+      [app, visibleConversation].forEach(element => {
         if (!element) return;
-        element.style.backgroundImage = imageSource ? `url("${imageSource.replace(/"/g, '\\"')}")` : '';
-        element.style.backgroundSize = imageSource ? 'cover' : '';
-        element.style.backgroundPosition = imageSource ? 'center' : '';
-        element.style.backgroundRepeat = imageSource ? 'no-repeat' : '';
+        const nextBackground = imageSource ? `url("${imageSource.replace(/"/g, '\\"')}")` : '';
+        if (element.style.backgroundImage !== nextBackground) element.style.backgroundImage = nextBackground;
+        const nextSize = imageSource ? 'cover' : '';
+        if (element.style.backgroundSize !== nextSize) element.style.backgroundSize = nextSize;
+        const nextPosition = imageSource ? 'center' : '';
+        if (element.style.backgroundPosition !== nextPosition) element.style.backgroundPosition = nextPosition;
+        const nextRepeat = imageSource ? 'no-repeat' : '';
+        if (element.style.backgroundRepeat !== nextRepeat) element.style.backgroundRepeat = nextRepeat;
       });
     };
     // 菜单、表情面板等子节点变化也会触发这个观察器。解析壁纸期间
     // 保留当前画面，避免先清空背景、下一帧再恢复造成闪屏。
-    if (!wallpaper) { paint(''); return; }
-    resolveChatWallpaperSource(wallpaper).then(paint);
+    if (!wallpaper) {
+      chatWallpaperSource = '';
+      chatWallpaperResolvedSource = '';
+      chatWallpaperImageSource = '';
+      chatWallpaperPendingSource = '';
+      paint('');
+      return;
+    }
+    chatWallpaperSource = wallpaper;
+    if (chatWallpaperResolvedSource === wallpaper && !chatWallpaperPendingSource) {
+      paint(chatWallpaperImageSource);
+      return;
+    }
+    if (chatWallpaperPendingSource === wallpaper) return;
+    chatWallpaperPendingSource = wallpaper;
+    resolveChatWallpaperSource(wallpaper).then(imageSource => {
+      if (chatWallpaperSource !== wallpaper) return;
+      chatWallpaperPendingSource = '';
+      paint(imageSource);
+    });
   }
   function applyChatWallpaperPreview() {
     const preview = document.querySelector('.chat-wallpaper-preview');
@@ -2845,7 +2982,7 @@ ${roundText}
   renderChatSettings = function() { baseTapSettingsFinalRender(); const section = document.querySelector('[data-chat-tap-settings]'); if (!section || !tapSettingsOpen) return; const labels = section.querySelectorAll('.chat-tap-settings-body label'); if (labels[0]?.firstChild) labels[0].firstChild.nodeValue = tapName('user') + ' 拍一拍设置（固定：拍了拍）'; if (labels[1]?.firstChild) labels[1].firstChild.nodeValue = tapName('character') + ' 拍一拍设置（固定：拍了拍）'; section.querySelectorAll('input[data-chat-tap-setting]').forEach(input => { input.placeholder = '可选附加文字'; }); };
   document.addEventListener('click', event => { const recalled = event.target.closest('.chat-recalled'); if (!recalled) return; const row = recalled.closest('[data-chat-message-id]'); const message = currentChat()?.messages.find(item => item.id === row?.dataset.chatMessageId); if (!message?.recalledText) return; event.preventDefault(); event.stopImmediatePropagation(); const old = row.querySelector('.chat-recalled-original'); if (old) { old.remove(); return; } const detail = document.createElement('div'); detail.className = 'chat-recalled-original'; detail.textContent = '原消息：' + message.recalledText; recalled.insertAdjacentElement('afterend', detail); }, true);
   const baseTapSettingsByTarget = chatSettingsFor;
-  chatSettingsFor = function(chat = currentChat()) { const settings = baseTapSettingsByTarget(chat); if (settings.userBeTappedText == null) settings.userBeTappedText = settings.userTapText === '拍了拍' ? '' : (settings.userTapText || ''); if (settings.characterBeTappedText == null) settings.characterBeTappedText = settings.characterTapText === '拍了拍' ? '' : (settings.characterTapText || ''); return settings; };
+  chatSettingsFor = function(chat = currentChat()) { const settings = baseTapSettingsByTarget(chat); if (settings.userBeTappedText == null) settings.userBeTappedText = settings.userTapText === '拍了拍' ? '' : (settings.userTapText || ''); if (settings.characterBeTappedText == null) settings.characterBeTappedText = settings.characterTapText === '拍了拍' ? '' : (settings.characterTapText || ''); settings.autoTranslate = Boolean(settings.autoTranslate); return settings; };
   addTapMessage = function(actor, target) { const settings = chatSettingsFor(currentChat()); const suffix = target === 'user' ? settings.userBeTappedText : settings.characterBeTappedText; const targetName = actor === target ? '自己' : tapName(target); const text = tapName(actor) + ' 拍了拍 ' + targetName + (suffix ? ' ' + suffix : ''); addMessage(text, actor, 'tap', { tapActor: actor, tapTarget: target }); };
   const baseTapSettingsByTargetRender = renderChatSettings;
   renderChatSettings = function() { baseTapSettingsByTargetRender(); const section = document.querySelector('[data-chat-tap-settings]'); if (!section || !tapSettingsOpen) return; const settings = chatSettingsFor(currentChat()); const labels = section.querySelectorAll('.chat-tap-settings-body label'); const userInput = labels[0]?.querySelector('input'); const characterInput = labels[1]?.querySelector('input'); if (labels[0]?.firstChild) labels[0].firstChild.nodeValue = tapName('user') + ' 被拍一拍'; if (labels[1]?.firstChild) labels[1].firstChild.nodeValue = tapName('character') + ' 被拍一拍'; if (userInput) { userInput.dataset.chatTapSetting = 'userBeTappedText'; userInput.value = settings.userBeTappedText || ''; userInput.placeholder = '可选附加文字'; } if (characterInput) { characterInput.dataset.chatTapSetting = 'characterBeTappedText'; characterInput.value = settings.characterBeTappedText || ''; characterInput.placeholder = '可选附加文字'; } };
@@ -3425,14 +3562,21 @@ ${roundText}
     return String(value || '')
       // 完整的 MSG 已经在分条阶段处理；这里再兜底一次，避免控制标记进入气泡。
       .replace(/\[\[MSG\]\]/gi, '')
+      // 兼容后台/旧版回复路径，避免未经过表情解析的标记直接显示。
+      .replace(/\[\[STICKER\s*:[^\]]+\]\]/ig, '')
       // 无法校验的音乐分享也不能把控制标记漏到聊天气泡里。
       .replace(/\[\[MUSIC\b[^\]]*\]\]/ig, '')
-      .replace(/\[\[THOUGHT\]\][\s\S]*?(?:\[\[\/THOUGHT\]\]|$)/ig, '')
-      .replace(/\[\[\/?THOUGHT\]\]/ig, '')
+      // 翻译标记只用于同一次 API 返回中的结构化解析，不能进入可见正文。
+      .replace(/\[\[\s*TRANSLATION\s*\]\][\s\S]*?(?:\[\[\s*\/\s*TRANSLATION\s*\]\]|$)/ig, '')
+      .replace(/\[\[\s*THOUGHT\s*\]\][\s\S]*?(?:\[\[\s*\/\s*THOUGHT\s*\]\]|$)/ig, '')
+      .replace(/\[\[\s*\/?\s*THOUGHT\s*\]\]/ig, '')
       // API 截断或模型漏写结尾时，清掉残留的“[[”及其后半个控制标记。
       .replace(/\[\[[^\]\r\n]*$/g, '')
       .replace(/[ \t]+/g, ' ')
       .trim();
+  }
+  function isCharacterChatMessage(message) {
+    return Boolean(message) && message.role !== 'user' && message.role !== 'system' && message.senderKind !== 'user' && message.senderKind !== 'system';
   }
 
   // 不同兼容接口可能把正文放在 message.content、content 数组、output_text
@@ -3476,12 +3620,16 @@ ${roundText}
     Object.values(state.chats || {}).forEach(chat => {
       if (!Array.isArray(chat?.messages)) return;
       chat.messages = chat.messages.filter(message => {
-        if (message?.role !== 'character' || message?.type) return true;
+        if (!isCharacterChatMessage(message) || message?.type) return true;
         const cleaned = cleanCharacterReplyText(message.text);
-        if (cleaned === String(message.text || '').trim()) return true;
+        const cleanedOriginal = message.originalText ? cleanCharacterReplyText(message.originalText) : '';
+        const cleanedTranslation = message.translation ? cleanCharacterVisibleText(message.translation) : '';
+        if (cleaned === String(message.text || '').trim() && cleanedOriginal === String(message.originalText || '').trim() && cleanedTranslation === String(message.translation || '').trim()) return true;
         changed = true;
         if (!cleaned) return false;
         message.text = cleaned;
+        if (message.originalText) message.originalText = cleanedOriginal || cleaned;
+        if (message.translation) message.translation = cleanedTranslation;
         return true;
       });
     });
@@ -3522,6 +3670,116 @@ ${roundText}
     return trailingSticker ? `${answer} ${trailingSticker.trim()}` : answer;
   }
 
+  function chatTranslationHint(contact, text) {
+    const languageProfile = roleLanguageProfile(contact);
+    const persona = [contact?.name, contact?.nickname, contact?.identity, contact?.details, contact?.signature].filter(Boolean).join(' ');
+    const personaHint = /外国|海外|英国|美国|法国|德国|日本|韩国|香港|澳门|广东|粤语|英语|英文|法语|德语|日语|韩语|English|Cantonese|British|American|French|German|Japanese|Korean/i.test(persona);
+    const value = String(text || '');
+    const cantonese = /冇|喺|係|唔|咁|呢|佢|嘅|嚟|喎|啲|咗|睇|邊|點解|而家|攞|諗|嗰|咪|喺度|唔係/.test(value);
+    const foreign = (value.match(/[A-Za-zÀ-ÖØ-öø-ÿ\u0370-\u03ff\u0400-\u04ff\u0590-\u05ff\u0600-\u06ff\u0900-\u097f\u0e00-\u0e7f\u3040-\u30ff\uac00-\ud7af]/g) || []).length >= 2;
+    return Boolean(languageProfile.code) || personaHint || cantonese || foreign;
+  }
+  function characterTranslationMeta(value, chat, contact, meta = {}) {
+    const settings = chatSettingsFor(chat);
+    if (!settings.autoTranslate || !chatTranslationHint(contact, value)) return meta;
+    const translated = cleanCharacterVisibleText(meta.translation || '').trim();
+    return translated && translated !== String(value || '').trim()
+      ? { ...meta, originalText:String(value || ''), translation:translated }
+      : meta;
+  }
+  function extractCharacterTranslation(value) {
+    const source = String(value || '').trim();
+    const match = source.match(/\[\[\s*TRANSLATION\s*\]\]([\s\S]*?)(?:\[\[\s*\/\s*TRANSLATION\s*\]\]|$)/i);
+    if (!match) {
+      try {
+        const parsed = JSON.parse(source);
+        const text = String(parsed?.text ?? parsed?.original ?? parsed?.content ?? '').trim();
+        const translation = cleanCharacterVisibleText(String(parsed?.translation ?? parsed?.translated ?? parsed?.zh ?? '')).trim();
+        if (text) return { text, translation };
+      } catch {}
+      return { text:source, translation:'' };
+    }
+    const text = source.slice(0, match.index).trim();
+    return { text, translation:cleanCharacterVisibleText(match[1]).trim() };
+  }
+  // 模型偶尔会把多条消息的译文堆到最后一条。解析到缺失译文时，按消息
+  // 建立一组一一对应的翻译结果；这样不会把一整段译文挂到最后一个气泡。
+  async function fillMissingCharacterTranslations(items, chat, contact) {
+    const settings = chatSettingsFor(chat);
+    if (!settings.autoTranslate || !contact || !Array.isArray(items) || !items.length) return items;
+    const pending = items
+      .map((item, index) => ({ item, index, text:String(item?.text || '').trim() }))
+      .filter(entry => entry.text && !String(entry.item?.translation || '').trim() && chatTranslationHint(contact, entry.text));
+    if (!pending.length) return items;
+    // 只要同一轮存在一个缺失项，就不能信任最后一条已有的长译文：它很可能
+    // 是模型把前面几条一起翻译后的结果。把本轮候选消息重新逐条对齐。
+    const candidates = items
+      .map((item, index) => ({ item, index, text:String(item?.text || '').trim() }))
+      .filter(entry => entry.text && chatTranslationHint(contact, entry.text));
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    if (!config?.endpoint || !config.key || !model) return items;
+    const request = window.IdealMachineFetch || nativeChatFetch;
+    try {
+      const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`},
+        body:JSON.stringify({
+          model,
+          temperature:.15,
+          messages:[
+            { role:'system', content:'你是逐条聊天翻译器。只返回合法 JSON 数组，每个输入 index 必须对应一个对象：[{"index":0,"translation":"译文"}]。每个对象只翻译同一个 index 的原文，绝对不能把多个 index 合并成一条译文；如果原文已经是自然现代普通话，translation 返回空字符串。不要解释。' },
+            { role:'user', content:JSON.stringify(candidates.map(entry => ({ index:entry.index, text:entry.text }))) }
+          ]
+        }),
+        idealScope:'chat-translation'
+      });
+      if (!response.ok) return items;
+      const data = await response.json();
+      const raw = String(data.choices?.[0]?.message?.content || data.output_text || data.response || '').replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(raw);
+      const rows = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.translations) ? parsed.translations : []);
+      const byIndex = new Map(rows.map(row => [Number(row?.index), cleanCharacterVisibleText(String(row?.translation || '')).trim()]));
+      return items.map((item, index) => {
+        const translation = byIndex.has(index) ? byIndex.get(index) : '';
+        return translation ? { ...item, translation } : item;
+      });
+    } catch {
+      return items;
+    }
+  }
+  // 兼容已经保存的“正文[[TRANSLATION]]译文”格式。这里仅做本地解析，
+  // 不再为历史消息另起翻译请求，保证聊天和翻译始终共用同一次 API 调用。
+  const translationBackfillJobs = new Map();
+  const translationBackfillAttempted = new WeakSet();
+  async function backfillChatTranslations(chat, contact) {
+    if (!chat || !contact || !chatSettingsFor(chat).autoTranslate) return;
+    const contactId = String(contact.id || activeContact || '');
+    if (!contactId || translationBackfillJobs.has(contactId)) return;
+    const pending = (Array.isArray(chat.messages) ? chat.messages : [])
+      .filter(message => isCharacterChatMessage(message) && !message.type && !message.recalled && !message.translation && /\[\[\s*TRANSLATION\s*\]\]/i.test(String(message.text || '')) && !translationBackfillAttempted.has(message))
+      .filter(message => cleanCharacterVisibleText(message.text) && chatTranslationHint(contact, message.text))
+      .slice(-24);
+    if (!pending.length) return;
+    const job = (async () => {
+      let changed = false;
+      for (const message of pending) {
+        translationBackfillAttempted.add(message);
+        const parsed = extractCharacterTranslation(message.text);
+        const original = cleanCharacterReplyText(parsed.text);
+        const meta = characterTranslationMeta(original, chat, contact, { translation:parsed.translation });
+        if (!original || !meta.translation) continue;
+        Object.assign(message, meta, { text: original });
+        changed = true;
+      }
+      if (changed) {
+        save();
+        if (app.classList.contains('is-open') && activeTab === 'chat' && activeContact === contact.id) render();
+      }
+    })().finally(() => translationBackfillJobs.delete(contactId));
+    translationBackfillJobs.set(contactId, job);
+  }
+
   async function sendCharacterReplyContent(text, chat, meta = {}) {
     const settings = chatSettingsFor(chat);
     const selectedGroups = new Set(settings.characterEmojiGroupIds || []);
@@ -3535,14 +3793,17 @@ ${roundText}
       baseCharacterAddMessage(cleanCharacterVisibleText(raw), 'character');
       return;
     }
-    let chunks = raw.split(/\[\[MSG\]\]/i).map(item => item.trim()).filter(Boolean);
+    const taggedChunks = raw.split(/\[\[MSG\]\]/i).map(item => extractCharacterTranslation(item)).filter(item => item.text);
+    const hasInlineTranslations = taggedChunks.some(item => item.translation);
+    let chunks = taggedChunks.map(item => item.text);
+    let chunkTranslations = taggedChunks.map(item => item.translation);
     const bounds = characterReplyBounds(chat, settings.characterMultiMessage);
     const target = settings.characterMultiMessage ? (characterReplyTargetCount || (bounds.min + Math.floor(Math.random() * (bounds.max - bounds.min + 1)))) : 1;
-    if (!settings.characterMultiMessage) {
+    if (!hasInlineTranslations && !settings.characterMultiMessage) {
       // 不再把多个完整句子强行合并成一个气泡；只按自然句号、问号、感叹号等断句。
       const compact = chunks.join(' ').replace(/\s+/g, ' ').trim() || raw.replace(/\[\[MSG\]\]/gi, ' ').replace(/\s+/g, ' ').trim();
       chunks = splitCharacterReplyNaturally(compact);
-    } else {
+    } else if (!hasInlineTranslations) {
       // 模型偶尔会忘记分隔符：只在用户开启连续消息时做自然断句兜底。
       if (chunks.length < target) chunks = splitCharacterReplyFallback(raw, target);
       // 超出用户设置的数量时重新分组，避免一个回复刷出过多气泡。
@@ -3551,10 +3812,23 @@ ${roundText}
     }
     // 无论是否开启连续消息，已经存在于同一段里的多个完整句子都要自然拆开。
     // 这一步放在两条分支之后，避免“连续消息已开启”时绕过句子拆分。
-    chunks = chunks.flatMap(chunk => splitCharacterReplyNaturally(chunk));
-    if (settings.characterMultiMessage) chunks = capCharacterChunks(chunks, bounds.max);
+    if (!hasInlineTranslations) chunks = chunks.flatMap(chunk => splitCharacterReplyNaturally(chunk));
+    if (settings.characterMultiMessage && !hasInlineTranslations) chunks = capCharacterChunks(chunks, bounds.max);
     // 这里只清理空白，不按字数截断；完整语义优先。
-    chunks = chunks.map(chunk => compactCharacterChunk(chunk)).filter(Boolean);
+    if (hasInlineTranslations) {
+      const compacted = chunks.map((chunk, index) => ({ text:compactCharacterChunk(chunk), translation:chunkTranslations[index] || '' })).filter(item => item.text);
+      chunks = compacted.map(item => item.text);
+      chunkTranslations = compacted.map(item => item.translation);
+    } else {
+      chunks = chunks.map(chunk => compactCharacterChunk(chunk)).filter(Boolean);
+      chunkTranslations = chunks.map(() => '');
+    }
+    if (settings.autoTranslate && chunks.length) {
+      const translationContact = state.contacts.find(item => item.id === currentContactId()) || {};
+      const translatedItems = await fillMissingCharacterTranslations(chunks.map((text, index) => ({ text, translation:chunkTranslations[index] || '' })), chat, translationContact);
+      chunks = translatedItems.map(item => item.text);
+      chunkTranslations = translatedItems.map(item => item.translation || '');
+    }
     let sent = 0;
     let stickerSent = false;
     let visualMessageCount = 0;
@@ -3565,12 +3839,22 @@ ${roundText}
       // 每条消息分别保存、分别渲染，中间模拟真人的发送间隔。
       // 连续消息保留一点停顿，但不要让一轮回复因为气泡过多等待太久。
       await new Promise(resolve => setTimeout(resolve, visualMessageCount ? 180 + Math.random() * 320 : 120));
-      baseCharacterAddMessage(value, 'character', type, meta);
+      let messageMeta = meta;
+      const translationContactId = currentContactId();
+      const translationContact = state.contacts.find(item => item.id === translationContactId) || {};
+      if (type === '' && settings.autoTranslate && chatTranslationHint(translationContact, value)) {
+        messageMeta = await characterTranslationMeta(value, chat, translationContact, meta);
+      }
+      baseCharacterAddMessage(value, 'character', type, messageMeta);
       visualMessageCount += 1;
     };
     // 不再用 slice(0, target) 丢弃目标条数以外的内容。
     // target 只是模型分条的期望数量，完整回复始终必须保留。
-    for (let chunk of chunks) {
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+      let chunk = chunks[chunkIndex];
+      const chunkTranslation = chunkTranslations[chunkIndex] || '';
+      const translationMeta = chunkTranslation ? { translation:chunkTranslation } : {};
+      let translationAttached = false;
       const musicParsed = parseCharacterMusicMarkers(chunk);
       chunk = musicParsed.clean;
       let cursor = 0;
@@ -3578,13 +3862,13 @@ ${roundText}
       let match;
       while ((match = marker.exec(chunk))) {
         const before = chunk.slice(cursor, match.index).trim();
-        if (before) { await appendCharacterMessage(before); sent += 1; }
+        if (before) { await appendCharacterMessage(before, '', !translationAttached ? translationMeta : {}); translationAttached = true; sent += 1; }
         const item = byId.get(match[1].trim());
         if (item) { await appendCharacterMessage(emojiDisplaySource(item.url), 'image', { sticker: true, stickerDescription: item.text || '' }); sent += 1; stickerSent = true; }
         cursor = marker.lastIndex;
       }
       const rest = chunk.slice(cursor).trim();
-      if (rest) { await appendCharacterMessage(rest); sent += 1; }
+      if (rest) { await appendCharacterMessage(rest, '', !translationAttached ? translationMeta : {}); sent += 1; }
       for (const song of musicParsed.songs) {
         const verifiedSong = await resolveCharacterMusic(song);
         // 找不到标题和歌手同时完全匹配的网易云曲目时，不发送这张卡片，避免出现“歌名对了但歌手错了”的假分享。
@@ -3613,7 +3897,7 @@ ${roundText}
       if (visibleFallback && !/^[.。…\s]+$/u.test(visibleFallback)) await appendCharacterMessage(visibleFallback);
       else throw new Error(visibleFallback ? 'API 只返回了省略号，请重试' : 'API 返回了空回复（可能只返回了内部控制标记）');
     }
-    if (combined.thought) saveCombinedThought(chat, combined.thought);
+    if (combined.thought) saveCombinedThought(chat, combined.thought, combined.thoughtTranslation);
   }
 
   // 最后一层入库保护：即使某条旧回复路径绕过上面的生成拆分，写入聊天记录前仍按完整句拆泡。
@@ -3667,6 +3951,7 @@ ${roundText}
 【本轮角色风格锚点】\n角色：${contact.nickname || contact.name || '角色'}\n${personaAnchor}\n以上角色设定是本轮语气和行为的首要依据。先在心里判断角色的语速、亲和度、主动性、口癖与亲密表达方式，再组织回复，但不要输出分析过程。不要把“活泼”误写成“凶”，也不要把“短句”误写成命令句。
 默认只发送 1 条自然消息。${settings.characterMultiMessage ? `用户已允许连续消息，本次最多发送 ${characterReplyTargetCount} 条，使用 [[MSG]] 分隔。条数是上限而不是必须凑满：自然说完就停。每条按想表达的意思自然决定长短，不能为了短而停在半句；整轮回复也没有固定字数上限。` : '当前未开启连续消息，不要使用 [[MSG]]，不要主动拆成多条；按想表达的意思自然决定长短，不要为了短而截断句子。'}
 每条消息必须是完整、自然、能独立表达意思的语义单位；不要只输出半个短语或半句话，不要在不自然的位置插入 [[MSG]]。
+${settings.autoTranslate ? '【逐条翻译硬性规则】本轮每一个聊天气泡都必须单独处理翻译。非普通话消息必须紧跟在该气泡正文后输出 [[TRANSLATION]]该条普通话译文[[/TRANSLATION]]，再用 [[MSG]] 分隔下一条；绝对不能把多条消息的译文集中放到最后一条，也不能让最后一条译文代替前面消息的译文。' : ''}
 短小不代表敷衍或冷淡。短句也必须保留角色原本的情绪温度：活泼、犬系、开朗、黏人或直球型角色应当轻快、柔和、有亲近感，可以主动接话、好奇追问、撒娇、逗人或表达期待，但不要用命令、训斥、逼问或过多感叹号制造热情。冷淡克制或强势的表达只适用于角色设定和当前情节确实如此。保持角色的性格、关系、口癖和情绪连续。普通闲聊必须优先短回，绝大多数情况下不要连续输出大段文字；只有解释复杂事情、认真安慰、争执或推进重要情节时才展开。每一轮都要根据语境改变长度，不能把一段小作文平均切成几段或为了满足数量破坏自然对话。
 根据用户刚刚那句话决定长度：用户说得很短或只是普通闲聊时，通常也短回；不要复述对方的话，不要补完整前因后果，不要每轮都剖析自己的心理。
 每个聊天气泡不要求以句号或其他符号结尾。是否使用标点、使用哪种标点，都必须看角色的性格、平时打字习惯和这一刻的情绪；不要自动补句号，也不要为了形式完整强行加符号。像“来啦”“给我看看嘛”“等我一下”这样无结尾标点的消息是正常输出。
@@ -3683,7 +3968,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         if (system) {
           system.content += instruction;
           system.content += '\n\n【音乐分享规则】角色可以在确实符合自己的人设、兴趣、情绪和当前线上聊天背景时分享音乐，但不是每轮都要分享。只有角色真的想推荐歌曲、回应歌词或表达当下心情时才使用，不要为了凑消息类型而分享。若用户明确要求“分享一首歌、推荐歌曲、发歌或一起听”，本轮必须选择一首真实存在且符合角色身份或当前语境的歌曲并分享，不要只用文字答应。需要分享时，在正常文字之外追加严格格式：[[MUSIC title="歌曲名" artist="歌手名" album="专辑名"]]；歌曲名和歌手名必须是现实中同一首歌的准确信息，不确定歌手时可以省略 artist，让系统按准确歌名检索；不要编造 cover、id 或播放链接。系统会用网易云真实搜索结果校验歌名，并优先核对歌手；只有找不到真实曲目时才不发送音乐卡片。控制标记不要展示给用户。';
-          if (settings.thoughtEnabled !== false) system.content += '\n\n【本轮心声合并输出】在完成回复和可能的音乐选择后，末尾必须追加 [[THOUGHT]]角色此刻第一人称、1—3句且不超过80字的真实内心想法[[/THOUGHT]]。心声与聊天回复共用本次调用，不要把心声写进正常聊天内容。';
+          if (settings.thoughtEnabled !== false) system.content += `\n\n【本轮心声合并输出】必须先完成全部可见聊天消息，最后一项才追加 [[THOUGHT]]角色此刻第一人称、1—3句且不超过80字的真实内心想法${settings.autoTranslate ? '；如果心声不是自然的现代普通话，紧接着追加 [[TRANSLATION]]普通话译文[[/TRANSLATION]]' : ''}[[/THOUGHT]]。心声必须位于整段输出最末尾、严格闭合，不能插入正文或任何 [[MSG]] 消息中；理想机会单独保存心声，不会显示在聊天气泡里。`;
           // 这里的上限完全来自当前聊天设置，不能再被旧的“最多 3 条”提示覆盖。
           system.content = system.content.replace(/普通闲聊最多发送 3 条/g, `普通闲聊最多发送 ${rangeMax} 条`);
           // 短回复靠提示词控制，不靠过小的 token 上限硬截断；否则长一点的完整句子会被 API 从末尾截掉。
@@ -3740,39 +4025,78 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     return template.innerHTML;
   };
 
+  // 渐进式渲染聊天记录时不要反复清除壁纸配色并重新加载图床图片。
+  // 旧逻辑每次 render 都会先移除 dark/light class，远程图片还没探测完时
+  // 页面会短暂回到默认样式，在手机上看起来就是整屏模糊、闪烁、跳动。
+  let chatDockContrastSource = '';
+  let chatDockContrastTone = '';
+  let chatDockContrastResolved = false;
+  let chatDockContrastPending = '';
   function updateChatDockContrast() {
     const conversation = document.querySelector('.chat-conversation');
-    app.classList.remove('chat-wallpaper-dark');
-    app.classList.remove('chat-wallpaper-light');
-    conversation?.classList.remove('chat-wallpaper-dark');
-    conversation?.classList.remove('chat-wallpaper-light');
-    if (!conversation || !activeContact) return;
+    if (!conversation || !activeContact) {
+      app.classList.remove('chat-wallpaper-dark', 'chat-wallpaper-light');
+      return;
+    }
 
     // 视觉适配必须读取当前正在查看的联系人。后台角色回复时
     // currentChat() 可能暂时指向另一个联系人，手机上尤其容易出现错色。
     const visibleChat = state.chats?.[activeContact];
     const source = String(chatSettingsFor(visibleChat).wallpaper || '').trim();
-    if (!source) return;
-
     const currentVisibleSource = () => String(
       chatSettingsFor(state.chats?.[activeContact]).wallpaper || '',
     ).trim();
-    const applyContrast = (imageSource) => {
-      if (!imageSource || !conversation.isConnected || currentVisibleSource() !== source) return;
-      detectWallpaperContrast(imageSource, contrast => {
-        if (!contrast || !conversation.isConnected || currentVisibleSource() !== source) return;
-        const isDark = contrast === 'dark';
-        conversation.classList.toggle('chat-wallpaper-dark', isDark);
-        conversation.classList.toggle('chat-wallpaper-light', !isDark);
-        app.classList.toggle('chat-wallpaper-dark', isDark);
-        app.classList.toggle('chat-wallpaper-light', !isDark);
-      });
+
+    if (!source) {
+      chatDockContrastSource = '';
+      chatDockContrastTone = '';
+      chatDockContrastResolved = false;
+      chatDockContrastPending = '';
+      app.classList.remove('chat-wallpaper-dark', 'chat-wallpaper-light');
+      conversation.classList.remove('chat-wallpaper-dark', 'chat-wallpaper-light');
+      conversation.removeAttribute('data-chat-wallpaper-tone');
+      return;
+    }
+
+    const applyTone = tone => {
+      const visibleConversation = document.querySelector('.chat-conversation');
+      if (!tone || !visibleConversation?.isConnected || currentVisibleSource() !== source) return;
+      const isDark = tone === 'dark';
+      visibleConversation.classList.toggle('chat-wallpaper-dark', isDark);
+      visibleConversation.classList.toggle('chat-wallpaper-light', !isDark);
+      app.classList.toggle('chat-wallpaper-dark', isDark);
+      app.classList.toggle('chat-wallpaper-light', !isDark);
+      visibleConversation.dataset.chatWallpaperTone = tone;
+    };
+
+    // 同一张壁纸在消息增删、键盘弹出、表情面板切换时直接复用结果，
+    // 不再启动新的 Image 解码，也不会把已经显示的配色清掉。
+    if (chatDockContrastSource === source && chatDockContrastResolved) {
+      applyTone(chatDockContrastTone);
+      return;
+    }
+    if (chatDockContrastSource === source && chatDockContrastPending === source) return;
+
+    chatDockContrastSource = source;
+    chatDockContrastTone = '';
+    chatDockContrastResolved = false;
+    chatDockContrastPending = source;
+    const finish = contrast => {
+      if (currentVisibleSource() !== source) return;
+      chatDockContrastPending = '';
+      chatDockContrastResolved = true;
+      chatDockContrastTone = contrast || '';
+      if (contrast) applyTone(contrast);
+    };
+    const applyContrast = imageSource => {
+      if (!imageSource) return finish(null);
+      detectWallpaperContrast(imageSource, finish);
     };
 
     if (/^idb:image:/i.test(source) && typeof window.IdealMachineGetImage === 'function') {
       window.IdealMachineGetImage(source)
-        .then((imageSource) => applyContrast(imageSource))
-        .catch(() => {});
+        .then(applyContrast)
+        .catch(() => finish(null));
     } else {
       applyContrast(source);
     }
@@ -6022,7 +6346,7 @@ ${recentConversation}
     }
     const settings = chatSettingsFor(chat);
     const bounds = characterReplyBounds(chat, settings.characterMultiMessage);
-    systemText += `\n\n本轮直接以角色口吻回复。${settings.characterMultiMessage ? `可用 [[MSG]] 分隔 ${bounds.min} 至 ${bounds.max} 条自然、完整的聊天消息；不要拆断句子。` : '只发一条完整的聊天消息。'}不要在消息结尾留下逗号或残缺句子。${settings.thoughtEnabled !== false ? ' 回复末尾追加 [[THOUGHT]]角色此刻第一人称、1—3句且不超过80字的真实内心想法[[/THOUGHT]]；这是同一次调用的内部心声，不得混入聊天气泡。' : ''}`;
+    systemText += `\n\n本轮直接以角色口吻回复。${settings.characterMultiMessage ? `可用 [[MSG]] 分隔 ${bounds.min} 至 ${bounds.max} 条自然、完整的聊天消息；不要拆断句子。` : '只发一条完整的聊天消息。'}不要在消息结尾留下逗号或残缺句子。${settings.autoTranslate ? '【逐条翻译硬性规则】每一个 [[MSG]] 消息单元都必须单独判断翻译；非普通话消息必须在本单元正文末尾紧接 [[TRANSLATION]]该条译文[[/TRANSLATION]]，再开始下一个 [[MSG]]。严禁把多条原文的译文合并后只放在最后一条，严禁一条译文对应多条消息。' : ''}${settings.thoughtEnabled !== false ? ` 必须先完成全部可见聊天消息，最后才追加 [[THOUGHT]]角色此刻第一人称、1—3句且不超过80字的真实内心想法${settings.autoTranslate ? '；如果心声不是自然的现代普通话，紧接着追加 [[TRANSLATION]]普通话译文[[/TRANSLATION]]' : ''}[[/THOUGHT]]；心声必须位于整段输出最末尾、严格闭合，不能插入正文或任何 [[MSG]] 消息中，理想机会单独保存心声，不会显示在聊天气泡里。` : ''}`;
     const request = window.IdealMachineFetch || nativeChatFetch;
     const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
@@ -6035,19 +6359,37 @@ ${recentConversation}
     const combinedAnswer = extractCombinedThought(requireCharacterReplyText(data));
     const answer = combinedAnswer.reply;
     if (!cleanCharacterVisibleText(answer) || /^[.。…\s]+$/u.test(cleanCharacterVisibleText(answer))) throw new Error('API 返回了空回复（可能只返回了内部控制标记）');
-    let chunks = answer.split(/\[\[MSG\]\]/i).map(cleanCharacterReplyText).filter(Boolean);
-    if (!settings.characterMultiMessage) {
+    const taggedChunks = answer.split(/\[\[MSG\]\]/i).map(item => extractCharacterTranslation(item)).filter(item => item.text);
+    const hasInlineTranslations = taggedChunks.some(item => item.translation);
+    let chunks = taggedChunks.map(item => item.text);
+    let chunkTranslations = taggedChunks.map(item => item.translation);
+    if (!hasInlineTranslations && !settings.characterMultiMessage) {
       chunks = splitCharacterReplyNaturally(cleanCharacterReplyText(chunks.join(' ')));
-    } else {
+    } else if (!hasInlineTranslations) {
       if (chunks.length < bounds.min) chunks = splitCharacterReplyFallback(answer, bounds.min);
       chunks = chunks.flatMap(chunk => splitCharacterReplyNaturally(chunk));
       chunks = capCharacterChunks(chunks, bounds.max);
     }
-    chunks = mergeUnsafeCharacterChunks(chunks).map(cleanCharacterReplyText).filter(Boolean);
-    for (const chunk of chunks) {
+    if (!hasInlineTranslations) {
+      chunks = mergeUnsafeCharacterChunks(chunks).map(cleanCharacterReplyText).filter(Boolean);
+      chunkTranslations = chunks.map(() => '');
+    } else {
+      const compacted = chunks.map((chunk, index) => ({ text:cleanCharacterReplyText(chunk), translation:chunkTranslations[index] || '' })).filter(item => item.text);
+      chunks = compacted.map(item => item.text);
+      chunkTranslations = compacted.map(item => item.translation);
+    }
+    if (settings.autoTranslate && chunks.length) {
+      const translatedItems = await fillMissingCharacterTranslations(chunks.map((text, index) => ({ text, translation:chunkTranslations[index] || '' })), chat, contact);
+      chunks = translatedItems.map(item => item.text);
+      chunkTranslations = translatedItems.map(item => item.translation || '');
+    }
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+      const chunk = chunks[chunkIndex];
       if (!state.chats?.[contactId] || !state.contacts.some(item => item.id === contactId)) break;
       const viewingTargetChat = isViewingChat(contactId);
-      const message = { id: uid('message'), text: cleanCharacterReplyText(chunk), role: 'character', type: '', time: time(), unread: !viewingTargetChat };
+      const visibleText = cleanCharacterReplyText(chunk);
+      const translationMeta = characterTranslationMeta(visibleText, chat, contact, { translation:chunkTranslations[chunkIndex] || '' });
+      const message = { id: uid('message'), text: visibleText, role: 'character', type: '', ...translationMeta, time: time(), unread: !viewingTargetChat };
       chat.messages.push(message);
       save();
       if (!viewingTargetChat) {
@@ -6056,7 +6398,7 @@ ${recentConversation}
       if (activeContact === contactId && app.classList.contains('is-open')) render();
       await new Promise(resolve => setTimeout(resolve, 220));
     }
-    if (combinedAnswer.thought) saveCombinedThought(chat, combinedAnswer.thought);
+    if (combinedAnswer.thought) saveCombinedThought(chat, combinedAnswer.thought, combinedAnswer.thoughtTranslation);
   }
 
   const replyBeforeConcurrentContacts = reply;
@@ -6653,6 +6995,23 @@ ${recentConversation}
     const displaySource = emojiDisplaySource(originalSource);
     return html.replace(/<img src="[^"]*" alt="图片">/, `<img data-emoji-src="${esc(displaySource)}" src="${esc(displaySource)}" referrerpolicy="no-referrer" alt="图片">`);
   };
+  const messageHtmlWithChatTranslation = messageHtml;
+  messageHtml = function(message) {
+    const html = messageHtmlWithChatTranslation(message);
+    if (!isCharacterChatMessage(message) || message?.type || message?.recalled) return html;
+    const template = document.createElement('template');
+    template.innerHTML = html.trim();
+    const bubble = template.content.querySelector('.chat-bubble');
+    if (!bubble) return html;
+    const original = cleanCharacterVisibleText(message.originalText || message.text || '');
+    if (message.translation) {
+      bubble.innerHTML = `<span class="chat-translation-original">${esc(original)}</span><span class="chat-translation-text">${esc(cleanCharacterVisibleText(message.translation))}</span>`;
+    } else if (original !== String(message.text || '').trim()) {
+      // 旧记录或绕过标准回复管线的消息，也不能把内部标记渲染出来。
+      bubble.innerHTML = esc(original);
+    }
+    return template.innerHTML;
+  };
   const addMessageWithoutTaGroup = addMessage;
   addMessage = function(text, role = 'user', type = '', meta = {}) {
     const contact = taGroupContact();
@@ -6709,7 +7068,8 @@ ${recentConversation}
       if (!item || typeof item !== 'object') return null;
       return {
         sender:String(item.sender ?? item.name ?? item.speaker ?? item.member ?? item.roleName ?? '').trim(),
-        text:String(item.text ?? item.content ?? item.message ?? item.reply ?? '').trim()
+        text:String(item.text ?? item.content ?? item.message ?? item.reply ?? '').trim(),
+        translation:String(item.translation ?? item.translated ?? item.zh ?? item.chinese ?? '').trim()
       };
     }).filter(item => item?.text);
   }
@@ -6761,7 +7121,10 @@ ${recentConversation}
     const allowedEmojiGroups = new Set(groupSettings.characterEmojiGroupIds || []);
     const groupStickerItems = (state.emojis?.groups || []).filter(group => allowedEmojiGroups.has(group.id)).flatMap(group => group.items || []);
     const stickerPrompt = groupStickerItems.length ? `\n可用表情包：${groupStickerItems.map(item => `${item.id}（${item.text || '表情'}）`).join('；')}。角色或 NPC 确实想发送表情包时，可把对应消息的 text 写成 [[STICKER:表情ID]]；ID只能从此列表选择。` : '\n当前没有给群成员分配可用表情包，不要输出表情包标记。';
-    const groupSystemPrompt = `${buildChatSystemPrompt(roleContact, profile, chat)}\n\n# 群聊扩展规则（在上面的角色聊天规则基础上执行）\n你正在群聊“${contact.name}”中。主角色仍必须严格遵守上面的完整角色设定；此外，逐一阅读下面每位 NPC 的身份与人设。NPC也是独立参与者，可以根据自己的身份、关系、知识范围和说话习惯自然回复，不能都说成主角色的语气，也不能让任何成员知道其设定之外的信息。\n群成员：\n${members.filter(member => member.kind !== 'user').map(member => `- ${member.name}：${member.identity || '群成员'}；${member.id === contact.taRoleId ? (roleContact.details || member.persona || '暂无详细设定') : (member.persona || '暂无详细设定')}`).join('\n')}${stickerPrompt}\n\n本次输出格式优先级最高：只返回合法 JSON，格式为 {"messages":[{"sender":"成员姓名","text":"完整消息"}]}。发送者只能是群内的主角色或 NPC，不能代替用户发言。`;
+    const groupTranslationRule = groupSettings.autoTranslate
+      ? '如果某条消息不是自然的现代普通话，在该对象中同时填写 translation 字段，内容为准确的普通话译文；普通话消息的 translation 留空。translation 只放译文，不要解释。'
+      : '不需要 translation 字段。';
+    const groupSystemPrompt = `${buildChatSystemPrompt(roleContact, profile, chat)}\n\n# 群聊扩展规则（在上面的角色聊天规则基础上执行）\n你正在群聊“${contact.name}”中。主角色仍必须严格遵守上面的完整角色设定；此外，逐一阅读下面每位 NPC 的身份与人设。NPC也是独立参与者，可以根据自己的身份、关系、知识范围和说话习惯自然回复，不能都说成主角色的语气，也不能让任何成员知道其设定之外的信息。\n群成员：\n${members.filter(member => member.kind !== 'user').map(member => `- ${member.name}：${member.identity || '群成员'}；${member.id === contact.taRoleId ? (roleContact.details || member.persona || '暂无详细设定') : (member.persona || '暂无详细设定')}`).join('\n')}${stickerPrompt}\n\n本次输出格式优先级最高：只返回合法 JSON，格式为 {"messages":[{"sender":"成员姓名","text":"完整消息","translation":"普通话译文或空字符串"}]}。${groupTranslationRule}发送者只能是群内的主角色或 NPC，不能代替用户发言。`;
     const speakerRule = replyMembers.length > 1
       ? `本轮必须生成 2—4 条连续消息，并且至少由 2 名不同的群成员分别发送；每条消息的 sender 都必须填写真实成员姓名，不能全部让同一个人说。`
       : `当前只有 1 名可发言成员，最多生成 2 条连续消息；不要虚构群外成员。`;
@@ -6847,14 +7210,16 @@ ${recentConversation}
       genericNpcCursor = 0;
       const stickerById = new Map(groupStickerItems.map(item => [String(item.id), item]));
       let appended = 0;
-      (Array.isArray(parsed.messages) ? parsed.messages : []).filter(item => item?.text && !taGroupMessageNoise(item.text)).slice(0, 4).forEach(item => {
+      for (const item of (Array.isArray(parsed.messages) ? parsed.messages : []).filter(item => item?.text && !taGroupMessageNoise(item.text)).slice(0, 4)) {
         const sender = resolveMember(item.sender);
-        if (!sender) return;
+        if (!sender) continue;
         const rawText = String(item.text).trim().replace(/^(["'])|(["'])$/g, '').trim();
-        if (!rawText || /^[\[\]{}:,"']+$/.test(rawText) || normalizedName(rawText) === normalizedName(sender.name)) return;
-        const plainText = rawText.replace(/\[\[STICKER:([^\]]+)\]\]/gi, '').trim();
+        if (!rawText || /^[\[\]{}:,"']+$/.test(rawText) || normalizedName(rawText) === normalizedName(sender.name)) continue;
+        const plainText = cleanCharacterReplyText(rawText.replace(/\[\[STICKER:([^\]]+)\]\]/gi, '').trim());
         if (plainText) {
-          window.IdealMachineTaGroups.appendMessage(contact.taRoleId, contact.taGroupId, { id:uid('message'), senderId:sender.id, senderName:sender.name, senderAvatar:sender.avatar, senderKind:sender.kind, role:'character', text:plainText, time:time(), createdAt:Date.now() });
+          const senderContact = sender.id === contact.taRoleId ? roleContact : { name:sender.name, identity:sender.identity || '', details:sender.persona || '', worldbook:roleContact.worldbook || '' };
+          const translationMeta = characterTranslationMeta(plainText, chat, senderContact, { translation:item.translation || extractCharacterTranslation(rawText).translation });
+          window.IdealMachineTaGroups.appendMessage(contact.taRoleId, contact.taGroupId, { ...translationMeta, id:uid('message'), senderId:sender.id, senderName:sender.name, senderAvatar:sender.avatar, senderKind:sender.kind, role:'character', text:plainText, time:time(), createdAt:Date.now() });
           appended += 1;
         }
         for (const marker of rawText.matchAll(/\[\[STICKER:([^\]]+)\]\]/gi)) {
@@ -6863,7 +7228,7 @@ ${recentConversation}
           window.IdealMachineTaGroups.appendMessage(contact.taRoleId, contact.taGroupId, { id:uid('message'), senderId:sender.id, senderName:sender.name, senderAvatar:sender.avatar, senderKind:sender.kind, role:'character', text:emojiDisplaySource(sticker.url || ''), type:'image', sticker:true, stickerDescription:sticker.text || '', time:time(), createdAt:Date.now() });
           appended += 1;
         }
-      });
+      }
       if (!appended) throw new Error('接口没有返回可用的群聊消息，请重试');
     } catch (error) { window.alert(`群聊回复失败：${error.message}`); }
     finally { replyingContacts.delete(contactId); state = read(); render(); }
@@ -6939,8 +7304,12 @@ ${recentConversation}
     renderChatSettingsWithoutRealTimeAwareness();
     if (!chatSettingsOpen) return;
     const section = document.querySelector('#chatSettings .chat-display-settings');
-    if (!section || section.querySelector('[data-chat-setting-toggle="realTimeAwareness"]')) return;
+    if (!section) return;
     const settings = chatSettingsFor(currentChat());
+    if (!section.querySelector('[data-chat-setting-toggle="autoTranslate"]')) {
+      section.insertAdjacentHTML('beforeend', `<label class="chat-setting-toggle"><span>自动翻译<small>角色使用外语或粤语时，自动转换为普通话</small></span><input type="checkbox" data-chat-setting-toggle="autoTranslate" ${settings.autoTranslate ? 'checked' : ''}></label>`);
+    }
+    if (section.querySelector('[data-chat-setting-toggle="realTimeAwareness"]')) return;
     section.insertAdjacentHTML('beforeend', `<label class="chat-setting-toggle"><span>角色感知实际时间<small>根据真实日期、时间间隔和已过期事件自然推进聊天</small></span><input type="checkbox" data-chat-setting-toggle="realTimeAwareness" ${settings.realTimeAwareness ? 'checked' : ''}></label>`);
     const contact = taGroupContact();
     if (!contact) return;
@@ -7042,5 +7411,18 @@ ${recentConversation}
     const keepEmojiPanel = emojiOpen && app.classList.contains('is-open') && activeTab === 'chat' && (replying || isContactReplying(activeContact));
     if (keepEmojiPanel) return;
     return renderWithEmojiReplyGuard(...args);
+  };
+  const renderWithTranslationBackfill = render;
+  render = function(...args) {
+    const result = renderWithTranslationBackfill(...args);
+    if (app.classList.contains('is-open') && activeTab === 'chat' && activeContact) {
+      const contact = state.contacts.find(item => item.id === activeContact);
+      const chat = state.chats?.[activeContact];
+      if (contact && chatSettingsFor(chat).autoTranslate) {
+        const schedule = window.queueMicrotask || (callback => window.setTimeout(callback, 0));
+        schedule(() => backfillChatTranslations(chat, contact));
+      }
+    }
+    return result;
   };
 })();
