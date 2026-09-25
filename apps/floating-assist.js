@@ -3,14 +3,14 @@
   const errorsKey = 'ideal-machine-system-errors-v1';
   const callsKey = 'ideal-machine-api-calls-v1';
   const appCatalog = {
-    liaotian:['聊天','assets/icons/default-ios17/liaotian.png'], ta:['Ta','assets/icons/default-ios17/ta.png'],
-    luntan:['论坛','assets/icons/default-ios17/luntan.png'], xiangce:['相册','assets/icons/default-ios17/xiangce.png'],
-    rili:['日历','assets/icons/default-ios17/rili.png'], jiyiku:['记忆库','assets/icons/default-ios17/jiyiku.png'],
-    yinyue:['音乐','assets/icons/default-ios17/yinyue.png'], doubao:['豆包','assets/icons/default-ios17/doubao.png'],
-    gouwu:['购物','assets/icons/default-ios17/gouwu.png'], ifshikong:['if时空','assets/icons/default-ios17/ifshikong.png'],
-    qinglvkongjian:['情侣空间','assets/icons/default-ios17/qinglvkongjian.png'], shijieshu:['世界书','assets/icons/default-ios17/shijieshu.png'],
-    shezhi:['设置','assets/icons/default-ios17/shezhi.png'], debate:['辩论','assets/icons/default-ios17/debate.png'],
-    fanfic:['同人文','assets/icons/default-ios17/fanfic.png'], magazine:['杂志社','assets/icons/default-ios17/magazine.png']
+    liaotian:['聊天','assets/icons/default-ios17/liaotian.webp'], ta:['Ta','assets/icons/default-ios17/ta.webp'],
+    luntan:['论坛','assets/icons/default-ios17/luntan.webp'], xiangce:['相册','assets/icons/default-ios17/xiangce.webp'],
+    rili:['日历','assets/icons/default-ios17/rili.webp'], jiyiku:['记忆库','assets/icons/default-ios17/jiyiku.webp'],
+    yinyue:['音乐','assets/icons/default-ios17/yinyue.webp'], doubao:['豆包','assets/icons/default-ios17/doubao.webp'],
+    gouwu:['购物','assets/icons/default-ios17/gouwu.webp'], ifshikong:['if时空','assets/icons/default-ios17/ifshikong.webp'],
+    qinglvkongjian:['情侣空间','assets/icons/default-ios17/qinglvkongjian.webp'], shijieshu:['世界书','assets/icons/default-ios17/shijieshu.webp'],
+    shezhi:['设置','assets/icons/default-ios17/shezhi.webp'], debate:['辩论','assets/icons/default-ios17/debate.webp'],
+    fanfic:['同人文','assets/icons/default-ios17/fanfic.webp'], magazine:['杂志社','assets/icons/default-ios17/magazine.webp']
   };
   const defaults = { enabled:true, idleOpacity:.18, size:60, mode:'pill', apps:['liaotian','ta','jiyiku','shezhi'], side:'right', y:.56 };
   const readJson = (key, fallback) => { try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value ?? fallback; } catch { return fallback; } };
@@ -69,6 +69,9 @@
     try { accept = new Headers(init?.headers || {}).get('accept') || ''; } catch {}
     if (/^(?:data:|blob:|idb:)/i.test(url)) return false;
     if (/image\//i.test(accept)) return false;
+    // 设置中的“拉取模型”只是读取供应商可用模型列表，不是一次模型调用，
+    // 不应占用调用面板的记录和进行中计数。
+    if (!isModelCall && /\/(?:models)(?:[/?]|$)/i.test(path)) return false;
     if (/(?:读取|加载|导入|下载).*(?:图片|图像|封面|头像|壁纸|贴纸|资源)|下载生成结果/.test(String(purpose || ''))) return false;
     if (!isModelCall && /\.(?:png|jpe?g|gif|webp|svg|ico|css|js|mjs|woff2?|ttf)(?:[?#]|$)/i.test(path)) return false;
     const knownApiEndpoint = /\/(?:chat\/completions|embeddings|responses|models|config|subscribe|activation\/verify|images)(?:[/?]|$)/i.test(path)
@@ -77,7 +80,7 @@
     return Boolean(isModelCall || init?.idealPurpose || scope !== 'shared' || knownApiEndpoint);
   }
 
-  calls = calls.filter(item => !/(?:读取|加载|导入|下载).*(?:图片|图像|封面|头像|壁纸|贴纸|资源)|下载生成结果/.test(String(item?.purpose || '')));
+  calls = calls.filter(item => item?.purpose !== '设置 App－读取 API 模型列表' && !/(?:读取|加载|导入|下载).*(?:图片|图像|封面|头像|壁纸|贴纸|资源)|下载生成结果/.test(String(item?.purpose || '')));
   writeJson(callsKey, calls);
 
   function callPurpose(scope, rawUrl = '', init = {}) {
@@ -110,6 +113,7 @@
       'chat-background':'聊天 App－后台生成角色回复',
       'chat-moments-background':'聊天 App－后台生成朋友圈互动',
       'chat-thought':'聊天 App－单独补生成或重写角色心声',
+      'chat-translation':'聊天 App－翻译角色原文',
       'chat-offline':'聊天 App－生成线下见面回复',
       'chat-video-call':'聊天 App－生成视频通话回复',
       'chat-video-call-summary':'聊天 App－整理视频通话总结',

@@ -177,7 +177,7 @@
   function avatar(item) { return item?.avatar ? `<img src="${esc(item.avatar)}" alt="">` : esc((item?.nickname || item?.name || 'Ta').slice(0, 1)); }
   function icon(type) { const paths = { chat:'<path d="M8 10h32v22H19l-9 7v-7H8z"/><path d="M15 17h18M15 23h12"/>', forum:'<path d="M9 11h30v21H19l-8 6v-6H9z"/><path d="M16 18h16M16 24h10"/>', calendar:'<rect x="10" y="11" width="28" height="27" rx="4"/><path d="M16 8v7M32 8v7M10 19h28M17 26h.01M24 26h.01M31 26h.01M17 32h.01M24 32h.01"/>', couple:'<path d="M24 38S8 28 8 17a8 8 0 0 1 15-4 8 8 0 0 1 15 4c0 11-14 21-14 21z"/>', music:'<path d="M31 10v22M31 10l9-2v21M31 32c0 4-4 7-8 7s-7-2-7-5 3-6 7-6 8 1 8 4zM40 29c0 4-4 7-8 7"/>', doubao:'<path d="M10 27c0-10 7-17 16-17s12 5 12 13c0 9-7 16-17 16H10z"/><path d="M18 23h.01M30 23h.01M18 30c3 3 7 3 10 0"/>', shop:'<path d="M10 20h28v19H10zM8 20l3-9h26l3 9M16 20v4M24 20v4M32 20v4M16 39V29h16v10"/>', wallet:'<path d="M8 14h30v25H8zM8 18h30M31 25h10v9H31zM35 29h.01"/>', beauty:'<path d="M24 7c2 8 5 11 13 13-8 2-11 5-13 13-2-8-5-11-13-13 8-2 11-5 13-13zM37 31c1 4 3 6 7 7-4 1-6 3-7 7-1-4-3-6-7-7 4-1 6-3 7-7z"/>' }; return `<svg viewBox="0 0 48 48" aria-hidden="true">${paths[type] || ''}</svg>`; }
   const ios17IconKeys = new Set(['liaotian','luntan','xiangce','rili','qinglvkongjian','yinyue','doubao','gouwu','qianbao','meihua','debate','fanfic','magazine']);
-  function defaultIosIcon(key, fallback = '') { return ios17IconKeys.has(key) ? `<img class="ta-default-ios-icon" src="assets/icons/default-ios17/${key}.png" alt="">` : fallback; }
+  function defaultIosIcon(key, fallback = '') { return ios17IconKeys.has(key) ? `<img class="ta-default-ios-icon" src="assets/icons/default-ios17/${key}.webp" alt="">` : fallback; }
   function builtinAppIcon(key, fallback = '') { return defaultIosIcon(key, fallback); }
   function cloneAppearance(value=state.appearance) { return { wallpaper:value?.wallpaper || '', icons:{...(value?.icons || {})} }; }
   function appearanceValue() { if(appearanceOpen&&!appearanceDraft)appearanceDraft=cloneAppearance();return appearanceOpen ? appearanceDraft : state.appearance; }
@@ -1143,7 +1143,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
       const raw=String(value||'');
       if(raw.startsWith('builtin:')){
         const sourceKey=raw.slice(8);
-        if(ios17IconKeys.has(sourceKey)) icons[key]=`assets/icons/default-ios17/${sourceKey}.png`;
+        if(ios17IconKeys.has(sourceKey)) icons[key]=`assets/icons/default-ios17/${sourceKey}.webp`;
         continue;
       }
       const resolved=await resolveImage(value);
@@ -1171,7 +1171,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
   function reverseIconMarkup(key, custom, short) {
     if(custom) return `<i class="has-custom-image" style="background-image:url(&quot;${esc(custom)}&quot;)"></i>`;
     if(key==='creative-folder'){
-      const folderSources=['debate','fanfic','magazine'].map(item=>reverseAppearance.icons[item]||`assets/icons/default-ios17/${item}.png`);
+      const folderSources=['debate','fanfic','magazine'].map(item=>reverseAppearance.icons[item]||`assets/icons/default-ios17/${item}.webp`);
       return `<i class="has-folder-image">${folderSources.map(source=>`<img src="${esc(source)}" alt="">`).join('')}</i>`;
     }
     return `<i class="has-default-image">${defaultIosIcon(key,esc(short))}</i>`;

@@ -25,7 +25,7 @@
   const iconElement = item => item.querySelector('.app-icon, .dock-icon, .folder-app-icon');
   const nameElement = item => item.querySelector('.app-name, .dock-name, .folder-app-name');
   const ios17IconKeys = new Set(['liaotian','ta','luntan','xiangce','rili','jiyiku','debate','fanfic','magazine','yinyue','doubao','gouwu','ifshikong','shezhi','meihua','shijieshu','qinglvkongjian']);
-  const defaultIconPath = key => `assets/icons/default-ios17/${key}.png`;
+  const defaultIconPath = key => `assets/icons/default-ios17/${key}.webp`;
   const defaultIconUrl = key => `${defaultIconPath(key)}${key === 'qinglvkongjian' ? '?v=20260917-couple-default' : ''}`;
   const normalizeStoredIconPath = value => String(value || '').split(/[?#]/, 1)[0].replace(/^\.\//, '');
   function removeLegacyDefaultIconSettings() {
@@ -33,7 +33,7 @@
     let changed = false;
     ios17IconKeys.forEach(key => {
       const source = normalizeStoredIconPath(saved.icons[key]);
-      if (source === defaultIconPath(key) || source === `assets/icons/${key}.png`) {
+      if (source === defaultIconPath(key) || source === `assets/icons/default-ios17/${key}.png` || source === `assets/icons/${key}.png`) {
         delete saved.icons[key];
         changed = true;
       }
