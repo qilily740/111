@@ -1250,7 +1250,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 @media (prefers-color-scheme: dark) {
   :root { --widget-placeholder-gray: #444; }
   body { background-color: #202020; }
-  .profile-card, .todo-widget, .image-widget, .countdown-widget, .elapsed-days-widget, .shared-widget, .now-playing-widget, .search-input, .photo-card, .date-calendar-card, .dock-bar { background: rgba(255,255,255,.52); border-color: rgba(255,255,255,.72); box-shadow: 0 8px 26px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.72); }
+  .profile-card, .todo-widget, .image-widget, .countdown-widget, .elapsed-days-widget, .shared-widget, .now-playing-widget, .search-input, .photo-card, .date-calendar-card, .dock-bar { background: rgba(255,255,255,.72); border-color: rgba(255,255,255,.78); box-shadow: 0 8px 26px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.82); }
   .image-widget-placeholder { color:#ccc; }
   .avatar, .date-calendar-image, .photo-card { background-color: var(--widget-placeholder-gray); border-color: #555; }
   .nickname-text, .todo-title, .date-calendar-left, .app-name, .dock-name, .search-input { color: #eee; }
@@ -4992,7 +4992,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 @media (prefers-color-scheme:dark) { .frost-profile-widget { border-color:rgba(255,255,255,.3); background:rgba(222,225,228,.24); color:#303033; box-shadow:0 15px 35px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.28); }.frost-profile-body { border-color:rgba(255,255,255,.5); background:linear-gradient(145deg,rgba(255,255,255,.5),rgba(239,242,244,.34)); color:#303033; }.frost-profile-body > p { color:rgba(48,48,52,.64); }.frost-profile-body > p i { color:rgba(48,48,52,.44); } }
 
 /* 与待办同尺寸的四款可编辑手机小组件。 */
-.square-personal-widget { position:relative; width:100%; aspect-ratio:1; min-width:0; overflow:hidden; border:1px solid rgba(255,255,255,.55); border-radius:22px; background:rgba(218,221,222,.25); color:#303236; box-shadow:0 9px 24px rgba(33,38,44,.1),inset 0 1px 0 rgba(255,255,255,.52); cursor:pointer; isolation:isolate; -webkit-backdrop-filter:blur(25px) saturate(115%); backdrop-filter:blur(25px) saturate(115%); }
+.square-personal-widget { position:relative; width:100%; aspect-ratio:1; min-width:0; overflow:hidden; border:1px solid rgba(255,255,255,.72); border-radius:22px; background:rgba(255,255,255,.68); color:#303236; box-shadow:0 9px 24px rgba(33,38,44,.1),inset 0 1px 0 rgba(255,255,255,.78); cursor:pointer; isolation:isolate; -webkit-backdrop-filter:blur(25px) saturate(115%); backdrop-filter:blur(25px) saturate(115%); }
 .square-personal-widget button { display:grid; place-items:center; border:1px solid rgba(255,255,255,.44); background:rgba(255,255,255,.28); color:inherit; font:inherit; cursor:pointer; -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); }
 
 .contact-mini-cover { position:absolute; inset:0; z-index:-2; background:var(--widget-placeholder-gray) center/cover no-repeat; }
@@ -5011,7 +5011,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .daily-photo-copy time { font:600 8px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.14em; opacity:.72; }
 .daily-photo-copy p { display:-webkit-box; overflow:hidden; font-size:11px; font-weight:650; line-height:1.35; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 
-.relationship-mini-widget { display:flex; align-items:center; justify-content:center; flex-direction:column; padding:16px 10px 11px; background:linear-gradient(145deg,rgba(249,239,242,.52),rgba(214,220,226,.26)); }
+.relationship-mini-widget { display:flex; align-items:center; justify-content:center; flex-direction:column; padding:16px 10px 11px; background:linear-gradient(145deg,rgba(255,255,255,.72),rgba(241,239,243,.58)); }
 .relationship-mini-avatars { display:flex; align-items:center; justify-content:center; }
 .relationship-mini-avatar { width:45px; height:45px; border:2px solid rgba(255,255,255,.72); border-radius:50%; background:var(--widget-placeholder-gray) center/cover no-repeat; box-shadow:0 4px 12px rgba(34,39,45,.1); }
 .relationship-mini-avatars span { display:grid; z-index:2; place-items:center; width:25px; height:25px; margin:0 -5px; border:1px solid rgba(255,255,255,.7); border-radius:50%; background:rgba(255,255,255,.54); color:#c98798; font-size:11px; }
@@ -5045,7 +5045,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .polaroid-mini-widget > p { position:absolute; right:40px; bottom:-1px; left:25px; z-index:5; overflow:hidden; color:#77736d; font:italic 8px/1.2 Georgia,'Times New Roman',serif; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
 .polaroid-mini-widget > button { position:absolute; right:7px; bottom:6px; z-index:6; width:25px; height:25px; border-color:rgba(255,255,255,.82); border-radius:50%; background:rgba(250,249,246,.86); color:#68645f; box-shadow:0 3px 9px rgba(0,0,0,.12); font-size:12px; }
 
-@media (prefers-color-scheme:dark) { .square-personal-widget { border-color:rgba(255,255,255,.55); background:rgba(218,221,222,.25); color:#303236; box-shadow:0 9px 24px rgba(33,38,44,.1),inset 0 1px 0 rgba(255,255,255,.52); }.relationship-mini-widget { background:linear-gradient(145deg,rgba(249,239,242,.52),rgba(214,220,226,.26)); }.relationship-mini-names { color:#ddd; }.relationship-mini-widget > small { color:#aaa; }.square-personal-widget button { border-color:rgba(255,255,255,.44); background:rgba(255,255,255,.28); }.polaroid-mini-widget { border:0; background:transparent; box-shadow:none; }.polaroid-mini-widget > p { color:#77736d; }.polaroid-mini-widget > button { border-color:rgba(255,255,255,.72); background:rgba(250,249,246,.88); color:#68645f; } }
+@media (prefers-color-scheme:dark) { .square-personal-widget { border-color:rgba(255,255,255,.72); background:rgba(255,255,255,.68); color:#303236; box-shadow:0 9px 24px rgba(33,38,44,.1),inset 0 1px 0 rgba(255,255,255,.78); }.relationship-mini-widget { background:linear-gradient(145deg,rgba(255,255,255,.72),rgba(241,239,243,.58)); }.relationship-mini-names { color:#68646a; }.relationship-mini-widget > small { color:#9b9197; }.square-personal-widget button { border-color:rgba(255,255,255,.62); background:rgba(255,255,255,.48); }.polaroid-mini-widget { border:0; background:transparent; box-shadow:none; }.polaroid-mini-widget > p { color:#77736d; }.polaroid-mini-widget > button { border-color:rgba(255,255,255,.72); background:rgba(250,249,246,.88); color:#68645f; } }
 @media (prefers-reduced-motion:reduce) { .polaroid-mini-photo { transition:none; } }
 
 /* 小组件库保持固定高度，分类切换只改变内部滚动内容。 */
