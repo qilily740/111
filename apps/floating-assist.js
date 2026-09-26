@@ -438,7 +438,10 @@
   }
 
   let drag = null;
+  let snapTimer = 0;
   orb.addEventListener('pointerdown', event => {
+    clearTimeout(snapTimer);
+    root.classList.remove('is-snapping');
     const rect = orb.getBoundingClientRect();
     // 拖动时圆球跟随手指；松手时吸附到最近的屏幕边缘。
     orb.style.left = `${rect.left}px`;
@@ -464,7 +467,7 @@
   });
   orb.addEventListener('pointerup', event => {
     if (!drag || drag.id !== event.pointerId) return;
-    const finishedDrag = drag; const moved = finishedDrag.moved; drag = null; root.classList.remove('is-active');
+    const finishedDrag = drag; const moved = finishedDrag.moved; drag = null;
     if (moved) {
       const size = orb.offsetWidth;
       const x = Math.max(7, Math.min(innerWidth-size-7, event.clientX-finishedDrag.offsetX));
@@ -473,14 +476,28 @@
       settings.side = Object.keys(distances).reduce((nearest, edge) => distances[edge] < distances[nearest] ? edge : nearest, 'left');
       settings.x = x / innerWidth;
       settings.y = y / innerHeight;
-      orb.style.left = '';
-      orb.style.top = '';
-      orb.style.right = '';
-      orb.style.bottom = '';
+      const targetX = settings.side === 'left' ? 7 : settings.side === 'right' ? innerWidth-size-7 : x;
+      const targetY = settings.side === 'top' ? 7 : settings.side === 'bottom' ? innerHeight-size-7 : y;
+      root.classList.remove('is-active');
+      root.classList.add('is-snapping');
+      orb.style.left = `${x}px`;
+      orb.style.top = `${y}px`;
+      orb.style.right = 'auto';
+      orb.style.bottom = 'auto';
+      requestAnimationFrame(() => { orb.style.left = `${targetX}px`; orb.style.top = `${targetY}px`; });
       writeJson(settingsKey, settings);
-      applySettings();
+      clearTimeout(snapTimer);
+      snapTimer = window.setTimeout(() => {
+        root.classList.remove('is-snapping');
+        orb.style.left = '';
+        orb.style.top = '';
+        orb.style.right = '';
+        orb.style.bottom = '';
+        applySettings();
+      }, 300);
     }
     else {
+      root.classList.remove('is-active');
       orb.style.left = '';
       orb.style.top = '';
       orb.style.right = '';
@@ -493,6 +510,8 @@
     if (!drag || drag.id !== event.pointerId) return;
     drag = null;
     root.classList.remove('is-active');
+    root.classList.remove('is-snapping');
+    clearTimeout(snapTimer);
     orb.style.left = '';
     orb.style.top = '';
     orb.style.right = '';
