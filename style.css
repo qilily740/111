@@ -1,5 +1,5 @@
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-:root { --widget-placeholder-gray: #e2e2df; }
+:root { --widget-placeholder-gray: #e2e2df; color-scheme: only light; }
 /* 阅读讨论：独立于阅读页日夜主题的毛玻璃聊天样式 */
 .chat-reading-mini { background: rgba(255,255,255,.78) !important; color: var(--reading-chat-text-color, #222) !important; border-color: rgba(255,255,255,.82) !important; -webkit-backdrop-filter: blur(20px) saturate(135%) !important; backdrop-filter: blur(20px) saturate(135%) !important; }
 .chat-reading-mini header, .chat-reading-mini footer { background: rgba(255,255,255,.36) !important; border-color: rgba(255,255,255,.68) !important; }
