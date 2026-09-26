@@ -192,7 +192,18 @@
       const key = item.dataset.appKey;
       if (saved.icons?.[key]) showIconDraft(key, saved.icons[key]);
     });
-    modal.querySelectorAll('[data-beauty-file]').forEach(input => input.addEventListener('change', async event => { if (!event.target.files[0]) return; const key=event.target.dataset.beautyFile;const value=await readIconFile(event.target.files[0]);if(!value)return;batchIconDraft[key]=value;modal.querySelector(`[data-beauty-icon-url="${key}"]`).value = '';setPreview(modal.querySelector(`[data-beauty-preview="${key}"]`),value); }));
+    modal.querySelectorAll('[data-beauty-file]').forEach(input => input.addEventListener('change', async event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const key = event.target.dataset.beautyFile;
+      const urlInput = modal.querySelector(`[data-beauty-icon-url="${key}"]`);
+      if (urlInput) urlInput.value = '';
+      delete batchIconDraft[key];
+      const value = await readIconFile(file);
+      if (!value) { window.alert('图片读取失败，旧图源已与本次选择分开。请重新选择图片或使用图片链接。'); return; }
+      batchIconDraft[key] = value;
+      setPreview(modal.querySelector(`[data-beauty-preview="${key}"]`), value);
+    }));
     modal.querySelectorAll('[data-beauty-swap]').forEach(button => button.addEventListener('click', () => selectIconForSwap(button.dataset.beautySwap)));
   }
 
@@ -550,7 +561,7 @@
   async function save() {
     const wallpaperFile = document.querySelector('#beautyWallpaperFile').files[0];
     const wallpaperUrl = document.querySelector('#beautyWallpaperUrl').value.trim();
-    if (wallpaperFile) { const uploadedWallpaper = await readFile(wallpaperFile); saved.wallpaper = window.IdealMachinePutImage ? await window.IdealMachinePutImage(uploadedWallpaper) : uploadedWallpaper; }
+    if (wallpaperFile) { const uploadedWallpaper = await readFile(wallpaperFile); if (!uploadedWallpaper) return window.alert('壁纸读取失败，旧壁纸未更改。请重新选择图片或使用图片链接。'); saved.wallpaper = window.IdealMachinePutImage ? await window.IdealMachinePutImage(uploadedWallpaper) : uploadedWallpaper; }
     else if (wallpaperUrl) { saved.wallpaper = wallpaperUrl; window.IdealMachineAlbum?.archiveUrl?.(wallpaperUrl, '美化壁纸'); }
     saved.names = saved.names || {};
     saved.icons = saved.icons || {};
@@ -566,9 +577,11 @@
       }
       const file = document.querySelector(`[data-beauty-file="${key}"]`).files[0];
       const url = document.querySelector(`[data-beauty-icon-url="${key}"]`).value.trim();
-      const uploaded = await readIconFile(file);
-      if (uploaded) saved.icons[key] = window.IdealMachinePutImage ? await window.IdealMachinePutImage(uploaded) : uploaded;
-      else if (url) { saved.icons[key] = url; window.IdealMachineAlbum?.archiveUrl?.(url, '美化图标'); }
+      if (file) {
+        const uploaded = await readIconFile(file);
+        if (!uploaded) return window.alert('图标读取失败，旧图标未更改。请重新选择图片或使用图片链接。');
+        saved.icons[key] = window.IdealMachinePutImage ? await window.IdealMachinePutImage(uploaded) : uploaded;
+      } else if (url) { saved.icons[key] = url; window.IdealMachineAlbum?.archiveUrl?.(url, '美化图标'); }
     }
     try { localStorage.setItem(storageKey, JSON.stringify(saved)); } catch { try { const compacted = window.IdealMachineCompactStoredValue ? await window.IdealMachineCompactStoredValue(saved) : saved; saved = compacted || saved; localStorage.setItem(storageKey, JSON.stringify(saved)); } catch { window.alert('图片保存失败：Safari 的本地存储空间不足，请先删除旧壁纸或旧图标后重试。'); return; } }
     applySettings();
@@ -697,6 +710,8 @@
         window.IdealMachineAlbum.pick(value => {
           if (!value) return;
           batchIconDraft[key] = value;
+          const file = modal.querySelector(`[data-beauty-file="${key}"]`);
+          if (file) file.value = '';
           const hiddenUrl = modal.querySelector(`[data-beauty-icon-url="${key}"]`);
           if (hiddenUrl) hiddenUrl.value = '';
           showIconDraft(key, value);
@@ -729,8 +744,8 @@
   document.querySelector('#beautyReset').addEventListener('click', showRestoreConfirm);
   document.querySelector('#beautyExport').addEventListener('click', exportBeauty);
   document.querySelector('#beautyImportFile').addEventListener('change', event => importBeauty(event.target.files[0]));
-  document.querySelector('#beautyWallpaperUrl').addEventListener('input', event => previewWallpaper(event.target.value.trim()));
-  document.querySelector('#beautyWallpaperFile').addEventListener('change', async event => { const value = await readFile(event.target.files[0]); if (value) previewWallpaper(value); });
+  document.querySelector('#beautyWallpaperUrl').addEventListener('input', event => { if (event.target.value.trim()) document.querySelector('#beautyWallpaperFile').value = ''; previewWallpaper(event.target.value.trim()); });
+  document.querySelector('#beautyWallpaperFile').addEventListener('change', async event => { const file = event.target.files[0]; if (!file) return; document.querySelector('#beautyWallpaperUrl').value = ''; const value = await readFile(file); if (value) previewWallpaper(value); else window.alert('壁纸读取失败，请重新选择图片或使用图片链接。'); });
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && modal.classList.contains('is-open')) close(); });
   applySettings();
   migrateBeautyImages();

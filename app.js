@@ -312,7 +312,7 @@
   function imageField(key) {
     const value = state[key] || '';
     const urlValue = value.startsWith('data:') || value.startsWith('idb:image:') ? '' : value;
-    return `<div class="edit-field image-edit-field"><label>${imageLabels[key]}</label><input data-image-url="${key}" type="url" placeholder="粘贴图片地址（可选）" value="${escapeHtml(urlValue)}"><div class="edit-image-actions"><label class="file-picker">选择本地图片<input class="edit-file" data-image-file="${key}" type="file" accept="image/*"></label><button class="edit-album-pick" data-album-pick="${key}" type="button">从相册选择</button></div><div class="edit-preview" data-image-preview="${key}"></div></div>`;
+    return `<div class="edit-field image-edit-field" data-image-field="${key}"><label>${imageLabels[key]}</label><input data-image-url="${key}" type="url" placeholder="粘贴图片地址（可选）" value="${escapeHtml(urlValue)}"><div class="edit-image-actions"><label class="file-picker">选择本地图片<input class="edit-file" data-image-file="${key}" type="file" accept="image/*"></label><button class="edit-album-pick" data-album-pick="${key}" type="button">从相册选择</button><button data-image-clear="${key}" type="button">移除当前图片</button></div><div class="edit-preview" data-image-preview="${key}"></div></div>`;
   }
 
   function countdownDateField() {
@@ -360,6 +360,12 @@
     title.textContent = ({ 'contact-mini':'编辑联系人快捷卡', 'daily-photo':'编辑今日照片', 'relationship-mini':'编辑双人关系卡', 'polaroid-mini':'编辑拍立得相册' })[activeGroup] || title.textContent;
     form.innerHTML = keys.map(fieldMarkup).join('') + (activeGroup === 'profile' ? fontSizeFields() : activeGroup === 'calendar' ? calendarFields() : activeGroup === 'todo' ? '<div class="edit-field font-size-control"><label for="fontSize-todo">待办文字字号</label><input id="fontSize-todo" data-font-size="todo" type="number" min="9" max="24" step="1" value="' + (state['todo-size'] || 12) + '"><span class="font-size-value" data-font-value="todo">px</span></div>' : '');
     form.querySelectorAll('[data-image-file]').forEach(input => input.addEventListener('change', previewLocalImage));
+    form.querySelectorAll('[data-image-url]').forEach(input => input.addEventListener('input', () => {
+      if (!input.value.trim()) return;
+      const fileInput = form.querySelector(`[data-image-file="${input.dataset.imageUrl}"]`);
+      if (fileInput) fileInput.value = '';
+      form.querySelector(`[data-image-field="${input.dataset.imageUrl}"]`)?.removeAttribute('data-clear-image');
+    }));
     form.querySelectorAll('[data-font-size]').forEach(input => input.addEventListener('input', event => { document.querySelector(`[data-font-value="${event.target.dataset.fontSize}"]`).textContent = `${event.target.value}px`; }));
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
@@ -376,9 +382,26 @@
   function previewLocalImage(event) {
     const file = event.target.files[0];
     if (!file) return;
+    const key = event.target.dataset.imageFile;
+    const field = form.querySelector(`[data-image-field="${key}"]`);
+    const urlInput = form.querySelector(`[data-image-url="${key}"]`);
+    if (urlInput) urlInput.value = '';
+    field?.removeAttribute('data-clear-image');
     const reader = new FileReader();
-    reader.onload = () => setBackground(document.querySelector(`[data-image-preview="${event.target.dataset.imageFile}"]`), reader.result);
+    reader.onload = () => setBackground(document.querySelector(`[data-image-preview="${key}"]`), reader.result);
+    reader.onerror = () => window.alert('图片读取失败，请重新选择图片或使用图片链接。');
     reader.readAsDataURL(file);
+  }
+
+  function clearImageField(key) {
+    const field = form.querySelector(`[data-image-field="${key}"]`);
+    const urlInput = form.querySelector(`[data-image-url="${key}"]`);
+    const fileInput = form.querySelector(`[data-image-file="${key}"]`);
+    const preview = form.querySelector(`[data-image-preview="${key}"]`);
+    if (urlInput) urlInput.value = '';
+    if (fileInput) fileInput.value = '';
+    if (preview) preview.style.removeProperty('background-image');
+    field?.setAttribute('data-clear-image', 'true');
   }
 
   function readFile(file) {
@@ -401,8 +424,10 @@
         const file = document.querySelector(`[data-image-file="${key}"]`).files[0];
         const url = document.querySelector(`[data-image-url="${key}"]`).value.trim();
         const uploadedImage = await readFile(file);
+        if (file && !uploadedImage) return window.alert('图片读取失败，旧图片未更改。请重新选择文件或使用图片链接。');
         if (uploadedImage) state[key] = window.IdealMachinePutImage ? await window.IdealMachinePutImage(uploadedImage) : uploadedImage;
         else if (url) { state[key] = url; window.IdealMachineAlbum?.archiveUrl?.(url, '桌面'); }
+        else if (form.querySelector(`[data-image-field="${key}"]`)?.dataset.clearImage === 'true') delete state[key];
       }
     }
     if (activeGroup === 'profile') ['user-name', 'char-name', 'signature'].forEach(key => { state[`${key}-size`] = Number(document.querySelector(`[data-font-size="${key}"]`).value); });
@@ -450,7 +475,13 @@
     renderElapsedDays();
     Object.keys(imageLabels).forEach(key => {
       const element = document.querySelector(`[data-edit="${key}"]`);
-      if (!element || !state[key]) return;
+      if (!element) return;
+      if (!state[key]) {
+        if (key === 'calendar-image') element.replaceChildren();
+        else element.style.removeProperty('background-image');
+        element.classList.remove('has-image');
+        return;
+      }
       const value = state[key];
       const applyImage = resolved => { if (!resolved) return; if (key === 'calendar-image') { element.replaceChildren(); const image = document.createElement('img'); image.src = resolved; image.alt = '图片'; element.appendChild(image); } else { setBackground(element, resolved); if (key === 'widget-image' || key.startsWith('shared-image-') || key === 'now-avatar' || key.startsWith('now-image-') || key === 'mood-avatar' || key === 'time-photo-avatar' || key.startsWith('time-photo-') || key.startsWith('frost-profile-') || squareWidgetImageKeys.has(key)) element.classList.add('has-image'); const preview = document.querySelector(`[data-image-preview="${key}"]`); if (preview) setBackground(preview, resolved); } };
       if (window.IdealMachineGetImage && String(value).startsWith('idb:image:')) window.IdealMachineGetImage(value).then(applyImage); else applyImage(value);
@@ -618,12 +649,17 @@
       event.preventDefault();
       window.IdealMachineAlbum?.pick?.(url => {
         const input = form.querySelector(`[data-image-url="${albumPick.dataset.albumPick}"]`);
+        const fileInput = form.querySelector(`[data-image-file="${albumPick.dataset.albumPick}"]`);
         if (!input) return;
+        if (fileInput) fileInput.value = '';
         input.value = url || '';
+        form.querySelector(`[data-image-field="${albumPick.dataset.albumPick}"]`)?.removeAttribute('data-clear-image');
         setBackground(form.querySelector(`[data-image-preview="${albumPick.dataset.albumPick}"]`), url);
       });
       return;
     }
+    const clearImage = event.target.closest('[data-image-clear]');
+    if (clearImage) { event.preventDefault(); clearImageField(clearImage.dataset.imageClear); return; }
     if (event.target.closest('[data-edit-close]')) closeEditor();
   });
   document.querySelector('#editSave').addEventListener('click', saveEditor);
