@@ -443,6 +443,15 @@
     element.style.backgroundImage = `url("${String(value).replace(/"/g, '\\"')}")`;
   }
 
+  function setSquareWidgetImage(element, value) {
+    if (!element || !value) return;
+    const layer = `url("${String(value).replace(/"/g, '\\"')}")`;
+    element.style.backgroundImage = `${layer},${layer}`;
+    element.style.backgroundSize = 'contain,cover';
+    element.style.backgroundPosition = 'center,center';
+    element.style.backgroundRepeat = 'no-repeat,no-repeat';
+  }
+
   function render() {
     Object.keys(textLabels).forEach(key => {
       const element = document.querySelector(`[data-edit="${key}"]`);
@@ -483,7 +492,7 @@
         return;
       }
       const value = state[key];
-      const applyImage = resolved => { if (!resolved) return; if (key === 'calendar-image') { element.replaceChildren(); const image = document.createElement('img'); image.src = resolved; image.alt = '图片'; element.appendChild(image); } else { setBackground(element, resolved); if (key === 'widget-image' || key.startsWith('shared-image-') || key === 'now-avatar' || key.startsWith('now-image-') || key === 'mood-avatar' || key === 'time-photo-avatar' || key.startsWith('time-photo-') || key.startsWith('frost-profile-') || squareWidgetImageKeys.has(key)) element.classList.add('has-image'); const preview = document.querySelector(`[data-image-preview="${key}"]`); if (preview) setBackground(preview, resolved); } };
+      const applyImage = resolved => { if (!resolved) return; if (key === 'calendar-image') { element.replaceChildren(); const image = document.createElement('img'); image.src = resolved; image.alt = '图片'; element.appendChild(image); } else { if (key === 'widget-image') setSquareWidgetImage(element, resolved); else setBackground(element, resolved); if (key === 'widget-image' || key.startsWith('shared-image-') || key === 'now-avatar' || key.startsWith('now-image-') || key === 'mood-avatar' || key === 'time-photo-avatar' || key.startsWith('time-photo-') || key.startsWith('frost-profile-') || squareWidgetImageKeys.has(key)) element.classList.add('has-image'); const preview = document.querySelector(`[data-image-preview="${key}"]`); if (preview) { if (key === 'widget-image') setSquareWidgetImage(preview, resolved); else setBackground(preview, resolved); } } };
       if (window.IdealMachineGetImage && String(value).startsWith('idb:image:')) window.IdealMachineGetImage(value).then(applyImage); else applyImage(value);
     });
   }
