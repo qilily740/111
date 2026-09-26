@@ -1250,7 +1250,8 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 }
 
 @media (prefers-color-scheme: dark) {
-  .profile-card, .todo-widget, .image-widget, .countdown-widget, .elapsed-days-widget, .shared-widget, .now-playing-widget, .search-input, .photo-card, .date-calendar-card, .dock-bar { background: rgba(255,255,255,.72); border-color: rgba(255,255,255,.78); box-shadow: 0 8px 26px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.82); }
+  .profile-card, .todo-widget, .countdown-widget, .elapsed-days-widget, .shared-widget, .now-playing-widget, .search-input, .photo-card, .date-calendar-card, .dock-bar { background: rgba(255,255,255,.72); border-color: rgba(255,255,255,.78); box-shadow: 0 8px 26px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.82); }
+  .image-widget { background-color:rgba(255,255,255,.72); border-color:rgba(255,255,255,.78); box-shadow:0 8px 26px rgba(0,0,0,.08),inset 0 1px 0 rgba(255,255,255,.82); background-position:center; background-size:contain; background-repeat:no-repeat; }
   .image-widget-placeholder { color:#ccc; }
   .avatar { border-color:rgba(255,255,255,.86); }
   .date-calendar-image, .photo-card { background-color: var(--widget-placeholder-gray); border-color: #555; }
