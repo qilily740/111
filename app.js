@@ -312,7 +312,7 @@
   function imageField(key) {
     const value = state[key] || '';
     const urlValue = value.startsWith('data:') || value.startsWith('idb:image:') ? '' : value;
-    return `<div class="edit-field image-edit-field" data-image-field="${key}"><label>${imageLabels[key]}</label><input data-image-url="${key}" type="url" placeholder="粘贴图片地址（可选）" value="${escapeHtml(urlValue)}"><div class="edit-image-actions"><label class="file-picker">选择本地图片<input class="edit-file" data-image-file="${key}" type="file" accept="image/*"></label><button class="edit-album-pick" data-album-pick="${key}" type="button">从相册选择</button><button data-image-clear="${key}" type="button">移除当前图片</button></div><div class="edit-preview" data-image-preview="${key}"></div></div>`;
+    return `<div class="edit-field image-edit-field" data-image-field="${key}"><label>${imageLabels[key]}</label><input data-image-url="${key}" type="url" placeholder="粘贴图片地址（可选）" value="${escapeHtml(urlValue)}"><div class="edit-image-actions"><label class="file-picker">选择本地图片<input class="edit-file" data-image-file="${key}" type="file" accept="image/*"></label><div class="edit-image-library-actions"><button class="edit-album-pick" data-album-pick="${key}" type="button">从相册选择</button><button data-image-clear="${key}" type="button">移除当前图片</button></div></div><div class="edit-preview" data-image-preview="${key}"></div></div>`;
   }
 
   function countdownDateField() {
