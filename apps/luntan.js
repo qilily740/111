@@ -124,7 +124,7 @@
 
   function resolveStoredAvatars() { if (!window.IdealMachineGetImage) return; app.querySelectorAll('img[src^="idb:image:"]').forEach(image => window.IdealMachineGetImage(image.getAttribute('src')).then(value => { if (value) image.src = value; })); }
   function getForumSettings() { const value = read(settingsKey, {}); const legacyFonts = value.fontSource ? [{ id: 'legacy-font', name: value.fontName || '已导入字体', source: value.fontSource }] : []; const fontPackages = Array.isArray(value.fontPackages) ? value.fontPackages.filter(item => item?.id && item?.source) : legacyFonts; return { worldbookId: value.worldbookId || '', fontFamily: value.fontFamily || 'system', fontSize: Number(value.fontSize || 13), fontPackages, fontId: value.fontId || fontPackages[0]?.id || '' }; }
-  function getForumBooks() { const value = read('ideal-machine-worldbooks', {}); return Array.isArray(value.forum) ? value.forum : []; }
+  function getForumBooks() { const value = read('ideal-machine-worldbooks', {}); return Array.isArray(value.forum) ? value.forum.filter(book => book && book.scope !== 'global' && book.scope !== 'local' && book.enabled !== false) : []; }
   function npcIsDeceased(npc) {
     const text = [npc?.status, npc?.lifeStatus, npc?.identity, npc?.description, npc?.personality, npc?.motivation, npc?.reason, npc?.relationDescription, npc?.background].filter(Boolean).join(' ');
     const alive = /(仍然?健在|还活着|仍活着|存活|在世|生存|未去世|没有去世|并未去世|尚未死亡)/i.test(text);

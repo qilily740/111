@@ -5,7 +5,14 @@
   const taNpcStorageKey = 'ideal-machine-ta-npcs';
   const categories = { global: '全局世界书', local: '局部世界书', forum: '论坛世界书' };
   const data = (() => { try { const value = JSON.parse(localStorage.getItem(storageKey) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; } })();
-  Object.keys(categories).forEach(key => { if (!Array.isArray(data[key])) data[key] = []; });
+  Object.keys(categories).forEach(key => {
+    if (!Array.isArray(data[key])) data[key] = [];
+    data[key].forEach(book => {
+      if (!book || typeof book !== 'object') return;
+      if (book.enabled === undefined) book.enabled = true;
+      if (!book.scope) book.scope = key;
+    });
+  });
   let activeCategory = 'global';
   let activeBookId = null;
   let editorTarget = null;
@@ -19,22 +26,233 @@
 
   const app = document.createElement('div');
   app.className = 'worldbook-app';
-  app.innerHTML = `<div class="worldbook-page"><header class="worldbook-header"><div><div class="worldbook-kicker">KNOWLEDGE SYSTEM</div><h1>世界书</h1><p>将设定、关系与秩序，安静地收纳在一起。</p></div><button class="worldbook-close" data-world-close type="button">×</button></header><nav class="worldbook-tabs" aria-label="世界书分类">${Object.entries(categories).map(([key, label]) => `<button data-world-category="${key}" type="button">${label}</button>`).join('')}</nav><main class="worldbook-main"><section class="worldbook-books"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">LIBRARIES</span><h2 id="worldbookCategoryTitle"></h2></div><button class="worldbook-add-book" data-world-add-book type="button">＋ 新建</button></div><div class="worldbook-book-list" id="worldbookBookList"></div></section><section class="worldbook-entries"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">ENTRIES</span><h2 id="worldbookBookTitle">选择一本世界书</h2></div><div class="worldbook-entry-actions"><button class="worldbook-view-analysis" data-world-view-analysis type="button" hidden>查看世界</button><button class="worldbook-analyze" data-world-analyze type="button">AI 分析</button><div class="worldbook-entry-actions-stack"><button class="worldbook-add-entry" data-world-add-entry type="button">＋ 条目</button><button class="worldbook-scroll-top" data-world-scroll-top type="button">↑ 回顶</button></div></div><small class="worldbook-api-hint" id="worldbookApiHint"></small></div><div class="worldbook-entry-list" id="worldbookEntryList"></div><section class="worldbook-analysis" id="worldbookAnalysis" hidden></section></section></main></div><section class="worldbook-analysis-page" id="worldbookAnalysisPage" aria-hidden="true"></section><div class="world-editor" id="worldEditor" aria-hidden="true"><div class="world-editor-backdrop" data-world-editor-close></div><section class="world-editor-sheet"><div class="world-editor-head"><div><span class="worldbook-eyebrow">EDIT</span><h2 id="worldEditorTitle">编辑世界书</h2></div><button type="button" data-world-editor-close>×</button></div><div id="worldEditorForm"></div><div class="world-editor-actions"><button type="button" class="world-editor-cancel" data-world-editor-close>取消</button><button type="button" class="world-editor-save" data-world-editor-save>保存</button></div></section></div>`;
+  app.innerHTML = `<div class="worldbook-page"><header class="worldbook-header"><div><div class="worldbook-kicker">KNOWLEDGE SYSTEM</div><h1>世界书</h1><p>将设定、关系与秩序，安静地收纳在一起。</p></div><button class="worldbook-close" data-world-close type="button">×</button></header><nav class="worldbook-tabs" aria-label="世界书分类">${Object.entries(categories).map(([key, label]) => `<button data-world-category="${key}" type="button">${label}</button>`).join('')}</nav><main class="worldbook-main"><section class="worldbook-books"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">LIBRARIES</span><h2 id="worldbookCategoryTitle"></h2></div><div class="worldbook-library-actions"><button class="worldbook-import-book" data-world-import-book type="button">导入</button><button class="worldbook-add-book" data-world-add-book type="button">＋ 新建</button></div></div><div class="worldbook-book-list" id="worldbookBookList"></div></section><section class="worldbook-entries"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">ENTRIES</span><h2 id="worldbookBookTitle">选择一本世界书</h2></div><div class="worldbook-entry-actions"><button class="worldbook-view-analysis" data-world-view-analysis type="button" hidden>查看世界</button><button class="worldbook-analyze" data-world-analyze type="button">AI 分析</button><div class="worldbook-entry-actions-stack"><button class="worldbook-add-entry" data-world-add-entry type="button">＋ 条目</button><button class="worldbook-scroll-top" data-world-scroll-top type="button">↑ 回顶</button></div></div><small class="worldbook-api-hint" id="worldbookApiHint"></small></div><div class="worldbook-entry-list" id="worldbookEntryList"></div><section class="worldbook-analysis" id="worldbookAnalysis" hidden></section></section></main></div><section class="worldbook-analysis-page" id="worldbookAnalysisPage" aria-hidden="true"></section><div class="world-editor" id="worldEditor" aria-hidden="true"><div class="world-editor-backdrop" data-world-editor-close></div><section class="world-editor-sheet"><div class="world-editor-head"><div><span class="worldbook-eyebrow">EDIT</span><h2 id="worldEditorTitle">编辑世界书</h2></div><button type="button" data-world-editor-close>×</button></div><div id="worldEditorForm"></div><div class="world-editor-actions"><button type="button" class="world-editor-cancel" data-world-editor-close>取消</button><button type="button" class="world-editor-save" data-world-editor-save>保存</button></div></section></div><input id="worldbookImportFile" type="file" accept=".json,.doc,.docx,.txt,application/json,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>`;
   document.body.appendChild(app);
   const worldbookTabs = app.querySelector('.worldbook-tabs');
   const worldbookAddBook = app.querySelector('[data-world-add-book]');
+  const worldbookImportBook = app.querySelector('[data-world-import-book]');
+  const worldbookImportFile = app.querySelector('#worldbookImportFile');
   const worldbookLibraryHead = app.querySelector('.worldbook-books > .worldbook-section-head');
-  if (worldbookTabs && worldbookAddBook && worldbookLibraryHead) worldbookLibraryHead.appendChild(worldbookAddBook);
+  if (worldbookTabs && worldbookAddBook && worldbookLibraryHead) worldbookLibraryHead.querySelector('.worldbook-library-actions')?.append(worldbookImportBook, worldbookAddBook);
 
   const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const uid = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const save = () => localStorage.setItem(storageKey, JSON.stringify(data));
   const books = () => data[activeCategory];
   const activeBook = () => books().find(book => book.id === activeBookId);
+  function countEntryWords(value) { return Array.from(String(value || '').replace(/\s/g, '')).length; }
+  function importBaseName(fileName) {
+    return String(fileName || '导入的世界书').replace(/\.[^.]+$/, '').trim() || '导入的世界书';
+  }
+  function importText(value) {
+    if (value == null) return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
+    if (Array.isArray(value)) return value.map(importText).filter(Boolean).join('\n').trim();
+    if (typeof value === 'object') return importText(value.content ?? value.text ?? value.value ?? value.description ?? value.body ?? value.name ?? value.title ?? '');
+    return '';
+  }
+  function importEntries(value) {
+    if (!value) return [];
+    const source = Array.isArray(value) ? value : (Array.isArray(value.entries) ? value.entries : value);
+    if (Array.isArray(source)) {
+      return source.map((entry, index) => {
+        const item = entry && typeof entry === 'object' ? entry : { content: entry };
+        const content = importText(item.content ?? item.text ?? item.value ?? item.description ?? item.body);
+        if (!content) return null;
+        return {
+          id: uid('entry'),
+          name: importText(item.name ?? item.comment ?? item.title ?? item.label) || `世界书条目 ${index + 1}`,
+          content,
+          enabled: item.enabled !== false && item.disable !== true,
+          keys: Array.isArray(item.keys) ? item.keys : (Array.isArray(item.key) ? item.key : []),
+          secondaryKeys: Array.isArray(item.secondary_keys) ? item.secondary_keys : (Array.isArray(item.secondaryKeys) ? item.secondaryKeys : []),
+          constant: Boolean(item.constant),
+          priority: Number(item.priority ?? item.order ?? 0) || 0
+        };
+      }).filter(Boolean);
+    }
+    if (source && typeof source === 'object') {
+      const nested = source.entries || source.items || source.data;
+      if (nested && nested !== source) return importEntries(nested);
+      return Object.entries(source).map(([key, entry], index) => {
+        const item = entry && typeof entry === 'object' ? entry : { content: entry };
+        const content = importText(item.content ?? item.text ?? item.value ?? item.description ?? item.body);
+        if (!content) return null;
+        return {
+          id: uid('entry'),
+          name: importText(item.name ?? item.comment ?? item.title ?? item.label) || key || `世界书条目 ${index + 1}`,
+          content,
+          enabled: item.enabled !== false && item.disable !== true,
+          keys: Array.isArray(item.keys) ? item.keys : [],
+          secondaryKeys: Array.isArray(item.secondary_keys) ? item.secondary_keys : (Array.isArray(item.secondaryKeys) ? item.secondaryKeys : []),
+          constant: Boolean(item.constant),
+          priority: Number(item.priority ?? item.order ?? 0) || 0
+        };
+      }).filter(Boolean);
+    }
+    return [];
+  }
+  function normalizeImportedBooks(value, fallbackName) {
+    let source = value;
+    if (typeof source === 'string') {
+      try { source = JSON.parse(source); } catch { return []; }
+    }
+    if (source && typeof source === 'object' && source.data && typeof source.data === 'object') source = source.data;
+    if (source && typeof source === 'object' && source.localStorage?.[storageKey]) {
+      try { source = JSON.parse(source.localStorage[storageKey]); } catch {}
+    }
+    if (!source) return [];
+    const hasActiveCategory = Object.prototype.hasOwnProperty.call(source, activeCategory);
+    const categoryPayload = hasActiveCategory ? source[activeCategory] : (source.worldbooks || source.books || source.libraries);
+    if (Array.isArray(categoryPayload)) {
+      if (!categoryPayload.length) return [];
+      const looksLikeBooks = categoryPayload.some(item => item && typeof item === 'object' && (item.entries || item.character_book || item.worldbook || item.lorebook));
+      if (looksLikeBooks) return categoryPayload.map((item, index) => normalizeImportedBooks(item, `${fallbackName}${categoryPayload.length > 1 ? ` ${index + 1}` : ''}`)).flat().filter(book => book.entries.length);
+      const entries = importEntries(categoryPayload);
+      return entries.length ? [{ name:fallbackName, entries }] : [];
+    }
+    if (hasActiveCategory) {
+      const scopedBooks = categoryPayload && typeof categoryPayload === 'object' ? normalizeImportedBooks(categoryPayload, fallbackName) : [];
+      return scopedBooks;
+    }
+    const nested = source.character_book || source.characterBook || source.worldbook || source.world_book || source.worldbooks || source.lorebook || source.loreBook || source.book || source.books || source.library || source.libraries;
+    if (nested && nested !== source) {
+      const nestedBooks = normalizeImportedBooks(nested, fallbackName);
+      if (nestedBooks.length) return nestedBooks;
+    }
+    if (Array.isArray(source)) {
+      const looksLikeBooks = source.some(item => item && typeof item === 'object' && (item.entries || item.character_book || item.worldbook || item.lorebook));
+      if (looksLikeBooks) return source.map((item, index) => normalizeImportedBooks(item, `${fallbackName}${source.length > 1 ? ` ${index + 1}` : ''}`)).flat().filter(book => book.entries.length);
+      const entries = importEntries(source);
+      return entries.length ? [{ name:fallbackName, entries }] : [];
+    }
+    if (Array.isArray(source.entries) || source.entries && typeof source.entries === 'object') {
+      const entries = importEntries(source.entries);
+      return entries.length ? [{ name:importText(source.name ?? source.title ?? source.bookName) || fallbackName, entries }] : [];
+    }
+    const directContent = importText(source.content ?? source.text ?? source.value ?? source.description ?? source.body);
+    if (directContent) return [{ name:importText(source.name ?? source.title ?? source.bookName) || fallbackName, entries:[{ id:uid('entry'), name:importText(source.name ?? source.title ?? source.bookName) || '正文', content:directContent, enabled:source.enabled !== false && source.disable !== true, keys:Array.isArray(source.keys) ? source.keys : [], secondaryKeys:Array.isArray(source.secondary_keys) ? source.secondary_keys : (Array.isArray(source.secondaryKeys) ? source.secondaryKeys : []), constant:Boolean(source.constant), priority:Number(source.priority ?? source.order ?? 0) || 0 }] }];
+    const entry = importEntries(source);
+    if (entry.length) return [{ name:importText(source.name ?? source.title ?? source.bookName) || fallbackName, entries:entry }];
+    const nestedValues = Object.values(source).filter(item => item && typeof item === 'object');
+    const nestedBooks = nestedValues.map((item, index) => normalizeImportedBooks(item, `${fallbackName}${nestedValues.length > 1 ? ` ${index + 1}` : ''}`)).flat().filter(book => book.entries.length);
+    return nestedBooks;
+  }
+  function textToImportedBook(text, name) {
+    const normalized = String(text || '').replace(/\r\n?/g, '\n').trim();
+    if (!normalized) return null;
+    const lines = normalized.split('\n');
+    const headingPattern = /^\s*(?:#{1,6}\s+(.+?)\s*|【([^】]+)】\s*|\[([^\]]+)\]\s*)$/;
+    const sections = [];
+    let current = { name:'正文', lines:[] };
+    lines.forEach(line => {
+      const match = line.match(headingPattern);
+      if (match) {
+        if (current.lines.join('\n').trim()) sections.push(current);
+        current = { name:(match[1] || match[2] || match[3] || '正文').trim(), lines:[] };
+      } else current.lines.push(line);
+    });
+    if (current.lines.join('\n').trim()) sections.push(current);
+    const entries = sections.length ? sections : [{ name:'正文', lines:[normalized] }];
+    return { name, entries:entries.map((section, index) => ({ id:uid('entry'), name:section.name || `世界书条目 ${index + 1}`, content:section.lines.join('\n').trim(), enabled:true, keys:[], secondaryKeys:[], constant:false, priority:0 })).filter(entry => entry.content) };
+  }
+  async function inflateDocxEntry(bytes) {
+    if (typeof DecompressionStream !== 'function') throw new Error('当前浏览器不支持 DOCX 解压，请改用 TXT 或 JSON 导入。');
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  async function readDocxText(file) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let end = -1;
+    for (let index = bytes.length - 22; index >= 0; index -= 1) {
+      if (view.getUint32(index, true) === 0x06054b50) { end = index; break; }
+    }
+    if (end < 0) throw new Error('DOCX 文件结构无法读取。');
+    const count = view.getUint16(end + 10, true);
+    const centralOffset = view.getUint32(end + 16, true);
+    const decoder = new TextDecoder('utf-8');
+    let cursor = centralOffset; let documentXml = null;
+    for (let index = 0; index < count && cursor + 46 <= bytes.length; index += 1) {
+      if (view.getUint32(cursor, true) !== 0x02014b50) break;
+      const method = view.getUint16(cursor + 10, true);
+      const compressedSize = view.getUint32(cursor + 20, true);
+      const nameLength = view.getUint16(cursor + 28, true);
+      const extraLength = view.getUint16(cursor + 30, true);
+      const commentLength = view.getUint16(cursor + 32, true);
+      const localOffset = view.getUint32(cursor + 42, true);
+      const name = decoder.decode(bytes.slice(cursor + 46, cursor + 46 + nameLength));
+      if (name === 'word/document.xml') {
+        if (view.getUint32(localOffset, true) !== 0x04034b50) throw new Error('DOCX 主文档损坏。');
+        const localNameLength = view.getUint16(localOffset + 26, true);
+        const localExtraLength = view.getUint16(localOffset + 28, true);
+        const payload = bytes.slice(localOffset + 30 + localNameLength + localExtraLength, localOffset + 30 + localNameLength + localExtraLength + compressedSize);
+        documentXml = method === 0 ? payload : method === 8 ? await inflateDocxEntry(payload) : null;
+        break;
+      }
+      cursor += 46 + nameLength + extraLength + commentLength;
+    }
+    if (!documentXml) throw new Error('DOCX 中没有找到可读取的正文。');
+    const xml = new TextDecoder('utf-8').decode(documentXml)
+      .replace(/<w:tab\s*\/?>/gi, '\t').replace(/<w:br\s*\/?>/gi, '\n').replace(/<\/w:p>/gi, '\n').replace(/<\/w:tr>/gi, '\n').replace(/<[^>]+>/g, '');
+    const holder = document.createElement('textarea'); holder.innerHTML = xml;
+    return holder.value.replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+  function readLegacyDocText(fileBytes) {
+    const decode = (encoding, bytes) => { try { return new TextDecoder(encoding).decode(bytes); } catch { return ''; } };
+    const visibleRuns = value => String(value || '').replace(/\u0000/g, '').match(/[\p{L}\p{N}\u4e00-\u9fff][\p{L}\p{N}\u4e00-\u9fff\s，。！？；：、“”‘’（）《》【】——…,.!?;:'"()\[\]-]{1,}/gu) || [];
+    const utf16 = visibleRuns(decode('utf-16le', fileBytes)).join('\n');
+    const legacy = visibleRuns(decode('windows-1252', fileBytes)).join('\n');
+    const utf8 = decode('utf-8', fileBytes);
+    const html = /<(?:html|body|p|div|br)\b/i.test(utf8) ? utf8.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p\s*>/gi, '\n').replace(/<[^>]+>/g, '') : '';
+    const rtf = /^\s*\{\\rtf/i.test(utf8) ? utf8.replace(/\\par[d]?/gi, '\n').replace(/\\'[0-9a-f]{2}/gi, '').replace(/\\[a-z]+-?\d* ?/gi, '').replace(/[{}]/g, '') : '';
+    const score = value => (String(value).match(/[\u4e00-\u9fff]/g) || []).length * 4 + (String(value).match(/[A-Za-z]{2,}/g) || []).join('').length;
+    return [utf16, legacy, html, rtf].sort((first, second) => score(second) - score(first))[0].replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  }
+  async function importWorldbookFile(file) {
+    if (!file) return;
+    const extension = String(file.name || '').toLowerCase().split('.').pop();
+    const name = importBaseName(file.name);
+    let importedBooks = [];
+    if (extension === 'json') {
+      const parsed = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
+      importedBooks = normalizeImportedBooks(parsed, name);
+    } else if (extension === 'docx') {
+      importedBooks = [textToImportedBook(await readDocxText(file), name)].filter(Boolean);
+    } else if (extension === 'doc') {
+      importedBooks = [textToImportedBook(readLegacyDocText(new Uint8Array(await file.arrayBuffer())), name)].filter(Boolean);
+    } else if (extension === 'txt') {
+      importedBooks = [textToImportedBook(await file.text(), name)].filter(Boolean);
+    } else throw new Error('仅支持 JSON、DOC、DOCX 和 TXT 文件。');
+    importedBooks = importedBooks.filter(book => book?.entries?.length);
+    if (!importedBooks.length) throw new Error('文件中没有识别到可导入的世界书条目。');
+    syncStoredWorldbooks();
+    const existingNames = new Set(books().map(book => String(book.name || '').trim()));
+    const created = importedBooks.map((book, index) => {
+      const base = String(book.name || `${name}${importedBooks.length > 1 ? ` ${index + 1}` : ''}`).trim() || '导入的世界书';
+      let nextName = base; let suffix = 2;
+      while (existingNames.has(nextName)) nextName = `${base}（${suffix++}）`;
+      existingNames.add(nextName);
+      return { id:uid('book'), name:nextName, scope:activeCategory, enabled:true, entries:book.entries.map(entry => ({ ...entry, id:uid('entry'), name:String(entry.name || '世界书条目').trim(), content:String(entry.content || '').trim() })).filter(entry => entry.content) };
+    }).filter(book => book.entries.length);
+    books().unshift(...created);
+    activeBookId = created[0]?.id || null;
+    save();
+    window.dispatchEvent(new CustomEvent('ideal-worldbooks-updated'));
+    render();
+    window.alert(`已导入 ${created.length} 本世界书，共 ${created.reduce((sum, book) => sum + book.entries.length, 0)} 个条目。`);
+  }
   function syncStoredWorldbooks() {
     try {
       const latest = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      Object.keys(categories).forEach(key => { data[key] = Array.isArray(latest[key]) ? latest[key] : []; });
+      Object.keys(categories).forEach(key => {
+        data[key] = Array.isArray(latest[key]) ? latest[key] : [];
+        data[key].forEach(book => {
+          if (!book || typeof book !== 'object') return;
+          if (book.enabled === undefined) book.enabled = true;
+          if (!book.scope) book.scope = key;
+        });
+      });
       if (activeBookId && !books().some(book => book.id === activeBookId)) activeBookId = null;
     } catch {}
   }
@@ -261,7 +479,7 @@
     document.querySelector('#worldbookCategoryTitle').textContent = categories[activeCategory];
     document.querySelectorAll('[data-world-category]').forEach(button => button.classList.toggle('is-active', button.dataset.worldCategory === activeCategory));
     const bookList = document.querySelector('#worldbookBookList');
-    bookList.innerHTML = books().length ? books().map(book => `<div class="worldbook-book ${book.id === activeBookId ? 'is-active' : ''}" data-world-book="${book.id}" role="button" tabindex="0"><span class="worldbook-book-mark"></span><span class="worldbook-book-info"><b>${esc(book.name)}</b><small>${book.entries.length} 个条目</small></span><span class="worldbook-book-actions"><button class="worldbook-book-edit" data-world-edit-book="${book.id}" type="button">编辑</button><button class="worldbook-book-delete" data-world-delete-book="${book.id}" type="button">删除</button></span></div>`).join('') : '<div class="worldbook-empty">还没有世界书<br><small>从右上角新建一本开始</small></div>';
+    bookList.innerHTML = books().length ? books().map(book => { const globalBook = activeCategory === 'global'; const enabled = book.enabled !== false; return `<div class="worldbook-book ${book.id === activeBookId ? 'is-active' : ''}" data-world-book="${book.id}" role="button" tabindex="0"><span class="worldbook-book-mark"></span><span class="worldbook-book-info"><b>${esc(book.name)}</b><small>${book.entries.length} 个条目</small></span><span class="worldbook-book-actions">${globalBook ? `<button class="worldbook-entry-toggle ${enabled ? 'is-on' : ''}" data-world-toggle-book="${book.id}" role="switch" aria-checked="${enabled}" type="button"><span class="worldbook-entry-toggle-track"><i></i></span><em>${enabled ? '读取' : '不读'}</em></button>` : ''}<button class="worldbook-book-edit" data-world-edit-book="${book.id}" type="button">编辑</button><button class="worldbook-book-delete" data-world-delete-book="${book.id}" type="button">删除</button></span></div>`; }).join('') : '<div class="worldbook-empty">还没有世界书<br><small>可以导入文件，或新建一本</small></div>';
     const book = activeBook();
     document.querySelector('#worldbookBookTitle').textContent = book ? book.name : '选择一本世界书';
     document.querySelector('[data-world-add-entry]').disabled = !book;
@@ -274,7 +492,7 @@
     viewAnalysisButton.hidden = activeCategory !== 'local' || !book || !savedAnalysis;
     document.querySelector('#worldbookApiHint').textContent = activeCategory === 'local' ? apiHint : '';
     const entryList = document.querySelector('#worldbookEntryList');
-    entryList.innerHTML = book ? (book.entries.length ? book.entries.map(entry => { const enabled = entry.enabled !== false; return `<article class="worldbook-entry ${enabled ? '' : 'is-disabled'}"><div class="worldbook-entry-copy"><h3>${esc(entry.name)}</h3><p>${esc(entry.content).replace(/\n/g, '<br>')}</p></div><div class="worldbook-entry-actions"><button class="worldbook-entry-toggle ${enabled ? 'is-on' : ''}" data-world-toggle-entry="${entry.id}" role="switch" aria-checked="${enabled}" type="button"><span class="worldbook-entry-toggle-track"><i></i></span><em>${enabled ? '读取' : '不读'}</em></button><button data-world-edit-entry="${entry.id}" type="button">编辑</button><button data-world-delete-entry="${entry.id}" type="button">删除</button></div></article>`; }).join('') : '<div class="worldbook-empty">这本世界书还没有条目<br><small>添加一个设定、人物或规则</small></div>') : '<div class="worldbook-empty">选择左侧世界书查看条目</div>';
+    entryList.innerHTML = book ? (book.entries.length ? book.entries.map(entry => { const enabled = entry.enabled !== false; const count = countEntryWords(entry.content); return `<article class="worldbook-entry ${enabled ? '' : 'is-disabled'}"><div class="worldbook-entry-copy"><h3>${esc(entry.name)}</h3><p>${esc(entry.content).replace(/\n/g, '<br>')}</p></div><div class="worldbook-entry-actions"><span class="worldbook-entry-count" aria-label="${count} 字">${count} 字</span><button class="worldbook-entry-toggle ${enabled ? 'is-on' : ''}" data-world-toggle-entry="${entry.id}" role="switch" aria-checked="${enabled}" type="button"><span class="worldbook-entry-toggle-track"><i></i></span><em>${enabled ? '读取' : '不读'}</em></button><button data-world-edit-entry="${entry.id}" type="button">编辑</button><button data-world-delete-entry="${entry.id}" type="button">删除</button></div></article>`; }).join('') : '<div class="worldbook-empty">这本世界书还没有条目<br><small>添加一个设定、人物或规则</small></div>') : '<div class="worldbook-empty">选择左侧世界书查看条目</div>';
     const analysis = document.querySelector('#worldbookAnalysis');
     analysis.hidden = true;
     analysis.innerHTML = '';
@@ -359,7 +577,7 @@ ${entries || '暂无启用条目'}`;
       if (!name) return;
       const existing = activeBook();
       if (existing) existing.name = name;
-      else { const book = { id: uid('book'), name, entries: [] }; books().unshift(book); activeBookId = book.id; }
+      else { const book = { id: uid('book'), name, scope: activeCategory, enabled: true, entries: [] }; books().unshift(book); activeBookId = book.id; }
     } else if (editorTarget === 'entry') {
       const book = activeBook();
       if (!book) return;
@@ -374,6 +592,14 @@ ${entries || '暂无启用条目'}`;
     save(); render(); closeEditor();
   }
 
+  worldbookImportFile?.addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try { await importWorldbookFile(file); }
+    catch (error) { window.alert(`导入世界书失败：${error?.message || '文件无法读取'}`); }
+  });
+
   document.addEventListener('click', event => {
     if (event.target.closest('[data-app-key="shijieshu"]')) { syncStoredWorldbooks(); analysisOpen = false; selectedAnalysisNpc = ''; app.classList.add('is-open'); render(); return; }
     if (!app.classList.contains('is-open')) return;
@@ -386,7 +612,7 @@ ${entries || '暂无启用条目'}`;
     const category = event.target.closest('[data-world-category]');
     if (category) { activeCategory = category.dataset.worldCategory; activeBookId = null; apiHint = ''; render(); return; }
     const bookButton = event.target.closest('[data-world-book]');
-    if (bookButton && !event.target.closest('[data-world-edit-book]') && !event.target.closest('[data-world-delete-book]')) { activeBookId = bookButton.dataset.worldBook; render(); return; }
+    if (bookButton && !event.target.closest('[data-world-edit-book]') && !event.target.closest('[data-world-delete-book]') && !event.target.closest('[data-world-toggle-book]')) { activeBookId = bookButton.dataset.worldBook; render(); return; }
     const editBook = event.target.closest('[data-world-edit-book]');
     if (editBook) { const book = books().find(item => item.id === editBook.dataset.worldEditBook); if (book) { activeBookId = book.id; openEditor('book', book); } return; }
     const deleteBook = event.target.closest('[data-world-delete-book]');
@@ -401,6 +627,7 @@ ${entries || '暂无启用条目'}`;
       return;
     }
     if (event.target.closest('[data-world-add-book]')) { activeBookId = null; openEditor('book'); return; }
+    if (event.target.closest('[data-world-import-book]')) { worldbookImportFile?.click(); return; }
     if (event.target.closest('[data-world-scroll-top]')) {
       ['.worldbook-main', '.worldbook-books', '.worldbook-entries'].forEach(selector => {
         const target = app.querySelector(selector);
@@ -411,6 +638,8 @@ ${entries || '暂无启用条目'}`;
     if (event.target.closest('[data-world-add-entry]')) { document.querySelector('#worldEditorForm').dataset.entryId = ''; openEditor('entry'); return; }
     if (event.target.closest('[data-world-view-analysis]')) { const cached = activeBookId ? readJSON(analysisStorageKey, {})[activeBookId] : null; if (cached) { analysisBookId = activeBookId; analysisResult = cached; analysisOpen = true; selectedAnalysisNpc = ''; render(); } return; }
     if (event.target.closest('[data-world-analyze]')) { analyzeBook(); return; }
+    const toggleBook = event.target.closest('[data-world-toggle-book]');
+    if (toggleBook) { const book = books().find(item => item.id === toggleBook.dataset.worldToggleBook); if (activeCategory === 'global' && book) { book.enabled = book.enabled === false; save(); render(); } return; }
     const toggleEntry = event.target.closest('[data-world-toggle-entry]');
     if (toggleEntry) { const entry = activeBook()?.entries.find(item => item.id === toggleEntry.dataset.worldToggleEntry); if (entry) { entry.enabled = entry.enabled === false; save(); render(); } return; }
     const editEntry = event.target.closest('[data-world-edit-entry]');
