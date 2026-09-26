@@ -460,8 +460,12 @@
       const x = Math.max(7, Math.min(innerWidth-size-7, event.clientX-drag.offsetX));
       const y = Math.max(12, Math.min(innerHeight-size-12, event.clientY-drag.offsetY));
       orb.style.left = `${x}px`;
+      orb.style.top = `${y}px`;
       orb.style.right = 'auto';
       root.style.setProperty('--assist-y', `${y}px`);
+      root.style.setProperty('--assist-x', `${x}px`);
+      root.dataset.side = x + size / 2 < innerWidth / 2 ? 'left' : 'right';
+      settings.x = x / innerWidth;
       settings.y = y / innerHeight;
     }
   });
