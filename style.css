@@ -1248,7 +1248,6 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 }
 
 @media (prefers-color-scheme: dark) {
-  :root { --widget-placeholder-gray: #444; }
   .profile-card, .todo-widget, .image-widget, .countdown-widget, .elapsed-days-widget, .shared-widget, .now-playing-widget, .search-input, .photo-card, .date-calendar-card, .dock-bar { background: rgba(255,255,255,.72); border-color: rgba(255,255,255,.78); box-shadow: 0 8px 26px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.82); }
   .image-widget-placeholder { color:#ccc; }
   .avatar { border-color:rgba(255,255,255,.86); }
@@ -4996,18 +4995,20 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .square-personal-widget button { display:grid; place-items:center; border:1px solid rgba(255,255,255,.44); background:rgba(255,255,255,.28); color:inherit; font:inherit; cursor:pointer; -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); }
 
 .contact-mini-cover { position:absolute; inset:0; z-index:-2; background:var(--widget-placeholder-gray) center/cover no-repeat; }
-.contact-mini-widget::before { position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg,rgba(20,23,28,.04),rgba(18,21,26,.68)); content:''; }
+.contact-mini-widget:has(.contact-mini-cover.has-image)::before { position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg,rgba(20,23,28,.04),rgba(18,21,26,.68)); content:''; }
 .contact-mini-avatar { position:absolute; top:14px; left:14px; width:58px; height:58px; border:3px solid rgba(255,255,255,.74); border-radius:50%; background:var(--widget-placeholder-gray) center/cover no-repeat; background-clip:padding-box; box-shadow:0 5px 14px rgba(0,0,0,.18); }
 .contact-mini-copy { position:absolute; right:12px; bottom:14px; left:14px; display:grid; gap:4px; color:#fff; text-shadow:0 2px 7px rgba(0,0,0,.32); }
+.contact-mini-widget:not(:has(.contact-mini-cover.has-image)) .contact-mini-copy { color:#303236 !important; -webkit-text-fill-color:#303236 !important; text-shadow:none !important; }
 .contact-mini-copy strong,.contact-mini-copy p { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.contact-mini-copy strong { font-size:13px; }.contact-mini-copy p { color:rgba(255,255,255,.76); font-size:8px; }
+.contact-mini-copy strong { font-size:13px; }.contact-mini-copy p { color:rgba(255,255,255,.76); font-size:8px; }.contact-mini-widget:not(:has(.contact-mini-cover.has-image)) .contact-mini-copy p { color:rgba(48,50,54,.72) !important; -webkit-text-fill-color:rgba(48,50,54,.72) !important; }
 .contact-mini-actions { position:absolute; top:14px; right:12px; display:grid; gap:6px; }
 .contact-mini-actions button { width:28px; height:28px; border-radius:50%; color:#fff; font-size:10px; text-shadow:0 1px 5px rgba(0,0,0,.3); }
 
 .daily-photo-image { position:absolute; inset:0; z-index:-2; background:var(--widget-placeholder-gray) center/cover no-repeat; }
-.daily-photo-shade { position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg,rgba(16,18,22,.02) 35%,rgba(16,18,22,.7)); }
+.daily-photo-image.has-image + .daily-photo-shade { position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg,rgba(16,18,22,.02) 35%,rgba(16,18,22,.7)); }
 .daily-photo-avatar { position:absolute; top:12px; right:12px; width:34px; height:34px; border:2px solid rgba(255,255,255,.76); border-radius:50%; background:var(--widget-placeholder-gray) center/cover no-repeat; background-clip:padding-box; box-shadow:0 4px 11px rgba(0,0,0,.16); }
 .daily-photo-copy { position:absolute; right:14px; bottom:13px; left:14px; display:grid; gap:4px; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.38); }
+.daily-photo-widget:not(:has(.daily-photo-image.has-image)) .daily-photo-copy { color:#303236 !important; -webkit-text-fill-color:#303236 !important; text-shadow:none !important; }
 .daily-photo-copy time { font:600 8px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.14em; opacity:.72; }
 .daily-photo-copy p { display:-webkit-box; overflow:hidden; font-size:11px; font-weight:650; line-height:1.35; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 
