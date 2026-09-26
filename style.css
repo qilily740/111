@@ -9951,6 +9951,7 @@ select,
 .ideal-floating-assist[hidden] { display:none !important; }
 .ideal-assist-orb { position:absolute; top:var(--assist-y); display:grid; place-items:center; width:var(--assist-size); height:var(--assist-size); padding:0; border:0; border-radius:50%; outline:0; background:#202024; box-shadow:0 7px 18px rgba(0,0,0,.2); opacity:var(--assist-idle-opacity); pointer-events:auto; touch-action:none; transition:opacity .25s ease,transform .2s ease,left .22s ease,right .22s ease; }
 .ideal-floating-assist.is-active .ideal-assist-orb { transition:opacity .25s ease,transform .2s ease; }
+.ideal-floating-assist.is-snapping .ideal-assist-orb { transition:opacity .25s ease,transform .2s ease,left .28s cubic-bezier(.2,.75,.25,1),top .28s cubic-bezier(.2,.75,.25,1); }
 .ideal-floating-assist[data-side="right"] .ideal-assist-orb { right:7px; }.ideal-floating-assist[data-side="left"] .ideal-assist-orb { left:7px; }
 .ideal-floating-assist[data-edge="top"] .ideal-assist-orb { top:7px; right:auto; left:var(--assist-x); }
 .ideal-floating-assist[data-edge="bottom"] .ideal-assist-orb { top:auto; right:auto; bottom:7px; left:var(--assist-x); }
