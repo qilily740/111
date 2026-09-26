@@ -345,7 +345,10 @@
   function applySettings() {
     settings = readSettings();
     root.hidden = !settings.enabled;
-    root.dataset.side = settings.side === 'left' ? 'left' : 'right';
+    const edge = ['left','right','top','bottom'].includes(settings.side) ? settings.side : 'right';
+    const horizontalSide = edge === 'top' || edge === 'bottom' ? (Number(settings.x ?? .9) < .5 ? 'left' : 'right') : edge;
+    root.dataset.side = horizontalSide;
+    root.dataset.edge = edge;
     root.dataset.mode = ['pill','grid','rail'].includes(settings.mode) ? settings.mode : 'pill';
     root.style.setProperty('--assist-idle-opacity', String(Math.max(.08, Math.min(.8, Number(settings.idleOpacity) || .18))));
     root.style.setProperty('--assist-size', `${Math.max(40, Math.min(62, Number(settings.size) || 60))}px`);
@@ -355,6 +358,9 @@
   function positionOrb() {
     const size = Math.max(40, Math.min(62, Number(settings.size) || 60));
     const top = Math.max(12, Math.min(innerHeight - size - 12, Number(settings.y || .56) * innerHeight));
+    const side = settings.side === 'left' || settings.side === 'top' ? 'left' : 'right';
+    const x = Math.max(7, Math.min(innerWidth - size - 7, Number(settings.x ?? (side === 'left' ? .1 : .9)) * innerWidth));
+    root.style.setProperty('--assist-x', `${x}px`);
     root.style.setProperty('--assist-y', `${top}px`);
   }
   function updateBadge() {
@@ -434,9 +440,11 @@
   let drag = null;
   orb.addEventListener('pointerdown', event => {
     const rect = orb.getBoundingClientRect();
-    // 拖动过程中允许圆球跟随手指移动；松手时再吸附到最近的左右边缘。
+    // 拖动时圆球跟随手指；松手时吸附到最近的屏幕边缘。
     orb.style.left = `${rect.left}px`;
+    orb.style.top = `${rect.top}px`;
     orb.style.right = 'auto';
+    orb.style.bottom = 'auto';
     drag = { id:event.pointerId, x:event.clientX, y:event.clientY, offsetX:event.clientX-rect.left, offsetY:event.clientY-rect.top, moved:false };
     orb.setPointerCapture(event.pointerId);
     root.classList.add('is-active');
@@ -456,17 +464,27 @@
   });
   orb.addEventListener('pointerup', event => {
     if (!drag || drag.id !== event.pointerId) return;
-    const moved = drag.moved; drag = null; root.classList.remove('is-active');
+    const finishedDrag = drag; const moved = finishedDrag.moved; drag = null; root.classList.remove('is-active');
     if (moved) {
-      settings.side = event.clientX < innerWidth/2 ? 'left' : 'right';
+      const size = orb.offsetWidth;
+      const x = Math.max(7, Math.min(innerWidth-size-7, event.clientX-finishedDrag.offsetX));
+      const y = Math.max(7, Math.min(innerHeight-size-7, event.clientY-finishedDrag.offsetY));
+      const distances = { left:x, right:innerWidth-size-x, top:y, bottom:innerHeight-size-y };
+      settings.side = Object.keys(distances).reduce((nearest, edge) => distances[edge] < distances[nearest] ? edge : nearest, 'left');
+      settings.x = x / innerWidth;
+      settings.y = y / innerHeight;
       orb.style.left = '';
+      orb.style.top = '';
       orb.style.right = '';
+      orb.style.bottom = '';
       writeJson(settingsKey, settings);
       applySettings();
     }
     else {
       orb.style.left = '';
+      orb.style.top = '';
       orb.style.right = '';
+      orb.style.bottom = '';
       positionOrb();
       root.classList.contains('is-open') ? dismissPanel() : openPanel();
     }
@@ -476,7 +494,9 @@
     drag = null;
     root.classList.remove('is-active');
     orb.style.left = '';
+    orb.style.top = '';
     orb.style.right = '';
+    orb.style.bottom = '';
     positionOrb();
   });
   panel.addEventListener('click', event => {
