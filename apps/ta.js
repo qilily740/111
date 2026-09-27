@@ -467,7 +467,7 @@
   function fallbackGroup(owner, npcs, profile) {
     const members = [{ id:`role:${owner.id}`, name:owner.nickname || owner.name || '角色', avatar:owner.avatar || '', kind:'owner', identity:'群主', persona:owner.details || owner.signature || '' }, ...npcs.slice(0, 3).map((npc, index) => groupMember(owner, npc, index))];
     const messages = [];
-    npcs.slice(0, 3).forEach((npc, index) => (npc.messages || []).slice(-3).forEach(message => messages.push({ senderId:message.role === 'character' ? `role:${owner.id}` : `npc:${owner.id}:${index}`, senderName:message.role === 'character' ? (owner.nickname || owner.name) : npc.name, senderAvatar:message.role === 'character' ? owner.avatar || '' : npc.avatar || '', senderKind:message.role === 'character' ? 'owner' : 'npc', role:'character', text:message.text, time:message.time })));
+    npcs.slice(0, 3).forEach((npc, index) => (npc.messages || []).slice(-3).forEach(message => messages.push({ senderId:message.role === 'character' ? `role:${owner.id}` : `npc:${owner.id}:${index}`, senderName:message.role === 'character' ? (owner.nickname || owner.name) : npc.name, senderAvatar:message.role === 'character' ? owner.avatar || '' : npc.avatar || '', senderKind:message.role === 'character' ? 'owner' : 'npc', role:'character', text:message.text, ...(message.translation ? { translation:message.translation } : {}), time:message.time })));
     if (!messages.length) messages.push({ senderId:`role:${owner.id}`, senderName:owner.nickname || owner.name || '角色', senderKind:'owner', role:'character', text:'你们最近都在忙什么？', time:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) });
     const topic = '最近碰面吗';
     return { id:`ta-group-${owner.id}-main`, roleId:owner.id, category:normalizeGroupCategory('', { name:contextualGroupName(owner, members, topic), topic, members }), name:contextualGroupName(owner, members, topic), topic, members, memberIds:members.map(item => item.id), profileId:profile?.id || '', messages, createdAt:Date.now(), updatedAt:Date.now() };
@@ -625,6 +625,12 @@
     if (groupCategories.includes(first)) return { category:first, name:String(values[1] || '').trim(), topic:String(values[2] || '').trim(), memberText:values.slice(3).join('｜').trim() };
     return { category:'', name:first, topic:String(values[1] || '').trim(), memberText:values.slice(2).join('｜').trim() };
   }
+  function taGeneratedMessageParts(fields = []) {
+    const values = Array.isArray(fields) ? fields.map(item => String(item || '').trim()) : [];
+    const marker = values.findIndex(item => /^(?:TRANSLATION|译文)$/i.test(item));
+    if (marker < 0) return { text:values.join('｜').trim(), translation:'' };
+    return { text:values.slice(0, marker).join('｜').trim(), translation:values.slice(marker + 1).join('｜').trim() };
+  }
   function parseRoleChatContent(value, existing) {
     try { const parsed = parseApiJSON(value); if (Array.isArray(parsed?.npcs) && parsed.npcs.length) return parsed; } catch {}
     const byName = new Map((Array.isArray(existing) ? existing : []).map(item => [String(item.name || '').trim(), { ...item, messages:[] }]));
@@ -635,10 +641,10 @@
       const parts = protocolParts(line); if (parts.length < 2) return;
       const label = parts.shift().toUpperCase();
       if (/^(?:CONTACT|联系人)$/.test(label)) { const [name, identity, ...reason] = parts; const npc = ensure(name); if (npc) { npc.identity = identity || npc.identity; npc.reason = reason.join('｜') || npc.reason; } return; }
-      if (/^(?:OWNER_MESSAGE|CHARACTER|角色消息)$/.test(label)) { const [name, time, ...text] = parts; const npc = ensure(name); const content = text.join('｜').trim(); if (npc && content) npc.messages.push({ role:'character', time, text:content }); return; }
-      if (/^(?:NPC_MESSAGE|NPC消息)$/.test(label)) { const [name, time, ...text] = parts; const npc = ensure(name); const content = text.join('｜').trim(); if (npc && content) npc.messages.push({ role:'npc', time, text:content }); }
+      if (/^(?:OWNER_MESSAGE|CHARACTER|角色消息)$/.test(label)) { const [name, time, ...text] = parts; const npc = ensure(name); const translated = taGeneratedMessageParts(text); if (npc && translated.text) npc.messages.push({ role:'character', time, text:translated.text, ...(translated.translation ? { translation:translated.translation } : {}) }); return; }
+      if (/^(?:NPC_MESSAGE|NPC消息)$/.test(label)) { const [name, time, ...text] = parts; const npc = ensure(name); const translated = taGeneratedMessageParts(text); if (npc && translated.text) npc.messages.push({ role:'npc', time, text:translated.text, ...(translated.translation ? { translation:translated.translation } : {}) }); }
       if (/^(?:GROUP|群聊)$/.test(label)) { const header = groupHeaderParts(parts); const group = ensureGroup(header.name); if (group) { group.category = header.category; group.topic = header.topic || ''; group.members = String(header.memberText || '').split(/[、,，]/).map(item => item.trim()).filter(Boolean); } }
-      if (/^(?:GROUP_MESSAGE|群聊消息)$/.test(label)) { const [groupName, sender, time, ...text] = parts; const group = ensureGroup(groupName); const content = text.join('｜').trim(); if (group && content) group.messages.push({ sender, time, text:content }); }
+      if (/^(?:GROUP_MESSAGE|群聊消息)$/.test(label)) { const [groupName, sender, time, ...text] = parts; const group = ensureGroup(groupName); const translated = taGeneratedMessageParts(text); if (group && translated.text) group.messages.push({ sender, time, text:translated.text, ...(translated.translation ? { translation:translated.translation } : {}) }); }
     });
     const npcs = [...byName.values()].filter(item => item.messages?.length);
     if (!npcs.length) throw new Error('API 没有返回可识别的 NPC 聊天，请重新刷新');
@@ -655,7 +661,7 @@
       const parts = protocolParts(line); if (parts.length < 2) return;
       const label = parts.shift().toUpperCase();
       if (/^(?:GROUP|群聊)$/.test(label)) { const header = groupHeaderParts(parts); const group = ensureGroup(header.name); if (group) { group.category = header.category; group.topic = header.topic || ''; group.members = String(header.memberText || '').split(/[、,，]/).map(item => item.trim()).filter(Boolean); } }
-      if (/^(?:GROUP_MESSAGE|群聊消息)$/.test(label)) { const [groupName, sender, time, ...text] = parts; const group = ensureGroup(groupName); const content = text.join('｜').trim(); if (group && content) group.messages.push({ sender, time, text:content }); }
+      if (/^(?:GROUP_MESSAGE|群聊消息)$/.test(label)) { const [groupName, sender, time, ...text] = parts; const group = ensureGroup(groupName); const translated = taGeneratedMessageParts(text); if (group && translated.text) group.messages.push({ sender, time, text:translated.text, ...(translated.translation ? { translation:translated.translation } : {}) }); }
     });
     return [...groupsByName.values()];
   }
@@ -684,13 +690,13 @@
         ? `当前 NPC 数量不足以再组成更多包含至少 2 位 NPC 的群聊；本次不要凑数或虚构 NPC，只延续已有群聊。`
         : `当前已经有 ${maxGroupCount} 个群聊，本次禁止新增，只能延续已有群聊并生成新的聊天内容。`;
     const prompt = `生成角色“${owner.nickname || owner.name}”手机聊天 App 中，角色与 NPC 联系人的聊天记录，以及角色所在的真实群聊。现实用户与角色的聊天由程序直接同步，禁止把现实用户写进 NPC 列表，也不要生成角色与现实用户的私聊。
-不要返回 JSON。每位 NPC 先输出一行联系人资料，再输出聊天；群聊先输出群资料，再输出群消息，严格使用下面五种格式：
+不要返回 JSON。每位 NPC 先输出一行联系人资料，再输出聊天；群聊先输出群资料，再输出群消息，严格使用下面五种格式（消息末尾可带译文字段）：
 CONTACT｜NPC姓名｜NPC身份｜与角色的关系
-OWNER_MESSAGE｜NPC姓名｜时间｜角色发送的消息
-NPC_MESSAGE｜NPC姓名｜时间｜NPC发送的消息
+OWNER_MESSAGE｜NPC姓名｜时间｜原文｜TRANSLATION｜中文译文
+NPC_MESSAGE｜NPC姓名｜时间｜原文｜TRANSLATION｜中文译文
 GROUP｜群类别｜符合身份的群名称｜群聊当前话题｜成员姓名，用顿号分隔
-GROUP_MESSAGE｜群名称｜发送者姓名｜时间｜群消息
-每条记录单独一行，不要编号、Markdown、代码块、解释或其他文字。${fixedContacts.length ? `下面列出的 ${fixedContacts.length} 位是世界书分析后锁定的固定联系人。必须逐一为他们生成聊天，姓名保持完全一致，禁止新增、删除、替换或改名。` : '根据角色设定、世界书及已有 NPC，选取 2—5 位确实与角色有关的 NPC。'}每位生成 4—10 条有来有回的自然聊天；OWNER_MESSAGE 永远代表手机主人“${owner.nickname || owner.name}”，NPC_MESSAGE 代表对应 NPC；双方严格交替，内容符合各自身份和关系，口语化、长短自然，不要写旁白、动作、系统说明或提示词。
+GROUP_MESSAGE｜群名称｜发送者姓名｜时间｜原文｜TRANSLATION｜中文译文
+每条记录单独一行；外文消息必须在末尾追加“｜TRANSLATION｜中文译文”，中文消息也保留“｜TRANSLATION｜”但译文留空。消息正文不要使用“｜”字符。不要编号、Markdown、代码块、解释或其他文字。${fixedContacts.length ? `下面列出的 ${fixedContacts.length} 位是世界书分析后锁定的固定联系人。必须逐一为他们生成聊天，姓名保持完全一致，禁止新增、删除、替换或改名。` : '根据角色设定、世界书及已有 NPC，选取 2—5 位确实与角色有关的 NPC。'}每位生成 4—10 条有来有回的自然聊天；OWNER_MESSAGE 永远代表手机主人“${owner.nickname || owner.name}”，NPC_MESSAGE 代表对应 NPC；双方严格交替，内容符合各自身份和关系，口语化、长短自然，不要写旁白、动作、系统说明或提示词。
 群聊要求：群类别只能从“家庭、朋友、工作、学校、兴趣、其他”中选择，同一角色下每个类别最多只能有 1 个群聊，不能重复类别。每个 GROUP 的成员列表都必须包含角色本人“${owner.nickname || owner.name}”以及至少 2 位 NPC，禁止生成只有 NPC 没有角色的群聊。${existingGroups.length ? `已有 ${existingGroups.length} 个群聊，必须保留这些群名、类别和成员关系，在原群里延续聊天或开启新话题，不得重置历史。已有群聊：${existingGroups.map(group => `${groupCategoryForUse(group)}｜${group.name}（${group.topic || '话题未知'}）`).join('；')}` : '这是首次生成群聊；每个群聊至少包含角色和 2 位 NPC，且类别不能重复。'}${groupCreationInstruction}每个 GROUP 必须先写类别，再写群名；新增群聊必须使用尚未出现的类别。群名必须像真实聊天软件里成员自己起的名称：短、随手、带有这个小圈子的具体记忆或共同语境。请从成员之间真实存在的关系、地点、项目代号、共同习惯、正在处理的具体事情或内部称呼中提取关键词，优先使用成员真的会输入的简称，不要凭空发明与人设无关的词。群名应让人一眼知道这是哪个关系圈，但不需要把所有成员身份写全；只有在身份本身就是大家日常使用的称呼时，才可以使用姓氏或组织简称。禁止使用固定模板、泛称和口号，禁止中点加副标题、完整句式身份、正式头衔、话题摘要、成员名单拼接，以及“临时小分队”“朋友群”“聊天群”“某某某的群聊”等名称。不要套用任何示例或预设词。群名控制在 2—10 个字。所有群聊合计最多 5 个。群消息必须像真实群聊：每条消息都要回应上一条或推进上一条提到的具体事情，至少形成 2—3 轮来回；不同成员要有明显不同的语气、立场和关系，不要让每个人各说各的，不要把 NPC 私聊原文复制进群里，不要出现系统提示、账号注销、消息无法送达、API、提示词或旁白。角色发言要和 NPC 发言一样自然，不能为了凑数量轮流播报。每个群至少生成 5 条有来有回的群消息。${existingGroups.length ? `不要删除或改名已有且自然的群聊；如果旧群名明显是“身份加话题”式机械名称，可以只修正群名，不能重置成员和历史：${existingGroups.map(group => group.name).join('、')}` : ''}
 角色设定：${String(owner.details || owner.signature || owner.identity || '暂无').slice(0,3500)}
 绑定用户资料（仅作背景，不能作为 NPC）：${String(profile?.persona || profile?.nickname || '暂无').slice(0,1000)}
@@ -719,11 +725,12 @@ ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? exis
           const rescueCategories = groupCategories.filter(category => !blockedCategories.includes(category));
           const rescuePrompt = `上一轮已经生成了 NPC 聊天，但群聊数量不足。现在必须一次性补齐 ${missingCount} 个此前不存在的新群聊，严格使用以下格式，不要输出 JSON、Markdown 或解释：
 GROUP｜群类别｜新的真实群名称｜群聊当前话题｜成员姓名，用顿号分隔
-GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
-GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
-GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
-GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
-GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
+GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRANSLATION｜中文译文
+GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRANSLATION｜中文译文
+GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRANSLATION｜中文译文
+GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRANSLATION｜中文译文
+GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRANSLATION｜中文译文
+外文消息必须填写中文译文，中文消息在末尾保留“｜TRANSLATION｜”并留空；消息正文不要使用“｜”字符。
 必须生成 ${missingCount} 个不同群聊，每个群使用不同类别，只能从这些未使用类别中选择：${rescueCategories.join('、') || '暂无'}。每个成员列表必须包含角色本人“${owner.nickname || owner.name}”以及至少 2 位 NPC，禁止生成只有 NPC 没有角色的群聊。群名必须来自成员真实共享的关系、地点、项目代号、共同习惯、内部称呼或正在处理的具体事情，像成员自己会起的短名称，控制在 2—10 个字。禁止正式头衔、身份加话题、成员名单、泛称、固定模板和“某某某的群聊”。每条群消息都要回应上一条，至少形成 2—3 轮自然来回；不要写系统提示、账号注销、接口错误或旁白。
 已有群名和类别（都不能重复）：${[...existingGroups, ...acceptedNewGroups].map(group => `${groupCategoryForUse(group)}｜${group.name}`).join('、') || '暂无'}
 角色设定：${String(owner.details || owner.signature || owner.identity || '暂无').slice(0,2200)}
@@ -744,6 +751,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
         const freshMessages = (Array.isArray(item.messages) ? item.messages : []).map(message => ({
           role:/^(?:character|owner|角色|角色本人)$/i.test(String(message?.role || '')) ? 'character' : 'npc',
           text:String(message?.text || message?.content || '').trim(),
+          ...(String(message?.translation || '').trim() ? { translation:String(message.translation).trim() } : {}),
           time:String(message?.time || '').trim()
         })).filter(message => message.text);
         const messages = [...(Array.isArray(previous.messages) ? previous.messages : []), ...freshMessages]
