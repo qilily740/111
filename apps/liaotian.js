@@ -885,8 +885,20 @@
     } catch (error) { window.alert(`导入角色卡失败：${error.message}`); }
   }
   function readCustomChatPrompt() { try { const saved = JSON.parse(localStorage.getItem('ideal-machine-settings') || '{}'); return String(saved.chatPrompt?.custom || '').replace(/\{\{(?:user_background|group_memory|time_gap|silence|lovers|listen|reading)\}\}/g, '').trim(); } catch { return ''; } }
+  function chatMomentsRequested(chat) {
+    const latest = [...(chat?.messages || [])].reverse().find(message => message?.role === 'user' && !message.recalled);
+    return /朋友圈|动态|帖子|发帖|点赞|评论区|可见范围|朋友圈封面/u.test(String(latest?.text || ''));
+  }
+  function chatMomentContext(contact, chat) {
+    if (!chatMomentsRequested(chat)) return '';
+    const rows = (state.moments || [])
+      .filter(post => !post.authorId || post.authorId === contact?.id || post.authorType === 'user')
+      .slice(0, 3)
+      .map(post => `${post.author || '用户'}：${post.text || '[图片动态]'}${post.time ? `（${post.time}）` : ''}`)
+      .join('\n');
+    return `\n\n【用户本轮明确提到朋友圈】\n${rows || '当前没有可见的相关朋友圈动态。'}\n只在当前话题确实相关时参考这些动态，不要主动扩展到其他朋友圈内容。`;
+  }
   function promptPlaceholderValues(contact, profile, chat) {
-    const moments = (state.moments || []).filter(post => !post.authorId || post.authorId === contact?.id || post.authorType === 'user').slice(0, 3).map(post => `${post.author || '用户'}：${post.text || '[图片动态]'}`).join('\n');
     let stickers = '暂无可用表情';
     try { const chatSettings = chatSettingsFor(chat); const ids = new Set(chatSettings.characterEmojiGroupIds || []); const items = (state.emojis?.groups || []).filter(group => ids.has(group.id)).flatMap(group => group.items || []); if (items.length) stickers = items.map(item => `${item.id}：${item.text || '表情'}`).join('\n'); } catch {}
     return {
@@ -897,7 +909,7 @@
       world_book: boundWorldbookContext(contact),
       block: contact?.blocked ? '角色已将用户拉黑' : '当前未拉黑',
       time: new Date().toLocaleString('zh-CN', { dateStyle: 'full', timeStyle: 'short' }),
-      moments: moments || '暂无相关朋友圈动态',
+      moments: '朋友圈不会自动注入；只有用户本轮明确提到朋友圈时才按需读取',
       stickers
     };
   }
@@ -964,11 +976,12 @@
       profile?.birthday ? `生日：${profile.birthday}` : ''
     ].filter(Boolean).join('\n');
     const builtinPrompt = interpolatePrompt(window.IdealMachineBuiltinChatPrompt || '', contact, profile, chat);
+    const momentContext = chatMomentContext(contact, chat);
     const customPrompt = interpolatePrompt(readCustomChatPrompt(), contact, profile, chat);
     const now = new Date().toLocaleString('zh-CN', { dateStyle: 'full', timeStyle: 'short' });
     const timeAwareness = realTimeAwarenessPrompt(chat);
     return `【理想机内置聊天提示词｜每次回复前必须完整阅读】
-${builtinPrompt}
+${builtinPrompt}${momentContext}
 
 # 理想机角色扮演协议
 
