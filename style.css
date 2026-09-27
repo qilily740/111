@@ -152,53 +152,59 @@ html.ideal-fullscreen-ready {
   --ideal-edge-bottom: max(var(--ideal-safe-bottom, 0px), env(safe-area-inset-bottom, 0px));
 }
 
-/* 三个带独立手机顶栏的 App：全屏根层覆盖安全区，但顶栏内容保持在最上层。 */
-.ta-app .ta-phone-status,
+/* iOS 独立窗口：安全区只留给内容顶栏，不能再把整层高度加长。 */
 .ta-app .ta-phone-head,
-.doubao-app .doubao-header,
-.album-app .album-header {
+.ta-app .ta-role-app-header,
+.ta-app .ta-role-conversation-header {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
 }
-.ta-app .ta-phone-status {
-  padding-top: max(12px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+.ta-app .ta-phone-head {
+  padding-top: max(7px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
 }
-.doubao-app .doubao-header {
+.ta-app .ta-role-app-header,
+.ta-app .ta-role-conversation-header {
+  padding-top: max(18px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+}
+.doubao-app .doubao-header,
+.ta-role-doubao-page .doubao-header {
+  position: relative;
+  z-index: 12;
+  flex-shrink: 0;
   padding-top: max(25px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
 }
-.doubao-app .doubao-chat-title {
-  top: max(29px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
-}
 .album-app .album-header {
+  position: relative;
+  z-index: 12;
+  flex-shrink: 0;
   padding-top: max(20px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
 }
+.chat-app:not(.is-chatting) .chat-tabs {
+  bottom: max(24px, var(--ideal-edge-bottom, env(safe-area-inset-bottom))) !important;
+  padding-bottom: max(9px, var(--ideal-edge-bottom, env(safe-area-inset-bottom))) !important;
+}
+
 html.ideal-fullscreen-ready,
 body.ideal-fullscreen-body {
   min-height: var(--ideal-viewport-height, 100dvh);
 }
 body.ideal-fullscreen-body {
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: auto;
-  left: 0;
+  inset: 0;
   width: 100%;
-  height: calc(var(--ideal-viewport-height, 100dvh) + var(--ideal-edge-top, 0px) + var(--ideal-edge-bottom, 0px));
+  height: var(--ideal-viewport-height, 100dvh);
   overflow: hidden;
   overscroll-behavior: none;
 }
 .ideal-fullscreen-surface {
   box-sizing: border-box;
-  top: 0 !important;
-  right: 0 !important;
-  bottom: auto !important;
-  left: 0 !important;
-  height: calc(var(--ideal-viewport-height, 100dvh) + var(--ideal-edge-top, 0px) + var(--ideal-edge-bottom, 0px));
-  max-height: none;
+  height: var(--ideal-viewport-height, 100dvh);
+  max-height: var(--ideal-viewport-height, 100dvh);
 }
 html.ideal-keyboard-open .ideal-fullscreen-surface {
-  height: calc(var(--ideal-visual-height, 100dvh) + var(--ideal-edge-top, 0px) + var(--ideal-edge-bottom, 0px));
+  height: var(--ideal-visual-height, 100dvh);
+  max-height: var(--ideal-visual-height, 100dvh);
 }
 
 .desktop-scroll-wrap { height: calc(100vh - 140px); display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
