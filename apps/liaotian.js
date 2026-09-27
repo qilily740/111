@@ -6,8 +6,8 @@
     maxPerDay: 2,
     minGapHours: 6,
     maxGapHours: 12,
-    activeStart: 8,
-    activeEnd: 23,
+    activeStartMinutes: 8 * 60,
+    activeEndMinutes: 23 * 60,
     imageEnabled: false,
     quietStart: 23,
     quietEnd: 8
@@ -20,14 +20,18 @@
     };
     const minGapHours = number(source.minGapHours, IDEAL_MOMENT_AUTOMATION_DEFAULT.minGapHours, 1, 48);
     const maxGapHours = Math.max(minGapHours, number(source.maxGapHours, IDEAL_MOMENT_AUTOMATION_DEFAULT.maxGapHours, minGapHours, 72));
+    const legacyStart = Number(source.activeStart);
+    const legacyEnd = Number(source.activeEnd);
+    const startCandidate = Number.isFinite(Number(source.activeStartMinutes)) ? Number(source.activeStartMinutes) : (Number.isFinite(legacyStart) ? legacyStart * 60 : IDEAL_MOMENT_AUTOMATION_DEFAULT.activeStartMinutes);
+    const endCandidate = Number.isFinite(Number(source.activeEndMinutes)) ? Number(source.activeEndMinutes) : (Number.isFinite(legacyEnd) ? legacyEnd * 60 : IDEAL_MOMENT_AUTOMATION_DEFAULT.activeEndMinutes);
     return {
       ...IDEAL_MOMENT_AUTOMATION_DEFAULT,
       enabled: source.enabled !== false,
       maxPerDay: Math.round(number(source.maxPerDay, IDEAL_MOMENT_AUTOMATION_DEFAULT.maxPerDay, 1, 6)),
       minGapHours,
       maxGapHours,
-      activeStart: Math.round(number(source.activeStart, IDEAL_MOMENT_AUTOMATION_DEFAULT.activeStart, 0, 23)),
-      activeEnd: Math.round(number(source.activeEnd, IDEAL_MOMENT_AUTOMATION_DEFAULT.activeEnd, 0, 23)),
+      activeStartMinutes: Math.round(number(startCandidate, IDEAL_MOMENT_AUTOMATION_DEFAULT.activeStartMinutes, 0, 1439)),
+      activeEndMinutes: Math.round(number(endCandidate, IDEAL_MOMENT_AUTOMATION_DEFAULT.activeEndMinutes, 0, 1439)),
       imageEnabled: source.imageEnabled === true,
       quietStart: Math.round(number(source.quietStart, IDEAL_MOMENT_AUTOMATION_DEFAULT.quietStart, 0, 23)),
       quietEnd: Math.round(number(source.quietEnd, IDEAL_MOMENT_AUTOMATION_DEFAULT.quietEnd, 0, 23)),
@@ -7359,9 +7363,9 @@ ${recentConversation}
     const momentAutomationSettings = momentAutomationSettingsFor(momentAutomationContact);
     const momentImageConfig = window.IdealMachineImageAPI?.getConfig?.() || {};
     const momentImageReady = Boolean(momentImageConfig.endpoint && momentImageConfig.model);
-    const momentHour = value => Math.max(0, Math.min(23, Math.round(Number(value) || 0)));
+    const momentTime = value => { const minutes = Math.max(0, Math.min(1439, Math.round(Number(value) || 0))); return String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0'); };
     const momentMaxPerDay = Math.max(1, Math.min(6, Math.round(Number(momentAutomationSettings.maxPerDay) || 2)));
-    momentAutomationSection.innerHTML = '<button class="chat-memory-settings-head" data-chat-moment-automation-settings-toggle type="button" aria-expanded="' + chatMomentAutomationSettingsOpen + '"><span><b>朋友圈自动活动</b><small>' + (momentAutomationSettings.enabled === false ? '已关闭' : '已开启 · 角色会自然发布动态') + '</small></span><i class="' + (chatMomentAutomationSettingsOpen ? 'is-open' : '') + '">⌄</i></button>' + (chatMomentAutomationSettingsOpen ? '<div class="chat-memory-settings-body"><label class="chat-memory-switch"><input type="checkbox" data-chat-moment-auto-enabled ' + (momentAutomationSettings.enabled === false ? '' : 'checked') + '><span><b>开启自动发朋友圈</b><small>当前角色会在页面运行时偶尔发布动态</small></span></label><div class="chat-memory-grid chat-moment-automation-grid"><label class="chat-moment-time-range"><span>自由活动时间</span><div class="chat-moment-time-inputs"><input type="number" min="0" max="23" step="1" data-chat-moment-active-start value="' + momentHour(momentAutomationSettings.activeStart) + '"><b>至</b><input type="number" min="0" max="23" step="1" data-chat-moment-active-end value="' + momentHour(momentAutomationSettings.activeEnd) + '"></div><small>每天允许自动发布动态的时间段</small></label><label><span>每天最多动态</span><input type="number" min="1" max="6" step="1" data-chat-moment-max-per-day value="' + momentMaxPerDay + '"><small>当前角色每天最多发布条数</small></label></div><label class="chat-memory-switch"><input type="checkbox" data-chat-moment-auto-image ' + (momentImageReady ? '' : 'disabled') + ' ' + (momentAutomationSettings.imageEnabled ? 'checked' : '') + '><span><b>自动生成配图</b><small>' + (momentImageReady ? '自动动态会调用生图 API 生成配图' : '请先在设置中配置生图 API') + '</small></span></label></div>' : '');
+    momentAutomationSection.innerHTML = '<button class="chat-memory-settings-head" data-chat-moment-automation-settings-toggle type="button" aria-expanded="' + chatMomentAutomationSettingsOpen + '"><span><b>朋友圈自动活动</b><small>' + (momentAutomationSettings.enabled === false ? '已关闭' : '已开启 · 角色会自然发布动态') + '</small></span><i class="' + (chatMomentAutomationSettingsOpen ? 'is-open' : '') + '">⌄</i></button>' + (chatMomentAutomationSettingsOpen ? '<div class="chat-memory-settings-body"><label class="chat-memory-switch"><input type="checkbox" data-chat-moment-auto-enabled ' + (momentAutomationSettings.enabled === false ? '' : 'checked') + '><span><b>开启自动发朋友圈</b><small>当前角色会在页面运行时偶尔发布动态</small></span></label><div class="chat-memory-grid chat-moment-automation-grid"><label class="chat-moment-time-range"><span>自由活动时间</span><div class="chat-moment-time-inputs"><input type="time" step="60" data-chat-moment-active-start value="' + momentTime(momentAutomationSettings.activeStartMinutes) + '"><b>至</b><input type="time" step="60" data-chat-moment-active-end value="' + momentTime(momentAutomationSettings.activeEndMinutes) + '"></div></label><label class="chat-moment-count-row"><span>每天最多动态</span><span class="chat-moment-count-value"><input type="number" min="1" max="6" step="1" data-chat-moment-max-per-day value="' + momentMaxPerDay + '"><small>条</small></span></label></div><label class="chat-memory-switch"><input type="checkbox" data-chat-moment-auto-image ' + (momentImageReady ? '' : 'disabled') + ' ' + (momentAutomationSettings.imageEnabled ? 'checked' : '') + '><span><b>自动生成配图</b><small>' + (momentImageReady ? '自动动态会调用生图 API 生成配图' : '请先在设置中配置生图 API') + '</small></span></label></div>' : '');
     section.insertAdjacentElement('afterend', visionSection);
     const memorySection = main.querySelector('[data-chat-memory-settings]');
     const group = document.createElement('section');
@@ -7436,10 +7440,11 @@ ${recentConversation}
     const contact = state.contacts.find(item => item.id === activeContact);
     if (!contact) return;
     const momentSettings = momentAutomationSettingsFor(contact);
+    const readMomentMinutes = input => { const parts = String(input?.value || '').split(':'); const hours = Number(parts[0]); const minutes = Number(parts[1]); return Math.max(0, Math.min(1439, (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0))); };
     if (toggle) momentSettings.enabled = toggle.checked;
     if (imageToggle) momentSettings.imageEnabled = imageToggle.checked;
-    if (activeStart) momentSettings.activeStart = Math.max(0, Math.min(23, Math.round(Number(activeStart.value) || 0)));
-    if (activeEnd) momentSettings.activeEnd = Math.max(0, Math.min(23, Math.round(Number(activeEnd.value) || 0)));
+    if (activeStart) momentSettings.activeStartMinutes = readMomentMinutes(activeStart);
+    if (activeEnd) momentSettings.activeEndMinutes = readMomentMinutes(activeEnd);
     if (maxPerDay) momentSettings.maxPerDay = Math.max(1, Math.min(6, Math.round(Number(maxPerDay.value) || 1)));
     save();
     if (toggle) {
@@ -8480,12 +8485,16 @@ ${recentConversation}
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 0 : date.getHours();
   }
+  function momentAutomationMinute(value = Date.now()) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 0 : date.getHours() * 60 + date.getMinutes();
+  }
   function momentAutomationInActiveHours(settings, now = Date.now()) {
-    const hour = momentAutomationHour(now);
-    const start = Number(settings?.activeStart ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.activeStart);
-    const end = Number(settings?.activeEnd ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.activeEnd);
+    const minute = momentAutomationMinute(now);
+    const start = Number(settings?.activeStartMinutes ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.activeStartMinutes);
+    const end = Number(settings?.activeEndMinutes ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.activeEndMinutes);
     if (start === end) return true;
-    return start < end ? hour >= start && hour < end : hour >= start || hour < end;
+    return start < end ? minute >= start && minute < end : minute >= start || minute < end;
   }
   function momentAutomationRandomDelay(settings) {
     const min = Math.max(1, Number(settings?.minGapHours) || IDEAL_MOMENT_AUTOMATION_DEFAULT.minGapHours);

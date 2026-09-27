@@ -692,10 +692,16 @@ body > .desktop-scroll-wrap {
 .chat-memory-grid > label { display:grid; gap:5px; padding:10px; border:1px solid rgba(0,0,0,.07); border-radius:12px; background:rgba(247,247,248,.82); color:#555; font-size:10px; }
 .chat-memory-grid input { width:100%; height:32px; padding:0 9px; border:1px solid rgba(0,0,0,.1); border-radius:9px; outline:0; background:#fff; color:#222; font:inherit; font-size:12px; }
 .chat-memory-grid small { min-height:25px; color:#999; font-size:8px; line-height:1.45; }
-.chat-moment-automation-grid { grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); }
-.chat-moment-time-inputs { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:5px; }
-.chat-moment-time-inputs input { min-width:0; padding-left:6px; padding-right:6px; text-align:center; }
+.chat-moment-automation-grid { display:grid; gap:7px; }
+.chat-moment-automation-grid > label { display:flex; align-items:center; gap:8px; min-height:32px; padding:0; border:0; background:transparent; }
+.chat-moment-automation-grid > label > span:first-child { color:#555; font-size:10px; }
+.chat-moment-time-inputs { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:5px; flex:1; }
+.chat-moment-time-inputs input { min-width:0; width:100%; height:29px; padding:0 4px; text-align:center; }
 .chat-moment-time-inputs b { color:#999; font-size:10px; font-weight:500; text-align:center; }
+.chat-moment-count-row { justify-content:space-between; }
+.chat-moment-count-value { display:flex; align-items:center; gap:5px; }
+.chat-moment-count-value input { width:48px; height:29px; padding:0 5px; text-align:center; }
+.chat-moment-count-value small { min-height:0; color:#999; font-size:9px; }
 .chat-memory-status { display:flex; flex-wrap:wrap; gap:6px; }
 .chat-memory-status span { padding:5px 7px; border-radius:8px; background:#ededed; color:#222; font-size:8px; }
 .chat-memory-actions { display:flex; justify-content:flex-end; gap:8px; }
@@ -730,7 +736,8 @@ body > .desktop-scroll-wrap {
   .chat-memory-advanced-toggle { border-color:rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:#eee; }
   .chat-memory-grid > label { border-color:rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:#ddd; }
   .chat-memory-grid input,.chat-memory-actions button { border-color:rgba(255,255,255,.13); background:#2b2b2b; color:#eee; }
-  .chat-moment-time-inputs b { color:#aaa; }
+  .chat-moment-automation-grid > label > span:first-child { color:#ddd; }
+  .chat-moment-time-inputs b,.chat-moment-count-value small { color:#aaa; }
   .chat-memory-status span { background:rgba(255,255,255,.1); color:#ddd; }
   .chat-memory-actions button.is-primary { border-color:#eee; background:#eee; color:#111; }
   .chat-thought-api-setting { color:#eee; }
