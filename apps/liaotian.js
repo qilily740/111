@@ -6311,7 +6311,9 @@ ${recentConversation}
         const baseMessages = [{ role:'system', content:'你是理想机线下角色扮演引擎，只输出角色本人自然、完整的回复。必须在这一次响应内完整收尾，禁止在句子、对白或动作中途停止。' }, { role:'user', content:prompt }];
         const response = await requestCompletion(baseMessages);
         const data = await response.json();
-        answer = cleanOfflineReply(data.choices?.[0]?.message?.content || '');
+        // 线下模式也要兼容 content 数组、choices[].text、output_text 等
+        // OpenAI 兼容接口格式，不能只读取 message.content 字符串。
+        answer = cleanOfflineReply(requireCharacterReplyText(data));
         finishReason = String(data.choices?.[0]?.finish_reason || '');
       }
       if (!answer) throw new Error('API 没有返回线下回复');
