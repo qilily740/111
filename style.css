@@ -1774,7 +1774,7 @@ body > .desktop-scroll-wrap {
 /* 联系人与“我”页面的操作区固定，只有条目列表滚动。 */
 .chat-contacts-page, .chat-me-page { display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; }
 .chat-app.is-contacts-tab .chat-main, .chat-app.is-me-tab .chat-main { overflow:hidden !important; }
-.chat-contacts-fixed-head, .chat-me-fixed-head { position:relative; z-index:4; flex:0 0 auto; background:rgba(245,245,243,.96); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); }
+.chat-contacts-fixed-head, .chat-me-fixed-head { position:relative; z-index:4; flex:0 0 auto; background:rgba(241,241,243,.96); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); }
 .chat-contacts-page .chat-contact-list, .chat-me-page .chat-profile-list { flex:1 1 auto; min-height:0; height:auto !important; max-height:none !important; overflow-y:auto !important; overflow-x:hidden; padding-bottom:120px; }
 .chat-contacts-page .chat-contact-group-panel { max-height:min(48vh,380px); margin-bottom:12px !important; }
 @media (prefers-color-scheme:dark) {
