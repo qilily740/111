@@ -14,6 +14,7 @@
       this.stableHeight = 0;
       this.orientation = this.getOrientation();
       this.safeArea = { top: 0, bottom: 0 };
+      this.backdropObserver = null;
       this.surfaceSelector = [
         '.chat-app', '.ta-app', '.forum-app', '.album-app', '.calendar-app',
         '.music-app', '.shopping-app', '.doubao-app', '.ifspace-app',
@@ -32,6 +33,7 @@
       this.root.classList.add('ideal-fullscreen-ready');
       this.body.classList.add('ideal-fullscreen-body');
       this.safeArea = this.readSafeArea();
+      this.syncBackdrop();
       this.syncSurfaces();
       this.scheduleViewportSync();
 
@@ -49,6 +51,8 @@
 
       this.observer = new MutationObserver(() => this.syncSurfaces());
       this.observer.observe(this.body, { childList: true });
+      this.backdropObserver = new MutationObserver(() => this.syncBackdrop());
+      this.backdropObserver.observe(this.body, { attributes: true, attributeFilter: ['class', 'style'] });
     }
 
     getOrientation() {
@@ -139,6 +143,15 @@
       this.root.style.setProperty('--ideal-edge-bottom', `${this.safeArea.bottom}px`);
       this.root.classList.toggle('ideal-keyboard-open', viewport.keyboardOpen);
       this.body.classList.toggle('ideal-keyboard-open', viewport.keyboardOpen);
+    }
+
+    syncBackdrop() {
+      const bodyStyle = getComputedStyle(this.body);
+      this.root.style.backgroundColor = bodyStyle.backgroundColor || '#f4f4f2';
+      this.root.style.backgroundImage = bodyStyle.backgroundImage || 'none';
+      this.root.style.backgroundPosition = bodyStyle.backgroundPosition || 'center';
+      this.root.style.backgroundSize = bodyStyle.backgroundSize || 'cover';
+      this.root.style.backgroundRepeat = bodyStyle.backgroundRepeat || 'no-repeat';
     }
 
     syncSurfaces() {

@@ -150,6 +150,7 @@ html.ideal-fullscreen-ready {
   --ideal-safe-bottom: 0px;
   --ideal-edge-top: max(var(--ideal-safe-top, 0px), env(safe-area-inset-top, 0px));
   --ideal-edge-bottom: max(var(--ideal-safe-bottom, 0px), env(safe-area-inset-bottom, 0px));
+  background: #f4f4f2 center/cover fixed no-repeat;
 }
 
 /* iOS 独立窗口：安全区只留给内容顶栏，不能再把整层高度加长。 */
@@ -161,32 +162,37 @@ html.ideal-fullscreen-ready {
   flex-shrink: 0;
 }
 .ta-app .ta-phone-head {
-  padding-top: max(7px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+  margin-top: var(--ideal-edge-top, env(safe-area-inset-top)) !important;
+  padding-top: 7px !important;
 }
 .ta-app .ta-role-app-header,
 .ta-app .ta-role-conversation-header {
-  padding-top: max(18px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+  margin-top: var(--ideal-edge-top, env(safe-area-inset-top)) !important;
+  padding-top: 18px !important;
 }
 .doubao-app .doubao-header,
 .ta-role-doubao-page .doubao-header {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
-  padding-top: max(25px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
-}
-.doubao-app .doubao-chat-title,
-.ta-role-doubao-page .doubao-chat-title {
-  top: calc(max(25px, var(--ideal-edge-top, env(safe-area-inset-top))) + 32px) !important;
-  transform: translateY(-50%) !important;
+  margin-top: var(--ideal-edge-top, env(safe-area-inset-top)) !important;
+  padding-top: 8px !important;
 }
 .album-app .album-header {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
-  padding-top: max(20px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+  margin-top: var(--ideal-edge-top, env(safe-area-inset-top)) !important;
+  padding-top: 20px !important;
+}
+.doubao-app .doubao-chat-title,
+.ta-role-doubao-page .doubao-chat-title {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
 }
 .album-app .album-header > div:nth-child(2) {
-  top: calc(max(20px, var(--ideal-edge-top, env(safe-area-inset-top))) + 32px) !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
 }
 .chat-app:not(.is-chatting) .chat-tabs {
   bottom: max(24px, var(--ideal-edge-bottom, env(safe-area-inset-bottom))) !important;
@@ -200,10 +206,21 @@ body.ideal-fullscreen-body {
 body.ideal-fullscreen-body {
   position: fixed;
   inset: 0;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: calc(var(--ideal-viewport-height, 100dvh) + var(--ideal-edge-bottom, 0px));
   overflow: hidden;
   overscroll-behavior: none;
+}
+body.ideal-fullscreen-body > .desktop-scroll-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto !important;
+}
+body.ideal-fullscreen-body > .page-indicator,
+body.ideal-fullscreen-body > .dock-bar {
+  flex: 0 0 auto;
 }
 .ideal-fullscreen-surface {
   box-sizing: border-box;
@@ -223,6 +240,12 @@ html.ideal-keyboard-open .ideal-fullscreen-surface {
 .desktop-page { position: relative; flex: 0 0 100vw; min-height: 100%; padding: 28px 18px; overflow-x: hidden; overflow-y: auto; scrollbar-width: none; scroll-snap-align: start; scroll-snap-stop: always; }
 .desktop-page::-webkit-scrollbar { display:none; }
 .bg-layer { position: absolute; inset: 0; z-index: 0; background: transparent; }
+
+/* 全屏外层负责铺到安全区，Dock 与中间桌面由同一个纵向布局分配高度。 */
+html.ideal-fullscreen-ready,
+body.ideal-fullscreen-body {
+  background-color: #f4f4f2;
+}
 
 .profile-card, .todo-widget, .image-widget, .countdown-widget, .elapsed-days-widget, .shared-widget, .now-playing-widget, .search-input, .photo-card, .date-calendar-card, .dock-bar {
   background: rgba(255,255,255,.52);
