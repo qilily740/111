@@ -4861,6 +4861,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   // 三级记忆：聊天设置、上下文注入与自动整理。
   let chatMemorySettingsOpen = false;
+  let chatMemoryAdvancedOpen = false;
   const baseMemorySettingsRender = renderChatSettings;
   renderChatSettings = function() {
     baseMemorySettingsRender();
@@ -4879,6 +4880,16 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     if (chatMemorySettingsOpen) {
       const grid = section.querySelector('.chat-memory-grid');
       if (grid) grid.insertAdjacentHTML('beforeend', `<label>上下文 Token 上限<input data-chat-memory-context-budget type="number" min="2000" max="50000" step="1000" value="${settings.contextTokenBudget}"><small>避免短期与长期记忆撑爆模型上下文</small></label>`);
+      if (grid) {
+        const body = section.querySelector('.chat-memory-settings-body');
+        const advanced = document.createElement('div');
+        advanced.className = 'chat-memory-advanced';
+        advanced.innerHTML = `<button class="chat-memory-advanced-toggle" data-chat-memory-advanced-toggle type="button" aria-expanded="${chatMemoryAdvancedOpen}"><span><b>高级记忆参数</b><small>总结轮数、召回数量、字数和上下文限制</small></span><i class="${chatMemoryAdvancedOpen ? 'is-open' : ''}">⌄</i></button><div class="chat-memory-advanced-body${chatMemoryAdvancedOpen ? ' is-open' : ''}"></div>`;
+        const advancedBody = advanced.querySelector('.chat-memory-advanced-body');
+        if (advancedBody) advancedBody.appendChild(grid);
+        const status = section.querySelector('.chat-memory-status');
+        if (body) body.insertBefore(advanced, status || null);
+      }
     }
     const anchor = main.querySelector('.chat-interaction-settings') || main.querySelector('[data-chat-css-editor]') || main.firstElementChild;
     if (anchor) anchor.insertAdjacentElement('afterend', section); else main.prepend(section);
@@ -4905,13 +4916,19 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   document.addEventListener('click', event => {
     const toggle = event.target.closest?.('[data-chat-memory-toggle]');
+    const advancedToggle = event.target.closest?.('[data-chat-memory-advanced-toggle]');
     const saveButton = event.target.closest?.('[data-chat-memory-save]');
     const runButton = event.target.closest?.('[data-chat-memory-run]');
-    if ((!toggle && !saveButton && !runButton) || !app.classList.contains('is-open') || !chatSettingsOpen) return;
+    if ((!toggle && !advancedToggle && !saveButton && !runButton) || !app.classList.contains('is-open') || !chatSettingsOpen) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     if (toggle) {
       chatMemorySettingsOpen = !chatMemorySettingsOpen;
+      renderChatSettings();
+      return;
+    }
+    if (event.target.closest?.('[data-chat-memory-advanced-toggle]')) {
+      chatMemoryAdvancedOpen = !chatMemoryAdvancedOpen;
       renderChatSettings();
       return;
     }

@@ -675,6 +675,14 @@ body > .desktop-scroll-wrap {
 .chat-memory-settings-head small { color:#999; font-size:10px; }
 .chat-memory-settings-head i { color:#888; font-size:17px; font-style:normal; }
 .chat-memory-settings-body { display:grid; gap:13px; margin-top:13px; padding-top:13px; border-top:1px solid rgba(0,0,0,.07); }
+.chat-memory-advanced { display:grid; gap:10px; }
+.chat-memory-advanced-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; padding:10px 11px; border:1px solid rgba(0,0,0,.08); border-radius:12px; background:rgba(247,247,248,.72); color:#333; font:inherit; text-align:left; cursor:pointer; }
+.chat-memory-advanced-toggle > span { display:grid; gap:3px; }
+.chat-memory-advanced-toggle b { font-size:11px; font-weight:600; }
+.chat-memory-advanced-toggle small { color:#999; font-size:9px; line-height:1.35; }
+.chat-memory-advanced-toggle i { color:#888; font-size:16px; font-style:normal; }
+.chat-memory-advanced-body { display:none; }
+.chat-memory-advanced-body.is-open { display:grid; }
 .chat-memory-switch { display:flex; align-items:center; gap:10px; }
 .chat-memory-switch input { width:17px; height:17px; margin:0; accent-color:#222; }
 .chat-memory-switch > span { display:grid; flex:1; gap:3px; }
@@ -715,6 +723,7 @@ body > .desktop-scroll-wrap {
   .chat-settings-page .chat-memory-settings { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }
   .chat-memory-settings-head { color:#eee; }
   .chat-memory-settings-body { border-color:rgba(255,255,255,.12); }
+  .chat-memory-advanced-toggle { border-color:rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:#eee; }
   .chat-memory-grid > label { border-color:rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:#ddd; }
   .chat-memory-grid input,.chat-memory-actions button { border-color:rgba(255,255,255,.13); background:#2b2b2b; color:#eee; }
   .chat-memory-status span { background:rgba(255,255,255,.1); color:#ddd; }
