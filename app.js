@@ -820,28 +820,15 @@
 
   let idealStableStandaloneHeight = 0;
   let idealStableStandaloneWidth = 0;
-  let idealRememberedBottomInset = 0;
   function installIdealViewportSizing() {
     const root = document.documentElement;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || !!window.navigator.standalone;
-    const readBottomInset = () => {
-      const probe = document.createElement('i');
-      probe.setAttribute('aria-hidden', 'true');
-      Object.assign(probe.style, { position:'fixed', visibility:'hidden', pointerEvents:'none', paddingBottom:'env(safe-area-inset-bottom)' });
-      document.body.appendChild(probe);
-      const value = Math.round(parseFloat(getComputedStyle(probe).paddingBottom) || 0);
-      probe.remove();
-      if (value > 0) idealRememberedBottomInset = value;
-      return idealRememberedBottomInset || value;
-    };
     const sync = () => {
       const visualHeight = Math.round(window.visualViewport?.height || window.innerHeight);
       const visualTop = Math.round(window.visualViewport?.offsetTop || 0);
       const standaloneIOS = isIOS && isStandalone();
-      let bottomInset = standaloneIOS ? readBottomInset() : 0;
       const layoutHeight = Math.round(window.innerHeight || visualHeight);
-      let appHeight = layoutHeight;
       let keyboardOpen = false;
       if (standaloneIOS) {
         const layoutWidth = Math.round(window.innerWidth || document.documentElement.clientWidth);
@@ -849,16 +836,18 @@
         idealStableStandaloneWidth = layoutWidth;
         if (!idealStableStandaloneHeight || layoutHeight > idealStableStandaloneHeight) idealStableStandaloneHeight = layoutHeight;
         keyboardOpen = visualHeight > 150 && visualHeight < idealStableStandaloneHeight - 100;
-        /* env(safe-area-inset-bottom) 已经包含在 iOS 布局视口内，只用于控件避让，
-           不能再次加进根高度，否则会在 Home Indicator 下方制造空白。 */
-        appHeight = keyboardOpen ? visualHeight + visualTop : idealStableStandaloneHeight;
-        if (keyboardOpen) bottomInset = 0;
       } else {
         idealStableStandaloneHeight = 0;
         idealStableStandaloneWidth = 0;
       }
-      root.style.setProperty('--ideal-app-height', `${appHeight}px`);
-      root.style.setProperty('--ideal-safe-bottom', `${bottomInset}px`);
+      // 仅键盘打开时覆盖内容高度；关闭后恢复 CSS 全屏高度和实时安全区。
+      if (keyboardOpen) {
+        root.style.setProperty('--ideal-app-height', `${visualHeight + visualTop}px`);
+        root.style.setProperty('--ideal-safe-bottom', '0px');
+      } else {
+        root.style.removeProperty('--ideal-app-height');
+        root.style.removeProperty('--ideal-safe-bottom');
+      }
       document.body.classList.toggle('ideal-keyboard-open', keyboardOpen);
       if (keyboardOpen && visualTop > 0) window.scrollTo(0, 0);
     };
@@ -866,7 +855,6 @@
     window.addEventListener('orientationchange', () => {
       idealStableStandaloneHeight = 0;
       idealStableStandaloneWidth = 0;
-      idealRememberedBottomInset = 0;
       sync();
       window.setTimeout(sync, 250);
     });
