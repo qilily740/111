@@ -141,6 +141,23 @@ body .chat-reading-modal .chat-reading-manage { width: 38px !important; min-widt
 .chat-reading-modal.is-night .chat-reading-chapter-menu > div > button.is-current { background: #4a4a4d; color: #fff; }
 html, body { width: 100%; height: 100%; overflow: hidden; }
 body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
+/* 独立视口适配层：只提供尺寸变量，不覆盖各 App 自己的顶栏和安全区布局。 */
+html.ideal-fullscreen-ready {
+  --ideal-viewport-height: 100dvh;
+  --ideal-visual-height: 100dvh;
+  --ideal-keyboard-inset: 0px;
+  --ideal-safe-top: 0px;
+  --ideal-safe-bottom: 0px;
+}
+.ideal-fullscreen-surface {
+  box-sizing: border-box;
+  height: var(--ideal-viewport-height, 100dvh);
+  max-height: var(--ideal-viewport-height, 100dvh);
+}
+html.ideal-keyboard-open .ideal-fullscreen-surface {
+  height: var(--ideal-visual-height, 100dvh);
+  max-height: var(--ideal-visual-height, 100dvh);
+}
 
 .desktop-scroll-wrap { height: calc(100vh - 140px); display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
 .desktop-scroll-wrap::-webkit-scrollbar { display: none; }
@@ -1118,7 +1135,7 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .worldbook-entry h3 { color: #222; font-size: 14px; font-weight: 650; }
 .worldbook-entry p { max-height: min(220px, 32vh); margin-top: 8px; padding-right: 9px; overflow-x: hidden; overflow-y: auto; color: #777; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; white-space: normal; scrollbar-gutter: stable; scrollbar-width: thin; overscroll-behavior: contain; }
 .worldbook-entry-actions { display: flex; flex-shrink: 0; gap: 5px; }
-.worldbook-entry-actions-stack { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.worldbook-entry-actions-stack { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 12px); min-width: 0; }
 .worldbook-entries > .worldbook-section-head { position: sticky; top: 0; z-index: 3; padding: 2px 0 16px; background: #f1f1f3; }
 .worldbook-entries > .worldbook-section-head .worldbook-entry-actions { margin-left: auto; min-width: 0; flex: 0 1 auto; }
 .worldbook-add-book, .worldbook-add-entry { min-width: 68px; padding: 8px 11px; border-color: rgba(0,0,0,.12); background: #fff !important; color: #111 !important; text-align: center; }
@@ -1128,15 +1145,19 @@ body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-famil
 .worldbook-books > .worldbook-section-head > .worldbook-add-book, .worldbook-entries > .worldbook-section-head > .worldbook-entry-actions { margin-right: 0; }
 .worldbook-entries > .worldbook-section-head > .worldbook-entry-actions { display: flex; justify-content: flex-end; }
 .worldbook-books > .worldbook-section-head, .worldbook-entries > .worldbook-section-head { align-items: flex-start; }
+.worldbook-entries > .worldbook-section-head { flex-wrap: nowrap; align-items: center; gap: clamp(4px, 1.5vw, 16px); }
+.worldbook-entries > .worldbook-section-head > div:first-child { flex: 1 1 auto; min-width: 0; }
+.worldbook-entries > .worldbook-section-head h2 { min-width: 0; overflow: hidden; font-size: clamp(13px, 4vw, 19px); line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.worldbook-entries > .worldbook-section-head > .worldbook-entry-actions { flex: 0 1 auto; min-width: 0; gap: clamp(2px, 1vw, 5px); }
 .worldbook-add-book, .worldbook-add-entry { height: 34px; min-height: 34px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
 .worldbook-add-entry { position: relative; left: 16px; }
-.worldbook-analyze,.worldbook-view-analysis { width:clamp(48px,12vw,68px); min-width:0; height:34px; min-height:34px; box-sizing:border-box; padding:8px clamp(4px,1.5vw,11px); border:1px solid rgba(0,0,0,.12) !important; border-radius:10px; background:#fff !important; color:#111 !important; font:inherit; font-size:clamp(9px,2.5vw,12px); text-align:center; white-space:nowrap; }
+.worldbook-analyze,.worldbook-view-analysis { width:clamp(42px, 14vw, 68px); min-width:0; height:34px; min-height:34px; box-sizing:border-box; padding:6px clamp(3px, 1.5vw, 9px); display:inline-flex; align-items:center; justify-content:center; flex:0 1 auto; border:1px solid rgba(0,0,0,.12) !important; border-radius:10px; background:#fff !important; color:#111 !important; font:inherit; font-size:clamp(8px,2.5vw,12px); line-height:1; text-align:center; white-space:nowrap; }
 .worldbook-tabs { padding: 14px 28px; }
 .worldbook-tabs > .worldbook-add-book { position: static; transform: none; }
 .worldbook-books > .worldbook-section-head > .worldbook-add-book { position: static; transform: none; margin-left: auto; }
 .worldbook-api-hint { display: block; max-width: 180px; color: #999; font-size: 10px; line-height: 1.4; text-align: right; }
-.worldbook-entry-actions .worldbook-analyze,.worldbook-entry-actions .worldbook-view-analysis,.worldbook-entry-actions .worldbook-add-entry,.worldbook-entry-actions .worldbook-scroll-top { padding:6px 9px; border:1px solid rgba(0,0,0,.1); border-radius:8px; background:rgba(0,0,0,.06); color:#555; font:inherit; font-size:11px; cursor:pointer; }
-.worldbook-entry-actions-stack .worldbook-add-entry,.worldbook-entry-actions-stack .worldbook-scroll-top { width:clamp(48px,12vw,68px); min-width:0; padding-left:clamp(4px,1.5vw,9px); padding-right:clamp(4px,1.5vw,9px); font-size:clamp(9px,2.5vw,11px); white-space:nowrap; }
+.worldbook-entry-actions .worldbook-analyze,.worldbook-entry-actions .worldbook-view-analysis,.worldbook-entry-actions .worldbook-add-entry,.worldbook-entry-actions .worldbook-scroll-top { padding:6px clamp(3px, 1.5vw, 9px); border:1px solid rgba(0,0,0,.1); border-radius:8px; background:rgba(0,0,0,.06); color:#555; font:inherit; font-size:clamp(8px, 2.5vw, 11px); cursor:pointer; }
+.worldbook-entry-actions-stack .worldbook-add-entry,.worldbook-entry-actions-stack .worldbook-scroll-top { width:clamp(42px,12vw,68px); min-width:0; padding-left:clamp(3px,1.5vw,9px); padding-right:clamp(3px,1.5vw,9px); font-size:clamp(8px,2.5vw,11px); white-space:nowrap; }
 .worldbook-entry-actions-stack .worldbook-add-entry,.worldbook-entry-actions-stack .worldbook-scroll-top { position:static; left:auto; }
 .worldbook-entry-actions-stack .worldbook-scroll-top { border-color:#111 !important; background:#111 !important; color:#fff !important; }
 .worldbook-entry-actions-stack .worldbook-scroll-top { height:34px; min-height:34px; box-sizing:border-box; }
