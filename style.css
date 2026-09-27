@@ -8500,44 +8500,8 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   opacity:1;
 }
 
-/* 创作类 App 按桌面壁纸色系切换，覆盖系统深色模式的固定配色。 */
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) {
-  background:#202020 !important;
-  color:#f1f1f1 !important;
-}
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-page,.fanfic-page,.magazine-page) {
-  background:linear-gradient(155deg,#292929,#1d1d1d) !important;
-  color:#f1f1f1 !important;
-}
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-header,.fanfic-header,.magazine-header) {
-  border-color:rgba(255,255,255,.12) !important;
-  background:rgba(35,35,35,.9) !important;
-  color:#f1f1f1 !important;
-}
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-header h1,.fanfic-header h1,.magazine-header h1) {
-  color:#fff !important;
-  -webkit-text-fill-color:#fff !important;
-  text-shadow:0 1px 3px rgba(0,0,0,.42) !important;
-}
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-header button,.fanfic-header button,.magazine-round-button) {
-  background:rgba(255,255,255,.1) !important;
-  color:#eee !important;
-}
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-history-card,.debate-topic-card,.debate-arrange-card,.debate-composer,.debate-turn,.debate-draft-side,.debate-room-topic,.fanfic-setup-card,.fanfic-story-settings,.fanfic-chapter,.magazine-form-card,.magazine-overview,.magazine-section-card,.magazine-article-editor,.magazine-cover-settings,.magazine-interview-room,.magazine-toc,.magazine-reading-page) {
-  border-color:rgba(255,255,255,.12) !important;
-  background:rgba(255,255,255,.08) !important;
-  color:#eee !important;
-}
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(input,textarea,select) {
-  border-color:rgba(255,255,255,.16) !important;
-  background:rgba(0,0,0,.24) !important;
-  color:#f1f1f1 !important;
-  -webkit-text-fill-color:#f1f1f1 !important;
-}
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(input,textarea,select)::placeholder { color:rgba(255,255,255,.58) !important; }
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-history-card b,.debate-topic-card h2,.debate-room-side b,.debate-turn p,.fanfic-setup-title h2,.fanfic-story-settings-head h2,.fanfic-chapter-head input,.magazine-form-title h2,.magazine-article-editor input,.magazine-reading-page h2) { color:#f1f1f1 !important; }
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-header p,.debate-section-head > b,.debate-section-head > small,.debate-local-note,.fanfic-header p,.fanfic-section-head > b,.fanfic-local-note,.magazine-header p,.magazine-panel-head p,.magazine-form-title p,.magazine-empty,.magazine-empty-small) { color:rgba(255,255,255,.62) !important; }
-:is(.debate-app.is-wallpaper-dark,.fanfic-app.is-wallpaper-dark,.magazine-app.is-wallpaper-dark) :is(.debate-generate-button,.debate-start-button,.debate-record-button,.fanfic-primary-action,.magazine-interview-form button,.magazine-article-editor footer button) { background:#f1f1f1 !important; color:#202020 !important; }
+/* 同人文、辩论、杂志社使用各自的浅色编辑界面，不随桌面壁纸明暗改变整页配色。
+   同人文阅读器的独立壁纸和毛玻璃控件仍由下方专用规则处理。 */
 
 :is(.debate-app.is-wallpaper-light,.fanfic-app.is-wallpaper-light,.magazine-app.is-wallpaper-light) {
   background:#f5f5f3 !important;
