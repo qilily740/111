@@ -143,7 +143,22 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
 /* 固定网页根容器：全屏只由根容器负责，各 App 自己处理安全区。 */
 html { background: #f4f4f2 center/cover fixed no-repeat; }
-body { position:fixed; inset:0; display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; overscroll-behavior:none; }
+body {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* iOS 桌面 PWA 的 100% 有时止于 Home Indicator 上方。
+     背景向下多铺一个安全区，等量 padding 保持桌面与 Dock 原有高度。 */
+  height: calc(100% + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 
 /* iOS 安全区只留给内容顶栏，不能再把整层高度加长。 */
 .ta-app .ta-phone-head,
