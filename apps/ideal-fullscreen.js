@@ -56,11 +56,15 @@
     }
 
     isIOSStandalone() {
-      const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
-        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const ios = this.isIOSDevice();
       const standalone = navigator.standalone === true
         || window.matchMedia?.('(display-mode: standalone)').matches;
       return ios && standalone;
+    }
+
+    isIOSDevice() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     }
 
     estimateIOSSafeArea() {
@@ -85,7 +89,9 @@
       let top = Number.parseFloat(computed.paddingTop) || 0;
       let bottom = Number.parseFloat(computed.paddingBottom) || 0;
       probe.remove();
-      if (!top && !bottom && this.isIOSStandalone()) {
+      const viewportMeta = document.querySelector('meta[name="viewport"]')?.content || '';
+      const usesViewportFitCover = /viewport-fit\s*=\s*cover/i.test(viewportMeta);
+      if (!top && !bottom && (this.isIOSStandalone() || (this.isIOSDevice() && usesViewportFitCover))) {
         ({ top, bottom } = this.estimateIOSSafeArea());
       }
       return { top, bottom };

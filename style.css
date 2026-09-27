@@ -174,11 +174,19 @@ html.ideal-fullscreen-ready {
   flex-shrink: 0;
   padding-top: max(25px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
 }
+.doubao-app .doubao-chat-title,
+.ta-role-doubao-page .doubao-chat-title {
+  top: calc(max(25px, var(--ideal-edge-top, env(safe-area-inset-top))) + 32px) !important;
+  transform: translateY(-50%) !important;
+}
 .album-app .album-header {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
   padding-top: max(20px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+}
+.album-app .album-header > div:nth-child(2) {
+  top: calc(max(20px, var(--ideal-edge-top, env(safe-area-inset-top))) + 32px) !important;
 }
 .chat-app:not(.is-chatting) .chat-tabs {
   bottom: max(24px, var(--ideal-edge-bottom, env(safe-area-inset-bottom))) !important;
@@ -193,18 +201,18 @@ body.ideal-fullscreen-body {
   position: fixed;
   inset: 0;
   width: 100%;
-  height: var(--ideal-viewport-height, 100dvh);
+  height: calc(var(--ideal-viewport-height, 100dvh) + var(--ideal-edge-bottom, 0px));
   overflow: hidden;
   overscroll-behavior: none;
 }
 .ideal-fullscreen-surface {
   box-sizing: border-box;
-  height: var(--ideal-viewport-height, 100dvh);
-  max-height: var(--ideal-viewport-height, 100dvh);
+  height: calc(var(--ideal-viewport-height, 100dvh) + var(--ideal-edge-bottom, 0px));
+  max-height: none;
 }
 html.ideal-keyboard-open .ideal-fullscreen-surface {
-  height: var(--ideal-visual-height, 100dvh);
-  max-height: var(--ideal-visual-height, 100dvh);
+  height: calc(var(--ideal-visual-height, 100dvh) + var(--ideal-edge-bottom, 0px));
+  max-height: none;
 }
 
 .desktop-scroll-wrap { height: calc(100vh - 140px); display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
