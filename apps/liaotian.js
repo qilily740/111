@@ -479,7 +479,7 @@
     const messages = chat?.messages || [];
     const rows = messages.length ? messages.map(message => taGroupMessageHtml(message, contact, chat)).join('') : '<div class="chat-hint">这个群聊还没有消息。</div>';
     const join = !joined ? `<button class="chat-group-join" data-chat-group-join type="button">请求加入群聊</button>` : '';
-    return `<div class="chat-conversation chat-group-conversation"><div class="chat-person"><div class="chat-avatar">群</div><div><b>${esc(contact.name)}</b><small>${esc(contact.identity || '群聊')} · ${(contact.taGroupMembers || []).length} 位成员</small></div>${join}</div>${messageEditBar()}<div class="chat-messages" id="chatMessages">${rows}</div>${joined ? `<div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入群消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${isContactReplying(activeContact) ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div>` : '<div class="chat-group-locked">加入群聊后才能发送消息</div>'}</div>`;
+    return `<div class="chat-conversation chat-group-conversation"><div class="chat-person">${avatarMarkup(contact)}<div><b>${esc(contact.name)}</b><small>${esc(contact.identity || '群聊')} · ${(contact.taGroupMembers || []).length} 位成员</small></div>${join}</div>${messageEditBar()}<div class="chat-messages" id="chatMessages">${rows}</div>${joined ? `<div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入群消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${isContactReplying(activeContact) ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div>` : '<div class="chat-group-locked">加入群聊后才能发送消息</div>'}</div>`;
   }
   function uid(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
   function time() { return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); }
@@ -7373,7 +7373,7 @@ ${recentConversation}
     group.dataset.chatApiSettingsGroup = '';
     group.innerHTML = '<h3 class="chat-interaction-title">API 功能设置</h3><div class="chat-api-settings-items"></div>';
     const items = group.querySelector('.chat-api-settings-items');
-    const sections = [memorySection, section, visionSection, momentAutomationSection].filter(Boolean);
+    const sections = [memorySection, section, visionSection, isGroupChatContact(momentAutomationContact) ? null : momentAutomationSection].filter(Boolean);
     if (items && sections.length) {
       const first = sections[0];
       first.parentElement?.insertBefore(group, first);

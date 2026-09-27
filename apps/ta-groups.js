@@ -62,6 +62,7 @@
       category: String(group.category || group.type || '').trim(),
       categorySource: String(group.categorySource || '').trim(),
       name: String(group.name || '临时小分队').trim(),
+      avatar: String(group.avatar || '').trim(),
       topic: String(group.topic || group.reason || '').trim(),
       members,
       memberIds:[...new Set(memberIds)],
@@ -161,7 +162,7 @@
       taRoleId: group.roleId,
       taGroupMembers: group.members,
       taGroupUserJoined: group.userJoined,
-      avatar: group.members.find(member => member.kind === 'npc')?.avatar || group.members[0]?.avatar || '',
+      avatar: String(group.avatar || ''),
       groupIds: Array.isArray(existingContact.groupIds) ? existingContact.groupIds : []
     };
     const index = state.contacts.findIndex(item => item.id === contactId);
