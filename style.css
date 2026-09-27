@@ -149,6 +149,18 @@ html.ideal-fullscreen-ready {
   --ideal-safe-top: 0px;
   --ideal-safe-bottom: 0px;
 }
+html.ideal-fullscreen-ready,
+body.ideal-fullscreen-body {
+  min-height: var(--ideal-viewport-height, 100dvh);
+}
+body.ideal-fullscreen-body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: var(--ideal-viewport-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 .ideal-fullscreen-surface {
   box-sizing: border-box;
   height: var(--ideal-viewport-height, 100dvh);

@@ -26,6 +26,7 @@
 
     start() {
       this.root.classList.add('ideal-fullscreen-ready');
+      this.body.classList.add('ideal-fullscreen-body');
       this.safeArea = this.readSafeArea();
       this.syncSurfaces();
       this.scheduleViewportSync();
