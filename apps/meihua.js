@@ -449,6 +449,22 @@
   }
 
   let autoContrastRequest = 0;
+  function applyAutoContrastClass(target, tone) {
+    if (!target?.isConnected) return;
+    const nextTone = tone === 'light' ? 'light' : 'dark';
+    const oppositeTone = nextTone === 'light' ? 'dark' : 'light';
+    if (target.dataset.autoContrastTone === nextTone
+      && target.classList.contains(`auto-${nextTone}`)
+      && !target.classList.contains(`auto-${oppositeTone}`)) return;
+    target.classList.toggle('auto-light', nextTone === 'light');
+    target.classList.toggle('auto-dark', nextTone === 'dark');
+    target.dataset.autoContrastTone = nextTone;
+  }
+  function clearAutoContrastClass(target) {
+    if (!target?.isConnected) return;
+    target.classList.remove('auto-light', 'auto-dark');
+    delete target.dataset.autoContrastTone;
+  }
   function updateAutoContrast() {
     const request = ++autoContrastRequest;
     const liveAppItems = [...document.querySelectorAll('.app-item[data-app-key], .dock-item[data-app-key]')];
@@ -460,9 +476,7 @@
       const latest = JSON.parse(localStorage.getItem(storageKey) || '{}') || {};
       if (typeof latest.wallpaper === 'string' && latest.wallpaper !== currentWallpaper) { saved.wallpaper = latest.wallpaper; currentWallpaper = latest.wallpaper; }
     } catch {}
-    if (!currentWallpaper) { targets.forEach(target => target.classList.remove('auto-light', 'auto-dark')); return; }
-    // 新壁纸完成取样前先清掉上一张壁纸的白字状态，避免深色切到浅色时残留。
-    targets.forEach(target => { target.classList.remove('auto-light'); target.classList.add('auto-dark'); });
+    if (!currentWallpaper) { targets.forEach(clearAutoContrastClass); return; }
     const image = new Image();
     // 只有真正跨源的网络图片才需要 CORS；对 data/blob/同源图片设置 crossOrigin
     // 会让部分手机浏览器把本来可读的图片判成画布污染。
@@ -472,11 +486,7 @@
     const applyContrastFallback = () => {
       if (request !== autoContrastRequest) return;
       const globalTone = window.IdealMachineWallpaperTone?.getTone?.();
-      targets.forEach(target => {
-        target.classList.remove('auto-light');
-        target.classList.toggle('auto-light', globalTone === 'dark');
-        target.classList.toggle('auto-dark', globalTone !== 'dark');
-      });
+      targets.forEach(target => applyAutoContrastClass(target, globalTone === 'dark' ? 'light' : 'dark'));
     };
     image.onload = () => {
       if (request !== autoContrastRequest) return;
@@ -507,8 +517,7 @@
           let red = 0, green = 0, blue = 0, count = 0;
           for (let index = 0; index < sample.length; index += 4) { red += sample[index]; green += sample[index + 1]; blue += sample[index + 2]; count += 1; }
           const luminance = ((red / Math.max(1, count)) * 299 + (green / Math.max(1, count)) * 587 + (blue / Math.max(1, count)) * 114) / 1000;
-          target.classList.toggle('auto-light', luminance < 145);
-          target.classList.toggle('auto-dark', luminance >= 145);
+          applyAutoContrastClass(target, luminance < 145 ? 'light' : 'dark');
         });
       } catch {
         applyContrastFallback();

@@ -162,28 +162,24 @@ html.ideal-fullscreen-ready {
   flex-shrink: 0;
 }
 .ta-app .ta-phone-head {
-  margin-top: var(--ideal-edge-top, env(safe-area-inset-top)) !important;
-  padding-top: 7px !important;
+  padding-top: max(7px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
 }
 .ta-app .ta-role-app-header,
 .ta-app .ta-role-conversation-header {
-  margin-top: var(--ideal-edge-top, env(safe-area-inset-top)) !important;
-  padding-top: 18px !important;
+  padding-top: max(18px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
 }
 .doubao-app .doubao-header,
 .ta-role-doubao-page .doubao-header {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
-  margin-top: var(--ideal-edge-top, env(safe-area-inset-top)) !important;
-  padding-top: 8px !important;
+  padding-top: max(25px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
 }
 .album-app .album-header {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
-  margin-top: var(--ideal-edge-top, env(safe-area-inset-top)) !important;
-  padding-top: 20px !important;
+  padding-top: max(20px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
 }
 .doubao-app .doubao-chat-title,
 .ta-role-doubao-page .doubao-chat-title {
@@ -221,6 +217,13 @@ body.ideal-fullscreen-body > .desktop-scroll-wrap {
 body.ideal-fullscreen-body > .page-indicator,
 body.ideal-fullscreen-body > .dock-bar {
   flex: 0 0 auto;
+}
+body.ideal-fullscreen-body > .dock-bar {
+  box-sizing: border-box;
+  height: calc(88px + var(--ideal-edge-bottom, 0px));
+  min-height: calc(88px + var(--ideal-edge-bottom, 0px));
+  margin-bottom: 0 !important;
+  padding-bottom: calc(4px + var(--ideal-edge-bottom, 0px));
 }
 .ideal-fullscreen-surface {
   box-sizing: border-box;

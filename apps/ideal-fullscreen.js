@@ -147,11 +147,7 @@
 
     syncBackdrop() {
       const bodyStyle = getComputedStyle(this.body);
-      this.root.style.backgroundColor = bodyStyle.backgroundColor || '#f4f4f2';
-      this.root.style.backgroundImage = bodyStyle.backgroundImage || 'none';
-      this.root.style.backgroundPosition = bodyStyle.backgroundPosition || 'center';
-      this.root.style.backgroundSize = bodyStyle.backgroundSize || 'cover';
-      this.root.style.backgroundRepeat = bodyStyle.backgroundRepeat || 'no-repeat';
+      this.root.style.background = bodyStyle.background || '#f4f4f2 center/cover fixed no-repeat';
     }
 
     syncSurfaces() {

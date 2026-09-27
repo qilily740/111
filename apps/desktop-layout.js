@@ -1353,7 +1353,11 @@
     pageIndicator.style.transform = transform;
   }
   function safeAreaInset(name) {
-    return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+    const styles = getComputedStyle(document.documentElement);
+    const value = parseFloat(styles.getPropertyValue(name));
+    if (Number.isFinite(value)) return value;
+    const idealName = name === '--safe-area-top' ? '--ideal-edge-top' : '--ideal-edge-bottom';
+    return parseFloat(styles.getPropertyValue(idealName)) || 0;
   }
   function dockGroupRect() {
     const dockRect = dock.getBoundingClientRect();
@@ -1372,7 +1376,7 @@
     const minLeft = sideGap;
     const maxLeft = Math.max(minLeft, innerWidth - rect.width - sideGap);
     const minTop = safeAreaInset('--safe-area-top') + sideGap;
-    const maxTop = Math.max(minTop, innerHeight - rect.height - safeAreaInset('--safe-area-bottom') - sideGap);
+    const maxTop = Math.max(minTop, innerHeight - rect.height - sideGap);
     const left = Math.max(minLeft, Math.min(maxLeft, rect.left));
     const top = Math.max(minTop, Math.min(maxTop, rect.top));
     return { x:position.x + left - rect.left, y:position.y + top - rect.top };
@@ -1397,7 +1401,7 @@
     const minLeft = sideGap;
     const maxLeft = Math.max(minLeft, innerWidth - dockDrag.startRect.width - sideGap);
     const minTop = safeAreaInset('--safe-area-top') + sideGap;
-    const maxTop = Math.max(minTop, innerHeight - dockDrag.startRect.height - safeAreaInset('--safe-area-bottom') - sideGap);
+    const maxTop = Math.max(minTop, innerHeight - dockDrag.startRect.height - sideGap);
     const nextLeft = Math.max(minLeft, Math.min(maxLeft, dockDrag.startRect.left + deltaX));
     const nextTop = Math.max(minTop, Math.min(maxTop, dockDrag.startRect.top + deltaY));
     applyDockPosition({ x:0, y:dockDrag.startPosition.y + nextTop - dockDrag.startRect.top });
