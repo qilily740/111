@@ -1,12 +1,12 @@
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 :root {
   --widget-placeholder-gray: #e2e2df;
-  --ideal-app-height: 100vh;
+  --ideal-app-height: var(--ideal-fullscreen-height, 100vh);
   --ideal-safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: only light;
 }
 @supports (height: 100dvh) {
-  :root { --ideal-app-height: 100dvh; }
+  :root { --ideal-app-height: var(--ideal-fullscreen-height, 100dvh); }
 }
 /* 阅读讨论：独立于阅读页日夜主题的毛玻璃聊天样式 */
 .chat-reading-mini { background: rgba(255,255,255,.78) !important; color: var(--reading-chat-text-color, #222) !important; border-color: rgba(255,255,255,.82) !important; -webkit-backdrop-filter: blur(20px) saturate(135%) !important; backdrop-filter: blur(20px) saturate(135%) !important; }
@@ -148,9 +148,9 @@ body .chat-reading-modal .chat-reading-manage { width: 38px !important; min-widt
 .chat-reading-modal.is-night .chat-reading-chapter-menu > div > button { color: #ddd; }
 .chat-reading-modal.is-night .chat-reading-chapter-menu > div > button.is-current { background: #4a4a4d; color: #fff; }
 html, body { width: 100%; overflow: hidden; }
-body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
+body { background: #f4f4f2 center/cover no-repeat; color: #222; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
 /* 根背景始终覆盖完整视口，键盘只调整 body 内容区。 */
-html { height: 100%; background: #f4f4f2 center/cover fixed no-repeat; overscroll-behavior: none; }
+html { height: var(--ideal-fullscreen-height, 100%); background: #f4f4f2 center/cover no-repeat; overscroll-behavior: none; }
 body {
   position: relative;
   display: flex;
@@ -224,8 +224,8 @@ body > .dock-bar {
   box-sizing: border-box;
   height: 88px;
   min-height: 88px;
-  margin-bottom: 0 !important;
-  padding-bottom: max(4px, var(--ideal-safe-bottom));
+  margin-bottom: max(12px, var(--ideal-safe-bottom)) !important;
+  padding: 10px 18px;
 }
 body > .desktop-scroll-wrap {
   touch-action: pan-x !important;

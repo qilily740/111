@@ -832,11 +832,20 @@
       let keyboardOpen = false;
       if (standaloneIOS) {
         const layoutWidth = Math.round(window.innerWidth || document.documentElement.clientWidth);
+        // iOS 主屏幕应用可能把状态栏高度从 vh/dvh/innerHeight 中扣掉。
+        // 仅窗口宽度匹配整块屏幕时校准，避免把 iPad 分屏撑成全屏。
+        const screenWidth = Number(window.screen?.width) || 0;
+        const screenHeight = Number(window.screen?.height) || 0;
+        const fullHeight = Math.abs(layoutWidth - screenWidth) <= 2 ? screenHeight
+          : Math.abs(layoutWidth - screenHeight) <= 2 ? screenWidth : 0;
+        if (fullHeight > 0) root.style.setProperty('--ideal-fullscreen-height', `${fullHeight}px`);
+        else root.style.removeProperty('--ideal-fullscreen-height');
         if (idealStableStandaloneWidth && Math.abs(layoutWidth - idealStableStandaloneWidth) > 40) idealStableStandaloneHeight = 0;
         idealStableStandaloneWidth = layoutWidth;
         if (!idealStableStandaloneHeight || layoutHeight > idealStableStandaloneHeight) idealStableStandaloneHeight = layoutHeight;
         keyboardOpen = visualHeight > 150 && visualHeight < idealStableStandaloneHeight - 100;
       } else {
+        root.style.removeProperty('--ideal-fullscreen-height');
         idealStableStandaloneHeight = 0;
         idealStableStandaloneWidth = 0;
       }

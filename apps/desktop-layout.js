@@ -1366,6 +1366,10 @@
     const bottom = Math.max(dockRect.bottom, indicatorRect.bottom);
     return { left, top, right, bottom, width:right - left, height:bottom - top };
   }
+  function dockViewportBottom() {
+    const gap = parseFloat(getComputedStyle(dock).marginBottom) || 0;
+    return document.body.clientHeight - Math.max(8, gap);
+  }
   function constrainedDockPosition(value) {
     const position = dockPosition(value);
     applyDockPosition(position);
@@ -1374,7 +1378,7 @@
     const minLeft = sideGap;
     const maxLeft = Math.max(minLeft, innerWidth - rect.width - sideGap);
     const minTop = safeAreaInset('--safe-area-top') + sideGap;
-    const maxTop = Math.max(minTop, innerHeight - rect.height - sideGap);
+    const maxTop = Math.max(minTop, dockViewportBottom() - rect.height);
     const left = Math.max(minLeft, Math.min(maxLeft, rect.left));
     const top = Math.max(minTop, Math.min(maxTop, rect.top));
     return { x:position.x + left - rect.left, y:position.y + top - rect.top };
@@ -1399,7 +1403,7 @@
     const minLeft = sideGap;
     const maxLeft = Math.max(minLeft, innerWidth - dockDrag.startRect.width - sideGap);
     const minTop = safeAreaInset('--safe-area-top') + sideGap;
-    const maxTop = Math.max(minTop, innerHeight - dockDrag.startRect.height - sideGap);
+    const maxTop = Math.max(minTop, dockViewportBottom() - dockDrag.startRect.height);
     const nextLeft = Math.max(minLeft, Math.min(maxLeft, dockDrag.startRect.left + deltaX));
     const nextTop = Math.max(minTop, Math.min(maxTop, dockDrag.startRect.top + deltaY));
     applyDockPosition({ x:0, y:dockDrag.startPosition.y + nextTop - dockDrag.startRect.top });
