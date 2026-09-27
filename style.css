@@ -3460,7 +3460,7 @@ body > .desktop-scroll-wrap {
 .chat-moments-page .chat-moment-filters { position:sticky; top:0; z-index:5; box-sizing:border-box; align-items:center; min-height:62px; padding:8px 20px; border-bottom:1px solid rgba(0,0,0,.07); background:rgba(255,255,255,.96); -webkit-backdrop-filter:blur(16px) saturate(130%); backdrop-filter:blur(16px) saturate(130%); }
 .chat-moments-page .chat-moment-filters button { min-height:36px; }
 .chat-moments-page .chat-moment-filters {
-  --moments-sticky-gap:calc(env(safe-area-inset-top, 0px) + 20px);
+  --moments-sticky-gap:env(safe-area-inset-top, 0px);
   --moments-sticky-background:#fff;
   top:var(--moments-sticky-gap);
 }
