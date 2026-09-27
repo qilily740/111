@@ -19,7 +19,11 @@
         '.music-app', '.shopping-app', '.doubao-app', '.ifspace-app',
         '.settings-app', '.beauty-app', '.worldbook-app', '.memory-library-app',
         '.couple-app', '.fanfic-app', '.debate-app', '.magazine-app',
-        '.folder-app-shell', '.desktop-folder-layer'
+        '.folder-app-shell', '.desktop-folder-layer',
+        '.chat-settings', '.chat-editor', '.chat-reading-modal', '.chat-user-home-page',
+        '.chat-offline-modal', '.chat-video-call-modal', '.chat-wallet-modal',
+        '.launcher-setup', '.beauty-modal', '.world-editor', '.edit-modal',
+        '.desktop-widget-library', '.game-app', '.stock-game'
       ].join(',');
       this.start();
     }
@@ -51,6 +55,22 @@
       return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
     }
 
+    isIOSStandalone() {
+      const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const standalone = navigator.standalone === true
+        || window.matchMedia?.('(display-mode: standalone)').matches;
+      return ios && standalone;
+    }
+
+    estimateIOSSafeArea() {
+      const screenHeight = Math.max(window.screen?.height || 0, window.screen?.width || 0);
+      if (screenHeight >= 900) return { top: 59, bottom: 34 };
+      if (screenHeight >= 800) return { top: 47, bottom: 34 };
+      if (screenHeight >= 700) return { top: 44, bottom: 20 };
+      return { top: 20, bottom: 0 };
+    }
+
     readSafeArea() {
       const probe = document.createElement('i');
       probe.setAttribute('aria-hidden', 'true');
@@ -62,9 +82,12 @@
       ].join(';');
       this.body.appendChild(probe);
       const computed = getComputedStyle(probe);
-      const top = Number.parseFloat(computed.paddingTop) || 0;
-      const bottom = Number.parseFloat(computed.paddingBottom) || 0;
+      let top = Number.parseFloat(computed.paddingTop) || 0;
+      let bottom = Number.parseFloat(computed.paddingBottom) || 0;
       probe.remove();
+      if (!top && !bottom && this.isIOSStandalone()) {
+        ({ top, bottom } = this.estimateIOSSafeArea());
+      }
       return { top, bottom };
     }
 
@@ -106,6 +129,8 @@
       this.root.style.setProperty('--ideal-keyboard-inset', `${viewport.keyboardInset}px`);
       this.root.style.setProperty('--ideal-safe-top', `${this.safeArea.top}px`);
       this.root.style.setProperty('--ideal-safe-bottom', `${this.safeArea.bottom}px`);
+      this.root.style.setProperty('--ideal-edge-top', `${this.safeArea.top}px`);
+      this.root.style.setProperty('--ideal-edge-bottom', `${this.safeArea.bottom}px`);
       this.root.classList.toggle('ideal-keyboard-open', viewport.keyboardOpen);
       this.body.classList.toggle('ideal-keyboard-open', viewport.keyboardOpen);
     }

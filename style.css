@@ -148,6 +148,8 @@ html.ideal-fullscreen-ready {
   --ideal-keyboard-inset: 0px;
   --ideal-safe-top: 0px;
   --ideal-safe-bottom: 0px;
+  --ideal-edge-top: max(var(--ideal-safe-top, 0px), env(safe-area-inset-top, 0px));
+  --ideal-edge-bottom: max(var(--ideal-safe-bottom, 0px), env(safe-area-inset-bottom, 0px));
 }
 html.ideal-fullscreen-ready,
 body.ideal-fullscreen-body {
@@ -155,20 +157,26 @@ body.ideal-fullscreen-body {
 }
 body.ideal-fullscreen-body {
   position: fixed;
-  inset: 0;
+  top: calc(0px - var(--ideal-edge-top, 0px));
+  right: 0;
+  bottom: auto;
+  left: 0;
   width: 100%;
-  height: var(--ideal-viewport-height, 100dvh);
+  height: calc(var(--ideal-viewport-height, 100dvh) + var(--ideal-edge-top, 0px) + var(--ideal-edge-bottom, 0px));
   overflow: hidden;
   overscroll-behavior: none;
 }
 .ideal-fullscreen-surface {
   box-sizing: border-box;
-  height: var(--ideal-viewport-height, 100dvh);
-  max-height: var(--ideal-viewport-height, 100dvh);
+  top: calc(0px - var(--ideal-edge-top, 0px)) !important;
+  right: 0 !important;
+  bottom: auto !important;
+  left: 0 !important;
+  height: calc(var(--ideal-viewport-height, 100dvh) + var(--ideal-edge-top, 0px) + var(--ideal-edge-bottom, 0px));
+  max-height: none;
 }
 html.ideal-keyboard-open .ideal-fullscreen-surface {
-  height: var(--ideal-visual-height, 100dvh);
-  max-height: var(--ideal-visual-height, 100dvh);
+  height: calc(var(--ideal-visual-height, 100dvh) + var(--ideal-edge-top, 0px) + var(--ideal-edge-bottom, 0px));
 }
 
 .desktop-scroll-wrap { height: calc(100vh - 140px); display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
