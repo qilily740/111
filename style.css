@@ -156,6 +156,15 @@ html.ideal-fullscreen-ready {
   overflow: hidden;
   overscroll-behavior: none;
 }
+html.ideal-fullscreen-ready::before {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  display: block;
+  background: inherit;
+  content: '';
+  pointer-events: none;
+}
 
 /* iOS 独立窗口：安全区只留给内容顶栏，不能再把整层高度加长。 */
 .ta-app .ta-phone-head,
@@ -242,12 +251,17 @@ body.ideal-fullscreen-body > .desktop-scroll-wrap {
   overscroll-behavior: none;
 }
 .ideal-fullscreen-surface {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
+  left: 0 !important;
   box-sizing: border-box;
-  height: var(--ideal-viewport-height, 100dvh);
+  height: calc(var(--ideal-viewport-height, 100dvh) + var(--ideal-edge-bottom, 0px));
   max-height: none;
 }
 html.ideal-keyboard-open .ideal-fullscreen-surface {
-  height: var(--ideal-visual-height, 100dvh);
+  height: calc(var(--ideal-visual-height, 100dvh) + var(--ideal-edge-bottom, 0px));
   max-height: none;
 }
 
