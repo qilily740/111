@@ -5936,7 +5936,8 @@ body > .desktop-scroll-wrap {
   padding-bottom:var(--chat-keyboard-inset, 0px);
 }
 .chat-app.is-chatting .chat-conversation.is-input-focused > .chat-compose-wrap {
-  margin-bottom:0 !important;
+  /* Keep a small visible gap above iOS' keyboard/accessory edge. */
+  margin-bottom:10px !important;
 }
 .chat-app.is-chatting .chat-conversation > .chat-messages {
   min-height:0;
