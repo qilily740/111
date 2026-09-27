@@ -5146,6 +5146,49 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   // Keep the conversation that requested the latest position explicit so a
   // later redraw cannot restore an old snapshot from another render cycle.
   let chatScrollLatestContactId = '';
+  let chatLatestLayoutCleanup = null;
+  let chatLatestFollowing = false;
+  function followChatLatestLayout() {
+    chatLatestLayoutCleanup?.();
+    const box = document.querySelector('#chatMessages');
+    const contactId = activeContact;
+    if (!box) return;
+    chatLatestFollowing = true;
+    let frame = 0;
+    const align = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (chatLatestFollowing && box.isConnected && activeContact === contactId && activeTab === 'chat' && app.classList.contains('is-open')) box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
+      });
+    };
+    const stop = () => {
+      chatLatestFollowing = false;
+      chatScrollToLatestPending = false;
+      chatScrollLatestContactId = '';
+      clearTimeout(chatScrollToLatestTimer);
+      cancelAnimationFrame(frame);
+    };
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(align) : null;
+    const observe = () => {
+      resize?.disconnect();
+      resize?.observe(box);
+      for (const child of box.children) resize?.observe(child);
+      align();
+    };
+    const mutation = new MutationObserver(observe);
+    mutation.observe(box, { childList:true });
+    box.addEventListener('load', align, true);
+    for (const event of ['touchstart', 'pointerdown', 'wheel', 'keydown']) box.addEventListener(event, stop, { passive:true });
+    chatLatestLayoutCleanup = () => {
+      stop();
+      resize?.disconnect();
+      mutation.disconnect();
+      box.removeEventListener('load', align, true);
+      for (const event of ['touchstart', 'pointerdown', 'wheel', 'keydown']) box.removeEventListener(event, stop);
+      chatLatestLayoutCleanup = null;
+    };
+    observe();
+  }
   function requestChatScrollToLatest(contactId = activeContact) {
     const targetId = String(contactId || '');
     if (!targetId || activeContact !== contactId || activeTab !== 'chat' || !app.classList.contains('is-open')) return;
@@ -5157,6 +5200,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   }
   render = function() {
     const renderToken = ++chatScrollRenderToken;
+    clearTimeout(chatScrollToLatestTimer);
     const messageBox = document.querySelector('#chatMessages');
     const messageCount = state.chats?.[activeContact]?.messages?.length || 0;
     const renderedCount = messageBox?.querySelectorAll('[data-chat-message-id]').length || 0;
@@ -5165,6 +5209,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     if (hasNewMessages) {
       requestChatScrollToLatest(activeContact);
     }
+    if (chatVisible && chatLatestFollowing) requestChatScrollToLatest(activeContact);
     // Keep the current reading position for state-only redraws. Once a message has
     // been appended, all redraws in that reply/transfer cycle stay pinned to the latest item.
     const shouldRestore = chatVisible && Boolean(messageBox) && !chatScrollToLatestPending;
@@ -5180,8 +5225,14 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     chatViewRendering = true;
     try { renderWithChatScrollRestore(); } finally { chatViewRendering = false; }
     if (chatScrollToLatestPending) {
+      // Cleanup of the previous view must not cancel this render's request.
+      const latestContactId = chatScrollLatestContactId;
+      followChatLatestLayout();
+      chatScrollLatestContactId = latestContactId;
+      chatScrollToLatestPending = true;
       const scrollLatest = () => {
         if (renderToken !== chatScrollRenderToken) return;
+        if (!chatScrollToLatestPending) return;
         if (!app.classList.contains('is-open') || activeTab !== 'chat' || !activeContact || String(activeContact) !== chatScrollLatestContactId) return;
         const messages = document.querySelector('#chatMessages');
         const main = document.querySelector('#chatMain');
@@ -5195,12 +5246,14 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       setTimeout(scrollLatest, 100);
       setTimeout(scrollLatest, 220);
       chatScrollToLatestTimer = setTimeout(() => {
+        if (renderToken !== chatScrollRenderToken) return;
         scrollLatest();
         chatScrollToLatestPending = false;
         chatScrollLatestContactId = '';
       }, 420);
       return;
     }
+    chatLatestLayoutCleanup?.();
     if (snapshot) {
       const restore = () => {
         if (renderToken !== chatScrollRenderToken || chatScrollToLatestPending) return;
@@ -6638,6 +6691,10 @@ ${recentConversation}
     const messageId = result.dataset.chatSearchMessage || '';
     const messageIndex = Number(result.dataset.chatSearchIndex);
     if (!contactId) return;
+    chatLatestLayoutCleanup?.();
+    chatScrollToLatestPending = false;
+    chatScrollLatestContactId = '';
+    clearTimeout(chatScrollToLatestTimer);
     refreshConversationFromStorage(contactId);
     activeContact = contactId;
     activeTab = 'chat';
