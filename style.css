@@ -151,13 +151,35 @@ html.ideal-fullscreen-ready {
   --ideal-edge-top: max(var(--ideal-safe-top, 0px), env(safe-area-inset-top, 0px));
   --ideal-edge-bottom: max(var(--ideal-safe-bottom, 0px), env(safe-area-inset-bottom, 0px));
 }
+
+/* 三个带独立手机顶栏的 App：全屏根层覆盖安全区，但顶栏内容保持在最上层。 */
+.ta-app .ta-phone-status,
+.ta-app .ta-phone-head,
+.doubao-app .doubao-header,
+.album-app .album-header {
+  position: relative;
+  z-index: 12;
+  flex-shrink: 0;
+}
+.ta-app .ta-phone-status {
+  padding-top: max(12px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+}
+.doubao-app .doubao-header {
+  padding-top: max(25px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+}
+.doubao-app .doubao-chat-title {
+  top: max(29px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+}
+.album-app .album-header {
+  padding-top: max(20px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+}
 html.ideal-fullscreen-ready,
 body.ideal-fullscreen-body {
   min-height: var(--ideal-viewport-height, 100dvh);
 }
 body.ideal-fullscreen-body {
   position: fixed;
-  top: calc(0px - var(--ideal-edge-top, 0px));
+  top: 0;
   right: 0;
   bottom: auto;
   left: 0;
@@ -168,7 +190,7 @@ body.ideal-fullscreen-body {
 }
 .ideal-fullscreen-surface {
   box-sizing: border-box;
-  top: calc(0px - var(--ideal-edge-top, 0px)) !important;
+  top: 0 !important;
   right: 0 !important;
   bottom: auto !important;
   left: 0 !important;
@@ -3732,8 +3754,8 @@ html.ideal-keyboard-open .ideal-fullscreen-surface {
 .ta-phone-page { position:relative; display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; isolation:isolate; }
 .ta-wallpaper { position:absolute; inset:0; z-index:-2; background:linear-gradient(145deg,#d9e9fb 0%,#f8e7f0 48%,#f7e7ca 100%); background-position:center; background-size:cover; }
 .ta-wallpaper::after { position:absolute; inset:0; background:radial-gradient(circle at 80% 12%,rgba(255,255,255,.75),transparent 32%),linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.42)); content:""; }
-.ta-phone-status { display:flex; justify-content:space-between; padding:max(12px,env(safe-area-inset-top)) 24px 0; color:#303642; font-size:12px; font-weight:700; }
-.ta-phone-head { display:flex; align-items:center; justify-content:space-between; padding:14px 22px 10px; }
+.ta-phone-status { position:relative; z-index:3; display:flex; flex:0 0 auto; justify-content:space-between; padding:max(12px,var(--ideal-edge-top,env(safe-area-inset-top))) 24px 0; color:#303642; font-size:12px; font-weight:700; }
+.ta-phone-head { position:relative; z-index:3; display:flex; flex:0 0 auto; align-items:center; justify-content:space-between; padding:14px 22px 10px; }
 .ta-phone-head > button:first-child { display:flex; align-items:center; gap:9px; min-width:0; padding:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; }
 .ta-phone-head > button:first-child > i { display:grid; flex:0 0 42px; place-items:center; width:42px; height:42px; overflow:hidden; border:2px solid rgba(255,255,255,.9); border-radius:14px; background:rgba(255,255,255,.56); color:#737987; font-style:normal; box-shadow:0 4px 13px rgba(86,103,131,.13); }
 .ta-phone-head > button:first-child > i img { width:100%; height:100%; object-fit:cover; }
