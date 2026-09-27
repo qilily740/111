@@ -6447,6 +6447,10 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
 .ta-app-icon[data-ta-role-app="qinglvkongjian"] > i > img,
 .ta-icon-swap-preview[data-ta-icon-swap="qinglvkongjian"] > img { transform:scale(1.32); }
 
+/* “TA 看我”反查手机桌面也要裁掉情侣空间图标自带的宽白边，保持和其他图标的主体大小一致。 */
+.ta-reverse-desktop-pages article[data-ta-reverse-prefer="qinglvkongjian"] > i > img,
+.ta-reverse-browser.ta-reverse-app-qinglvkongjian .ta-reverse-opened-icon.has-default-image > img { transform:scale(1.32); }
+
 /* 文件夹内的图片 App 与桌面一致：去掉白色描边和内高光。 */
 .folder-app-icon:has(img),.folder-mini-app:has(img) { overflow:hidden; border:0 !important; background:transparent !important; box-shadow:none !important; -webkit-backdrop-filter:none !important; backdrop-filter:none !important; }
 .folder-app-icon>img { display:block; width:100%; height:100%; border-radius:inherit; object-fit:cover; transform:scale(1.02); }
