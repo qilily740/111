@@ -303,6 +303,16 @@
     }
     return null;
   }
+  function taBilingualMarkup(message) {
+    let original = String(message?.originalText || message?.text || message?.content || '').trim();
+    let translation = String(message?.translation || '').trim();
+    if (!translation && message?.type === 'translation') {
+      const match = original.match(/^([\s\S]*?)「([\s\S]+)」\s*$/);
+      if (match) { original = match[1].trim(); translation = match[2].trim(); }
+    }
+    if (!original || !translation || original === translation) return '';
+    return `<span class="ideal-chat-bilingual-original">${esc(original)}</span><span class="ideal-chat-bilingual-translation">${esc(translation)}</span>`;
+  }
   function taChatBubbleBody(message) {
     if (message?.recalled) return `<span class="ta-chat-recalled">${esc(message.text || '撤回了一条消息')}</span>`;
     if (['image', 'sticker'].includes(message?.type) && message.text) return `<img src="${esc(message.text)}" data-sticker="${message.sticker || message.type === 'sticker' ? 'true' : 'false'}" alt="${message.sticker || message.type === 'sticker' ? '表情包' : '图片'}">`;
@@ -335,6 +345,8 @@
       return `<div class="chat-voice-wrap"><span class="chat-voice-bubble"><span class="chat-voice-wave"><i></i><i></i><i></i><i></i><i></i></span><b>${seconds}"</b></span></div>`;
     }
     if (message?.type === 'together') return `▤ ${esc(message.text || '')}`;
+    const bilingual = taBilingualMarkup(message);
+    if (bilingual) return bilingual;
     return `<span>${esc(message?.text || message?.content || '')}</span>`;
   }
   function roleConversation(owner, target) {
@@ -354,7 +366,8 @@
       const quote = message?.quote;
       const displayMessage = quote?.prefix && String(message.text || '').startsWith(quote.prefix) ? { ...message, text:String(message.text).slice(quote.prefix.length) } : message;
       const quoteMarkup = quote ? `<div class="chat-message-quote"><small>${esc(quote.speaker || '消息')}</small><p>${esc(quote.text || '')}</p></div>` : '';
-      const bubble = `<div class="ta-chat-bubble chat-bubble${bubbleType}${statusClass}">${quoteMarkup}${taChatBubbleBody(displayMessage)}</div>`;
+      const bilingualClass = taBilingualMarkup(displayMessage) ? ' ideal-chat-bilingual-open' : '';
+      const bubble = `<div class="ta-chat-bubble chat-bubble${bubbleType}${statusClass}${bilingualClass}">${quoteMarkup}${taChatBubbleBody(displayMessage)}</div>`;
       const senderIdentity = sender.identity && !/^(?:NPC|群主|群成员)$/.test(sender.identity) ? `<em>${esc(sender.identity)}</em>` : '';
       const content = contact.kind === 'group' ? `<div class="ta-chat-message-content"><b class="ta-chat-sender-name"><span>${esc(sender.name || sender.nickname || '群成员')}</span>${senderIdentity}</b>${bubble}</div>` : bubble;
       return `<article class="ta-chat-message ${ownerMessage ? 'is-owner' : 'is-other'}${type}" data-ta-chat-message-id="${esc(message.id || '')}"><div class="ta-chat-message-line"><i>${avatar(sender)}</i>${content}${stamp}</div></article>`;
@@ -1090,7 +1103,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜群消息
   function reverseSafeData(value,depth=0) { if(depth>8)return '[更深层记录]';if(value==null||typeof value==='number'||typeof value==='boolean')return value;if(typeof value==='string'){if(/^data:(?:image|audio|video)\//i.test(value))return '[媒体文件]';return value.slice(0,4000);}if(Array.isArray(value))return value.map(item=>reverseSafeData(item,depth+1));if(typeof value==='object'){const result={};Object.entries(value).forEach(([key,item])=>{if(/(?:api.?key|secret|password|token|authorization|session)/i.test(key))return;result[key]=reverseSafeData(item,depth+1);});return result;}return String(value); }
   function userPhoneEvidence(owner) {
     const chat=read(chatKey,{});const ownChat=chat.chats?.[owner.id]||{};const profileId=ownChat.profileId||'';const profile=(chat.profiles||[]).find(item=>item.id===profileId)||{};
-    const conversations=(chat.contacts||[]).filter(contact=>contact.id!==owner.id&&chat.chats?.[contact.id]?.profileId===profileId).map(contact=>({contactId:contact.id,with:contact.nickname||contact.name,realName:contact.name||'',relationship:'用户与其他角色的聊天',isOtherRole:true,avatar:contact.avatar||'',userAvatar:profile.avatar||'',settings:{...(chat.chats[contact.id]?.settings||{})},messages:(chat.chats[contact.id]?.messages||[]).map(item=>({speaker:item.role==='user'?(profile.nickname||profile.realName||'用户'):(contact.nickname||contact.name||'对方'),speakerType:item.role==='user'?'user':'character',text:item.text||item.content||'',type:item.type||'text',time:item.time||item.createdAt||'',quote:item.quote?{...item.quote}:undefined}))}));
+    const conversations=(chat.contacts||[]).filter(contact=>contact.id!==owner.id&&chat.chats?.[contact.id]?.profileId===profileId).map(contact=>({contactId:contact.id,with:contact.nickname||contact.name,realName:contact.name||'',relationship:'用户与其他角色的聊天',isOtherRole:true,avatar:contact.avatar||'',userAvatar:profile.avatar||'',settings:{...(chat.chats[contact.id]?.settings||{})},messages:(chat.chats[contact.id]?.messages||[]).map(item=>({speaker:item.role==='user'?(profile.nickname||profile.realName||'用户'):(contact.nickname||contact.name||'对方'),speakerType:item.role==='user'?'user':'character',text:item.text||item.content||'',originalText:item.originalText||undefined,translation:item.translation||undefined,type:item.type||'text',time:item.time||item.createdAt||'',quote:item.quote?{...item.quote}:undefined}))}));
     const shopping=read('ideal-machine-shopping',{});const music=read('ideal-machine-music',{});const couple=read('ideal-machine-couple',{});const album=read('ideal-machine-album-v1',{});
     const albumView={...album,items:(Array.isArray(album.items)?album.items:[]).map(item=>({...item}))};const shoppingView={profileId,cart:shopping.carts?.[profileId]||[],orders:shopping.orders?.[profileId]||[],wishes:shopping.wishes?.[profileId]||[],gifts:shopping.gifts?.[profileId]||[],companion:shopping.companion?.[profileId]||'',payer:shopping.payers?.[profileId]||'',flowerMarket:shopping.privateModes?.[profileId]||false,productArchive:shopping.productArchive||[]};const musicView={profileId,current:music.current?.[profileId]||music.current||{},library:music.library?.[profileId]||[],rooms:music.rooms||{},neteaseProfile:read(`ideal-machine-netease-profile-${profileId}`,{})};
     const apps={聊天:{profileId,conversations},论坛:{feed:read('ideal-machine-forum',[]),discover:read('ideal-machine-forum-discover',[]),notices:read('ideal-machine-forum-notices',[]),profile:read('ideal-machine-forum-profile',{})},相册:albumView,日历:read('ideal-machine-calendar-events',[]),音乐:musicView,豆包:{messages:read('ideal-machine-doubao',[]),history:read('ideal-machine-doubao-history',[])},购物:shoppingView,情侣空间:couple.spaces?.[owner.id]||couple,辩论:read('ideal-machine-debates',{}),同人文:read('ideal-machine-fanfic',{}),杂志社:read('ideal-machine-magazine',{})};
