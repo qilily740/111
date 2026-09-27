@@ -6,6 +6,9 @@
     maxPerDay: 2,
     minGapHours: 6,
     maxGapHours: 12,
+    activeStart: 8,
+    activeEnd: 23,
+    imageEnabled: false,
     quietStart: 23,
     quietEnd: 8
   });
@@ -23,6 +26,9 @@
       maxPerDay: Math.round(number(source.maxPerDay, IDEAL_MOMENT_AUTOMATION_DEFAULT.maxPerDay, 1, 6)),
       minGapHours,
       maxGapHours,
+      activeStart: Math.round(number(source.activeStart, IDEAL_MOMENT_AUTOMATION_DEFAULT.activeStart, 0, 23)),
+      activeEnd: Math.round(number(source.activeEnd, IDEAL_MOMENT_AUTOMATION_DEFAULT.activeEnd, 0, 23)),
+      imageEnabled: source.imageEnabled === true,
       quietStart: Math.round(number(source.quietStart, IDEAL_MOMENT_AUTOMATION_DEFAULT.quietStart, 0, 23)),
       quietEnd: Math.round(number(source.quietEnd, IDEAL_MOMENT_AUTOMATION_DEFAULT.quietEnd, 0, 23)),
       lastRunAt: Number.isFinite(Number(source.lastRunAt)) ? Number(source.lastRunAt) : 0
@@ -7351,7 +7357,11 @@ ${recentConversation}
     momentAutomationSection.dataset.chatMomentAutomationOptions = '';
     const momentAutomationContact = state.contacts.find(item => item.id === activeContact);
     const momentAutomationSettings = momentAutomationSettingsFor(momentAutomationContact);
-    momentAutomationSection.innerHTML = '<button class="chat-memory-settings-head" data-chat-moment-automation-settings-toggle type="button" aria-expanded="' + chatMomentAutomationSettingsOpen + '"><span><b>朋友圈自动活动</b><small>' + (momentAutomationSettings.enabled === false ? '已关闭' : '已开启 · 角色会自然发布动态') + '</small></span><i class="' + (chatMomentAutomationSettingsOpen ? 'is-open' : '') + '">⌄</i></button>' + (chatMomentAutomationSettingsOpen ? '<div class="chat-memory-settings-body"><label class="chat-memory-switch"><input type="checkbox" data-chat-moment-auto-enabled ' + (momentAutomationSettings.enabled === false ? '' : 'checked') + '><span><b>开启自动发朋友圈</b><small>当前角色会在页面运行时偶尔发布动态，每天最多 2 条</small></span></label><p class="chat-vision-api-warning">角色会避开夜间、刚聊完天和重复内容；自动活动只使用独立的朋友圈上下文，不会把朋友圈注入普通聊天。</p></div>' : '');
+    const momentImageConfig = window.IdealMachineImageAPI?.getConfig?.() || {};
+    const momentImageReady = Boolean(momentImageConfig.endpoint && momentImageConfig.model);
+    const momentHour = value => Math.max(0, Math.min(23, Math.round(Number(value) || 0)));
+    const momentMaxPerDay = Math.max(1, Math.min(6, Math.round(Number(momentAutomationSettings.maxPerDay) || 2)));
+    momentAutomationSection.innerHTML = '<button class="chat-memory-settings-head" data-chat-moment-automation-settings-toggle type="button" aria-expanded="' + chatMomentAutomationSettingsOpen + '"><span><b>朋友圈自动活动</b><small>' + (momentAutomationSettings.enabled === false ? '已关闭' : '已开启 · 角色会自然发布动态') + '</small></span><i class="' + (chatMomentAutomationSettingsOpen ? 'is-open' : '') + '">⌄</i></button>' + (chatMomentAutomationSettingsOpen ? '<div class="chat-memory-settings-body"><label class="chat-memory-switch"><input type="checkbox" data-chat-moment-auto-enabled ' + (momentAutomationSettings.enabled === false ? '' : 'checked') + '><span><b>开启自动发朋友圈</b><small>当前角色会在页面运行时偶尔发布动态</small></span></label><div class="chat-memory-grid"><label><span>活动开始时间</span><input type="number" min="0" max="23" step="1" data-chat-moment-active-start value="' + momentHour(momentAutomationSettings.activeStart) + '"><small>每天从几点开始自由活动</small></label><label><span>活动结束时间</span><input type="number" min="0" max="23" step="1" data-chat-moment-active-end value="' + momentHour(momentAutomationSettings.activeEnd) + '"><small>每天到几点停止自由活动</small></label><label><span>每天最多动态</span><input type="number" min="1" max="6" step="1" data-chat-moment-max-per-day value="' + momentMaxPerDay + '"><small>当前角色每天最多发布条数</small></label></div><label class="chat-memory-switch"><input type="checkbox" data-chat-moment-auto-image ' + (momentImageReady ? '' : 'disabled') + ' ' + (momentAutomationSettings.imageEnabled ? 'checked' : '') + '><span><b>自动生成配图</b><small>' + (momentImageReady ? '自动动态会调用生图 API 生成配图' : '请先在设置中配置生图 API') + '</small></span></label></div>' : '');
     section.insertAdjacentElement('afterend', visionSection);
     const memorySection = main.querySelector('[data-chat-memory-settings]');
     const group = document.createElement('section');
@@ -7418,14 +7428,24 @@ ${recentConversation}
   });
   document.addEventListener('change', event => {
     const toggle = event.target.closest?.('[data-chat-moment-auto-enabled]');
-    if (!toggle || !app.classList.contains('is-open')) return;
+    const imageToggle = event.target.closest?.('[data-chat-moment-auto-image]');
+    const activeStart = event.target.closest?.('[data-chat-moment-active-start]');
+    const activeEnd = event.target.closest?.('[data-chat-moment-active-end]');
+    const maxPerDay = event.target.closest?.('[data-chat-moment-max-per-day]');
+    if ((!toggle && !imageToggle && !activeStart && !activeEnd && !maxPerDay) || !app.classList.contains('is-open')) return;
     const contact = state.contacts.find(item => item.id === activeContact);
     if (!contact) return;
     const momentSettings = momentAutomationSettingsFor(contact);
-    momentSettings.enabled = toggle.checked;
+    if (toggle) momentSettings.enabled = toggle.checked;
+    if (imageToggle) momentSettings.imageEnabled = imageToggle.checked;
+    if (activeStart) momentSettings.activeStart = Math.max(0, Math.min(23, Math.round(Number(activeStart.value) || 0)));
+    if (activeEnd) momentSettings.activeEnd = Math.max(0, Math.min(23, Math.round(Number(activeEnd.value) || 0)));
+    if (maxPerDay) momentSettings.maxPerDay = Math.max(1, Math.min(6, Math.round(Number(maxPerDay.value) || 1)));
     save();
-    const summary = document.querySelector('[data-chat-moment-automation-options] .chat-memory-settings-head small');
-    if (summary) summary.textContent = toggle.checked ? '已开启 · 角色会自然发布动态' : '已关闭';
+    if (toggle) {
+      const summary = document.querySelector('[data-chat-moment-automation-options] .chat-memory-settings-head small');
+      if (summary) summary.textContent = toggle.checked ? '已开启 · 角色会自然发布动态' : '已关闭';
+    }
   }, true);
   // On touch devices the input blurs before click. Keep the airplane visible
   // for the duration of the gesture, then handle sending with a pinned view.
@@ -8460,11 +8480,11 @@ ${recentConversation}
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 0 : date.getHours();
   }
-  function momentAutomationInQuietHours(settings, now = Date.now()) {
+  function momentAutomationInActiveHours(settings, now = Date.now()) {
     const hour = momentAutomationHour(now);
-    const start = Number(settings?.quietStart ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.quietStart);
-    const end = Number(settings?.quietEnd ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.quietEnd);
-    if (start === end) return false;
+    const start = Number(settings?.activeStart ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.activeStart);
+    const end = Number(settings?.activeEnd ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.activeEnd);
+    if (start === end) return true;
     return start < end ? hour >= start && hour < end : hour >= start || hour < end;
   }
   function momentAutomationRandomDelay(settings) {
@@ -8516,9 +8536,9 @@ ${recentConversation}
   function momentAutomationShouldSkipContact(contact, settings, now, force = false) {
     if (!contact || contact.isGroup || isGroupChatContact(contact) || momentActorIsDeceased(contact)) return true;
     if (!force && (state.momentAutomation?.enabled === false || settings.enabled === false)) return true;
-    if (!force && momentAutomationInQuietHours(state.momentAutomation, now)) return true;
+    if (!force && !momentAutomationInActiveHours(settings, now)) return true;
     if (!force && settings.nextDueAt && Number(settings.nextDueAt) > now) return true;
-    if (!force && momentAutomationPostsToday(contact.id, now) >= Number(state.momentAutomation?.maxPerDay || IDEAL_MOMENT_AUTOMATION_DEFAULT.maxPerDay)) return true;
+    if (!force && momentAutomationPostsToday(contact.id, now) >= Number(settings.maxPerDay || IDEAL_MOMENT_AUTOMATION_DEFAULT.maxPerDay)) return true;
     if (replyingContacts.has(contact.id) || String(backgroundReplyContactId || '') === String(contact.id || '')) return true;
     const chat = state.chats?.[contact.id];
     const latest = Array.isArray(chat?.messages) ? chat.messages.at(-1) : null;
@@ -8534,7 +8554,7 @@ ${recentConversation}
     } catch {}
     return { shouldPost: true, text: source };
   }
-  async function momentAutomationGenerate(contact, now) {
+  async function momentAutomationGenerate(contact, now, settings) {
     const config = window.IdealMachineAPI?.getConfig?.();
     const model = window.IdealMachineAPI?.getModel?.('chat');
     if (!config?.endpoint || !config.key || !model) return false;
@@ -8565,7 +8585,7 @@ ${recentConversation}
     if (!result || result.shouldPost === false || String(result.shouldPost || '').toLowerCase() === 'false') return false;
     const text = cleanGeneratedMomentText(result.text || result.content || result.post || '', contact);
     if (!text || text.length < 2 || momentAutomationTooSimilar(text, momentAutomationRecentPosts(contact.id))) return false;
-    state.moments.unshift({
+    const post = {
       id: uid('moment'),
       author: roleName,
       realName: contact.name || roleName,
@@ -8581,8 +8601,10 @@ ${recentConversation}
       autoGeneratedAt: now,
       likes: 0,
       comments: []
-    });
+    };
+    state.moments.unshift(post);
     save();
+    if (settings?.imageEnabled === true) await addGeneratedMomentImages([post]);
     if (app.classList.contains('is-open') && activeTab === 'moments') render();
     return true;
   }
@@ -8602,9 +8624,9 @@ ${recentConversation}
     const contact = selected.contact;
     const settings = selected.settings;
     settings.lastRunAt = now;
-    settings.nextDueAt = now + momentAutomationRandomDelay(state.momentAutomation);
+    settings.nextDueAt = now + momentAutomationRandomDelay(settings);
     try {
-      const created = await momentAutomationGenerate(contact, now);
+      const created = await momentAutomationGenerate(contact, now, settings);
       if (created) settings.lastPostedAt = now;
       save();
       return created;
