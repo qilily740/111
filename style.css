@@ -141,32 +141,11 @@ body .chat-reading-modal .chat-reading-manage { width: 38px !important; min-widt
 .chat-reading-modal.is-night .chat-reading-chapter-menu > div > button.is-current { background: #4a4a4d; color: #fff; }
 html, body { width: 100%; height: 100%; overflow: hidden; }
 body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
-/* 独立视口适配层：只提供尺寸变量，不覆盖各 App 自己的顶栏和安全区布局。 */
-html.ideal-fullscreen-ready {
-  --ideal-viewport-height: 100dvh;
-  --ideal-visual-height: 100dvh;
-  --ideal-keyboard-inset: 0px;
-  --ideal-safe-top: 0px;
-  --ideal-safe-bottom: 0px;
-  --ideal-edge-top: max(var(--ideal-safe-top, 0px), env(safe-area-inset-top, 0px));
-  --ideal-edge-bottom: max(var(--ideal-safe-bottom, 0px), env(safe-area-inset-bottom, 0px));
-  background: #f4f4f2 center/cover fixed no-repeat;
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-html.ideal-fullscreen-ready::before {
-  position: fixed;
-  z-index: -1;
-  inset: 0;
-  display: block;
-  background: inherit;
-  content: '';
-  pointer-events: none;
-}
+/* 固定网页根容器：全屏只由根容器负责，各 App 自己处理安全区。 */
+html { background: #f4f4f2 center/cover fixed no-repeat; }
+body { position:fixed; inset:0; display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; overscroll-behavior:none; }
 
-/* iOS 独立窗口：安全区只留给内容顶栏，不能再把整层高度加长。 */
+/* iOS 安全区只留给内容顶栏，不能再把整层高度加长。 */
 .ta-app .ta-phone-head,
 .ta-app .ta-role-app-header,
 .ta-app .ta-role-conversation-header {
@@ -175,24 +154,24 @@ html.ideal-fullscreen-ready::before {
   flex-shrink: 0;
 }
 .ta-app .ta-phone-head {
-  padding-top: max(7px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+  padding-top: max(7px, env(safe-area-inset-top, 0px)) !important;
 }
 .ta-app .ta-role-app-header,
 .ta-app .ta-role-conversation-header {
-  padding-top: max(18px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+  padding-top: max(18px, env(safe-area-inset-top, 0px)) !important;
 }
 .doubao-app .doubao-header,
 .ta-role-doubao-page .doubao-header {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
-  padding-top: max(25px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+  padding-top: max(25px, env(safe-area-inset-top, 0px)) !important;
 }
 .album-app .album-header {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
-  padding-top: max(20px, var(--ideal-edge-top, env(safe-area-inset-top))) !important;
+  padding-top: max(20px, env(safe-area-inset-top, 0px)) !important;
 }
 .doubao-app .doubao-chat-title,
 .ta-role-doubao-page .doubao-chat-title {
@@ -209,62 +188,30 @@ html.ideal-fullscreen-ready::before {
   pointer-events: auto;
 }
 .chat-app:not(.is-chatting) .chat-tabs {
-  bottom: max(24px, var(--ideal-edge-bottom, env(safe-area-inset-bottom))) !important;
-  padding-bottom: max(9px, var(--ideal-edge-bottom, env(safe-area-inset-bottom))) !important;
+  bottom: max(24px, env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: max(9px, env(safe-area-inset-bottom, 0px)) !important;
 }
 
-html.ideal-fullscreen-ready,
-body.ideal-fullscreen-body {
-  min-height: var(--ideal-viewport-height, 100dvh);
-}
-body.ideal-fullscreen-body {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: var(--ideal-viewport-height, 100dvh);
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-body.ideal-fullscreen-body > .desktop-scroll-wrap {
+body > .desktop-scroll-wrap {
   flex: 1 1 auto;
   min-height: 0;
   height: auto !important;
 }
-body.ideal-fullscreen-body > .page-indicator,
-body.ideal-fullscreen-body > .dock-bar {
+body > .page-indicator,
+body > .dock-bar {
   flex: 0 0 auto;
 }
-body.ideal-fullscreen-body > .dock-bar {
+body > .dock-bar {
   box-sizing: border-box;
   height: 88px;
   min-height: 88px;
   margin-bottom: 0 !important;
   padding-bottom: 4px;
 }
-body.ideal-fullscreen-body > .desktop-scroll-wrap {
+body > .desktop-scroll-wrap {
   touch-action: pan-x !important;
   overscroll-behavior-y: none !important;
 }
-.ideal-fullscreen-surface {
-  overscroll-behavior: none;
-}
-.ideal-fullscreen-surface {
-  position: fixed !important;
-  top: 0 !important;
-  right: 0 !important;
-  bottom: auto !important;
-  left: 0 !important;
-  box-sizing: border-box;
-  height: calc(var(--ideal-viewport-height, 100dvh) + var(--ideal-edge-bottom, 0px));
-  max-height: none;
-}
-html.ideal-keyboard-open .ideal-fullscreen-surface {
-  height: calc(var(--ideal-visual-height, 100dvh) + var(--ideal-edge-bottom, 0px));
-  max-height: none;
-}
-
 .desktop-scroll-wrap { height: calc(100vh - 140px); display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
 .desktop-scroll-wrap::-webkit-scrollbar { display: none; }
 .desktop-layout-pending .desktop-scroll-wrap,
@@ -273,12 +220,6 @@ html.ideal-keyboard-open .ideal-fullscreen-surface {
 .desktop-page { position: relative; flex: 0 0 100vw; min-height: 100%; padding: 28px 18px; overflow-x: hidden; overflow-y: auto; scrollbar-width: none; scroll-snap-align: start; scroll-snap-stop: always; }
 .desktop-page::-webkit-scrollbar { display:none; }
 .bg-layer { position: absolute; inset: 0; z-index: 0; background: transparent; }
-
-/* 全屏外层负责铺到安全区，Dock 与中间桌面由同一个纵向布局分配高度。 */
-html.ideal-fullscreen-ready,
-body.ideal-fullscreen-body {
-  background-color: #f4f4f2;
-}
 
 .profile-card, .todo-widget, .image-widget, .countdown-widget, .elapsed-days-widget, .shared-widget, .now-playing-widget, .search-input, .photo-card, .date-calendar-card, .dock-bar {
   background: rgba(255,255,255,.52);
@@ -3824,7 +3765,7 @@ body.ideal-fullscreen-body {
 .ta-phone-page { position:relative; display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; isolation:isolate; }
 .ta-wallpaper { position:absolute; inset:0; z-index:-2; background:linear-gradient(145deg,#d9e9fb 0%,#f8e7f0 48%,#f7e7ca 100%); background-position:center; background-size:cover; }
 .ta-wallpaper::after { position:absolute; inset:0; background:radial-gradient(circle at 80% 12%,rgba(255,255,255,.75),transparent 32%),linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.42)); content:""; }
-.ta-phone-status { position:relative; z-index:3; display:flex; flex:0 0 auto; justify-content:space-between; padding:max(12px,var(--ideal-edge-top,env(safe-area-inset-top))) 24px 0; color:#303642; font-size:12px; font-weight:700; }
+.ta-phone-status { position:relative; z-index:3; display:flex; flex:0 0 auto; justify-content:space-between; padding:max(12px,env(safe-area-inset-top,0px)) 24px 0; color:#303642; font-size:12px; font-weight:700; }
 .ta-phone-head { position:relative; z-index:3; display:flex; flex:0 0 auto; align-items:center; justify-content:space-between; padding:14px 22px 10px; }
 .ta-phone-head > button:first-child { display:flex; align-items:center; gap:9px; min-width:0; padding:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; }
 .ta-phone-head > button:first-child > i { display:grid; flex:0 0 42px; place-items:center; width:42px; height:42px; overflow:hidden; border:2px solid rgba(255,255,255,.9); border-radius:14px; background:rgba(255,255,255,.56); color:#737987; font-style:normal; box-shadow:0 4px 13px rgba(86,103,131,.13); }

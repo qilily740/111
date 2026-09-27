@@ -1355,9 +1355,7 @@
   function safeAreaInset(name) {
     const styles = getComputedStyle(document.documentElement);
     const value = parseFloat(styles.getPropertyValue(name));
-    if (Number.isFinite(value)) return value;
-    const idealName = name === '--safe-area-top' ? '--ideal-edge-top' : '--ideal-edge-bottom';
-    return parseFloat(styles.getPropertyValue(idealName)) || 0;
+    return Number.isFinite(value) ? value : 0;
   }
   function dockGroupRect() {
     const dockRect = dock.getBoundingClientRect();

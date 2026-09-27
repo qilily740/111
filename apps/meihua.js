@@ -389,7 +389,7 @@
 
   function applySettings() {
     applyLauncherIcon();
-    const applyWallpaper = value => { const wallpaperValue = value ? `url("${cssUrl(value)}")` : ''; document.body.style.backgroundImage = wallpaperValue; const preview = document.querySelector('#beautyWallpaperPreview'); if (preview) preview.style.backgroundImage = wallpaperValue; updateAutoContrast(); window.IdealMachineWallpaperTone?.refresh?.(); };
+    const applyWallpaper = value => { const wallpaperValue = value ? `url("${cssUrl(value)}")` : ''; document.documentElement.style.backgroundImage = wallpaperValue; document.body.style.backgroundImage = wallpaperValue; const preview = document.querySelector('#beautyWallpaperPreview'); if (preview) preview.style.backgroundImage = wallpaperValue; updateAutoContrast(); window.IdealMachineWallpaperTone?.refresh?.(); };
     if (String(saved.wallpaper || '').startsWith('idb:image:') && window.IdealMachineGetImage) window.IdealMachineGetImage(saved.wallpaper).then(applyWallpaper); else applyWallpaper(saved.wallpaper || '');
     const desktop = document.querySelector('.desktop-scroll-wrap');
     if (desktop) desktop.style.backgroundImage = 'none';
@@ -562,6 +562,7 @@
 
   function previewWallpaper(value) {
     const background = value ? `url("${cssUrl(value)}")` : '';
+    document.documentElement.style.backgroundImage = background;
     document.body.style.backgroundImage = background;
     const preview = document.querySelector('#beautyWallpaperPreview');
     if (preview) preview.style.backgroundImage = background;
