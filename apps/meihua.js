@@ -611,26 +611,52 @@
     closeRestoreConfirm();
     modal.querySelector('.beauty-sheet').insertAdjacentHTML('beforeend', '<div class="beauty-confirm-backdrop" data-beauty-confirm-cancel></div><section class="beauty-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="beautyConfirmTitle"><h3 id="beautyConfirmTitle">恢复默认图标与名称？</h3><p>所有可自定义 App 的图标和名称都会恢复为默认形式。</p><div><button class="beauty-btn beauty-confirm-cancel" type="button" data-beauty-confirm-cancel>取消</button><button class="beauty-btn beauty-confirm-ok" type="button" data-beauty-confirm-ok>确定恢复</button></div></section>');
   }
-  function exportBeauty() {
-    const payload = { format: 'ideal-machine-beauty', version: 2, exportedAt: new Date().toISOString(), wallpaper: saved.wallpaper || '', names: saved.names || {}, icons: saved.icons || {}, launcherIcon: saved.launcherIcon || null };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'desktop-beauty.json';
-    link.click();
-    URL.revokeObjectURL(link.href);
+  async function resolveBeautyAsset(value) {
+    const source = String(value || '');
+    if (!source.startsWith('idb:image:') || typeof window.IdealMachineGetImage !== 'function') return source;
+    try { return String(await window.IdealMachineGetImage(source) || source); } catch { return source; }
+  }
+  async function storeImportedBeautyAsset(value) {
+    const source = String(value || '');
+    if (!source.startsWith('data:image/') || typeof window.IdealMachinePutImage !== 'function') return source;
+    try { return String(await window.IdealMachinePutImage(source) || source); } catch { return source; }
+  }
+  async function exportBeauty() {
+    try {
+      if (window.IdealMachineStorageReady) await window.IdealMachineStorageReady;
+      const icons = {};
+      for (const [key, value] of Object.entries(saved.icons || {})) icons[key] = await resolveBeautyAsset(value);
+      const launcherIcon = saved.launcherIcon && typeof saved.launcherIcon === 'object' ? normalizeLauncherIcon(saved.launcherIcon) : null;
+      if (launcherIcon?.custom) launcherIcon.custom = await resolveBeautyAsset(launcherIcon.custom);
+      const payload = { format: 'ideal-machine-beauty', version: 3, exportedAt: new Date().toISOString(), wallpaper: await resolveBeautyAsset(saved.wallpaper), names: saved.names || {}, icons, launcherIcon };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'desktop-beauty.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 0);
+    } catch { window.alert('桌面美化导出失败，请稍后重试。'); }
   }
   function importBeauty(file) {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
+        if (window.IdealMachineStorageReady) await window.IdealMachineStorageReady;
         const payload = JSON.parse(reader.result);
         if (!payload || typeof payload !== 'object' || (payload.format && payload.format !== 'ideal-machine-beauty')) throw new Error('invalid');
-        if (typeof payload.wallpaper === 'string') saved.wallpaper = payload.wallpaper;
+        if (typeof payload.wallpaper === 'string') saved.wallpaper = await storeImportedBeautyAsset(payload.wallpaper);
         if (payload.names && typeof payload.names === 'object') saved.names = payload.names;
-        if (payload.icons && typeof payload.icons === 'object') saved.icons = payload.icons;
-        if (payload.launcherIcon && typeof payload.launcherIcon === 'object') saved.launcherIcon = normalizeLauncherIcon(payload.launcherIcon);
+        if (payload.icons && typeof payload.icons === 'object') {
+          const icons = {};
+          for (const [key, value] of Object.entries(payload.icons)) icons[key] = await storeImportedBeautyAsset(value);
+          saved.icons = icons;
+        }
+        if (payload.launcherIcon && typeof payload.launcherIcon === 'object') {
+          const launcherIcon = normalizeLauncherIcon(payload.launcherIcon);
+          launcherIcon.custom = await storeImportedBeautyAsset(launcherIcon.custom);
+          saved.launcherIcon = launcherIcon;
+        }
         removeRetiredAppSettings();
         localStorage.setItem(storageKey, JSON.stringify(saved));
         applySettings();
