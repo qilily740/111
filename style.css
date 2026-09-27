@@ -224,8 +224,8 @@ body > .dock-bar {
 }
 body > .dock-bar {
   box-sizing: border-box;
-  height: calc(88px + var(--ideal-safe-bottom));
-  min-height: calc(88px + var(--ideal-safe-bottom));
+  height: 88px;
+  min-height: 88px;
   margin-bottom: 0 !important;
   padding-bottom: max(4px, var(--ideal-safe-bottom));
 }
