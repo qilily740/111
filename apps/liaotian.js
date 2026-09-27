@@ -715,10 +715,22 @@
     return result;
   };
   const renderWithMomentsScrollRestore = render;
+  function syncMomentsFilterInset(page) {
+    const filters = page?.querySelector('.chat-moment-filters');
+    if (!filters) return;
+    const inset = parseFloat(getComputedStyle(filters).top) || 0;
+    const pinned = page.scrollTop > 0 && filters.getBoundingClientRect().top <= page.getBoundingClientRect().top + inset + 1;
+    filters.classList.toggle('is-pinned', pinned);
+  }
+  app.addEventListener('scroll', event => {
+    if (event.target.matches?.('.chat-moments-page')) syncMomentsFilterInset(event.target);
+  }, true);
+  window.addEventListener('resize', () => syncMomentsFilterInset(app.querySelector('.chat-moments-page')));
   render = function() {
     const momentsPage = activeTab === 'moments' ? app.querySelector('.chat-moments-page') : null;
     const momentsScrollTop = momentsPage?.scrollTop || 0;
     renderWithMomentsScrollRestore();
+    requestAnimationFrame(() => syncMomentsFilterInset(app.querySelector('.chat-moments-page')));
     if (momentsPage) {
       const nextPage = app.querySelector('.chat-moments-page');
       if (nextPage) {

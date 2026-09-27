@@ -3459,6 +3459,19 @@ body > .desktop-scroll-wrap {
 .chat-moments-page .chat-moment-actions button { min-height:32px; padding:0 11px; border-radius:10px; font-size:10px; }
 .chat-moments-page .chat-moment-filters { position:sticky; top:0; z-index:5; box-sizing:border-box; align-items:center; min-height:62px; padding:8px 20px; border-bottom:1px solid rgba(0,0,0,.07); background:rgba(255,255,255,.96); -webkit-backdrop-filter:blur(16px) saturate(130%); backdrop-filter:blur(16px) saturate(130%); }
 .chat-moments-page .chat-moment-filters button { min-height:36px; }
+.chat-moments-page .chat-moment-filters {
+  --moments-sticky-gap:calc(env(safe-area-inset-top, 0px) + 20px);
+  --moments-sticky-background:#fff;
+  top:var(--moments-sticky-gap);
+}
+/* Only cover the status-bar gap once the filter row reaches its sticky position. */
+.chat-moments-page .chat-moment-filters.is-pinned {
+  background:var(--moments-sticky-background);
+  box-shadow:0 calc(-1 * var(--moments-sticky-gap)) 0 var(--moments-sticky-background);
+}
+@media (prefers-color-scheme:dark) {
+  .chat-moments-page .chat-moment-filters { --moments-sticky-background:#202020; }
+}
 .chat-moments-page .chat-moments { height:auto; overflow:visible; padding:0; }
 .chat-moments-page .chat-moment { display:block; margin:0; padding:22px 20px 25px; border:0; border-bottom:1px solid rgba(0,0,0,.07); border-radius:0; background:#fff; }
 .chat-moments-page .chat-moment-head { gap:10px; }
