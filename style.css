@@ -664,10 +664,10 @@ body > .desktop-scroll-wrap {
 }
 
 /* 聊天三级记忆设置 */
-.chat-settings-page .chat-api-settings-group { margin-bottom:17px; padding:17px; border:1px solid rgba(0,0,0,.08); border-radius:20px; background:rgba(255,255,255,.72); }
-.chat-api-settings-group > h3 { margin:0 0 12px; color:#333; font-size:13px; font-weight:700; }
+.chat-settings-page .chat-api-settings-group { display:grid; gap:8px; margin-bottom:17px; padding:18px; border:1px solid rgba(0,0,0,.08); border-radius:18px; background:rgba(255,255,255,.5); }
+.chat-api-settings-group > h3 { margin:0 0 2px; }
 .chat-api-settings-items { display:grid; gap:10px; }
-.chat-settings-page .chat-api-settings-group .chat-memory-settings { margin:0; padding:13px; border-color:rgba(0,0,0,.07); border-radius:15px; background:rgba(255,255,255,.62); }
+.chat-settings-page .chat-api-settings-group .chat-memory-settings { margin:0; padding:13px; border-color:rgba(0,0,0,.08); border-radius:14px; background:#fff; }
 .chat-settings-page .chat-memory-settings { margin-bottom:17px; padding:14px; border:1px solid rgba(0,0,0,.08); border-radius:16px; background:rgba(255,255,255,.72); }
 .chat-memory-settings-head { display:flex; align-items:center; justify-content:space-between; width:100%; padding:0; border:0; background:transparent; color:#222; font:inherit; text-align:left; cursor:pointer; }
 .chat-memory-settings-head > span { display:grid; gap:4px; }
@@ -706,6 +706,7 @@ body > .desktop-scroll-wrap {
 .chat-thought-api-setting select { width:100%; min-width:0; height:37px; padding:0 11px; border:1px solid rgba(0,0,0,.1); border-radius:10px; background:#fff; color:#333; font:inherit; font-size:11px; }
 .chat-thought-api-setting select:disabled { opacity:.5; }
 .chat-vision-api-warning { margin:0; padding:9px 10px; border-radius:10px; background:rgba(196,148,37,.1); color:#896b22; font-size:9px; line-height:1.55; }
+.chat-settings-page .chat-wallpaper-settings { margin-bottom:17px; padding:13px; border:1px solid rgba(0,0,0,.08); border-radius:14px; background:#fff; }
 
 /* 记忆库中的当前核心记忆 */
 .memory-core-card { margin:0 0 16px; padding:16px; border:1px solid rgba(123,100,153,.13); border-radius:18px; background:linear-gradient(145deg,rgba(255,255,255,.76),rgba(239,233,245,.7)); box-shadow:0 8px 20px rgba(92,74,114,.05); }
@@ -718,8 +719,7 @@ body > .desktop-scroll-wrap {
 
 @media (prefers-color-scheme:dark) {
   .chat-settings-page .chat-api-settings-group { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }
-  .chat-api-settings-group > h3 { color:#eee; }
-  .chat-settings-page .chat-api-settings-group .chat-memory-settings { border-color:rgba(255,255,255,.1); background:rgba(255,255,255,.05); }
+  .chat-settings-page .chat-api-settings-group .chat-memory-settings { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }
   .chat-settings-page .chat-memory-settings { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }
   .chat-memory-settings-head { color:#eee; }
   .chat-memory-settings-body { border-color:rgba(255,255,255,.12); }
@@ -731,6 +731,7 @@ body > .desktop-scroll-wrap {
   .chat-thought-api-setting { color:#eee; }
   .chat-thought-api-setting select { border-color:rgba(255,255,255,.13); background:#2b2b2b; color:#eee; }
   .chat-vision-api-warning { background:rgba(226,183,73,.12); color:#e8ca7d; }
+  .chat-settings-page .chat-wallpaper-settings { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }
   .memory-core-card { border-color:rgba(255,255,255,.12); background:linear-gradient(145deg,rgba(255,255,255,.09),rgba(127,98,149,.08)); }
   .memory-core-card header b,.memory-core-card > p { color:#e3d9e9; }
 }
@@ -12915,7 +12916,7 @@ button.fanfic-home-row-main:active { opacity:.58; }
 .ideal-chat-bilingual-toggle { display:flex; align-items:center; justify-content:space-between; gap:14px; }
 .ideal-chat-bilingual-toggle > span,
 .ideal-chat-bilingual-fields label > span { display:grid; gap:4px; }
-.ideal-chat-bilingual-toggle b,
+.ideal-chat-bilingual-toggle b { color:#555; font-size:12px; font-weight:500; }
 .ideal-chat-bilingual-fields b { color:#262626; font-size:12px; font-weight:650; }
 .ideal-chat-bilingual-toggle small,
 .ideal-chat-bilingual-fields small { color:#999; font-size:10px; line-height:1.45; }
@@ -12930,7 +12931,7 @@ button.fanfic-home-row-main:active { opacity:.58; }
 @media (prefers-color-scheme:dark) {
   .ideal-chat-bilingual-translation { border-color:rgba(255,255,255,.2); }
   .chat-settings-page .ideal-chat-bilingual-settings.is-enabled { border-bottom-color:rgba(255,255,255,.25) !important; }
-  .ideal-chat-bilingual-toggle b,
+  .ideal-chat-bilingual-toggle b { color:#ccc; font-weight:500; }
   .ideal-chat-bilingual-fields b { color:#eee; }
   .ideal-chat-bilingual-fields { border-color:rgba(255,255,255,.1); }
   .ideal-chat-bilingual-fields select { border-color:rgba(255,255,255,.18); background:#222; color:#eee; }

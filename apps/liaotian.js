@@ -7269,7 +7269,7 @@ ${recentConversation}
     const group = document.createElement('section');
     group.className = 'chat-api-settings-group';
     group.dataset.chatApiSettingsGroup = '';
-    group.innerHTML = '<h3>API 功能设置</h3><div class="chat-api-settings-items"></div>';
+    group.innerHTML = '<h3 class="chat-interaction-title">API 功能设置</h3><div class="chat-api-settings-items"></div>';
     const items = group.querySelector('.chat-api-settings-items');
     const sections = [memorySection, section, visionSection].filter(Boolean);
     if (items && sections.length) {
