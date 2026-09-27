@@ -106,6 +106,7 @@
   let dockDrag = null;
   let tapCount = 0;
   let tapTimer = 0;
+  let desktopLongPress = null;
   let suppressClickUntil = 0;
   let edgeTurnAt = 0;
 
@@ -1188,7 +1189,9 @@
     Object.assign(ghost.style, { width:`${rect.width}px`, height:`${rect.height}px`, left:`${rect.left}px`, top:`${rect.top}px` });
     document.body.appendChild(ghost);
     item.classList.add('is-layout-source');
-    drag = { item, placeholder, ghost, pointerId:event.pointerId, startX:event.clientX, startY:event.clientY, lastX:event.clientX, lastY:event.clientY, moved:false, edgeDirection:0, edgeTimer:0, offsetX:event.clientX - rect.left, offsetY:event.clientY - rect.top, originalContainer:item.parentElement, originalPosition, drop:null };
+    drag = { item, placeholder, ghost, pointerId:event.pointerId, captureTarget:item, startX:event.clientX, startY:event.clientY, lastX:event.clientX, lastY:event.clientY, moved:false, edgeDirection:0, edgeTimer:0, offsetX:event.clientX - rect.left, offsetY:event.clientY - rect.top, originalContainer:item.parentElement, originalPosition, drop:null };
+    try { item.setPointerCapture?.(event.pointerId); } catch {}
+    event.preventDefault?.();
   }
   function allowedContainer(container, item) {
     if (!container) return false;
@@ -1244,7 +1247,7 @@
   }
   function moveDrag(event) {
     if (!drag || event.pointerId !== drag.pointerId) return;
-    if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 8) drag.moved = true;
+    if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 4) drag.moved = true;
     drag.lastX = event.clientX;
     drag.lastY = event.clientY;
     drag.ghost.style.left = `${event.clientX - drag.offsetX}px`;
@@ -1278,7 +1281,28 @@
       saveState();
     }
     const moved = drag.moved;
-    drag.item.classList.remove('is-layout-source'); drag.placeholder.remove(); drag.ghost.remove(); drag = null; suppressClickUntil = moved ? Date.now() + 450 : 0;
+    const pointerId = drag.pointerId;
+    const captureTarget = drag.captureTarget;
+    drag.item.classList.remove('is-layout-source'); drag.placeholder.remove(); drag.ghost.remove(); drag = null; suppressClickUntil = moved ? Date.now() + 450 : suppressClickUntil;
+    try { if (captureTarget?.hasPointerCapture?.(pointerId)) captureTarget.releasePointerCapture(pointerId); } catch {}
+  }
+
+  function cancelDesktopLongPress(pointerId = null) {
+    if (!desktopLongPress || (pointerId !== null && desktopLongPress.pointerId !== pointerId)) return;
+    clearTimeout(desktopLongPress.timer);
+    desktopLongPress = null;
+  }
+  function scheduleDesktopLongPress(item, event) {
+    cancelDesktopLongPress();
+    if (editing || drag || event.pointerType === 'mouse' || event.button > 0) return;
+    const pending = { item, pointerId:event.pointerId, startX:event.clientX, startY:event.clientY, event, timer:0 };
+    pending.timer = setTimeout(() => {
+      if (desktopLongPress !== pending || !pending.item.isConnected) return;
+      desktopLongPress = null;
+      enterEditing();
+      beginDrag(pending.item, pending.event);
+    }, 360);
+    desktopLongPress = pending;
   }
   function removeWidget(id) {
     const widget = itemMap.get(id);
@@ -1430,9 +1454,14 @@
     if (editing && folderItem) { beginFolderDrag(folderItem, event); return; }
     const item = event.target.closest('[data-desktop-item]');
     if (editing && item) beginDrag(item, event);
+    else if (item) scheduleDesktopLongPress(item, event);
   }, true);
-  document.addEventListener('pointermove', event => { if (dockDrag) moveDockGesture(event); else if (folderDrag) moveFolderDrag(event); else if (drag) moveDrag(event); }, { capture:true, passive:false });
+  document.addEventListener('pointermove', event => {
+    if (desktopLongPress?.pointerId === event.pointerId && Math.hypot(event.clientX - desktopLongPress.startX, event.clientY - desktopLongPress.startY) > 10) cancelDesktopLongPress(event.pointerId);
+    if (dockDrag) moveDockGesture(event); else if (folderDrag) moveFolderDrag(event); else if (drag) moveDrag(event);
+  }, { capture:true, passive:false });
   document.addEventListener('pointerup', event => {
+    cancelDesktopLongPress(event.pointerId);
     if (dockDrag && event.pointerId === dockDrag.pointerId) { cleanupDockDrag(true); return; }
     if (folderDrag && event.pointerId === folderDrag.pointerId) {
       cleanupFolderDrag(true, event);
@@ -1448,7 +1477,7 @@
       else if (createdFolderId) openCreatedFolder(createdFolderId);
     });
   }, true);
-  document.addEventListener('pointercancel', () => { cleanupDockDrag(false); cleanupFolderDrag(false); cleanupDrag(false); }, true);
+  document.addEventListener('pointercancel', event => { cancelDesktopLongPress(event.pointerId); cleanupDockDrag(false); cleanupFolderDrag(false); cleanupDrag(false); }, true);
   document.addEventListener('click', event => {
     const onDesktopBlank = event.target.closest('.desktop-page') && !event.target.closest('[data-desktop-item], input, button, a');
     if (!editing && onDesktopBlank) { tapCount += 1; clearTimeout(tapTimer); if (tapCount >= 3) { tapCount = 0; event.preventDefault(); event.stopImmediatePropagation(); enterEditing(); } else tapTimer = setTimeout(() => { tapCount = 0; }, 620); return; }

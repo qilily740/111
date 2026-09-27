@@ -5811,18 +5811,17 @@ ${recentConversation}
     const visualViewport = window.visualViewport;
     const focused = document.activeElement === input;
     const viewportBottom = visualViewport ? visualViewport.offsetTop + visualViewport.height : window.innerHeight;
-    const keyboardInset = focused && visualViewport
-      ? Math.max(0, window.innerHeight - viewportBottom)
+    // Measure remaining occlusion after the global viewport sizing has run.
+    // iOS standalone already shrinks the app; subtracting keyboard height again
+    // would lift the composer twice. Padding shrinks the list in normal flow.
+    const keyboardInset = focused
+      ? Math.max(0, conversation.getBoundingClientRect().bottom - viewportBottom)
       : 0;
-    wrap.style.setProperty('--chat-keyboard-inset', `${Math.ceil(keyboardInset)}px`);
-    wrap.classList.toggle('is-keyboard-lifted', keyboardInset > 8);
+    conversation.classList.toggle('is-input-focused', focused);
+    conversation.style.setProperty('--chat-keyboard-inset', `${Math.ceil(keyboardInset)}px`);
     const messages = conversation.querySelector('#chatMessages');
-    if (messages) {
-      messages.style.setProperty('--chat-keyboard-bottom-space', `${Math.ceil(keyboardInset)}px`);
-      messages.classList.toggle('is-keyboard-avoiding', keyboardInset > 8);
-      if (keyboardInset > 8 && wrap.classList.contains('has-chat-quote')) {
-        requestAnimationFrame(() => { messages.scrollTop = messages.scrollHeight; });
-      }
+    if (focused && messages && chatLatestFollowing) {
+      messages.scrollTop = Math.max(0, messages.scrollHeight - messages.clientHeight);
     }
   }
   function scheduleChatKeyboardPosition() {
@@ -5832,7 +5831,11 @@ ${recentConversation}
   window.visualViewport?.addEventListener('resize', scheduleChatKeyboardPosition);
   window.visualViewport?.addEventListener('scroll', scheduleChatKeyboardPosition);
   window.addEventListener('resize', scheduleChatKeyboardPosition);
-  document.addEventListener('focusin', event => { if (event.target.closest?.('#chatInput')) scheduleChatKeyboardPosition(); });
+  document.addEventListener('focusin', event => {
+    if (!event.target.closest?.('#chatInput')) return;
+    followChatLatestLayout();
+    scheduleChatKeyboardPosition();
+  });
   document.addEventListener('focusout', event => { if (event.target.closest?.('#chatInput')) setTimeout(scheduleChatKeyboardPosition, 80); });
   function syncChatQuoteBar() {
     const wrap = document.querySelector('.chat-conversation .chat-compose-wrap');
