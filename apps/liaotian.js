@@ -7248,6 +7248,18 @@ ${recentConversation}
     const visionModels = visionModelsFor(chat);
     visionSection.innerHTML = `<button class="chat-memory-settings-head" data-chat-vision-settings-toggle type="button" aria-expanded="${chatVisionSettingsOpen}"><span><b>读图设置</b><small>${settings.visionEnabled === false ? '已关闭' : '已开启 · 发送图片时读取'}</small></span><i class="${chatVisionSettingsOpen ? 'is-open' : ''}">⌄</i></button>${chatVisionSettingsOpen ? `<div class="chat-memory-settings-body"><label class="chat-memory-switch"><input type="checkbox" data-chat-vision-enabled ${settings.visionEnabled === false ? '' : 'checked'}><span><b>开启读图</b><small>角色回复时读取你在本聊天中发送的图片</small></span></label><label class="chat-thought-api-setting"><span>读图模型<small>仅显示当前 API 配置中保留的模型</small></span><select data-chat-vision-model ${settings.visionEnabled === false || !visionModels.length ? 'disabled' : ''}><option value="">${visionModels.length ? '跟随“读图”功能分配' : '暂无保留模型，请先到设置中保存'}</option>${visionModels.map(model => `<option value="${esc(model)}" ${settings.visionModel === model ? 'selected' : ''}>${esc(model)}</option>`).join('')}</select></label><p class="chat-vision-api-warning">开启后，带图片的聊天请求会消耗额外 API 用量；关闭后图片仍会保存在聊天记录中，但不会发送给模型。</p></div>` : ''}`;
     section.insertAdjacentElement('afterend', visionSection);
+    const memorySection = main.querySelector('[data-chat-memory-settings]');
+    const group = document.createElement('section');
+    group.className = 'chat-api-settings-group';
+    group.dataset.chatApiSettingsGroup = '';
+    group.innerHTML = '<h3>API 功能设置</h3><div class="chat-api-settings-items"></div>';
+    const items = group.querySelector('.chat-api-settings-items');
+    const sections = [memorySection, section, visionSection].filter(Boolean);
+    if (items && sections.length) {
+      const first = sections[0];
+      first.parentElement?.insertBefore(group, first);
+      sections.forEach(item => items.appendChild(item));
+    }
   };
   document.addEventListener('click', event => {
     if (!event.target.closest?.('[data-chat-thought-settings-toggle]')) return;

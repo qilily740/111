@@ -664,6 +664,10 @@ body > .desktop-scroll-wrap {
 }
 
 /* 聊天三级记忆设置 */
+.chat-settings-page .chat-api-settings-group { margin-bottom:17px; padding:17px; border:1px solid rgba(0,0,0,.08); border-radius:20px; background:rgba(255,255,255,.72); }
+.chat-api-settings-group > h3 { margin:0 0 12px; color:#333; font-size:13px; font-weight:700; }
+.chat-api-settings-items { display:grid; gap:10px; }
+.chat-settings-page .chat-api-settings-group .chat-memory-settings { margin:0; padding:13px; border-color:rgba(0,0,0,.07); border-radius:15px; background:rgba(255,255,255,.62); }
 .chat-settings-page .chat-memory-settings { margin-bottom:17px; padding:14px; border:1px solid rgba(0,0,0,.08); border-radius:16px; background:rgba(255,255,255,.72); }
 .chat-memory-settings-head { display:flex; align-items:center; justify-content:space-between; width:100%; padding:0; border:0; background:transparent; color:#222; font:inherit; text-align:left; cursor:pointer; }
 .chat-memory-settings-head > span { display:grid; gap:4px; }
@@ -705,6 +709,9 @@ body > .desktop-scroll-wrap {
 .memory-core-card.is-empty { border-style:dashed; background:rgba(255,255,255,.42); }
 
 @media (prefers-color-scheme:dark) {
+  .chat-settings-page .chat-api-settings-group { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }
+  .chat-api-settings-group > h3 { color:#eee; }
+  .chat-settings-page .chat-api-settings-group .chat-memory-settings { border-color:rgba(255,255,255,.1); background:rgba(255,255,255,.05); }
   .chat-settings-page .chat-memory-settings { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }
   .chat-memory-settings-head { color:#eee; }
   .chat-memory-settings-body { border-color:rgba(255,255,255,.12); }
