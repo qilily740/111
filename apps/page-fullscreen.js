@@ -51,6 +51,9 @@
   function updateButton(root, active) {
     const button = root.querySelector(':scope > [data-page-fullscreen], header [data-page-fullscreen]');
     if (!button) return;
+    const nextState = active ? 'true' : 'false';
+    if (button.dataset.pageFullscreenState === nextState) return;
+    button.dataset.pageFullscreenState = nextState;
     button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icon(active ? 'exit' : 'enter')}</svg>`;
     button.setAttribute('aria-label', active ? '退出全屏' : '进入全屏');
     button.title = active ? '退出全屏' : '进入全屏';
