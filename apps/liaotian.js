@@ -6260,6 +6260,10 @@ ${recentConversation}
     const chat = currentChat();
     const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId);
     if (resumePending && session?.pendingOfflineReply) text = session.pendingOfflineReply.userInput;
+    // 补足残缺回复前先移除上一次暂存的正文和提醒，避免重试后出现重复气泡。
+    if (resumePending && session) {
+      session.messages = session.messages.filter(item => !item.retryable && !item.offlinePartial);
+    }
     const contact = state.contacts.find(item => item.id === activeContact);
     const profile = state.profiles.find(item => item.id === chat?.profileId);
     const config = window.IdealMachineAPI?.getConfig?.() || {};
@@ -6328,6 +6332,9 @@ ${recentConversation}
       session.messages = session.messages.filter(item => !item.retryable);
       if (answer && (offlineReplyCharCount(answer) < minLength || offlineReplyCharCount(answer) > maxLength || !offlineReplyEndsCleanly(answer) || finishReason === 'length')) {
         session.pendingOfflineReply = { text:answer, userInput:text, targetLength:length, finishReason };
+        // 正文已经由 API 返回，即使长度或结尾检查未通过，也必须先显示给用户。
+        // 之前这里只保存了提醒，造成“API 日志有字、线下面板没有字”。
+        session.messages.push({ role:'character', text:answer, offlinePartial:true });
         const issue = offlineReplyCharCount(answer) < minLength ? `还差 ${minLength - offlineReplyCharCount(answer)} 字` : offlineReplyCharCount(answer) > maxLength ? `超出上限 ${offlineReplyCharCount(answer) - maxLength} 字` : '结尾还没有写完整';
         session.messages.push({ role:'error', retryable:true, text:`已生成 ${offlineReplyCharCount(answer)} 字，但${issue}。正文已保留，点击下方按钮继续完成。` });
       } else {
