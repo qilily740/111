@@ -1,5 +1,10 @@
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-:root { --widget-placeholder-gray: #e2e2df; color-scheme: only light; }
+:root {
+  --widget-placeholder-gray: #e2e2df;
+  --ideal-app-height: 100dvh;
+  --ideal-safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: only light;
+}
 /* 阅读讨论：独立于阅读页日夜主题的毛玻璃聊天样式 */
 .chat-reading-mini { background: rgba(255,255,255,.78) !important; color: var(--reading-chat-text-color, #222) !important; border-color: rgba(255,255,255,.82) !important; -webkit-backdrop-filter: blur(20px) saturate(135%) !important; backdrop-filter: blur(20px) saturate(135%) !important; }
 .chat-reading-mini header, .chat-reading-mini footer { background: rgba(255,255,255,.36) !important; border-color: rgba(255,255,255,.68) !important; }
@@ -139,7 +144,7 @@ body .chat-reading-modal .chat-reading-manage { width: 38px !important; min-widt
 .chat-reading-modal.is-night .chat-reading-chapter-menu header button { background: #4a4a4d; color: #eee; }
 .chat-reading-modal.is-night .chat-reading-chapter-menu > div > button { color: #ddd; }
 .chat-reading-modal.is-night .chat-reading-chapter-menu > div > button.is-current { background: #4a4a4d; color: #fff; }
-html, body { width: 100%; height: 100%; overflow: hidden; }
+html, body { width: 100%; min-height: var(--ideal-app-height); height: var(--ideal-app-height); overflow: hidden; }
 body { background: #f4f4f2 center/cover fixed no-repeat; color: #222; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
 /* 固定网页根容器：全屏只由根容器负责，各 App 自己处理安全区。 */
 html { background: #f4f4f2 center/cover fixed no-repeat; }
@@ -152,10 +157,11 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
-  /* iOS 桌面 PWA 的 100% 有时止于 Home Indicator 上方。
-     背景向下多铺一个安全区，等量 padding 保持桌面与 Dock 原有高度。 */
-  height: calc(100% + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* 根画布只等于真实视口高度。安全区由具体控件内部消化，
+     不能加到根高度或根 padding，否则会在底部重复预留空间。 */
+  min-height: var(--ideal-app-height);
+  height: var(--ideal-app-height);
+  padding-bottom: 0;
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -218,10 +224,10 @@ body > .dock-bar {
 }
 body > .dock-bar {
   box-sizing: border-box;
-  height: 88px;
-  min-height: 88px;
+  height: calc(88px + var(--ideal-safe-bottom));
+  min-height: calc(88px + var(--ideal-safe-bottom));
   margin-bottom: 0 !important;
-  padding-bottom: 4px;
+  padding-bottom: max(4px, var(--ideal-safe-bottom));
 }
 body > .desktop-scroll-wrap {
   touch-action: pan-x !important;
