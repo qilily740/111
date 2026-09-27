@@ -1190,7 +1190,9 @@
     document.body.appendChild(ghost);
     item.classList.add('is-layout-source');
     drag = { item, placeholder, ghost, pointerId:event.pointerId, captureTarget:item, startX:event.clientX, startY:event.clientY, lastX:event.clientX, lastY:event.clientY, moved:false, edgeDirection:0, edgeTimer:0, offsetX:event.clientX - rect.left, offsetY:event.clientY - rect.top, originalContainer:item.parentElement, originalPosition, drop:null };
-    try { item.setPointerCapture?.(event.pointerId); } catch {}
+    // Capture on a stable, visible surface: the source icon is hidden while dragging.
+    drag.captureTarget = desktop;
+    try { desktop.setPointerCapture?.(event.pointerId); } catch {}
     event.preventDefault?.();
   }
   function allowedContainer(container, item) {
@@ -1201,8 +1203,10 @@
   }
   function updateDragDestination(clientX, clientY, sourceEvent = null) {
     if (!drag) return;
-    const under = document.elementFromPoint(clientX, clientY);
-    const container = under?.closest('.desktop-layout-grid, .dock-bar');
+    const stack = document.elementsFromPoint(clientX, clientY).filter(node => !node.closest('.desktop-layout-ghost'));
+    const under = stack.find(node => node.closest('.desktop-layout-grid, .dock-bar'));
+    const page = stack.map(node => node.closest('.desktop-page')).find(Boolean);
+    const container = under?.closest('.desktop-layout-grid, .dock-bar') || page?.querySelector('.desktop-layout-grid');
     if (!allowedContainer(container, drag.item)) return;
     if (container.matches('.desktop-layout-grid')) {
       const position = gridPositionFromPoint(container, clientX, clientY, drag.item);
@@ -1217,7 +1221,7 @@
     }
     clearDesktopPosition(drag.placeholder);
     const candidates = [...container.children].filter(item => item !== drag.item && item !== drag.placeholder && !item.classList.contains('is-layout-source'));
-    const before = candidates.find(item => { const rect = item.getBoundingClientRect(); return clientY < rect.top + rect.height / 2 || (clientY < rect.bottom && clientX < rect.left + rect.width / 2); });
+    const before = candidates.find(item => clientX < item.getBoundingClientRect().left + item.getBoundingClientRect().width / 2);
     container.insertBefore(drag.placeholder, before || null);
     drag.drop = { container, position:null };
     sourceEvent?.preventDefault();
@@ -1247,6 +1251,7 @@
   }
   function moveDrag(event) {
     if (!drag || event.pointerId !== drag.pointerId) return;
+    event.preventDefault();
     if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 4) drag.moved = true;
     drag.lastX = event.clientX;
     drag.lastY = event.clientY;
@@ -1258,6 +1263,7 @@
   }
   function cleanupDrag(commit, event) {
     if (!drag) return;
+    if (commit && event && drag.moved) updateDragDestination(event.clientX, event.clientY);
     if (drag.edgeTimer) clearTimeout(drag.edgeTimer);
     drag.edgeTimer = 0;
     drag.edgeDirection = 0;
@@ -1459,6 +1465,10 @@
   document.addEventListener('pointermove', event => {
     if (desktopLongPress?.pointerId === event.pointerId && Math.hypot(event.clientX - desktopLongPress.startX, event.clientY - desktopLongPress.startY) > 10) cancelDesktopLongPress(event.pointerId);
     if (dockDrag) moveDockGesture(event); else if (folderDrag) moveFolderDrag(event); else if (drag) moveDrag(event);
+  }, { capture:true, passive:false });
+  // Safari can otherwise claim a horizontal gesture for desktop page scrolling.
+  document.addEventListener('touchmove', event => {
+    if (drag || folderDrag || dockDrag) event.preventDefault();
   }, { capture:true, passive:false });
   document.addEventListener('pointerup', event => {
     cancelDesktopLongPress(event.pointerId);
