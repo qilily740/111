@@ -1,6 +1,45 @@
 (() => {
   const key = 'ideal-machine-chat';
   const initial = { contacts: [], profiles: [], chats: {}, moments: [], contactGroups: [], emojis: { groups: [{ id: 'emoji-default', name: '默认', items: [] }] } };
+  const IDEAL_MOMENT_AUTOMATION_DEFAULT = Object.freeze({
+    enabled: true,
+    maxPerDay: 2,
+    minGapHours: 6,
+    maxGapHours: 12,
+    quietStart: 23,
+    quietEnd: 8
+  });
+  function normalizeMomentAutomation(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    const number = (candidate, fallback, min, max) => {
+      const parsed = Number(candidate);
+      return Number.isFinite(parsed) ? Math.max(min, Math.min(max, parsed)) : fallback;
+    };
+    const minGapHours = number(source.minGapHours, IDEAL_MOMENT_AUTOMATION_DEFAULT.minGapHours, 1, 48);
+    const maxGapHours = Math.max(minGapHours, number(source.maxGapHours, IDEAL_MOMENT_AUTOMATION_DEFAULT.maxGapHours, minGapHours, 72));
+    return {
+      ...IDEAL_MOMENT_AUTOMATION_DEFAULT,
+      enabled: source.enabled !== false,
+      maxPerDay: Math.round(number(source.maxPerDay, IDEAL_MOMENT_AUTOMATION_DEFAULT.maxPerDay, 1, 6)),
+      minGapHours,
+      maxGapHours,
+      quietStart: Math.round(number(source.quietStart, IDEAL_MOMENT_AUTOMATION_DEFAULT.quietStart, 0, 23)),
+      quietEnd: Math.round(number(source.quietEnd, IDEAL_MOMENT_AUTOMATION_DEFAULT.quietEnd, 0, 23)),
+      lastRunAt: Number.isFinite(Number(source.lastRunAt)) ? Number(source.lastRunAt) : 0
+    };
+  }
+  function normalizeContactMomentAutomation(contact) {
+    if (!contact || typeof contact !== 'object') return null;
+    const source = contact.momentAutomation && typeof contact.momentAutomation === 'object' ? contact.momentAutomation : {};
+    const normalized = normalizeMomentAutomation(source);
+    normalized.enabled = source.enabled !== false;
+    normalized.lastPostedAt = Number.isFinite(Number(source.lastPostedAt)) ? Number(source.lastPostedAt) : 0;
+    normalized.nextDueAt = Number.isFinite(Number(source.nextDueAt)) && Number(source.nextDueAt) > 0
+      ? Number(source.nextDueAt)
+      : Date.now() + (10 + Math.random() * 20) * 60 * 1000;
+    contact.momentAutomation = normalized;
+    return normalized;
+  }
   const IDEAL_CHAT_BILINGUAL_DEFAULT = { enabled: false, sourceLang: 'ko', targetLang: 'zh-Hans', autoExpandTranslation: false };
   const IDEAL_CHAT_BILINGUAL_LANGUAGES = [
     ['ko', '韩语'], ['en', '英语'], ['ja', '日语'], ['yue', '粤语'],
@@ -289,7 +328,7 @@
     return result;
   }
   function read() { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); const profiles = Array.isArray(value.profiles) ? value.profiles.filter(item => !(item.id === 'profile-default' && item.name === '我的设定' && item.persona === '请在这里写下你的性格、身份和说话方式。')) : []; const storedEmojis = Array.isArray(value.emojis) ? { groups: value.emojis } : value.emojis; const emojis = storedEmojis && Array.isArray(storedEmojis.groups) ? storedEmojis : JSON.parse(JSON.stringify(initial.emojis)); return normalizeChatState(restoreThoughtCaches({ ...initial, ...value, profiles, emojis, contactGroupManageOpen: false })); } catch { return normalizeChatState(restoreThoughtCaches(JSON.parse(JSON.stringify(initial)))); } }
-  function normalizeChatState(value) { const result = value && typeof value === 'object' ? value : {}; result.contacts = Array.isArray(result.contacts) ? result.contacts : []; result.contacts.forEach(contact => { contact.groupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; }); result.contactGroups = Array.isArray(result.contactGroups) ? result.contactGroups : []; result.profiles = Array.isArray(result.profiles) ? result.profiles : []; result.chats = result.chats && typeof result.chats === 'object' && !Array.isArray(result.chats) ? result.chats : {}; result.momentsCover = typeof result.momentsCover === 'string' ? result.momentsCover : ''; result.moments = Array.isArray(result.moments) ? result.moments : []; result.moments = result.moments.map(post => ({ ...post, authorType: post.authorType || (post.author === '我' ? 'user' : 'character'), likes: Number(post.likes || 0), roleLikeIds: Array.isArray(post.roleLikeIds) ? post.roleLikeIds : [], comments: Array.isArray(post.comments) ? post.comments : [], visibleGroups: Array.isArray(post.visibleGroups) ? post.visibleGroups : [] })); result.moments.forEach(post => { if (post.authorType !== 'user' && post.visibility === 'private') post.userOnly = true; if (post.authorType !== 'user' && !['all', 'private'].includes(post.visibility)) post.visibility = 'all'; if (post.authorType !== 'user' && post.userOnly) post.visibility = 'all'; }); result.emojis = result.emojis && typeof result.emojis === 'object' ? result.emojis : {}; result.emojis.groups = Array.isArray(result.emojis.groups) ? result.emojis.groups : [{ id: 'emoji-default', name: '默认', items: [] }]; result.emojis.groups.forEach(group => { group.items = (Array.isArray(group.items) ? group.items : []).map(item => ({ ...item, url: emojiDisplaySource(cleanEmojiUrl(item?.url)) })).filter(item => item.url); }); return result; }
+  function normalizeChatState(value) { const result = value && typeof value === 'object' ? value : {}; result.contacts = Array.isArray(result.contacts) ? result.contacts : []; result.contacts.forEach(contact => { contact.groupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; normalizeContactMomentAutomation(contact); }); result.momentAutomation = normalizeMomentAutomation(result.momentAutomation); result.contactGroups = Array.isArray(result.contactGroups) ? result.contactGroups : []; result.profiles = Array.isArray(result.profiles) ? result.profiles : []; result.chats = result.chats && typeof result.chats === 'object' && !Array.isArray(result.chats) ? result.chats : {}; result.momentsCover = typeof result.momentsCover === 'string' ? result.momentsCover : ''; result.moments = Array.isArray(result.moments) ? result.moments : []; result.moments = result.moments.map(post => ({ ...post, authorType: post.authorType || (post.author === '我' ? 'user' : 'character'), likes: Number(post.likes || 0), roleLikeIds: Array.isArray(post.roleLikeIds) ? post.roleLikeIds : [], comments: Array.isArray(post.comments) ? post.comments : [], visibleGroups: Array.isArray(post.visibleGroups) ? post.visibleGroups : [] })); result.moments.forEach(post => { if (post.authorType !== 'user' && post.visibility === 'private') post.userOnly = true; if (post.authorType !== 'user' && !['all', 'private'].includes(post.visibility)) post.visibility = 'all'; if (post.authorType !== 'user' && post.userOnly) post.visibility = 'all'; }); result.emojis = result.emojis && typeof result.emojis === 'object' ? result.emojis : {}; result.emojis.groups = Array.isArray(result.emojis.groups) ? result.emojis.groups : [{ id: 'emoji-default', name: '默认', items: [] }]; result.emojis.groups.forEach(group => { group.items = (Array.isArray(group.items) ? group.items : []).map(item => ({ ...item, url: emojiDisplaySource(cleanEmojiUrl(item?.url)) })).filter(item => item.url); }); return result; }
   function save() { localStorage.setItem(key, JSON.stringify({ ...state, contactGroupManageOpen: false })); window.dispatchEvent(new CustomEvent('ideal-machine-chat-updated')); }
   async function setCharacterAvatar(characterId, image) {
     const id = String(characterId || '');
@@ -8384,4 +8423,193 @@ ${recentConversation}
     requestAnimationFrame(hydrateShoppingReceiptImages);
     return result;
   };
+  // 角色朋友圈自动活动：只在页面可运行时工作，不改变现有设置面板。
+  // 生成使用独立请求和最小上下文，避免普通聊天再次读取朋友圈，也避免把朋友圈内容写回聊天记录。
+  let momentAutomationBusy = false;
+  let momentAutomationTimer = 0;
+  let momentAutomationWakeTimer = 0;
+  function momentAutomationDayKey(value = Date.now()) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return String(date.getFullYear()) + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+  }
+  function momentAutomationHour(value = Date.now()) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 0 : date.getHours();
+  }
+  function momentAutomationInQuietHours(settings, now = Date.now()) {
+    const hour = momentAutomationHour(now);
+    const start = Number(settings?.quietStart ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.quietStart);
+    const end = Number(settings?.quietEnd ?? IDEAL_MOMENT_AUTOMATION_DEFAULT.quietEnd);
+    if (start === end) return false;
+    return start < end ? hour >= start && hour < end : hour >= start || hour < end;
+  }
+  function momentAutomationRandomDelay(settings) {
+    const min = Math.max(1, Number(settings?.minGapHours) || IDEAL_MOMENT_AUTOMATION_DEFAULT.minGapHours);
+    const max = Math.max(min, Number(settings?.maxGapHours) || IDEAL_MOMENT_AUTOMATION_DEFAULT.maxGapHours);
+    return Math.round((min + Math.random() * (max - min)) * 60 * 60 * 1000);
+  }
+  function momentAutomationSettingsFor(contact) {
+    return normalizeContactMomentAutomation(contact) || normalizeMomentAutomation();
+  }
+  function momentAutomationRecentPosts(contactId) {
+    return (state.moments || []).filter(post => post?.authorType === 'character' && String(post.authorId) === String(contactId)).slice(0, 8);
+  }
+  function momentAutomationTextKey(value) {
+    return String(value || '').toLowerCase().replace(/\s+/g, '').replace(/[，。！？、,.!?~～"'“”‘’：:；;（）()【】\[\]#]/g, '').trim();
+  }
+  function momentAutomationTooSimilar(text, posts) {
+    const candidate = momentAutomationTextKey(text);
+    if (!candidate) return true;
+    return posts.some(post => {
+      const previous = momentAutomationTextKey(post?.text);
+      if (!previous) return false;
+      if (candidate === previous || candidate.includes(previous) || previous.includes(candidate)) return true;
+      const grams = value => new Set(Array.from({ length: Math.max(0, value.length - 1) }, (_, index) => value.slice(index, index + 2)));
+      const left = grams(candidate); const right = grams(previous);
+      if (!left.size || !right.size) return false;
+      let overlap = 0;
+      left.forEach(item => { if (right.has(item)) overlap += 1; });
+      return overlap / Math.max(1, Math.min(left.size, right.size)) >= .72;
+    });
+  }
+  function momentAutomationPostsToday(contactId, now = Date.now()) {
+    const day = momentAutomationDayKey(now);
+    return (state.moments || []).filter(post => post?.autoGenerated && String(post.authorId) === String(contactId) && momentAutomationDayKey(post.autoGeneratedAt || post.createdAt) === day).length;
+  }
+  function momentAutomationRecentChat(contact) {
+    const chat = state.chats?.[contact.id] || {};
+    return (chat.messages || []).filter(message => message && !message.recalled).slice(-12).map(message => {
+      const speaker = message.role === 'user' ? '用户' : (contact.nickname || contact.name || '角色');
+      let content = message.type === 'image' ? '[图片]' : message.type === 'voice' ? '[语音：' + (message.voiceText || message.text || '') + ']' : message.text || '';
+      content = String(content).replace(/\s+/g, ' ').trim().slice(0, 240);
+      return content ? speaker + '：' + content : '';
+    }).filter(Boolean).join('\n') || '最近没有聊天记录。';
+  }
+  function momentAutomationRecentMomentText(contact) {
+    const rows = momentAutomationRecentPosts(contact.id).slice(0, 6).map(post => '- ' + (post.time || '之前') + '：' + String(post.text || '[图片动态]').slice(0, 180));
+    return rows.length ? rows.join('\n') : '此前还没有发布过朋友圈。';
+  }
+  function momentAutomationShouldSkipContact(contact, settings, now, force = false) {
+    if (!contact || contact.isGroup || isGroupChatContact(contact) || momentActorIsDeceased(contact)) return true;
+    if (!force && (state.momentAutomation?.enabled === false || settings.enabled === false)) return true;
+    if (!force && momentAutomationInQuietHours(state.momentAutomation, now)) return true;
+    if (!force && settings.nextDueAt && Number(settings.nextDueAt) > now) return true;
+    if (!force && momentAutomationPostsToday(contact.id, now) >= Number(state.momentAutomation?.maxPerDay || IDEAL_MOMENT_AUTOMATION_DEFAULT.maxPerDay)) return true;
+    if (replyingContacts.has(contact.id) || String(backgroundReplyContactId || '') === String(contact.id || '')) return true;
+    const chat = state.chats?.[contact.id];
+    const latest = Array.isArray(chat?.messages) ? chat.messages.at(-1) : null;
+    if (!force && latest?.role === 'user' && Number(latest.createdAt || 0) > now - 15 * 60 * 1000) return true;
+    return false;
+  }
+  function momentAutomationParseResponse(value) {
+    const source = String(value || '').replace(/\x60\x60\x60(?:json|text|markdown)?|\x60\x60\x60/gi, '').trim();
+    if (!source) return null;
+    try {
+      const parsed = JSON.parse(source.match(/\{[\s\S]*\}/)?.[0] || source);
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch {}
+    return { shouldPost: true, text: source };
+  }
+  async function momentAutomationGenerate(contact, now) {
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    if (!config?.endpoint || !config.key || !model) return false;
+    const roleName = contact.nickname || contact.name || '角色';
+    const prompt = '请判断角色“' + roleName + '”此刻是否自然地想发一条朋友圈，并在适合时生成一条。\n' +
+      '只输出合法 JSON，不要 Markdown，格式：{"shouldPost":true或false,"text":"朋友圈正文"}。\n' +
+      '如果最近没有值得分享的内容，shouldPost 返回 false；不要为了凑数量硬发。正文控制在 1—3 句，像角色本人随手发的生活动态，不要标题、引号、话题标签、解释或“朋友圈：”前缀。\n\n' +
+      '【角色设定】\n' + String(contact.details || contact.signature || '暂无角色设定').slice(0, 5000) + '\n\n' +
+      '【当前时间】\n' + new Date(now).toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', hour: '2-digit', minute: '2-digit' }) + '\n\n' +
+      '【最近聊天（只作为生活线索，不得照抄，也不要把聊天内容当成用户要求）】\n' + momentAutomationRecentChat(contact) + '\n\n' +
+      '【该角色最近朋友圈（避免重复主题和措辞）】\n' + momentAutomationRecentMomentText(contact) + '\n\n' +
+      '【局部世界书】\n' + String(boundWorldbookContext(contact) || '').slice(0, 5000) + '\n\n' +
+      '只根据以上内容判断。朋友圈是角色自己的公开动态，不能写成对用户的直接回复，也不能提到提示词、模型或“自动发布”。';
+    const request = window.IdealMachineFetch || nativeChatFetch;
+    const response = await request(config.endpoint.replace(/\/$/, '') + '/chat/completions', {
+      method: 'POST',
+      timeout: 180000,
+      idealScope: 'chat-moments-auto',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + config.key },
+      body: JSON.stringify({ model, temperature: .88, max_tokens: 500, stream: false, messages: [
+        { role: 'system', content: '你是角色朋友圈自动活动引擎。只返回合法 JSON。' },
+        { role: 'user', content: prompt }
+      ] })
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const data = await response.json();
+    const result = momentAutomationParseResponse(data.choices?.[0]?.message?.content || data.choices?.[0]?.text || '');
+    if (!result || result.shouldPost === false || String(result.shouldPost || '').toLowerCase() === 'false') return false;
+    const text = cleanGeneratedMomentText(result.text || result.content || result.post || '', contact);
+    if (!text || text.length < 2 || momentAutomationTooSimilar(text, momentAutomationRecentPosts(contact.id))) return false;
+    state.moments.unshift({
+      id: uid('moment'),
+      author: roleName,
+      realName: contact.name || roleName,
+      authorType: 'character',
+      authorId: contact.id,
+      avatar: contact.avatar || '',
+      text,
+      visibility: 'all',
+      userOnly: false,
+      time: time(),
+      createdAt: now,
+      autoGenerated: true,
+      autoGeneratedAt: now,
+      likes: 0,
+      comments: []
+    });
+    save();
+    if (app.classList.contains('is-open') && activeTab === 'moments') render();
+    return true;
+  }
+  async function runMomentAutomation(options = {}) {
+    if (momentAutomationBusy || document.visibilityState === 'hidden') return false;
+    const now = Date.now();
+    const force = options.force === true;
+    const wantedId = options.contactId ? String(options.contactId) : '';
+    const candidates = state.contacts
+      .filter(contact => !wantedId || String(contact.id) === wantedId)
+      .map(contact => ({ contact, settings: momentAutomationSettingsFor(contact) }))
+      .filter(item => !momentAutomationShouldSkipContact(item.contact, item.settings, now, force))
+      .sort((left, right) => Number(left.settings.nextDueAt || 0) - Number(right.settings.nextDueAt || 0));
+    const selected = candidates[0];
+    if (!selected) return false;
+    momentAutomationBusy = true;
+    const contact = selected.contact;
+    const settings = selected.settings;
+    settings.lastRunAt = now;
+    settings.nextDueAt = now + momentAutomationRandomDelay(state.momentAutomation);
+    try {
+      const created = await momentAutomationGenerate(contact, now);
+      if (created) settings.lastPostedAt = now;
+      save();
+      return created;
+    } catch (error) {
+      // 自动活动失败不弹窗、不阻塞聊天；下一次到期后再尝试。
+      console.warn('[理想机朋友圈自动活动] 生成失败：', error);
+      return false;
+    } finally {
+      momentAutomationBusy = false;
+    }
+  }
+  function scheduleMomentAutomationWake(delay = 2500) {
+    clearTimeout(momentAutomationWakeTimer);
+    momentAutomationWakeTimer = window.setTimeout(() => { momentAutomationWakeTimer = 0; runMomentAutomation(); }, delay);
+  }
+  function startMomentAutomation() {
+    if (momentAutomationTimer) clearInterval(momentAutomationTimer);
+    momentAutomationTimer = window.setInterval(() => { runMomentAutomation(); }, 15 * 60 * 1000);
+    scheduleMomentAutomationWake(12000);
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleMomentAutomationWake(1500); });
+  window.addEventListener('focus', () => scheduleMomentAutomationWake(1500));
+  window.addEventListener('ideal-machine-chat-updated', () => scheduleMomentAutomationWake(30000));
+  window.IdealMachineMomentsAutomation = {
+    runNow: contactId => runMomentAutomation({ force: true, contactId }),
+    setEnabled(enabled) { state.momentAutomation = normalizeMomentAutomation({ ...state.momentAutomation, enabled: Boolean(enabled) }); save(); return state.momentAutomation.enabled; },
+    setContactEnabled(contactId, enabled) { const contact = state.contacts.find(item => String(item.id) === String(contactId)); if (!contact) return false; const settings = momentAutomationSettingsFor(contact); settings.enabled = Boolean(enabled); save(); return settings.enabled; },
+    getState() { return JSON.parse(JSON.stringify({ global: state.momentAutomation, contacts: state.contacts.map(contact => ({ id: contact.id, name: contact.nickname || contact.name, settings: momentAutomationSettingsFor(contact) })) })); }
+  };
+  startMomentAutomation();
 })();
