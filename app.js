@@ -101,6 +101,66 @@
   window.IdealMachineReadImage = readImageFile;
   const nativeFetch = window.fetch.bind(window);
   const activeRequests = new Map();
+  const machineApiPaths = /\/(?:models|chat\/completions|responses|embeddings|images\/generations)(?:[/?]|$)/i;
+  const sharedMachineAuthPaths = /\/(?:models|chat\/completions|responses|embeddings)(?:[/?]|$)/i;
+  function machineRequestUrl(input) {
+    try { return new URL(input?.url || String(input), location.href); } catch { return null; }
+  }
+  function machineApiConfig() {
+    try { return window.IdealMachineAPI?.getConfig?.() || {}; } catch { return {}; }
+  }
+  function machineRouteUrl(endpoint, route) {
+    const base = String(endpoint || '').trim().replace(/\/+$/, '');
+    const suffix = String(route || '').replace(/^\/+/, '');
+    if (!base) return '';
+    return new RegExp(`/${suffix.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`, 'i').test(base) ? base : `${base}/${suffix}`;
+  }
+  async function machineResponseError(response, fallback = 'API 请求失败') {
+    const status = response?.status ? `HTTP ${response.status}` : '';
+    let detail = '';
+    try {
+      const payload = await response.clone().json();
+      detail = payload?.error?.message || payload?.message || payload?.detail || '';
+    } catch {
+      try { detail = (await response.clone().text()).trim(); } catch {}
+    }
+    detail = String(detail || '').replace(/\s+/g, ' ').slice(0, 300);
+    return [status, detail || fallback].filter(Boolean).join('：');
+  }
+  async function machineJson(response, fallback = 'API 没有返回有效数据') {
+    if (!response?.ok) throw new Error(await machineResponseError(response, fallback));
+    try { return await response.json(); } catch { throw new Error(fallback); }
+  }
+  function machineModelFor(scope, body, pathname = '') {
+    if (!/\/(?:chat\/completions|responses)(?:[/?]|$)/i.test(pathname)) return '';
+    const currentModel = String(body?.model || '').trim();
+    if (currentModel) return currentModel;
+    try { return String(window.IdealMachineAPI?.getModel?.(scope) || window.IdealMachineAPI?.getModel?.('chat') || '').trim(); } catch { return ''; }
+  }
+  function prepareMachineRequest(input, init = {}) {
+    const url = machineRequestUrl(input);
+    if (!url || !machineApiPaths.test(url.pathname)) return { input, init };
+    const config = machineApiConfig();
+    const headers = new Headers(typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined);
+    new Headers(init.headers || {}).forEach((value, key) => headers.set(key, value));
+    // 生图配置有自己的密钥；只有主 API、向量 API 和模型列表才自动使用主配置。
+    if (sharedMachineAuthPaths.test(url.pathname) && !headers.has('Authorization') && config.key) headers.set('Authorization', `Bearer ${config.key}`);
+    const hasBody = typeof init.body === 'string' && init.body.trim();
+    const isJson = hasBody && /^(?:\{|\[)/.test(init.body.trim());
+    let body = init.body;
+    if (isJson) {
+      try {
+        const payload = JSON.parse(init.body);
+        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+          const model = machineModelFor(String(init.idealScope || 'shared'), payload, url.pathname);
+          if (model && !String(payload.model || '').trim()) payload.model = model;
+          body = JSON.stringify(payload);
+        }
+      } catch {}
+    }
+    if (body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+    return { input, init: { ...init, headers, body } };
+  }
   function localAIProxyRequest(input, init) {
     const configuredProxy = window.IdealMachineConfig?.aiProxyBase;
     if (!configuredProxy || !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin)) return null;
@@ -113,6 +173,9 @@
     return { input: proxy.href, init: { ...init, headers } };
   }
   window.IdealMachineFetch = async function idealMachineFetch(input, init = {}) {
+    const prepared = prepareMachineRequest(input, init);
+    input = prepared.input;
+    init = prepared.init;
     const scope = String(init.idealScope || 'shared');
     // 所有外部请求统一至少保留 180 秒，批量生成等场景仍可传入更长时限。
     const timeout = Math.max(180000, Number(init.timeout) || 180000);
@@ -156,6 +219,57 @@
   window.IdealMachineCancelAllRequests = ({ preserveScopes = [] } = {}) => {
     const preserved = new Set((Array.isArray(preserveScopes) ? preserveScopes : []).map(String));
     [...activeRequests.keys()].filter(scope => !preserved.has(scope)).forEach(scope => window.IdealMachineCancelRequests(scope));
+  };
+  window.IdealMachineRequest = {
+    request(route, options = {}) {
+      const config = machineApiConfig();
+      const endpoint = machineRouteUrl(options.endpoint || config.endpoint, route);
+      if (!endpoint) return Promise.reject(new Error('请先配置 API 接口地址'));
+      const { endpoint: ignoredEndpoint, route: ignoredRoute, body, key: ignoredKey, ...requestOptions } = options;
+      const next = { ...requestOptions, idealScope: String(options.idealScope || 'shared') };
+      if (body && typeof body === 'object' && !(body instanceof FormData) && !(body instanceof Blob)) next.body = JSON.stringify(body);
+      if (options.key) {
+        next.headers = new Headers(next.headers || {});
+        if (!next.headers.has('Authorization')) next.headers.set('Authorization', `Bearer ${options.key}`);
+      }
+      return window.IdealMachineFetch(endpoint, next);
+    },
+    chat(messages, options = {}) {
+      const config = machineApiConfig();
+      const scope = String(options.idealScope || 'chat');
+      const endpoint = machineRouteUrl(options.endpoint || config.endpoint, 'chat/completions');
+      if (!endpoint) return Promise.reject(new Error('请先配置聊天 API 接口地址'));
+      const payload = { ...(options.body && typeof options.body === 'object' ? options.body : {}), messages };
+      const model = String(options.model || payload.model || '').trim();
+      if (model) payload.model = model;
+      const { endpoint: ignoredEndpoint, model: ignoredModel, body: ignoredBody, key: ignoredKey, ...requestOptions } = options;
+      return window.IdealMachineFetch(endpoint, {
+        ...requestOptions,
+        idealScope: scope,
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+    embeddings(input, options = {}) {
+      const config = machineApiConfig();
+      const endpoint = machineRouteUrl(options.endpoint || config.endpoint, 'embeddings');
+      if (!endpoint) return Promise.reject(new Error('请先配置向量 API 接口地址'));
+      const payload = { ...(options.body && typeof options.body === 'object' ? options.body : {}), input };
+      if (options.model || payload.model) payload.model = options.model || payload.model;
+      const { endpoint: ignoredEndpoint, model: ignoredModel, body: ignoredBody, key: ignoredKey, ...requestOptions } = options;
+      return window.IdealMachineFetch(endpoint, {
+        ...requestOptions,
+        idealScope: String(options.idealScope || 'vector'),
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+    models(options = {}) {
+      return this.request('models', { ...options, method: 'GET', idealScope: options.idealScope || 'models' });
+    },
+    json(response, fallback) {
+      return machineJson(response, fallback);
+    }
   };
   window.fetch = (input, init = {}) => window.IdealMachineFetch(input, init);
   window.addEventListener('pagehide', () => window.IdealMachineCancelAllRequests());
@@ -820,6 +934,24 @@
 
 【资料边界】
 先完整读取角色本人资料，再读取当前绑定用户资料。角色资料决定角色的身份、性格、行为和说话方式；用户资料只用于理解对方。姓名、性别、生日和年龄只能使用上面明确填写的值，未填写就保持未知，绝对不能根据名字、称呼、头像、语气、关系或上下文猜测，也不能把角色资料与用户资料互换。`;
+  };
+  window.IdealMachineContext = {
+    identity(role = {}, user = {}) {
+      return window.IdealMachineRoleUserContext(role, user);
+    },
+    assemble(parts = {}) {
+      const sections = [];
+      const add = (title, value) => {
+        const text = String(value || '').trim();
+        if (text) sections.push(title ? `【${title}】\n${text}` : text);
+      };
+      add('角色与用户资料', parts.identity);
+      add('长期记忆上下文', parts.memory);
+      add('世界观上下文', parts.worldbook);
+      add('本轮场景补充', parts.scene);
+      add('当前任务规则', parts.task);
+      return sections.join('\n\n');
+    }
   };
   registerIdealMachineServiceWorker();
 })();

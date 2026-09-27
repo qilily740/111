@@ -46,7 +46,7 @@
     errors = errors.filter(item => !/renderSettingsPanels is not defined/i.test(String(item?.message || '')));
     writeJson(errorsKey, errors);
   }
-  let calls = Array.isArray(readJson(callsKey, [])) ? readJson(callsKey, []).slice(0, 100) : [];
+  let calls = Array.isArray(readJson(callsKey, [])) ? readJson(callsKey, []) : [];
   calls = calls.map(item => ({
     ...item,
     purpose: /^forum(?:-|$)/.test(String(item?.scope || '')) ? callPurpose(String(item?.scope || 'forum'), '', {}) : item?.purpose,
@@ -60,6 +60,11 @@
   let currentView = 'main';
   let floatingSettingsSection = null;
   let settingsPanelView = 'api';
+  const apiCallWindowMs = 3 * 24 * 60 * 60 * 1000;
+  function recentApiCalls() {
+    const cutoff = Date.now() - apiCallWindowMs;
+    return calls.filter(item => Number(item?.time) >= cutoff);
+  }
 
   // 调用面板只记录真正的 API/模型请求；图片、脚本、样式和本地资源读取不属于 API 调用。
   function shouldTrackRequest(scope, rawUrl, init, purpose, isModelCall, endpointPath) {
@@ -272,7 +277,7 @@
       try {
         const response = await originalRequest(input, init);
         const call = { id:`call-${started}-${Math.random().toString(36).slice(2,7)}`, time:started, scope, purpose, model, isModelCall, host, status:response.status, ok:response.ok, duration:Date.now()-started, tokens:0, inputTokens:0, outputTokens:0 };
-        calls.unshift(call); calls = calls.slice(0, 100); writeJson(callsKey, calls); renderSettingsPanels();
+        calls.unshift(call); writeJson(callsKey, calls); renderSettingsPanels();
         if (!response.ok) {
           const providerReason = await readResponseError(response);
           const summary = `HTTP ${response.status}：${httpReason(response.status)}`;
@@ -290,7 +295,7 @@
       } catch (error) {
         const aborted = error?.name === 'AbortError';
         calls.unshift({ id:`call-${started}-${Math.random().toString(36).slice(2,7)}`, time:started, scope, purpose, model, isModelCall, host, status:0, ok:false, duration:Date.now()-started, aborted, tokens:0, inputTokens:0, outputTokens:0 });
-        calls = calls.slice(0, 100); writeJson(callsKey, calls); renderSettingsPanels();
+        writeJson(callsKey, calls); renderSettingsPanels();
         if (!aborted) addError(error, purpose, { detail:host });
         throw error;
       } finally { activeCalls = Math.max(0, activeCalls - 1); updateBadge(); renderPanel(); }
@@ -375,14 +380,14 @@
   }
   function mainPanel() {
     const selected = (Array.isArray(settings.apps) ? settings.apps : defaults.apps).filter(key => appCatalog[key]).slice(0, 8);
-    return `<header><b><span>快捷</span><span>工具</span></b><button data-assist-close type="button">×</button></header><div class="ideal-assist-apps">${selected.map(appButton).join('')}</div><div class="ideal-assist-tools"><button data-assist-view="errors" type="button"><i class="is-error">!</i><span>报错</span><b>${errors.length || '正常'}</b></button><button data-assist-view="api" type="button"><i class="is-api">↗</i><span>API</span><b>${activeCalls ? `${activeCalls} 调用中` : calls.length ? '查看' : '暂无'}</b></button></div>`;
+    return `<header><b><span>快捷</span><span>工具</span></b><button data-assist-close type="button">×</button></header><div class="ideal-assist-apps">${selected.map(appButton).join('')}</div><div class="ideal-assist-tools"><button data-assist-view="errors" type="button"><i class="is-error">!</i><span>报错</span><b>${errors.length || '正常'}</b></button><button data-assist-view="api" type="button"><i class="is-api">↗</i><span>API</span><b>${activeCalls ? `${activeCalls} 调用中` : recentApiCalls().length ? '查看' : '暂无'}</b></button></div>`;
   }
   function errorsPanel() {
     return `<header><button data-assist-view="main" type="button">‹</button><b>最近报错</b><button data-assist-clear="errors" type="button">清空</button></header><div class="ideal-assist-list">${errors.length ? errors.slice(0,5).map(item => `<details><summary><i>!</i><span><b>${escapeHtml(item.source)}</b><small>${timeText(item.time)}${item.count > 1 ? ` · ${item.count} 次` : ''}</small></span></summary><p>${escapeHtml(item.message)}</p>${item.detail ? `<code>${escapeHtml(item.detail)}</code>` : ''}<button class="ideal-assist-copy-error" data-assist-copy-error="${escapeHtml(item.id)}" type="button">复制</button></details>`).join('') : '<div class="ideal-assist-empty">最近运行正常<br><small>还没有捕获到报错</small></div>'}</div>`;
   }
   function apiPanel() {
-    const recent = calls.slice(0,5), success = calls.filter(item => item.ok).length, failed = calls.filter(item => !item.ok && !item.aborted).length;
-    return `<header><button data-assist-view="main" type="button">‹</button><b>API 调用</b><button data-assist-clear="api" type="button">清空</button></header><div class="ideal-assist-api-summary"><span><b>${activeCalls}</b><small>调用中</small></span><span><b>${success}</b><small>成功</small></span><span><b>${failed}</b><small>失败</small></span></div><div class="ideal-assist-list">${recent.length ? recent.map(item => { const modelText = item.model || (item.isModelCall ? '历史记录未保存' : '非模型调用'); const hasUsage = Boolean(item.inputTokens || item.outputTokens || item.tokens); const tokenText = hasUsage ? `输入 ${item.inputTokens || 0} · 输出 ${item.outputTokens || 0} · 合计 ${item.tokens || (item.inputTokens || 0) + (item.outputTokens || 0)} tokens` : item.isModelCall ? '输入 未返回 · 输出 未返回 · 合计 未返回' : ''; const statusText = item.ok ? '成功' : Number(item.status) > 0 ? String(item.status) : (item.aborted ? '取消' : '网络错误'); return `<article><i class="${item.ok ? 'is-ok' : item.aborted ? 'is-muted' : 'is-bad'}"></i><span><b>${escapeHtml(dateTimeText(item.time))}　${escapeHtml(item.purpose || callPurpose(item.scope, ''))}</b><small class="ideal-assist-call-meta">${escapeHtml(modelText)}<br>耗时 ${item.duration}ms${tokenText ? `<br>${escapeHtml(tokenText)}` : ''}</small></span><time>${escapeHtml(statusText)}</time></article>`; }).join('') : '<div class="ideal-assist-empty">暂无调用记录</div>'}</div>`;
+    const recent = recentApiCalls(), success = recent.filter(item => item.ok).length, failed = recent.filter(item => !item.ok && !item.aborted).length;
+    return `<header><button data-assist-view="main" type="button">‹</button><b>API 调用 · 最近 3 天</b><button data-assist-clear="api" type="button">清空</button></header><div class="ideal-assist-api-summary"><span><b>${activeCalls}</b><small>调用中</small></span><span><b>${success}</b><small>成功</small></span><span><b>${failed}</b><small>失败</small></span></div><div class="ideal-assist-list">${recent.length ? recent.map(item => { const modelText = item.model || (item.isModelCall ? '历史记录未保存' : '非模型调用'); const hasUsage = Boolean(item.inputTokens || item.outputTokens || item.tokens); const tokenText = hasUsage ? `输入 ${item.inputTokens || 0} · 输出 ${item.outputTokens || 0} · 合计 ${item.tokens || (item.inputTokens || 0) + (item.outputTokens || 0)} tokens` : item.isModelCall ? '输入 未返回 · 输出 未返回 · 合计 未返回' : ''; const statusText = item.ok ? '成功' : Number(item.status) > 0 ? String(item.status) : (item.aborted ? '取消' : '网络错误'); return `<article><i class="${item.ok ? 'is-ok' : item.aborted ? 'is-muted' : 'is-bad'}"></i><span><b>${escapeHtml(dateTimeText(item.time))}　${escapeHtml(item.purpose || callPurpose(item.scope, ''))}</b><small class="ideal-assist-call-meta">${escapeHtml(modelText)}<br>耗时 ${item.duration}ms${tokenText ? `<br>${escapeHtml(tokenText)}` : ''}</small></span><time>${escapeHtml(statusText)}</time></article>`; }).join('') : '<div class="ideal-assist-empty">暂无调用记录</div>'}</div>`;
   }
   function renderPanel() {
     if (!panel || panel.getAttribute('aria-hidden') === 'true') return;
@@ -426,8 +431,8 @@
       host.innerHTML = `<header><b>最近报错</b><span><small>${errors.length} 条记录</small><button data-assist-clear="errors" type="button">清空</button></span></header>${recent.length ? `<div class="settings-floating-panel-list">${recent.map(item => `<details><summary><b>${escapeHtml(item.source || '系统')} · ${escapeHtml(timeText(item.time))}</b><small>${escapeHtml(item.message)}${item.count > 1 ? ` · ${item.count} 次` : ''}</small></summary><p>${escapeHtml(item.message)}</p>${item.detail ? `<code>${escapeHtml(item.detail)}</code>` : ''}<button class="ideal-assist-copy-error" data-assist-copy-error="${escapeHtml(item.id)}" type="button">复制</button></details>`).join('')}</div>` : '<div class="settings-floating-panel-empty">最近运行正常</div>'}`;
       return;
     }
-    const recent = calls.slice(0, 5);
-    host.innerHTML = `<header><b>API 调用</b><small>${calls.length} 条记录</small></header>${recent.length ? `<div class="settings-floating-panel-list">${recent.map(item => {
+    const recent = recentApiCalls();
+    host.innerHTML = `<header><b>API 调用</b><small>最近 3 天 · ${recent.length} 条</small></header>${recent.length ? `<div class="settings-floating-panel-list">${recent.map(item => {
       const modelText = item.model || (item.isModelCall ? '历史记录未保存' : '非模型调用');
       const usage = item.inputTokens || item.outputTokens || item.tokens
         ? `输入 ${item.inputTokens || 0} · 输出 ${item.outputTokens || 0} · 合计 ${item.tokens || (item.inputTokens || 0) + (item.outputTokens || 0)} tokens`
