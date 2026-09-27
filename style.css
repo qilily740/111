@@ -693,6 +693,7 @@ body > .desktop-scroll-wrap {
 .chat-thought-api-setting small { color:#999; font-size:9px; font-weight:400; line-height:1.45; }
 .chat-thought-api-setting select { width:100%; min-width:0; height:37px; padding:0 11px; border:1px solid rgba(0,0,0,.1); border-radius:10px; background:#fff; color:#333; font:inherit; font-size:11px; }
 .chat-thought-api-setting select:disabled { opacity:.5; }
+.chat-vision-api-warning { margin:0; padding:9px 10px; border-radius:10px; background:rgba(196,148,37,.1); color:#896b22; font-size:9px; line-height:1.55; }
 
 /* 记忆库中的当前核心记忆 */
 .memory-core-card { margin:0 0 16px; padding:16px; border:1px solid rgba(123,100,153,.13); border-radius:18px; background:linear-gradient(145deg,rgba(255,255,255,.76),rgba(239,233,245,.7)); box-shadow:0 8px 20px rgba(92,74,114,.05); }
@@ -713,6 +714,7 @@ body > .desktop-scroll-wrap {
   .chat-memory-actions button.is-primary { border-color:#eee; background:#eee; color:#111; }
   .chat-thought-api-setting { color:#eee; }
   .chat-thought-api-setting select { border-color:rgba(255,255,255,.13); background:#2b2b2b; color:#eee; }
+  .chat-vision-api-warning { background:rgba(226,183,73,.12); color:#e8ca7d; }
   .memory-core-card { border-color:rgba(255,255,255,.12); background:linear-gradient(145deg,rgba(255,255,255,.09),rgba(127,98,149,.08)); }
   .memory-core-card header b,.memory-core-card > p { color:#e3d9e9; }
 }
