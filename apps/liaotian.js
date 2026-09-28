@@ -72,9 +72,9 @@
       return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.round(parsed))) : fallback;
     };
     settings.activeMessageEnabled = settings.activeMessageEnabled === true;
-    settings.activeMessageIdleMinutes = number(settings.activeMessageIdleMinutes, IDEAL_ACTIVE_MESSAGE_DEFAULT.idleMinutes, 5, 240);
-    settings.activeMessageCooldownMinutes = number(settings.activeMessageCooldownMinutes, IDEAL_ACTIVE_MESSAGE_DEFAULT.cooldownMinutes, 15, 720);
-    settings.activeMessageDailyLimit = number(settings.activeMessageDailyLimit, IDEAL_ACTIVE_MESSAGE_DEFAULT.dailyLimit, 1, 10);
+    settings.activeMessageIdleMinutes = number(settings.activeMessageIdleMinutes, IDEAL_ACTIVE_MESSAGE_DEFAULT.idleMinutes, 1, 1440);
+    settings.activeMessageCooldownMinutes = number(settings.activeMessageCooldownMinutes, IDEAL_ACTIVE_MESSAGE_DEFAULT.cooldownMinutes, 5, 1440);
+    settings.activeMessageDailyLimit = number(settings.activeMessageDailyLimit, IDEAL_ACTIVE_MESSAGE_DEFAULT.dailyLimit, 1, 20);
     settings.activeMessageLastSentAt = Number.isFinite(Number(settings.activeMessageLastSentAt)) ? Number(settings.activeMessageLastSentAt) : 0;
     settings.activeMessageNextCheckAt = Number.isFinite(Number(settings.activeMessageNextCheckAt)) ? Number(settings.activeMessageNextCheckAt) : 0;
     const today = activeMessageDayKey();
@@ -7429,7 +7429,7 @@ ${recentConversation}
     activeMessageSection.className = 'chat-memory-settings chat-active-message-settings';
     activeMessageSection.dataset.chatActiveMessageOptions = '';
     const activeMessageSummary = settings.activeMessageEnabled ? `已开启 · ${settings.activeMessageIdleMinutes} 分钟未回复后尝试` : '已关闭';
-    activeMessageSection.innerHTML = '<button class="chat-memory-settings-head" data-chat-active-message-settings-toggle type="button" aria-expanded="' + chatActiveMessageSettingsOpen + '"><span><b>主动消息设置</b><small>' + activeMessageSummary + '</small></span><i class="' + (chatActiveMessageSettingsOpen ? 'is-open' : '') + '">⌄</i></button>' + (chatActiveMessageSettingsOpen ? '<div class="chat-memory-settings-body"><label class="chat-memory-switch"><input type="checkbox" data-chat-active-message-enabled ' + (settings.activeMessageEnabled ? 'checked' : '') + '><span><b>开启主动消息</b><small>角色会在你上一条消息后等待 ' + settings.activeMessageIdleMinutes + ' 分钟；两次主动消息至少间隔 ' + settings.activeMessageCooldownMinutes + ' 分钟，每天最多 ' + settings.activeMessageDailyLimit + ' 条。默认关闭。</small></span></label></div>' : '');
+    activeMessageSection.innerHTML = '<button class="chat-memory-settings-head" data-chat-active-message-settings-toggle type="button" aria-expanded="' + chatActiveMessageSettingsOpen + '"><span><b>主动消息设置</b><small>' + activeMessageSummary + '</small></span><i class="' + (chatActiveMessageSettingsOpen ? 'is-open' : '') + '">⌄</i></button>' + (chatActiveMessageSettingsOpen ? '<div class="chat-memory-settings-body"><label class="chat-memory-switch"><input type="checkbox" data-chat-active-message-enabled ' + (settings.activeMessageEnabled ? 'checked' : '') + '><span><b>开启主动消息</b><small data-chat-active-message-hint>角色会在你上一条消息后等待 ' + settings.activeMessageIdleMinutes + ' 分钟；两次主动消息至少间隔 ' + settings.activeMessageCooldownMinutes + ' 分钟，每天最多 ' + settings.activeMessageDailyLimit + ' 条。默认关闭。</small></span></label><div class="chat-memory-grid chat-active-message-grid"><label>未回复等待<input type="number" min="1" max="1440" step="1" data-chat-active-message-idle value="' + settings.activeMessageIdleMinutes + '"><small>用户多久没有新消息后才判断</small></label><label>主动消息间隔<input type="number" min="5" max="1440" step="5" data-chat-active-message-cooldown value="' + settings.activeMessageCooldownMinutes + '"><small>两次主动消息之间的最短时间</small></label><label>每天最多发送<input type="number" min="1" max="20" step="1" data-chat-active-message-daily-limit value="' + settings.activeMessageDailyLimit + '"><small>每个聊天每天单独计算</small></label></div></div>' : '');
     section.insertAdjacentElement('afterend', visionSection);
     const memorySection = main.querySelector('[data-chat-memory-settings]');
     const group = document.createElement('section');
@@ -7506,16 +7506,28 @@ ${recentConversation}
     const activeEnd = event.target.closest?.('[data-chat-moment-active-end]');
     const maxPerDay = event.target.closest?.('[data-chat-moment-max-per-day]');
     const activeMessage = event.target.closest?.('[data-chat-active-message-enabled]');
-    if ((!toggle && !imageToggle && !activeStart && !activeEnd && !maxPerDay && !activeMessage) || !app.classList.contains('is-open')) return;
-    if (activeMessage) {
+    const activeMessageIdle = event.target.closest?.('[data-chat-active-message-idle]');
+    const activeMessageCooldown = event.target.closest?.('[data-chat-active-message-cooldown]');
+    const activeMessageDailyLimit = event.target.closest?.('[data-chat-active-message-daily-limit]');
+    if ((!toggle && !imageToggle && !activeStart && !activeEnd && !maxPerDay && !activeMessage && !activeMessageIdle && !activeMessageCooldown && !activeMessageDailyLimit) || !app.classList.contains('is-open')) return;
+    if (activeMessage || activeMessageIdle || activeMessageCooldown || activeMessageDailyLimit) {
       const chat = activeContact ? state.chats?.[activeContact] : null;
       if (!chat) return;
       const settings = chatSettingsFor(chat);
-      settings.activeMessageEnabled = activeMessage.checked;
-      settings.activeMessageNextCheckAt = activeMessage.checked ? Date.now() + Number(settings.activeMessageIdleMinutes || IDEAL_ACTIVE_MESSAGE_DEFAULT.idleMinutes) * 60 * 1000 : 0;
+      const clamp = (value, fallback, min, max) => { const parsed = Number(value); return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.round(parsed))) : fallback; };
+      if (activeMessage) settings.activeMessageEnabled = activeMessage.checked;
+      if (activeMessageIdle) settings.activeMessageIdleMinutes = clamp(activeMessageIdle.value, settings.activeMessageIdleMinutes, 1, 1440);
+      if (activeMessageCooldown) settings.activeMessageCooldownMinutes = clamp(activeMessageCooldown.value, settings.activeMessageCooldownMinutes, 5, 1440);
+      if (activeMessageDailyLimit) settings.activeMessageDailyLimit = clamp(activeMessageDailyLimit.value, settings.activeMessageDailyLimit, 1, 20);
+      if (activeMessageIdle) activeMessageIdle.value = settings.activeMessageIdleMinutes;
+      if (activeMessageCooldown) activeMessageCooldown.value = settings.activeMessageCooldownMinutes;
+      if (activeMessageDailyLimit) activeMessageDailyLimit.value = settings.activeMessageDailyLimit;
+      settings.activeMessageNextCheckAt = settings.activeMessageEnabled ? Date.now() + Number(settings.activeMessageIdleMinutes || IDEAL_ACTIVE_MESSAGE_DEFAULT.idleMinutes) * 60 * 1000 : 0;
       save();
       const summary = document.querySelector('[data-chat-active-message-options] .chat-memory-settings-head small');
-      if (summary) summary.textContent = activeMessage.checked ? `已开启 · ${settings.activeMessageIdleMinutes} 分钟未回复后尝试` : '已关闭';
+      if (summary) summary.textContent = settings.activeMessageEnabled ? `已开启 · ${settings.activeMessageIdleMinutes} 分钟未回复后尝试` : '已关闭';
+      const hint = document.querySelector('[data-chat-active-message-hint]');
+      if (hint) hint.textContent = `角色会在你上一条消息后等待 ${settings.activeMessageIdleMinutes} 分钟；两次主动消息至少间隔 ${settings.activeMessageCooldownMinutes} 分钟，每天最多 ${settings.activeMessageDailyLimit} 条。默认关闭。`;
       return;
     }
     const contact = state.contacts.find(item => item.id === activeContact);
