@@ -83,16 +83,50 @@ async function qrCheck(request, env) {
 
 async function syncNetease(request, env) {
   const cookie = requestCookie(request); if (!cookie) return json({ error: '网易云登录会话不存在，请重新扫码' }, 401, request, env);
-  const accountResult = await upstreamGet(env, '/user/account', {}, cookie); const account = accountResult.body?.account || {}; const uid = String(account.id || account.userId || account.uid || ''); let profile = accountResult.body?.profile || {};
-  if (uid) { try { profile = (await upstreamGet(env, '/user/detail', { uid }, cookie)).body?.profile || profile; } catch {} }
+  let accountResult = await upstreamGet(env, '/user/account', {}, cookie);
+  let account = accountResult.body?.account || accountResult.body?.data?.account || {};
+  let profile = accountResult.body?.profile || accountResult.body?.data?.profile || {};
+  let uid = String(account.id || account.userId || account.uid || profile.userId || '');
+  if (!uid) {
+    const status = await upstreamGet(env, '/login/status', {}, cookie);
+    account = status.body?.data?.account || status.body?.account || account;
+    profile = status.body?.data?.profile || status.body?.profile || profile;
+    uid = String(account.id || account.userId || account.uid || profile.userId || '');
+    accountResult = status;
+  }
+  if (!uid) return json({ error: '网易云会话已连接，但未能读取账号 UID。请退出理想机网易云账号后重新扫码登录。' }, 502, request, env);
+  try { profile = (await upstreamGet(env, '/user/detail', { uid }, cookie)).body?.profile || profile; } catch {}
+  let vip = {};
+  try { vip = (await upstreamGet(env, '/vip/info', { uid }, cookie)).body || {}; } catch {}
+  const vipPayload = vip?.data || vip?.profile || vip;
+  const vipType = vipPayload?.vipType ?? vipPayload?.redVipLevel ?? profile.vipType ?? account.vipType ?? 0;
+  if (Number(vipType) > 0) profile = { ...profile, vipType: Number(vipType), isVip: true };
   let playlists = [];
   if (uid) {
     try {
-      const list = (await upstreamGet(env, '/user/playlist', { uid, limit: 20, offset: 0 }, cookie)).body?.playlist || [];
-      playlists = await Promise.all(list.map(async playlist => { try { const tracks = (await upstreamGet(env, '/playlist/track/all', { id: playlist.id, limit: 100, offset: 0 }, cookie)).body?.songs || []; return { ...playlist, tracks }; } catch { return { ...playlist, tracks: [] }; } }));
-    } catch {}
+      const list = (await upstreamGet(env, '/user/playlist', { uid, limit: 100, offset: 0 }, cookie)).body?.playlist || [];
+      playlists = await Promise.all(list.map(async playlist => { try { const total = Number(playlist.trackCount || playlist.size || 0), limit = 100; const pages = Math.max(1, Math.ceil(total / limit)); const batches = await Promise.all(Array.from({ length: pages }, (_, page) => upstreamGet(env, '/playlist/track/all', { id: playlist.id, limit, offset: page * limit }, cookie).then(result => result.body?.songs || []).catch(() => []))); return { ...playlist, tracks: batches.flat() }; } catch { return { ...playlist, tracks: [] }; } }));
+    } catch (error) { return json({ error: `网易云歌单读取失败：${error?.message || '上游接口错误'}` }, 502, request, env); }
+    try {
+      let likedIds = (await upstreamGet(env, '/likelist', { uid }, cookie)).body?.ids || [];
+      const likedPlaylist = playlists.find(playlist => /我喜欢的音乐/.test(playlist.name || '')) || playlists[0];
+      if (!likedIds.length && likedPlaylist?.id) {
+        const detail = (await upstreamGet(env, '/playlist/detail', { id: likedPlaylist.id }, cookie)).body?.playlist;
+        likedIds = (detail?.trackIds || []).map(track => track.id);
+      }
+      if (likedPlaylist) {
+        const songs = [];
+        for (let offset = 0; offset < likedIds.length; offset += 100) {
+          const ids = likedIds.slice(offset, offset + 100);
+          try { songs.push(...((await upstreamGet(env, '/song/detail', { ids: ids.join(',') }, cookie)).body?.songs || [])); } catch {}
+        }
+        const byId = new Map(songs.map(song => [String(song.id), song]));
+        likedPlaylist.tracks = likedIds.map(id => byId.get(String(id))).filter(Boolean);
+        likedPlaylist.trackCount = likedIds.length;
+      }
+    } catch (error) { return json({ error: `网易云喜欢歌单读取失败：${error?.message || '上游接口错误'}` }, 502, request, env); }
   }
-  return json({ userId: uid, profile: { ...profile, userId: profile.userId || uid }, account: accountResult.body, vip: { vipType: profile.vipType || account.vipType || 0 }, playlists }, 200, request, env);
+  return json({ userId: uid, profile: { ...profile, userId: profile.userId || uid }, account: accountResult.body, vip: { ...vip, vipType }, playlists }, 200, request, env);
 }
 
 async function proxyNetease(request, env, path) {
