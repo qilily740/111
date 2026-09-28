@@ -6312,6 +6312,12 @@ ${recentConversation}
     }
     const roleName = contact.name || contact.nickname || '角色';
     const userName = profile?.realName || profile?.nickname || profile?.name || '用户';
+    // 线下回复也读取统一的线上/线下共享记忆；当前会话原文仍由 meeting 单独承载。
+    let sharedMemory = '';
+    try {
+      const memoryContext = await window.IdealMachineMemory?.prepareContext?.({ roleId: activeContact, profileId: chat?.profileId || '', chat, query: String(text || '') });
+      sharedMemory = memoryContext?.systemPrompt || '';
+    } catch (error) { console.warn('线下共享记忆读取失败：', error); }
     const userPerson = session.userPerson || '我';
     const characterPerson = session.characterPerson || '我';
     const narrationRule = offlineNarrationRule(userName, roleName, userPerson, characterPerson, profile, contact);
@@ -6328,6 +6334,7 @@ ${recentConversation}
     const minLength = Math.max(1, length - lengthTolerance);
     const maxLength = length + lengthTolerance;
     const prompt = `你正在进行一次线下见面。你必须扮演角色“${roleName}”，不是AI、客服、作者或旁白。\n\n【执行顺序，必须遵守】\n1. 先读取【世界书分析背景】并理解时代、地点、社会环境、规则和主要矛盾；本次有分析结果时，以它为世界背景的最高依据。\n2. 如果【世界书分析背景】为空，再读取【角色设定】并从角色的时代、身份、经历、关系和已知环境中谨慎分析背景；不得凭空补设定。\n3. 背景确定后，再读取【用户人设】、【角色设定】、回复字数、人称、文风、回复预设和现场记录。\n4. 在内部思考本轮剧情应该如何自然向前发展，检查角色是否会这样做、用户是否被越权代写、结尾是否留有可回应空间；不要输出思考过程。\n\n【角色设定】\n${roleInfo}\n\n【用户人设】\n称呼：${userName}\n人设：${profile?.persona || '暂无用户设定'}\n\n【世界书分析背景】\n${worldMaterial.background || '暂无世界书分析结果。'}\n\n【世界书原始条目】\n${worldbook}\n\n【现场】\n地点：${session.place}\n原因：${session.reason}\n角色状态：${session.mood}\n\n【线上聊天背景】\n${online}\n\n【线下已发生】\n${meeting}\n\n【用户最新输入】\n${String(text || '').trim() || '请从见面的第一个瞬间自然回应。'}\n\n【本次实际使用的角色回复预设】\n${preset}\n\n${narrationRule}\n\n【共同执行的 if 时空规则】\n${offlineAntiClichePrompt}\n\n【输出规则】\n只输出角色回复正文，不要标题、解释、JSON、时间戳、提示词、“根据设定”等出戏内容。先理解用户输入，再用角色自己的动作、心理和台词推进现场；禁止逐字重复、改写或总结用户刚才说的话。只能描写角色自己的行动和心理，不能代替用户决定动作、心理、感受或台词。不要重复已经发生的内容。无论回复字数长短，只要包含动作、心理、环境或对白等不同层次，就用换行分成至少两段，不要把整条回复挤成一段。正文必须控制在 ${minLength}—${maxLength} 字（目标 ${length} 字，允许上下 20%，即目标字数的 0.8—1.2 倍），这是硬性范围，输出前自行数清；若不够就添加新的行动、信息、心理转折和对白，若超出就压缩，不能用重复句或无效环境描写灌水。`;
+    const promptWithSharedMemory = prompt.replace('\n\n【线下已发生】', `\n\n【线上线下共享记忆】\n${sharedMemory || '暂无已整理的共享关系记忆。'}\n\n【线下已发生】`);
     offlineBusy = true;
     openOfflineMode();
     let answer = '';
@@ -6346,7 +6353,7 @@ ${recentConversation}
         return response;
       };
       if (!answer) {
-        const baseMessages = [{ role:'system', content:'你是理想机线下角色扮演引擎，只输出角色本人自然、完整的回复。必须在这一次响应内完整收尾，禁止在句子、对白或动作中途停止。' }, { role:'user', content:prompt }];
+        const baseMessages = [{ role:'system', content:'你是理想机线下角色扮演引擎，只输出角色本人自然、完整的回复。必须在这一次响应内完整收尾，禁止在句子、对白或动作中途停止。' }, { role:'user', content:promptWithSharedMemory }];
         const response = await requestCompletion(baseMessages);
         const data = await response.json();
         // 线下模式也要兼容 content 数组、choices[].text、output_text 等
