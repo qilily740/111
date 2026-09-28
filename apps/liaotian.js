@@ -8776,6 +8776,9 @@ ${recentConversation}
     const end = IDEAL_ACTIVE_MESSAGE_DEFAULT.activeEndMinutes;
     return start < end ? minute >= start && minute < end : minute >= start || minute < end;
   }
+  function activeMessageCanRunInBackground() {
+    return window.IdealMachineKeepAlive?.isRunning?.() === true;
+  }
   function activeMessageTimestamp(message) {
     const value = Number(message?.createdAt || message?.timestamp || 0);
     return Number.isFinite(value) && value > 0 ? value : 0;
@@ -8788,7 +8791,8 @@ ${recentConversation}
   }
   function activeMessageShouldSkip(contact, chat, settings, now) {
     if (!contact || contact.isGroup || isGroupChatContact(contact) || !chat || settings.activeMessageEnabled !== true) return true;
-    if (document.visibilityState !== 'visible' || document.hidden || !activeMessageInActiveWindow(now)) return true;
+    const pageVisible = document.visibilityState === 'visible' && !document.hidden;
+    if ((!pageVisible && !activeMessageCanRunInBackground()) || !activeMessageInActiveWindow(now)) return true;
     if (!chat.profileId || replyingContacts.has(contact.id) || activeMessageBusy.has(contact.id)) return true;
     if (Number(settings.activeMessageNextCheckAt || 0) > now) return true;
     if (Number(settings.activeMessageLastSentAt || 0) > now - Number(settings.activeMessageCooldownMinutes || IDEAL_ACTIVE_MESSAGE_DEFAULT.cooldownMinutes) * 60 * 1000) return true;
@@ -8835,7 +8839,8 @@ ${recentConversation}
     return true;
   }
   async function runActiveMessageAutomation() {
-    if (document.visibilityState !== 'visible' || document.hidden) return false;
+    const pageVisible = document.visibilityState === 'visible' && !document.hidden;
+    if (!pageVisible && !activeMessageCanRunInBackground()) return false;
     const now = Date.now();
     const candidate = state.contacts.map(contact => ({ contact, chat: state.chats?.[contact.id], settings: normalizeActiveMessageSettings(state.chats?.[contact.id]) }))
       .filter(item => !activeMessageShouldSkip(item.contact, item.chat, item.settings, now))
@@ -8861,6 +8866,7 @@ ${recentConversation}
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleActiveMessageWake(1500); });
   window.addEventListener('focus', () => scheduleActiveMessageWake(1500));
   window.addEventListener('ideal-machine-chat-updated', () => scheduleActiveMessageWake(30000));
+  window.addEventListener('ideal-machine-keepalive-state', () => scheduleActiveMessageWake(1500));
   window.IdealMachineActiveMessages = {
     runNow: () => runActiveMessageAutomation(),
     getState() { return JSON.parse(JSON.stringify(state.chats || {})); }
