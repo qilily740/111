@@ -32,9 +32,9 @@
     { id:'widget-search', key:'search', name:'搜索条', description:'桌面搜索入口', selector:'.search-wrap', size:'wide', columns:4, rows:1, defaultHidden:true },
     { id:'widget-photos', key:'photos', name:'三联照片', description:'三张竖版照片', selector:'.photo-group', size:'photos', columns:4, rows:2, defaultHidden:true },
   ];
-  const defaultLayoutVersion = 6;
+  const defaultLayoutVersion = 7;
   const defaultPages = [
-    ['widget-profile','widget-polaroid-mini','app-liaotian','app-ta','app-luntan','app-rili','app-xiangce'],
+    ['widget-profile','widget-polaroid-mini','app-liaotian','app-ta','app-luntan','app-ideal','app-xiangce','app-jiaocheng','app-rili'],
     ['widget-mood','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-relationship-mini','widget-time-photo'],
     ['widget-chat','widget-image','app-jiyiku','app-creative-folder','widget-now']
   ];
@@ -44,8 +44,10 @@
     'app-liaotian':{ page:0, column:3, row:4 },
     'app-ta':{ page:0, column:4, row:4 },
     'app-luntan':{ page:0, column:3, row:5 },
+    'app-ideal':{ page:0, column:2, row:6 },
     'app-rili':{ page:0, column:4, row:5 },
     'app-xiangce':{ page:0, column:3, row:6 },
+    'app-jiaocheng':{ page:0, column:4, row:6 },
     'widget-mood':{ page:1, column:1, row:1 },
     'app-yinyue':{ page:1, column:1, row:3 },
     'app-doubao':{ page:1, column:2, row:3 },
@@ -100,6 +102,17 @@
     }
     state.layoutVersion = defaultLayoutVersion;
   }
+  // 新增的两个入口只放到桌面第一页；已有自定义布局也补入相册左右相邻位置。
+  const newDesktopAppPositions = { 'app-ideal':{ page:0, column:2, row:6 }, 'app-jiaocheng':{ page:0, column:4, row:6 } };
+  state.pages ||= [];
+  state.pages[0] ||= [];
+  state.positions ||= {};
+  const storedFolderApps = new Set((state.folders || []).flatMap(folder => Array.isArray(folder.apps) ? folder.apps : []));
+  const storedDesktopApps = new Set([...(state.pages || []).flat(), ...(state.dock || []), ...storedFolderApps]);
+  Object.entries(newDesktopAppPositions).forEach(([id, position]) => {
+    if (!storedDesktopApps.has(id)) { state.pages[0].push(id); storedDesktopApps.add(id); }
+    if (!state.positions[id]) state.positions[id] = { ...position };
+  });
   let editing = false;
   let drag = null;
   let folderDrag = null;

@@ -3057,7 +3057,84 @@ ${rerollRule}
     openOfflineMode();
     offlineReply('请基于当前现场和此前互动重新给出一次不同但符合角色人设的回应，不要提及重试或重写。');
   }
-  async function finishOfflineSession() { const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); if (!session || offlineBusy || offlineFinishing) return; offlineFinishing = true; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('chat'); const contact = state.contacts.find(item => item.id === activeContact) || {}; const contextText = (session.contextMessages || []).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); const meetingText = session.messages.filter(item => !item.contextPrompt).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); offlineBusy = true; openOfflineMode(); try { if (!config.endpoint || !config.key || !model) throw new Error('未配置 API'); const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` }, body:JSON.stringify({ model, temperature:.45, messages:[{ role:'system', content:'请用中文简洁总结这次线下见面。概括见面经过、双方情绪变化、重要动作或承诺，以及关系产生的变化。只输出一段自然摘要，不要列表，不要提及AI，控制在200字左右。' }, { role:'user', content:`角色：${contact.name || '角色'}\n见面前背景：\n${contextText || '无'}\n线下经过：\n${meetingText || '刚刚见面，尚未发生更多互动。'}` }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); session.summary = data.choices?.[0]?.message?.content || '这次见面已经结束，彼此的情绪与互动被保留下来。'; } catch { const last = session.messages.filter(item => !item.contextPrompt).slice(-3).map(item => item.text).join('；'); session.summary = last ? `这次见面中，你们经历了：${last}` : '这次见面刚刚开始便结束了，彼此的情绪仍停留在见面前的聊天里。'; } finally { session.endedAt = Date.now(); session.ended = true; session.savedAt = Date.now(); if (chat.activeOfflineSessionId === session.id) chat.activeOfflineSessionId = ''; offlineFinishing = false; offlineBusy = false; save(); renderOfflineSummary(session); const profile = state.profiles.find(item => item.id === chat.profileId); window.IdealMachineMemory?.ingestOffline?.({ roleId: activeContact, profileId: chat.profileId || '', role: contact, profile, chat, session }).catch(error => console.warn('线下记忆入库失败：', error)); } }
+  async function finishOfflineSession() {
+    const chat = currentChat();
+    const roleId = activeContact;
+    const sessionId = offlineSessionId;
+    const session = chat?.offlineSessions?.find(item => item.id === sessionId);
+    if (!session || offlineBusy || offlineFinishing) return;
+
+    offlineFinishing = true;
+    offlineBusy = true;
+    const config = window.IdealMachineAPI?.getConfig?.() || {};
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    const contact = state.contacts.find(item => item.id === roleId) || {};
+    const contextText = (session.contextMessages || []).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n');
+    const meetingText = session.messages.filter(item => !item.contextPrompt).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n');
+    openOfflineMode();
+
+    let summary = '';
+    let emotionArc = '';
+    let keywords = [];
+    const compactEmotionArc = value => String(value || '').split(/(?:→|->)/).map(group => group.split(/[，,、；;。！？\n]+/).map(item => item.trim().slice(0, 8)).filter(Boolean).slice(0, 2).join('、')).filter(Boolean).slice(0, 3).join(' → ').slice(0, 80);
+    try {
+      if (!config.endpoint || !config.key || !model) throw new Error('未配置 API');
+      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` },
+        body:JSON.stringify({ model, temperature:.45, messages:[
+          { role:'system', content:'请总结这次线下见面，按时间顺序概括重要经过。情绪脉络只写3—6个情绪名词或简短情绪词组，按变化顺序用“ → ”连接，例如“紧张、戒备 → 好奇、放松 → 亲近、不舍”；不能写句子、解释、事件或一段话。情绪脉络必须从见面初始状态写到具体互动引起的变化，再写到结束时的状态，每个转折都以本次线下言行为依据。线上聊天只能作为关系背景，不能写成“延续刚才的情绪”。关键词必须是本次线下内容里的独立名词或名词短语，每个2—6个汉字，提取具体的人、物、地点、话题或活动名称，输出4—8个，用词语而非完整句子。禁止照抄对话、动作描写或带主谓结构的内容；禁止出现“的、了、着、把、我、你”等语法词，禁止标签“线下见面”“情绪变化”“聊天内容”。例如互动提到旧皮绳、蔬菜、门锁声，就写“旧皮绳、蔬菜、门锁声”，不要写成“手腕上那条旧皮绳勒得很紧”。区分用户与角色的言行，不得推断用户未表达的内心。只返回合法 JSON：{"summary":"约200字的一段自然摘要，其中写出本次经过和情绪变化","emotionArc":"紧张、戒备 → 好奇、放松 → 亲近、不舍","keywords":["旧皮绳","蔬菜","门锁声"]}。不要 Markdown 或其他文字。' },
+          { role:'user', content:`角色：${contact.name || '角色'}\n见面前背景（仅作关系背景）：\n${contextText || '无'}\n角色见面初始状态：\n${session.mood || '未特别说明'}\n本次线下经过（情绪变化的主要依据）：\n${meetingText || '刚刚见面，尚未发生更多互动。'}` }
+        ] })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const rawSummary = String(data.choices?.[0]?.message?.content || '').trim();
+      try {
+        const cleanedSummary = rawSummary.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+        const jsonSummary = cleanedSummary.match(/\{[\s\S]*\}/)?.[0] || cleanedSummary;
+        const parsed = JSON.parse(jsonSummary);
+        summary = String(parsed.summary || '').trim();
+        emotionArc = compactEmotionArc(parsed.emotionArc);
+        keywords = window.IdealMachineMemory?.cleanOfflineKeywords?.(parsed.keywords) || [];
+      } catch {
+        summary = rawSummary;
+      }
+      summary ||= rawSummary || '这次见面已经结束，彼此的互动被保留下来。';
+      emotionArc ||= compactEmotionArc(session.mood) || '情绪未记录';
+    } catch {
+      const last = session.messages.filter(item => !item.contextPrompt).slice(-3).map(item => item.text).join('；');
+      summary = last ? `这次见面中，你们经历了：${last}` : '这次见面刚刚开始便结束了，现场记录没有更多互动，无法归纳后续的情绪转变。';
+      emotionArc = compactEmotionArc(session.mood) || '情绪未记录';
+    } finally {
+      // 同步过程可能已经替换过 chat/session 引用；结束时按 ID 找回当前对象再保存。
+      const currentChatState = state.chats?.[roleId] || chat;
+      const currentSession = currentChatState?.offlineSessions?.find(item => item.id === sessionId);
+      if (currentSession) {
+        currentSession.summary = summary;
+        currentSession.emotionArc = emotionArc || summary;
+        currentSession.keywords = keywords;
+        currentSession.endedAt = Date.now();
+        currentSession.ended = true;
+        currentSession.savedAt = Date.now();
+        if (currentChatState.activeOfflineSessionId === sessionId) currentChatState.activeOfflineSessionId = '';
+        save();
+      }
+      offlineFinishing = false;
+      offlineBusy = false;
+
+      if (currentSession) {
+        if (offlineSessionId === sessionId && activeContact === roleId) renderOfflineSummary(currentSession);
+        const currentContact = state.contacts.find(item => item.id === roleId) || contact;
+        const profile = state.profiles.find(item => item.id === currentChatState.profileId);
+        try {
+          await window.IdealMachineMemory?.ingestOffline?.({ roleId, profileId: currentChatState.profileId || '', role: currentContact, profile, chat:currentChatState, session:currentSession });
+        } catch (error) {
+          console.warn('线下记忆入库失败：', error);
+        }
+      }
+    }
+  }
   function renderImageChoice() { const portal = document.querySelector('#chatImageChoicePortal'); if (!portal) return; portal.innerHTML = imageChoiceOpen ? (imageDescriptionOpen ? '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>图片文字描述</h3><textarea id="chatImageDescription" placeholder="输入这张图片的内容描述…"></textarea><div><button data-chat-image-description-cancel type="button">取消</button><button data-chat-image-description-send type="button">发送</button></div></div></div>' : '<div class="chat-image-choice-modal"><div class="chat-image-choice-card"><h3>发送图片</h3><button data-chat-image-choice="text" type="button">文字描述</button><button data-chat-image-choice="file" type="button">从本地选择</button><button data-chat-image-choice="album" type="button">从理想机相册选择</button></div></div>') : ''; }
   document.addEventListener('click', event => {
     const albumChoice = event.target.closest?.('[data-chat-image-choice="album"]');
@@ -6038,13 +6115,15 @@ ${recentConversation}
   // state object captured by memory, multi-message, or generated-image handlers.
   const readBeforeBackgroundReply = read;
   read = function() {
-    return backgroundReplyContactId || replyingContacts.size ? state : readBeforeBackgroundReply();
+    return backgroundReplyContactId || replyingContacts.size || activeMessageBusy.size || offlineRequestLocked || offlineFinishing ? state : readBeforeBackgroundReply();
   };
 
   // 打开会话前只刷新目标会话，避免后台回复进行中时替换整个 state 对象，
   // 同时确保列表页停留期间由通知/其他页面写入的最新消息能够显示出来。
   function refreshConversationFromStorage(contactId) {
-    if (!contactId || backgroundReplyContactId === contactId || replyingContacts.has(contactId)) return;
+    // 线下请求持有当前会话的引用。请求未结束时替换整个 chat 对象，
+    // 会让 API 返回的回复写入旧 session，随后被 save() 丢弃。
+    if (!contactId || backgroundReplyContactId === contactId || replyingContacts.has(contactId) || activeMessageBusy.has(contactId) || ((offlineRequestLocked || offlineFinishing) && contactId === activeContact)) return;
     const persisted = readBeforeBackgroundReply();
     const persistedContact = persisted.contacts?.find(item => item.id === contactId);
     if (persistedContact) {

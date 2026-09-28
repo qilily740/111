@@ -32,6 +32,15 @@
   let stockGameNotice = '';
   let stockGameNoticeTimer = 0;
   let gamesScrollLeft = 0;
+  let gameInstallingId = '';
+  let gameInstallTimer = 0;
+  let loveLetterOpen = false;
+  let loveLetterLogOpen = false;
+  let loveLetterLogPosition = null;
+  let loveLetterBotTimer = 0;
+  let loveLetterRulesOpen = false;
+  let loveLetterRulesCountdown = 0;
+  let loveLetterRulesTimer = 0;
   let flowerRouletteStarted = false;
   let flowerRouletteFirstActor = '';
   let flowerRouletteUserAction = '';
@@ -73,8 +82,8 @@
     return window.IdealMachineFetch ? window.IdealMachineFetch(input, { ...next, idealScope:'couple' }) : window.fetch(input, next);
   };
   const readChat = () => { try { const value = JSON.parse(localStorage.getItem(chatKey) || '{}'); return { contacts: Array.isArray(value.contacts) ? value.contacts : [], profiles: Array.isArray(value.profiles) ? value.profiles : [], chats: value.chats || {} }; } catch { return { contacts: [], profiles: [], chats: {} }; } };
-  const emptySpace = () => ({ memories:[], moods:{}, moodReply:'', wishes:[], wishReplies:{}, letters:[], letterReplies:{}, events:[], dates:[], dateIdeas:[], selectedDateIdea:-1, datePlaceConfirmed:false, dateSession:null, dateHistory:[], exchange:null, exchangeHistory:[], exchangeImageEnabled:false, answers:{}, roleAnswers:{}, roleNotes:{}, mysteryCases:{}, mysteryRandomCases:{}, dailyQuestionDate:'', dailyQuestionText:'', interaction:'', interactionReply:'', checkins:{}, play:{ title:'', intro:'', prompt:'', turns:[], progress:'', createdAt:0 }, aiPlan:'', dailyMoment:null, presence:null, relationshipReview:null, relationshipReviewHistory:[] });
-  const normalizeSpace = value => ({ ...emptySpace(), ...(value && typeof value === 'object' ? value : {}), memories:Array.isArray(value?.memories) ? value.memories : [], moods:value?.moods || {}, wishes:Array.isArray(value?.wishes) ? value.wishes : [], wishReplies:value?.wishReplies || {}, letters:Array.isArray(value?.letters) ? value.letters : [], letterReplies:value?.letterReplies || {}, events:Array.isArray(value?.events) ? value.events : [], dates:Array.isArray(value?.dates) ? value.dates : [], dateIdeas:Array.isArray(value?.dateIdeas) ? value.dateIdeas.slice(0,3) : [], selectedDateIdea:Number.isInteger(value?.selectedDateIdea) ? value.selectedDateIdea : -1, datePlaceConfirmed:value?.datePlaceConfirmed === true, dateSession:value?.dateSession && typeof value.dateSession === 'object' ? value.dateSession : null, dateHistory:Array.isArray(value?.dateHistory) ? value.dateHistory : [], exchange:value?.exchange && typeof value.exchange === 'object' ? value.exchange : null, exchangeHistory:Array.isArray(value?.exchangeHistory) ? value.exchangeHistory.map(String).slice(-50) : [], exchangeImageEnabled:value?.exchangeImageEnabled === true, answers:value?.answers || {}, roleAnswers:value?.roleAnswers || {}, roleNotes:value?.roleNotes || {}, mysteryCases:value?.mysteryCases && typeof value.mysteryCases === 'object' && !Array.isArray(value.mysteryCases) ? value.mysteryCases : {}, mysteryRandomCases:value?.mysteryRandomCases && typeof value.mysteryRandomCases === 'object' && !Array.isArray(value.mysteryRandomCases) ? value.mysteryRandomCases : {}, checkins:value?.checkins && typeof value.checkins === 'object' ? value.checkins : {}, play:value?.play && typeof value.play === 'object' ? { ...emptySpace().play, ...value.play, turns:Array.isArray(value.play.turns) ? value.play.turns : [] } : emptySpace().play, aiPlan:String(value?.aiPlan || ''), presence:value?.presence && typeof value.presence === 'object' ? value.presence : null, relationshipReview:value?.relationshipReview && typeof value.relationshipReview === 'object' ? value.relationshipReview : null, relationshipReviewHistory:Array.isArray(value?.relationshipReviewHistory) ? value.relationshipReviewHistory : [] });
+  const emptySpace = () => ({ memories:[], moods:{}, moodReply:'', wishes:[], wishReplies:{}, letters:[], letterReplies:{}, events:[], dates:[], dateIdeas:[], selectedDateIdea:-1, datePlaceConfirmed:false, dateSession:null, dateHistory:[], exchange:null, exchangeHistory:[], exchangeImageEnabled:false, gameInstallations:{}, loveLetterGame:null, loveLetterRulesSeen:false, answers:{}, roleAnswers:{}, roleNotes:{}, mysteryCases:{}, mysteryRandomCases:{}, dailyQuestionDate:'', dailyQuestionText:'', interaction:'', interactionReply:'', checkins:{}, play:{ title:'', intro:'', prompt:'', turns:[], progress:'', createdAt:0 }, aiPlan:'', dailyMoment:null, presence:null, relationshipReview:null, relationshipReviewHistory:[] });
+  const normalizeSpace = value => ({ ...emptySpace(), ...(value && typeof value === 'object' ? value : {}), memories:Array.isArray(value?.memories) ? value.memories : [], moods:value?.moods || {}, wishes:Array.isArray(value?.wishes) ? value.wishes : [], wishReplies:value?.wishReplies || {}, letters:Array.isArray(value?.letters) ? value.letters : [], letterReplies:value?.letterReplies || {}, events:Array.isArray(value?.events) ? value.events : [], dates:Array.isArray(value?.dates) ? value.dates : [], dateIdeas:Array.isArray(value?.dateIdeas) ? value.dateIdeas.slice(0,3) : [], selectedDateIdea:Number.isInteger(value?.selectedDateIdea) ? value.selectedDateIdea : -1, datePlaceConfirmed:value?.datePlaceConfirmed === true, dateSession:value?.dateSession && typeof value.dateSession === 'object' ? value.dateSession : null, dateHistory:Array.isArray(value?.dateHistory) ? value.dateHistory : [], exchange:value?.exchange && typeof value.exchange === 'object' ? value.exchange : null, exchangeHistory:Array.isArray(value?.exchangeHistory) ? value.exchangeHistory.map(String).slice(-50) : [], exchangeImageEnabled:value?.exchangeImageEnabled === true, gameInstallations:value?.gameInstallations && typeof value.gameInstallations === 'object' ? Object.fromEntries(Object.entries(value.gameInstallations).filter(([, installed]) => installed === true).map(([id]) => [id, true])) : {}, loveLetterGame:value?.loveLetterGame && typeof value.loveLetterGame === 'object' ? value.loveLetterGame : null, loveLetterRulesSeen:value?.loveLetterRulesSeen === true, answers:value?.answers || {}, roleAnswers:value?.roleAnswers || {}, roleNotes:value?.roleNotes || {}, mysteryCases:value?.mysteryCases && typeof value.mysteryCases === 'object' && !Array.isArray(value.mysteryCases) ? value.mysteryCases : {}, mysteryRandomCases:value?.mysteryRandomCases && typeof value.mysteryRandomCases === 'object' && !Array.isArray(value.mysteryRandomCases) ? value.mysteryRandomCases : {}, checkins:value?.checkins && typeof value.checkins === 'object' ? value.checkins : {}, play:value?.play && typeof value.play === 'object' ? { ...emptySpace().play, ...value.play, turns:Array.isArray(value.play.turns) ? value.play.turns : [] } : emptySpace().play, aiPlan:String(value?.aiPlan || ''), presence:value?.presence && typeof value.presence === 'object' ? value.presence : null, relationshipReview:value?.relationshipReview && typeof value.relationshipReview === 'object' ? value.relationshipReview : null, relationshipReviewHistory:Array.isArray(value?.relationshipReviewHistory) ? value.relationshipReviewHistory : [] });
   const read = () => {
     try {
       const value = JSON.parse(localStorage.getItem(storageKey) || '{}');
@@ -131,7 +140,7 @@
     page.className = `couple-page${tab === 'games' ? ' couple-page-games' : ''}`;
     const titles = { today:['OUR FREQUENCY','心动'], dates:['OUR NEXT TIME','约会'], games:['PLAY TOGETHER','游戏'], secrets:['JUST FOR YOU','心事'], us:['US, LATELY','我们'] };
     const [eyebrow, title] = titles[tab] || titles.today;
-    page.innerHTML = `<header class="couple-header"><div><span>${eyebrow}</span><h1>${title}</h1></div><div class="couple-header-side"><button data-couple-close type="button">×</button></div></header><main class="couple-main">${tab === 'games' ? games(role, profile) : tab === 'dates' ? datesPage(role) : tab === 'secrets' ? secretsPage(role) : tab === 'us' ? usPage(role, profile) : todayPage(role, profile)}</main><nav class="couple-tabs couple-tabs-four couple-tabs-five"><button data-couple-tab="today" class="${tab === 'today' ? 'is-active' : ''}" type="button">${tabIcon('today')}<small>心动</small></button><button data-couple-tab="dates" class="${tab === 'dates' ? 'is-active' : ''}" type="button">${tabIcon('dates')}<small>约会</small></button><button data-couple-tab="games" class="${tab === 'games' ? 'is-active' : ''}" type="button">${tabIcon('games')}<small>游戏</small></button><button data-couple-tab="secrets" class="${tab === 'secrets' ? 'is-active' : ''}" type="button">${tabIcon('secrets')}<small>心事</small></button><button data-couple-tab="us" class="${tab === 'us' ? 'is-active' : ''}" type="button">${tabIcon('us')}<small>我们</small></button></nav>${recordOpenMarkup()}${letterOpenMarkup()}${mysteryOpen ? mysteryMarkup(role) : ''}${stockGameOpen ? stockGameMarkup() : ''}`;
+    page.innerHTML = `<header class="couple-header"><div><span>${eyebrow}</span><h1>${title}</h1></div><div class="couple-header-side"><button data-couple-close type="button">×</button></div></header><main class="couple-main">${tab === 'games' ? games(role, profile) : tab === 'dates' ? datesPage(role) : tab === 'secrets' ? secretsPage(role) : tab === 'us' ? usPage(role, profile) : todayPage(role, profile)}</main><nav class="couple-tabs couple-tabs-four couple-tabs-five"><button data-couple-tab="today" class="${tab === 'today' ? 'is-active' : ''}" type="button">${tabIcon('today')}<small>心动</small></button><button data-couple-tab="dates" class="${tab === 'dates' ? 'is-active' : ''}" type="button">${tabIcon('dates')}<small>约会</small></button><button data-couple-tab="games" class="${tab === 'games' ? 'is-active' : ''}" type="button">${tabIcon('games')}<small>游戏</small></button><button data-couple-tab="secrets" class="${tab === 'secrets' ? 'is-active' : ''}" type="button">${tabIcon('secrets')}<small>心事</small></button><button data-couple-tab="us" class="${tab === 'us' ? 'is-active' : ''}" type="button">${tabIcon('us')}<small>我们</small></button></nav>${recordOpenMarkup()}${letterOpenMarkup()}${mysteryOpen ? mysteryMarkup(role) : ''}${stockGameOpen ? stockGameMarkup() : ''}${loveLetterOpen ? loveLetterMarkup(role, profile) : ''}`;
     const gamesRowAfter = app.querySelector('.couple-games-installed-row');
     if (gamesRowAfter) requestAnimationFrame(() => { if (gamesRowAfter.isConnected) gamesRowAfter.scrollLeft = gamesScrollLeft; });
     app.querySelector('.couple-flower-roulette')?.remove();
@@ -664,6 +673,372 @@
     const reasoning = Object.keys(progress.reasoning || {}).join('、') || '尚未提交';
     try { const reply=await requestCoupleAI(`你正在与用户合作调查《${caseFile.title}》。你是用户选择的角色本人，保持角色人设。案件真相保存在 truthData 中，禁止在用户未完成调查与断案前主动透露真凶、完整作案经过、最终反转或未获得的线索。只能使用本次提供的 playerKnownData：案件引子、涉案人物、已知事实、已获得线索、已完成调查、当前可调查内容、断案阶段。玩家直接问“凶手是谁”时，要求他先核对矛盾并给出下一步调查建议。可以提出怀疑、反问和温和提示，但不能替玩家下结论。回复 1—3 句，自然像探案搭档。\n案件引子：${caseFile.intro}\n人物：${caseFile.characters.map(x=>x[0]).join('、')}\n已知事实：${caseFile.initialFacts.join('；')}\n已获得线索：${known||'暂无'}\n已完成调查：${investigations||'暂无'}\n当前可调查：${available||'暂无'}\n自由调查记录：${freeHistory||'暂无'}\n已完成的推理层：${reasoning}\n最近讨论：${recentDiscussion||'暂无'}\n当前阶段：${mysteryView}`,`玩家说：${message}`,.65); if(requestId!==mysteryRequest||!mysteryOpen||store.contactId!==roleId||mysteryCaseId!==caseFile.id)return; const latest=mysteryProgress(caseFile.id); latest.discussion.push({who:'role',text:reply.slice(0,280)}); latest.discussion=latest.discussion.slice(-12); state.mysteryCases[caseFile.id]=latest; save(); } catch(error){ if(requestId===mysteryRequest)mysteryFeedback=`求助失败：${error.message}`; } finally { if(requestId===mysteryRequest){ mysteryBusy=false; render(); } }
   }
+  const LOVE_LETTER_CARDS = [
+    { key:'guard', name:'守卫', short:'守', value:1, count:5, text:'猜中对方手牌即可淘汰对方。不能猜守卫。' },
+    { key:'priest', name:'牧师', short:'牧', value:2, count:2, text:'秘密查看任意一名其他玩家的手牌。' },
+    { key:'baron', name:'男爵', short:'爵', value:3, count:2, text:'比较手牌，点数较低的一方出局。' },
+    { key:'handmaid', name:'侍女', short:'侍', value:4, count:2, text:'直到你的下回合开始前免受影响。' },
+    { key:'prince', name:'王子', short:'王', value:5, count:2, text:'选择一名玩家（包括自己）弃掉手牌并重新抽一张。' },
+    { key:'king', name:'国王', short:'国', value:6, count:1, text:'与你选择的玩家交换手牌。' },
+    { key:'countess', name:'伯爵夫人', short:'伯', value:7, count:1, text:'手里有国王或王子时必须打出。' },
+    { key:'princess', name:'公主', short:'公', value:8, count:1, text:'打出或被弃掉时立即出局。' }
+  ];
+  const loveLetterCard = key => LOVE_LETTER_CARDS.find(card => card.key === key) || LOVE_LETTER_CARDS[0];
+  const loveLetterDeck = () => LOVE_LETTER_CARDS.flatMap(card => Array.from({ length:card.count }, () => card.key));
+  const loveLetterShuffle = cards => { const result = [...cards]; for (let index = result.length - 1; index > 0; index -= 1) { const swap = Math.floor(Math.random() * (index + 1)); [result[index], result[swap]] = [result[swap], result[index]]; } return result; };
+  const loveLetterPlayer = (id, name) => ({ id, name, hand:[], discards:[], revealedHand:[], lastPublicCard:'', eliminated:false, protected:false });
+  function loveLetterBeginRound(game, starter = '') {
+    const deck = loveLetterShuffle(loveLetterDeck());
+    game.deck = deck.slice(6);
+    game.burned = deck[0];
+    game.exposed = deck.slice(3, 6);
+    game.players = { user:loveLetterPlayer('user', game.players?.user?.name || '我'), role:loveLetterPlayer('role', game.players?.role?.name || roleName(current().role)) };
+    game.players.user.hand = [deck[1]];
+    game.players.role.hand = [deck[2]];
+    game.current = starter || game.nextStarter || 'user';
+    game.phase = 'draw';
+    game.pending = null;
+    game.winner = '';
+    game.roundWinner = '';
+    game.actionLog = [];
+    game.lastEffect = '本轮开始：双方各持有 1 张手牌。';
+    game.botThinking = false;
+    game.message = game.current === 'user' ? '轮到你了，先抽一张牌。' : `${game.players.role.name} 先手，正在抽牌…`;
+  }
+  function loveLetterNewGame(role, profile) {
+    const game = { version:2, champion:6, round:1, scores:{ user:0, role:0 }, players:{ user:loveLetterPlayer('user', profileName(profile)), role:loveLetterPlayer('role', roleName(role)) }, deck:[], burned:'', exposed:[], current:'user', nextStarter:'user', phase:'draw', pending:null, winner:'', roundWinner:'', message:'', actionLog:[], history:[] };
+    loveLetterBeginRound(game, 'user');
+    state.loveLetterGame = game;
+    loveLetterOpen = true;
+    if (!state.loveLetterRulesSeen) loveLetterOpenRules();
+    save();
+    render();
+  }
+  function loveLetterOpenRules() {
+    if (state.loveLetterRulesSeen) { loveLetterRulesOpen = false; return; }
+    loveLetterRulesOpen = true;
+    loveLetterRulesCountdown = 5;
+    if (loveLetterRulesTimer) window.clearInterval(loveLetterRulesTimer);
+    loveLetterRulesTimer = window.setInterval(() => {
+      loveLetterRulesCountdown = Math.max(0, loveLetterRulesCountdown - 1);
+      if (!loveLetterRulesCountdown) { window.clearInterval(loveLetterRulesTimer); loveLetterRulesTimer = 0; }
+      render();
+    }, 1000);
+  }
+  function loveLetterFinishRules() {
+    if (loveLetterRulesCountdown > 0) return;
+    state.loveLetterRulesSeen = true;
+    loveLetterRulesOpen = false;
+    if (loveLetterRulesTimer) window.clearInterval(loveLetterRulesTimer);
+    loveLetterRulesTimer = 0;
+    save();
+    render();
+  }
+  function loveLetterCurrent(game) { return game?.players?.[game.current]; }
+  function loveLetterOnlyCard(player) { return player?.hand?.[0] ? loveLetterCard(player.hand[0]) : null; }
+  function loveLetterNormalizeGame(game) {
+    if (!game) return game;
+    if (Number(game.version || 1) < 2) {
+      game.version = 2;
+      game.champion = 6;
+      game.exposed = Array.isArray(game.deck) ? game.deck.splice(Math.max(0, game.deck.length - 3), 3) : [];
+    } else if (!Array.isArray(game.exposed)) game.exposed = [];
+    if (!Array.isArray(game.actionLog)) game.actionLog = [];
+    return game;
+  }
+  function loveLetterPlayerName(game, playerId) { return game?.players?.[playerId]?.name || (playerId === 'user' ? '我' : '角色'); }
+  function loveLetterAddLog(game, text) {
+    game.actionLog = [...(Array.isArray(game.actionLog) ? game.actionLog : []), String(text)].slice(-50);
+  }
+  function loveLetterMustPlayCountess(player) { return player?.hand?.some(key => key === 'countess') && player.hand.some(key => key === 'king' || key === 'prince'); }
+  function loveLetterEliminate(game, playerId, reason) {
+    const player = game.players[playerId];
+    if (!player || player.eliminated) return;
+    player.revealedHand = [...player.hand];
+    player.eliminated = true;
+    if (player.hand.length) player.discards.push(...player.hand.splice(0));
+    if (game.message) game.message += ` ${loveLetterPlayerName(game, playerId)} 已出局：${reason}`;
+    game.lastEffect = `${game.lastEffect || ''} ${loveLetterPlayerName(game, playerId)} 已出局：${reason}`.trim();
+    loveLetterFinishRound(game, playerId === 'user' ? 'role' : 'user', '对手出局');
+  }
+  function loveLetterFinishRound(game, winner, reason) {
+    if (game.phase === 'round-over' || game.phase === 'match-over') return;
+    game.roundWinner = winner;
+    game.nextStarter = winner;
+    game.scores[winner] = (game.scores[winner] || 0) + 1;
+    game.message = `${loveLetterPlayerName(game, winner)} 赢下这一局。${reason || ''}`.trim();
+    game.phase = game.scores[winner] >= game.champion ? 'match-over' : 'round-over';
+    game.winner = game.phase === 'match-over' ? winner : '';
+    if (game.phase === 'match-over') game.message += ` ${loveLetterPlayerName(game, winner)} 先拿到 ${game.champion} 枚信物。`;
+    save();
+    render();
+  }
+  function loveLetterShowdown(game) {
+    game.lastEffect = '牌库已经抽完：双方亮出保留手牌，比较点数决定胜负。';
+    game.players.user.revealedHand = [...game.players.user.hand];
+    game.players.role.revealedHand = [...game.players.role.hand];
+    const userCard = loveLetterOnlyCard(game.players.user);
+    const roleCard = loveLetterOnlyCard(game.players.role);
+    if (!userCard || !roleCard) return loveLetterFinishRound(game, userCard ? 'user' : 'role', '对手没有手牌');
+    if (userCard.value !== roleCard.value) return loveLetterFinishRound(game, userCard.value > roleCard.value ? 'user' : 'role', '牌库耗尽，手牌点数更高');
+    game.roundWinner = 'tie';
+    game.nextStarter = game.current === 'user' ? 'role' : 'user';
+    game.scores.user = (game.scores.user || 0) + 1;
+    game.scores.role = (game.scores.role || 0) + 1;
+    game.message = '牌库耗尽且手牌点数相同，这一局双方都获得 1 枚钟情标记。';
+    const userReached = game.scores.user >= game.champion;
+    const roleReached = game.scores.role >= game.champion;
+    game.phase = userReached || roleReached ? 'match-over' : 'round-over';
+    game.winner = game.phase === 'match-over' ? (userReached && roleReached ? 'tie' : userReached ? 'user' : 'role') : '';
+    if (game.phase === 'match-over') game.message += userReached && roleReached ? ' 双方同时达到胜利标记数。' : ` ${userReached ? loveLetterPlayerName(game, 'user') : loveLetterPlayerName(game, 'role')} 先拿到 ${game.champion} 枚信物。`;
+    save();
+    render();
+  }
+  function loveLetterStartTurn(game, playerId) {
+    if (game.phase === 'round-over' || game.phase === 'match-over') return;
+    game.current = playerId;
+    game.players[playerId].protected = false;
+    game.phase = 'draw';
+    game.pending = null;
+    game.message = playerId === 'user' ? '轮到你了，先抽一张牌。' : `${loveLetterPlayerName(game, 'role')} 正在思考下一步…`;
+    save();
+    render();
+    if (playerId === 'role') {
+      if (loveLetterBotTimer) window.clearTimeout(loveLetterBotTimer);
+      loveLetterBotTimer = window.setTimeout(loveLetterRunBot, 650);
+    }
+  }
+  function loveLetterEndTurn(game, actor) {
+    if (game.phase === 'round-over' || game.phase === 'match-over') return;
+    if (!game.deck.length) return loveLetterShowdown(game);
+    loveLetterStartTurn(game, actor === 'user' ? 'role' : 'user');
+  }
+  function loveLetterDrawUser() {
+    const game = state.loveLetterGame;
+    if (!loveLetterOpen || !game || game.current !== 'user' || game.phase !== 'draw' || game.players.user.eliminated) return;
+    const card = game.deck.pop();
+    if (!card) return loveLetterShowdown(game);
+    game.players.user.hand.push(card);
+    game.phase = 'play';
+    game.message = '选择一张牌打出。';
+    save();
+    render();
+  }
+  function loveLetterDrawRole(game) {
+    const card = game.deck.pop();
+    if (!card) { loveLetterShowdown(game); return false; }
+    game.players.role.hand.push(card);
+    game.phase = 'play';
+    return true;
+  }
+  function loveLetterDrawReplacement(game, player) {
+    const replacement = game.deck.length > 0 ? game.deck.pop() : '';
+    if (!replacement) return false;
+    player.hand.push(replacement);
+    return true;
+  }
+  function loveLetterTargetProtected(game, targetId) { return game.players[targetId]?.protected === true; }
+  function loveLetterApplyCard(game, actor, cardKey, targetId = '', guess = '', options = {}) {
+    const actorPlayer = game.players[actor];
+    const card = loveLetterCard(cardKey);
+    const actorLabel = loveLetterPlayerName(game, actor);
+    game.lastEffect = `${actorLabel}打出「${card.name}」：${card.text}`;
+    const report = text => { game.message = text; game.lastEffect = `${game.lastEffect} ${text}`; };
+    const forced = options.forced === true;
+    const finish = () => forced ? loveLetterStartTurn(game, options.nextTurn || (actor === 'user' ? 'role' : 'user')) : loveLetterEndTurn(game, actor);
+    if (forced && actor === 'user' && ['guard','priest','baron','prince','king'].includes(card.key) && !targetId) {
+      game.pending = { actor:'user', card:card.key, type:card.key === 'guard' ? 'guess' : 'target', forced:true, nextTurn:options.nextTurn || 'role' };
+      report(card.key === 'guard' ? `王子连锁：猜${loveLetterPlayerName(game, 'role')}的手牌。` : `王子连锁：选择${card.name}的目标。`);
+      render();
+      return;
+    }
+    if (forced && !targetId && ['guard','priest','baron','king'].includes(card.key)) targetId = actor === 'user' ? 'role' : 'user';
+    if (forced && !targetId && card.key === 'prince') targetId = game.players.user.eliminated ? 'role' : 'user';
+    if (forced && actor === 'role' && card.key === 'guard' && !guess) guess = LOVE_LETTER_CARDS.filter(item => item.key !== 'guard')[Math.floor(Math.random() * 7)].key;
+    const target = targetId ? game.players[targetId] : null;
+    if (card.key === 'guard') {
+      if (!target || loveLetterTargetProtected(game, targetId)) { report('目标受到侍女保护，这次猜测无效。'); return finish(); }
+      if (target.hand[0] === guess) loveLetterEliminate(game, targetId, `猜中了${loveLetterCard(guess).name}`);
+      else { report(`${actorLabel} 猜的是「${loveLetterCard(guess).name}」，猜错了。`); finish(); }
+    } else if (card.key === 'priest') {
+      if (!target || loveLetterTargetProtected(game, targetId)) report('目标受到侍女保护，无法查看手牌。');
+      else if (actor === 'user') {
+        const viewedName = loveLetterOnlyCard(target)?.name || '未知';
+        report(`你查看了${loveLetterPlayerName(game, targetId)}的手牌：是「${viewedName}」。`);
+      } else {
+        report(`${loveLetterPlayerName(game, actor)}查看了你的手牌（查看结果对${loveLetterPlayerName(game, actor)}保密）。`);
+      }
+      finish();
+    } else if (card.key === 'baron') {
+      if (!target || loveLetterTargetProtected(game, targetId)) { report('目标受到侍女保护，男爵效果无效。'); return finish(); }
+      const own = loveLetterOnlyCard(actorPlayer); const other = loveLetterOnlyCard(target);
+      if (own && other && own.value !== other.value) {
+        const loser = own.value < other.value ? actor : targetId;
+        report(`男爵对决：${loveLetterPlayerName(game, actor)} 是「${own.name}」，${loveLetterPlayerName(game, targetId)} 是「${other.name}」。`);
+        loveLetterEliminate(game, loser, '男爵比较失败');
+      } else { report(`男爵对决：双方都是「${own?.name || '未知'}」点数相同，没有人出局。`); finish(); }
+    } else if (card.key === 'handmaid') {
+      actorPlayer.protected = true;
+      report(actor === 'user' ? '你受到侍女保护，直到你的下回合开始。' : `${actorLabel}受到侍女保护。`);
+      finish();
+    } else if (card.key === 'prince') {
+      if (forced && actor === 'user' && !targetId) { game.pending = { actor:'user', card:'prince', type:'target', forced:true, nextTurn:options.nextTurn || 'role' }; report('王子连锁：选择要弃牌并重抽的对象。'); render(); return; }
+      if (!target || loveLetterTargetProtected(game, targetId)) { report('目标受到侍女保护，王子效果无效。'); return finish(); }
+      const discarded = target.hand.shift();
+      if (discarded) { target.discards.push(discarded); target.lastPublicCard = discarded; loveLetterAddLog(game, `${loveLetterPlayerName(game, targetId)}被王子迫使弃掉「${loveLetterCard(discarded).name}」`); }
+      if (discarded === 'princess') return loveLetterEliminate(game, targetId, '弃掉了公主');
+      const replacement = loveLetterDrawReplacement(game, target) ? loveLetterOnlyCard(target) : null;
+      report(actor === 'user' ? `你让${loveLetterPlayerName(game, targetId)}弃掉「${loveLetterCard(discarded).name}」，并重新抽了一张${replacement ? `「${replacement.name}」` : ''}。` : `${actorLabel}让你弃掉手牌并重新抽了一张${replacement ? `「${replacement.name}」` : ''}。`);
+      finish();
+    } else if (card.key === 'king') {
+      if (!target || loveLetterTargetProtected(game, targetId)) { report('目标受到侍女保护，国王效果无效。'); return finish(); }
+      [actorPlayer.hand, target.hand] = [target.hand, actorPlayer.hand];
+      report(actor === 'user' ? `你和${loveLetterPlayerName(game, targetId)}交换了手牌，你拿到「${loveLetterOnlyCard(actorPlayer)?.name || '未知'}」。` : `${actorLabel}和你交换了手牌。`);
+      finish();
+    } else if (card.key === 'princess') {
+      loveLetterEliminate(game, actor, '打出了公主');
+    } else {
+      report('伯爵夫人没有主动效果，本回合结束。');
+      finish();
+    }
+  }
+  function loveLetterPlayUser(index) {
+    const game = state.loveLetterGame;
+    if (!loveLetterOpen || !game || game.current !== 'user' || game.phase !== 'play') return;
+    const cardKey = game.players.user.hand[index];
+    if (!cardKey) return;
+    if (loveLetterMustPlayCountess(game.players.user) && cardKey !== 'countess') { game.message = '手里有国王或王子时，必须打出伯爵夫人。'; render(); return; }
+    game.players.user.hand.splice(index, 1);
+    game.players.user.discards.push(cardKey);
+    game.players.user.lastPublicCard = cardKey;
+    const card = loveLetterCard(cardKey);
+    loveLetterAddLog(game, `${loveLetterPlayerName(game, 'user')}打出「${card.name}」`);
+    game.lastEffect = `你打出「${card.name}」：${card.text}`;
+    if (['guard','priest','baron','prince','king'].includes(card.key) && game.players.role.protected) { loveLetterApplyCard(game, 'user', cardKey, 'role', ''); return; }
+    if (['guard','prince'].includes(card.key)) { game.pending = { actor:'user', card:card.key, type:card.key === 'guard' ? 'guess' : 'target' }; game.message = card.key === 'guard' ? `猜${loveLetterPlayerName(game, 'role')}的手牌（不能猜守卫）。` : '选择王子要影响的对象。'; render(); return; }
+    if (card.key === 'baron' || card.key === 'priest' || card.key === 'king') { game.pending = { actor:'user', card:card.key, type:'target' }; game.message = '选择目标。'; render(); return; }
+    loveLetterApplyCard(game, 'user', cardKey, 'role');
+  }
+  function loveLetterResolvePending(action, value) {
+    const game = state.loveLetterGame;
+    if (!game?.pending || game.pending.actor !== 'user') return;
+    const card = game.pending.card;
+    if (game.pending.type === 'target' && !['user','role'].includes(value)) return;
+    const pending = game.pending;
+    if (game.pending.type === 'guess') { if (value === 'guard') return; game.pending = null; return loveLetterApplyCard(game, 'user', card, 'role', value, { forced:pending.forced === true, nextTurn:pending.nextTurn }); }
+    game.pending = null;
+    loveLetterApplyCard(game, 'user', card, value, '', { forced:pending.forced === true, nextTurn:pending.nextTurn });
+  }
+  function loveLetterFallbackBotDecision(game) {
+    const player = game.players.role;
+    const legalIndexes = player.hand.map((_, index) => index);
+    let cardIndex = legalIndexes[Math.floor(Math.random() * legalIndexes.length)] ?? 0;
+    if (loveLetterMustPlayCountess(player)) cardIndex = player.hand.indexOf('countess');
+    const card = loveLetterCard(player.hand[cardIndex]);
+    const target = ['guard','priest','baron','king'].includes(card.key) ? 'user' : card.key === 'prince' && Math.random() < .35 ? 'role' : card.key === 'prince' ? 'user' : '';
+    const guesses = LOVE_LETTER_CARDS.filter(item => item.key !== 'guard');
+    return { cardIndex, target, guess:card.key === 'guard' ? guesses[Math.floor(Math.random() * guesses.length)]?.key || 'princess' : '' };
+  }
+  async function loveLetterBotDecision(game) {
+    const player = game.players.role;
+    const { role } = current();
+    const hand = player.hand.map((key, index) => `${index}: ${loveLetterCard(key).name}（${key}，${loveLetterCard(key).value}点）`).join('；');
+    const exposed = (game.exposed || []).map(key => loveLetterCard(key).name).join('、') || '暂无';
+    const prompt = `现在轮到你在 Love Letter 中行动。只依据以下可见信息做决定，不要猜测用户的具体手牌。\n你的手牌：${hand}\n用户手牌数量：${game.players.user.hand.length} 张；用户是否受到侍女保护：${game.players.user.protected ? '是' : '否'}\n你的保护状态：${player.protected ? '是' : '否'}\n牌库剩余：${game.deck.length} 张；本轮亮牌：${exposed}\n你的弃牌：${player.discards.map(key => loveLetterCard(key).name).join('、') || '暂无'}\n严格只返回 JSON：{"cardIndex":0或1,"target":"user"或"role"或"","guess":"guard 以外的角色 key 或空","remark":"不超过20字的自然出牌反应"}。cardIndex 必须是你当前手牌的索引；如果手里有伯爵夫人且同时有国王或王子，必须选择伯爵夫人。`;
+    const system = `你正在和用户进行标准版 Love Letter。你是角色“${roleName(role)}”本人，按角色设定和性格思考，但不要输出思维过程。你可以有策略、犹豫和误判；你不知道用户的手牌，除非游戏信息明确告诉你。侍卫不能猜侍卫，祭司、男爵、国王只能指定其他玩家，王子可以指定自己或其他玩家。${role?.details || role?.signature || ''}`;
+    const raw = await requestCoupleAI(system, prompt, .45);
+    const decision = parseApiObject(raw) || {};
+    const fallback = loveLetterFallbackBotDecision(game);
+    const cardIndex = Number(decision.cardIndex);
+    let safeIndex = Number.isInteger(cardIndex) && cardIndex >= 0 && cardIndex < player.hand.length ? cardIndex : fallback.cardIndex;
+    if (loveLetterMustPlayCountess(player)) safeIndex = player.hand.indexOf('countess');
+    const card = loveLetterCard(player.hand[safeIndex]);
+    const target = ['prince'].includes(card.key) ? (decision.target === 'role' ? 'role' : 'user') : ['guard','priest','baron','king'].includes(card.key) ? 'user' : '';
+    const guesses = LOVE_LETTER_CARDS.filter(item => item.key !== 'guard').map(item => item.key);
+    return { cardIndex:safeIndex, target, guess:card.key === 'guard' && guesses.includes(decision.guess) ? decision.guess : fallback.guess };
+  }
+  async function loveLetterRunBot() {
+    loveLetterBotTimer = 0;
+    const game = state.loveLetterGame;
+    if (!loveLetterOpen || !game || game.current !== 'role' || !['draw','play'].includes(game.phase) || game.players.role.eliminated) return;
+    const needsDraw = game.phase === 'draw';
+    if (needsDraw) {
+      if (!loveLetterDrawRole(game)) return;
+      save();
+      render();
+    }
+    game.botThinking = true;
+    game.lastEffect = `${loveLetterPlayerName(game, 'role')}正在根据当前牌面思考下一步……`;
+    save();
+    render();
+    let decision;
+    try { decision = await loveLetterBotDecision(game); } catch { decision = loveLetterFallbackBotDecision(game); }
+    if (!loveLetterOpen || state.loveLetterGame !== game || game.phase !== 'play' || game.current !== 'role') { game.botThinking = false; return; }
+    game.botThinking = false;
+    const player = game.players.role;
+    const index = Number.isInteger(decision?.cardIndex) && player.hand[decision.cardIndex] ? decision.cardIndex : 0;
+    const cardKey = player.hand.splice(index, 1)[0];
+    player.discards.push(cardKey);
+    player.lastPublicCard = cardKey;
+    loveLetterAddLog(game, `${loveLetterPlayerName(game, 'role')}打出「${loveLetterCard(cardKey).name}」`);
+    game.pending = null;
+    const card = loveLetterCard(cardKey);
+    let target = decision?.target || '';
+    if (['baron','priest','king','prince'].includes(card.key) && target === 'user' && loveLetterTargetProtected(game, target)) target = card.key === 'prince' ? 'role' : '';
+    const guesses = LOVE_LETTER_CARDS.filter(item => item.key !== 'guard');
+    const guess = card.key === 'guard' && guesses.some(item => item.key === decision?.guess) ? decision.guess : guesses[Math.floor(Math.random() * guesses.length)].key;
+    loveLetterApplyCard(game, 'role', cardKey, target, guess);
+  }
+  function loveLetterNextRound() {
+    const game = state.loveLetterGame;
+    if (!game || !['round-over'].includes(game.phase)) return;
+    game.round += 1;
+    loveLetterBeginRound(game, game.nextStarter || 'user');
+    save();
+    render();
+    if (game.current === 'role') loveLetterStartTurn(game, 'role');
+  }
+  const loveLetterCardImage = key => `assets/ui/game-cards/love-letter/${key}.webp?v=20260928-love-letter-art-1`;
+  function loveLetterCardMarkup(key, index, playable) {
+    const card = loveLetterCard(key);
+    return `<button class="love-letter-card love-letter-card-${card.key}" data-love-letter-card="${index}" title="${esc(card.text)}" aria-label="${esc(card.name)}：${esc(card.text)}" type="button" ${playable ? '' : 'disabled'}><img src="${loveLetterCardImage(card.key)}" alt="${esc(card.name)}"></button>`;
+  }
+  function loveLetterRulesMarkup() {
+    const rules = LOVE_LETTER_CARDS.map(card => `<li><img src="${loveLetterCardImage(card.key)}" alt=""><span><b>${card.value} · ${esc(card.name)}</b><small>${esc(card.text)}</small></span></li>`).join('');
+    return `<section class="love-letter-rules-backdrop"><article class="love-letter-rules-modal"><header><small>PLAY GUIDE</small><b>第一次玩，先看这里</b></header><p>标准版共 16 张牌。本轮先移出 1 张暗牌，2 人局再额外亮出 3 张；每回合摸 1 张并打出 1 张。牌库耗尽时比较手牌点数，相同则双方都获得 1 枚钟情标记。</p><ul>${rules}</ul><button data-love-letter-rules-close type="button" ${loveLetterRulesCountdown ? 'disabled' : ''}>${loveLetterRulesCountdown ? `${loveLetterRulesCountdown} 秒后开始` : '我知道了，开始游戏'}</button></article></section>`;
+  }
+  function loveLetterMarkup(role, profile) {
+    const stored = state.loveLetterGame;
+    const game = stored?.players?.user && stored?.players?.role ? loveLetterNormalizeGame(stored) : null;
+    const userName = game?.players.user.name || profileName(profile);
+    const roleDisplayName = game?.players.role.name || roleName(role);
+    if (game && (game.players.user.name !== userName || game.players.role.name !== roleDisplayName)) {
+      game.players.user.name = userName;
+      game.players.role.name = roleDisplayName;
+      save();
+    }
+    const header = `<header class="love-letter-header"><button data-love-letter-close type="button" aria-label="返回">‹</button><div><small>LOVE LETTER</small><b>情书</b></div><div class="love-letter-score"><span>${game?.scores?.user || 0}</span><i>♡</i><span>${game?.scores?.role || 0}</span></div></header>`;
+    if (!game) return `<section class="love-letter-game" role="dialog" aria-modal="true" aria-label="Love Letter">${header}<main class="love-letter-start"><div class="love-letter-seal">♥</div><small>CLASSIC CARD GAME</small><h1>情书</h1><p>用一张牌猜出${esc(roleDisplayName)}的心意。2 人局先拿到 6 枚钟情标记的人获胜。</p><div class="love-letter-rule-strip"><span>16 张牌</span><span>2 人对局</span><span>离线可玩</span></div><button data-love-letter-start type="button">开始对局</button></main></section>`;
+    const user = game.players.user; const opponent = game.players.role;
+    const pending = game.pending;
+    const userPlayable = game.current === 'user' && game.phase === 'play' && !pending;
+    const guessOptions = LOVE_LETTER_CARDS.filter(card => card.key !== 'guard').map(card => `<button data-love-letter-guess="${card.key}" type="button"><b>${card.value}</b>${esc(card.name)}</button>`).join('');
+    const targetOptions = (pending?.card === 'prince' ? [['user',userName],['role',roleDisplayName]] : [['role',roleDisplayName]]).filter(([id]) => !game.players[id]?.eliminated).map(([id,label]) => `<button data-love-letter-target="${id}" type="button">${esc(label)}</button>`).join('');
+    const exposedCards = (game.exposed || []).map(key => `<img src="${loveLetterCardImage(key)}" alt="${esc(loveLetterCard(key).name)}">`).join('');
+    const actionRows = (game.actionLog || []).slice(-6).map(item => `<li>${esc(item)}</li>`).join('');
+    const logPositionStyle = loveLetterLogPosition ? `left:${loveLetterLogPosition.left}px;top:${loveLetterLogPosition.top}px;right:auto;` : '';
+    const logSideClass = loveLetterLogPosition && loveLetterLogPosition.left < (window.innerWidth / 2) ? ' is-panel-right' : '';
+    const actionLogPanel = `<div class="love-letter-log-dock${logSideClass}" data-love-letter-log-dock style="${logPositionStyle}"><button class="love-letter-log-button" data-love-letter-log type="button" aria-expanded="${loveLetterLogOpen ? 'true' : 'false'}" aria-label="打开操作记录"><img src="assets/ui/game-cards/love-letter/action-log-envelope.webp?v=20260928-love-letter-envelope-2" alt=""></button>${loveLetterLogOpen ? `<section class="love-letter-letter-paper" role="dialog" aria-label="操作记录"><header><button data-love-letter-log-close type="button" aria-label="关闭操作记录">×</button></header><div class="love-letter-letter-scroll">${actionRows ? `<ol>${actionRows}</ol>` : '<p>本轮还没有操作记录。</p>'}</div></section>` : ''}</div>`;
+    const pendingPanel = pending ? `<section class="love-letter-choice" aria-label="选择操作"><small>${pending.type === 'guess' ? '请猜测目标手牌' : '请选择这张牌的目标'}</small>${pending.type === 'guess' ? `<div>${guessOptions}</div>` : `<div>${targetOptions}</div>`}</section>` : '';
+    const finishTitle = game.winner === 'tie' ? '双方同时赢得整场对局' : game.winner === 'user' ? `${userName} 赢得了整场对局` : game.winner === 'role' ? `${roleDisplayName} 赢得了整场对局` : game.roundWinner === 'tie' ? '这一局双方都获得信物' : game.roundWinner === 'user' ? `${userName} 这一局获胜` : `${roleDisplayName} 这一局获胜`;
+    const revealedCardKey = player => player.revealedHand?.[0] || player.hand?.[0] || player.lastPublicCard || '';
+    const revealCard = (player, label) => { const key = revealedCardKey(player); return `<div class="love-letter-reveal-player"><b>${label}</b>${key ? `<img src="${loveLetterCardImage(key)}" alt="${esc(loveLetterCard(key).name)}"><span>${esc(loveLetterCard(key).name)} · ${loveLetterCard(key).value} 点</span>` : '<span class="love-letter-no-card">无保留手牌</span>'}</div>`; };
+    const revealPanel = ['round-over','match-over'].includes(game.phase) ? `<section class="love-letter-reveal"><small>本轮结果 · 双方亮牌</small><div>${revealCard(user, userName)}${revealCard(opponent, roleDisplayName)}</div></section>` : '';
+    const finishPanel = ['round-over','match-over'].includes(game.phase) ? `<section class="love-letter-modal-backdrop love-letter-finish-backdrop" role="presentation"><section class="love-letter-finish" role="dialog" aria-modal="true" aria-label="对局结果"><small>${game.phase === 'match-over' ? 'MATCH COMPLETE' : 'ROUND COMPLETE'}</small><b>${finishTitle}</b><div class="love-letter-result-reason"><small>判定依据</small><strong>${esc(game.lastEffect || '本局已完成结算。')}</strong><p>${esc(game.message)}</p></div>${revealPanel}${game.phase === 'round-over' ? '<button data-love-letter-next-round type="button">下一局</button>' : '<button data-love-letter-start type="button">重新开始</button>'}</section></section>` : '';
+    const opponentCard = ['round-over','match-over'].includes(game.phase) && !opponent.eliminated && opponent.hand[0] ? `<div class="love-letter-hidden-card is-revealed"><img src="${loveLetterCardImage(loveLetterCard(opponent.hand[0]).key)}" alt="${esc(loveLetterCard(opponent.hand[0]).name)}"></div>` : '<div class="love-letter-hidden-card"><span>?</span></div>';
+    const effectPanel = `<div class="love-letter-effect-box"><small>牌面效果</small><span>${esc(game.lastEffect || '打出牌后，效果会显示在这里。')}</span></div>`;
+    return `<section class="love-letter-game" role="dialog" aria-modal="true" aria-label="Love Letter">${header}<main class="love-letter-board"><section class="love-letter-opponent"><div class="love-letter-player-line"><span class="love-letter-avatar">${esc(roleDisplayName.slice(0,1))}</span><div><b>${esc(roleDisplayName)}</b><small>${opponent.eliminated ? '已出局' : game.botThinking ? '正在思考…' : opponent.protected ? '受到保护' : `手牌 ${opponent.hand.length} 张`}</small></div><strong>${game.scores.role || 0} ♡</strong></div>${opponentCard}</section><section class="love-letter-center"><div class="love-letter-center-top"><span>牌库 ${game.deck.length}</span><i>弃牌 ${opponent.discards.length + user.discards.length}</i></div><div class="love-letter-message">${esc(game.message)}</div><div class="love-letter-burned">本轮移出 <b>1 张暗牌</b> · 额外亮出 3 张</div><div class="love-letter-exposed-cards" aria-label="本轮额外亮出的 3 张牌">${exposedCards}</div></section><section class="love-letter-user"><div class="love-letter-player-line"><span class="love-letter-avatar is-user">${esc(userName.slice(0,1))}</span><div><b>${esc(userName)}</b><small>${user.eliminated ? '已出局' : user.protected ? '受到保护' : game.current === 'user' ? '轮到你' : `等待 ${esc(roleDisplayName)}`}</small></div><strong>${game.scores.user || 0} ♡</strong></div><div class="love-letter-hand">${user.hand.map((key,index) => loveLetterCardMarkup(key,index,userPlayable)).join('')}</div>${game.current === 'user' && game.phase === 'draw' ? '<button class="love-letter-draw" data-love-letter-draw type="button">抽一张牌</button>' : ''}${effectPanel}${pendingPanel}</section></main>${actionLogPanel}${finishPanel}${loveLetterRulesOpen ? loveLetterRulesMarkup() : ''}</section>`;
+  }
   function games(role, profile) {
     const categories = [['🏁', '竞速'], ['🧩', '益智解谜'], ['♠', '娱乐场'], ['☀', '云游戏'], ['🎯', '策略']];
     const chips = categories.map(([icon, label], index) => `<button class="couple-games-chip" type="button" disabled><i class="couple-games-chip-icon chip-icon-${index + 1}" aria-hidden="true"></i><span>${label}</span></button>`).join('');
@@ -672,8 +1047,29 @@
       '<article class="couple-games-installed-card is-filled couple-mystery-cover"><div class="couple-mystery-cover-art"><img src="assets/ui/game-covers/ancient-mystery-cover-v2.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/ancient-mystery-cover-v2.png\'" alt="古籍悬案游戏封面"></div><div class="couple-games-installed-copy"><i>和 TA 一起读案推理</i><b>古籍悬案</b><span>翻开案卷，找出真相</span><button data-mystery-open type="button">打开</button></div></article>',
       '<article class="couple-games-installed-card is-filled stock-cover"><img class="couple-games-installed-cover" src="assets/ui/game-covers/stock-sort-cover-v1.webp" onerror="this.onerror=null;this.src=\'assets/ui/game-covers/stock-sort-cover-v1.png\'" alt="分类理货游戏封面"><div class="couple-games-installed-copy"><i>轻巧分类益智</i><b>分类理货</b><span>整理货堆，完成今日订单</span><button data-stock-open type="button">打开</button></div></article>'
     ].join('');
-    const rows = Array.from({ length: 4 }, () => '<article class="couple-games-row" aria-label="未安装游戏待定"><i class="couple-games-row-icon"></i><div><b></b><span></span></div><div class="couple-games-row-action"><button type="button" aria-label="获取">获取</button><small>App 内购买</small></div></article>').join('');
+    const installRing = '<svg class="couple-game-install-ring" viewBox="0 0 28 28" width="28" height="28" aria-hidden="true"><circle class="couple-install-wait" cx="14" cy="14" r="11"/><g class="couple-install-download"><circle class="couple-install-track" cx="14" cy="14" r="11"/><circle class="couple-install-progress" cx="14" cy="14" r="11" pathLength="100" transform="rotate(-90 14 14)"/><rect x="10" y="10" width="8" height="8" rx="1.2"/></g></svg>';
+    const gameAction = (gameId, label = '游戏') => { const installed = state.gameInstallations?.[gameId] === true; if (gameInstallingId === gameId) return `<button class="couple-game-get-button is-installing" type="button" aria-label="正在获取 ${esc(label)}" disabled>${installRing}</button>`; if (installed) return `<button class="couple-game-get-button" data-couple-game-open="${esc(gameId)}" type="button">打开</button>`; return `<button class="couple-game-get-button" data-couple-game-get="${esc(gameId)}" type="button" aria-label="获取 ${esc(label)}">获取</button>`; };
+    const loveLetterInstalled = state.gameInstallations?.['love-letter'] === true;
+    const loveLetterAction = gameAction('love-letter', 'Love Letter');
+    const loveLetterRow = `<article class="couple-games-row couple-love-letter-row" aria-label="Love Letter 情书"><i class="couple-games-row-icon couple-love-letter-icon" aria-hidden="true"><img src="assets/ui/game-covers/love-letter-cover.webp?v=20260928-love-letter-cover-1" alt="" draggable="false"></i><div><b>情书 Love Letter</b><span>经典卡牌 · 和 ${esc(roleName(role))} 一起猜心意</span></div><div class="couple-games-row-action"><div class="couple-game-action-slot">${loveLetterAction}</div><small>${loveLetterInstalled ? '已添加到游戏' : '免费游戏'}</small></div></article>`;
+    const rows = [loveLetterRow, ...Array.from({ length: 3 }, (_, index) => { const gameId = `featured-${index + 2}`; const installed = state.gameInstallations?.[gameId] === true; return `<article class="couple-games-row" aria-label="未安装游戏待定"><i class="couple-games-row-icon"></i><div><b></b><span></span></div><div class="couple-games-row-action"><div class="couple-game-action-slot">${gameAction(gameId, `近期佳作 ${index + 2}`)}</div><small>${installed ? '已添加到游戏' : 'App 内购买'}</small></div></article>`; })].join('');
     return `<section class="couple-games-shell"><div class="couple-games-category-row">${chips}</div><section class="couple-games-installed-row" aria-label="已安装游戏">${installed}</section><section class="couple-games-list-slot"><header><div><h2>近期佳作</h2><span>向左滑动查看更多</span></div><button type="button" disabled>查看全部</button></header>${rows}</section></section>`;
+  }
+  function startGameInstall(gameId) {
+    if (gameInstallingId || state.gameInstallations?.[gameId] === true) return;
+    const roleId = store.contactId;
+    gameInstallingId = gameId;
+    render();
+    if (gameInstallTimer) window.clearTimeout(gameInstallTimer);
+    gameInstallTimer = window.setTimeout(() => {
+      gameInstallTimer = 0;
+      if (store.contactId !== roleId) { gameInstallingId = ''; return; }
+      gameInstallingId = '';
+      state.gameInstallations ||= {};
+      state.gameInstallations[gameId] = true;
+      save();
+      render();
+    }, 1900);
   }
   function resetFlowerRouletteRound() {
     if (flowerRouletteCountdownTimer) window.clearInterval(flowerRouletteCountdownTimer);
@@ -925,6 +1321,18 @@
     const puzzleChoice = event.target.closest('[data-mystery-contradiction],[data-mystery-order],[data-mystery-answer]');
     if (puzzleChoice) { const caseFile = mysteryCases.find(item => item.id === mysteryCaseId); if (!caseFile) return; const progress = mysteryProgress(caseFile.id); const puzzle = legacyMysteryPuzzles[caseFile.id]; const index = Number(puzzleChoice.dataset.mysteryContradiction ?? puzzleChoice.dataset.mysteryOrder ?? puzzleChoice.dataset.mysteryAnswer); if (!Number.isInteger(index)) return; if (puzzleChoice.hasAttribute('data-mystery-contradiction')) { if (progress.viewed?.length < mysteryClues(caseFile).length || progress.contradictionDone) return; if (index === puzzle.contradiction.answer) { progress.contradictionDone = true; mysteryChoice = -1; mysteryFeedback = ''; } else mysteryFeedback = '这两条证据还不足以证明关键矛盾，再核对人物和时间。'; } else if (puzzleChoice.hasAttribute('data-mystery-order')) { if (!progress.contradictionDone || progress.orderDone) return; if (index === puzzle.order.answer) { progress.orderDone = true; mysteryChoice = -1; mysteryFeedback = ''; } else mysteryFeedback = puzzle.order.hint; } else { if (!progress.orderDone) return; mysteryChoice = index; mysteryFeedback = ''; } state.mysteryCases[caseFile.id] = progress; save(); render(); return; }
     if (event.target.closest('[data-mystery-submit]')) { const caseFile = mysteryCases.find(item => item.id === mysteryCaseId); if (!caseFile || mysteryChoice < 0 || !mysteryProgress(caseFile.id).orderDone) return; const progress = mysteryProgress(caseFile.id); progress.attempts = (Number(progress.attempts) || 0) + 1; if (mysteryChoice === caseFile.answer) { progress.solved = true; mysteryFeedback = ''; } else mysteryFeedback = `还差一步：${caseFile.hint}`; state.mysteryCases[caseFile.id] = progress; save(); render(); return; }
+    const gameGetButton = event.target.closest('[data-couple-game-get]'); if (gameGetButton) { startGameInstall(gameGetButton.dataset.coupleGameGet); return; }
+    const gameOpenButton = event.target.closest('[data-couple-game-open]'); if (gameOpenButton) { if (gameOpenButton.dataset.coupleGameOpen === 'love-letter') { loveLetterOpen = true; loveLetterLogOpen = false; loveLetterLogPosition = null; const hasSavedGame = Boolean(state.loveLetterGame?.players?.user && state.loveLetterGame?.players?.role); if (hasSavedGame && !state.loveLetterRulesSeen) loveLetterOpenRules(); render(); const game = state.loveLetterGame; if (!loveLetterRulesOpen && game?.current === 'role' && ['draw','play'].includes(game.phase) && !game.players.role.eliminated) { if (loveLetterBotTimer) window.clearTimeout(loveLetterBotTimer); loveLetterBotTimer = window.setTimeout(loveLetterRunBot, game.phase === 'play' ? 180 : 650); } } else window.alert('这个游戏页面正在接入中。'); return; }
+    if (event.target.closest('[data-love-letter-close]')) { if (loveLetterRulesOpen) return; if (loveLetterBotTimer) window.clearTimeout(loveLetterBotTimer); loveLetterOpen = false; loveLetterLogOpen = false; loveLetterLogPosition = null; render(); return; }
+    if (event.target.closest('[data-love-letter-rules-close]')) { loveLetterFinishRules(); return; }
+    if (event.target.closest('[data-love-letter-start]')) { loveLetterOpen = true; loveLetterLogOpen = false; const { role, profile } = current(); loveLetterNewGame(role, profile); return; }
+    if (event.target.closest('[data-love-letter-log-close]')) { loveLetterLogOpen = false; render(); return; }
+    const loveLetterLogButton = event.target.closest('[data-love-letter-log]'); if (loveLetterLogButton) { if (loveLetterLogButton.dataset.dragged === 'true') { delete loveLetterLogButton.dataset.dragged; return; } loveLetterLogOpen = !loveLetterLogOpen; render(); return; }
+    if (event.target.closest('[data-love-letter-draw]')) { loveLetterDrawUser(); return; }
+    const loveCard = event.target.closest('[data-love-letter-card]'); if (loveCard) { loveLetterPlayUser(Number(loveCard.dataset.loveLetterCard)); return; }
+    const loveGuess = event.target.closest('[data-love-letter-guess]'); if (loveGuess) { loveLetterResolvePending('guess', loveGuess.dataset.loveLetterGuess); return; }
+    const loveTarget = event.target.closest('[data-love-letter-target]'); if (loveTarget) { loveLetterResolvePending('target', loveTarget.dataset.loveLetterTarget); return; }
+    if (event.target.closest('[data-love-letter-next-round]')) { loveLetterNextRound(); return; }
     if (event.target.closest('[data-stock-open]')) { stockGameState = null; stockGameNotice = ''; stockGameOpen = true; render(); return; }
     if (event.target.closest('[data-stock-close]')) { stockGameOpen = false; stockGameState = null; stockGameNotice = ''; render(); return; }
     if (event.target.closest('[data-stock-start]')) { stockGameState = stockMakeGame(); stockGameNotice = ''; render(); return; }
@@ -938,7 +1346,7 @@
     if (event.target.closest('[data-flower-retry]')) { chooseFlowerRouletteRole(); return; }
     const flowerAction = event.target.closest('[data-flower-action]'); if (flowerAction) { chooseFlowerRouletteAction(flowerAction.dataset.flowerAction); return; }
     if (event.target.closest('[data-flower-probe]')) { testFlowerRouletteRole(); return; }
-    if (event.target.closest('[data-couple-close]')) { flowerRouletteOpen = false; mysteryOpen = false; stockGameOpen = false; stockGameState = null; stockGameNotice = ''; resetFlowerRouletteRound(); app.classList.remove('is-open'); return; }
+    if (event.target.closest('[data-couple-close]')) { if (loveLetterRulesOpen) return; flowerRouletteOpen = false; mysteryOpen = false; stockGameOpen = false; stockGameState = null; stockGameNotice = ''; loveLetterOpen = false; loveLetterLogOpen = false; loveLetterLogPosition = null; if (loveLetterBotTimer) window.clearTimeout(loveLetterBotTimer); resetFlowerRouletteRound(); app.classList.remove('is-open'); return; }
     if (event.target.closest('[data-couple-paper-close]')) { const paper = app.querySelector('.couple-paper-overlay'); if (paper) { paper.classList.add('is-closing'); window.setTimeout(() => paper.remove(), 280); } return; }
     const pieceCard = event.target.closest('[data-couple-piece]'); if (pieceCard) { const type = pieceCard.dataset.couplePiece; const id = pieceCard.dataset.couplePieceId; const item = type === 'thought' ? state.relationshipReviewHistory?.find(entry => entry.id === id) : state.memories.find(entry => entry.id === id); if (!item) return; app.querySelector('.couple-paper-overlay')?.remove(); app.querySelector('.couple-page').insertAdjacentHTML('beforeend', memoryPaperMarkup(type, item)); const overlay = app.querySelector('.couple-paper-overlay'); requestAnimationFrame(() => { if (overlay?.isConnected) animateMemoryPaper(overlay); }); return; }
     if (event.target.closest('[data-couple-home]')) { tab = 'today'; render(); return; }
@@ -982,6 +1390,54 @@
     const wish = event.target.closest('[data-couple-toggle-wish]'); if (wish) { const item = state.wishes.find(entry => entry.id === wish.dataset.coupleToggleWish); if (item) { item.done = !item.done; save(); render(); } return; }
     const delEvent = event.target.closest('[data-couple-delete-event]'); if (delEvent) { state.events = state.events.filter(item => item.id !== delEvent.dataset.coupleDeleteEvent); save(true); render(); return; }
     if (event.target.closest('[data-couple-save-answer]')) { const question = dailyQuestion(); const value = app.querySelector('#coupleAnswer')?.value.trim(); if (value) { state.answers[question] = value; state.roleAnswers ||= {}; state.roleAnswers[question] = `我看到你的回答了。${value.length > 12 ? '你的想法我会好好记住。' : '我也这样想。'} 下次我们一起去实现，好吗？`; save(); render(); } return; }
+  });
+  app.addEventListener('pointerdown', event => {
+    const button = event.target.closest('[data-love-letter-log]');
+    if (!button || !loveLetterOpen || event.target.closest('[data-love-letter-log-close]')) return;
+    const dock = button.closest('[data-love-letter-log-dock]');
+    if (!dock) return;
+    const start = { x:event.clientX, y:event.clientY, left:dock.getBoundingClientRect().left, top:dock.getBoundingClientRect().top };
+    let moved = false;
+    let frame = 0;
+    let latestDx = 0;
+    let latestDy = 0;
+    try { button.setPointerCapture(event.pointerId); } catch {}
+    dock.classList.add('is-dragging');
+    const move = moveEvent => {
+      const dx = moveEvent.clientX - start.x;
+      const dy = moveEvent.clientY - start.y;
+      if (!moved && Math.hypot(dx, dy) < 5) return;
+      moved = true;
+      latestDx = dx;
+      latestDy = dy;
+      if (!frame) frame = window.requestAnimationFrame(() => {
+        dock.style.transform = `translate3d(${latestDx}px,${latestDy}px,0)`;
+        frame = 0;
+      });
+      moveEvent.preventDefault();
+    };
+    const finish = () => {
+      window.removeEventListener('pointermove', move);
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = 0;
+      if (moved) {
+        const maxLeft = Math.max(4, window.innerWidth - dock.offsetWidth - 4);
+        const maxTop = Math.max(4, window.innerHeight - dock.offsetHeight - 4);
+        const left = Math.round(Math.max(4, Math.min(maxLeft, start.left + latestDx)));
+        const top = Math.round(Math.max(4, Math.min(maxTop, start.top + latestDy)));
+        dock.style.transform = '';
+        dock.style.left = `${left}px`;
+        dock.style.top = `${top}px`;
+        dock.style.right = 'auto';
+        loveLetterLogPosition = { left, top };
+        button.dataset.dragged = 'true';
+      } else {
+        dock.style.transform = '';
+      }
+      dock.classList.remove('is-dragging');
+    };
+    window.addEventListener('pointermove', move, { passive:false });
+    window.addEventListener('pointerup', finish, { once:true });
   });
   app.querySelector('.couple-hidden-file').addEventListener('change', event => { const file = event.target.files?.[0]; if (!file) return finishMemory(''); const read = window.IdealMachineReadImage ? window.IdealMachineReadImage(file, 900, .72) : new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(file); }); read.then(value => finishMemory(value)); event.target.value = ''; });
   app.addEventListener('change', event => { if (!event.target.matches('[data-couple-exchange-images]')) return; state.exchangeImageEnabled = Boolean(event.target.checked) && Boolean(window.IdealMachineImageAPI?.canAutoGenerate?.()); save(); render(); });

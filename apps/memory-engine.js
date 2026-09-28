@@ -166,14 +166,76 @@
   async function forgetConversation({roleId,profileId='',chat,role,profile}){if(!roleId)return{removed:0,rebuilt:false};const library=readLibrary();migrateRoleScope(library,roleId,profileId);const removed=library.entries.filter(item=>entryMatchesScope(item,roleId,profileId)&&item.type==='chat').length;library.entries=library.entries.filter(item=>!(entryMatchesScope(item,roleId,profileId)&&item.type==='chat'));const key=scopeKey(roleId,profileId),meta=library.roleMeta[key]||=( {roleId,profileId} );meta.lastSummarizedMessageId='';meta.summarizedRounds=0;purgeCore(library,roleId,profileId);saveLibrary(library);return{removed,rebuilt:await rebuildCoreAfterRemoval({library,roleId,profileId,role,profile,chat})};}
   function forgetRole(roleId){if(!roleId)return 0;const library=readLibrary(),before=library.entries.length;library.entries=library.entries.filter(item=>item.roleId!==roleId);Object.keys(library.cores).forEach(key=>{if(key===roleId||key.startsWith(`${roleId}::`))delete library.cores[key];});Object.keys(library.roleMeta).forEach(key=>{if(key===roleId||key.startsWith(`${roleId}::`))delete library.roleMeta[key];});saveLibrary(library);return before-library.entries.length;}
   function forgetProfile(profileId){if(!profileId)return 0;const library=readLibrary(),before=library.entries.length;library.entries=library.entries.filter(item=>item.profileId!==profileId);Object.keys(library.cores).forEach(key=>{if(key.endsWith(`::${profileId}`)||library.cores[key]?.profileId===profileId)delete library.cores[key];});Object.keys(library.roleMeta).forEach(key=>{if(key.endsWith(`::${profileId}`)||library.roleMeta[key]?.profileId===profileId)delete library.roleMeta[key];});saveLibrary(library);return before-library.entries.length;}
+  function cleanOfflineKeywords(values=[]){
+    const generic=new Set(['线下见面','情绪变化','情绪脉络','本次互动','见面总结','聊天内容','刚才聊天']);
+    const sentenceMarkers=/(?:我|我们|你|你们|他|她|它|的|地|得|了|着|过|把|被|给|从|向|对|在|和|与|而|并|还|很|都|就|才|直接|已经|刚才|一下|一声|一秒|没有|然后|因为|所以|进入|进去|出来|延续|继续|挤进|顶开|打开|提着|走进|响了|勒得)/;
+    const clean=value=>{
+      const word=String(value||'').trim().replace(/^[“”"'「」『』【】\[\]（）()]+|[“”"'「」『』【】\[\]（）()，。！？；：、,.!?;:]+$/g,'');
+      if(word.length<2||word.length>8||/[\s，。！？；：、,.!?;:\n]/.test(word)||generic.has(word)||sentenceMarkers.test(word))return'';
+      return word;
+    };
+    return[...new Set((Array.isArray(values)?values:[]).map(clean).filter(Boolean))].slice(0,8);
+  }
+  function offlineMemoryKeywords(session={}){
+    const supplied=cleanOfflineKeywords(session.keywords);
+    if(supplied.length)return supplied;
+    const actualMessages=(session.messages||[]).filter(item=>!item?.contextPrompt).flatMap(item=>String(item?.text||'').split(/[，。！？；：、\n]+/));
+    const fromSummary=String(session.summary||'').split(/[，。！？；：、\n]+/);
+    return cleanOfflineKeywords([session.place,session.reason,...actualMessages,...fromSummary]);
+  }
   function syncLegacySources(data=readJSON(chatKey,{})){
-    const library=readLibrary(),contacts=Array.isArray(data.contacts)?data.contacts.filter(role=>!role?.isGroup):[],chats=data.chats&&typeof data.chats==='object'?data.chats:{};let created=0;
-    contacts.forEach(role=>{const chat=chats[role.id]||{},profileId=chat.profileId||'';(chat.offlineSessions||[]).forEach(session=>{if(!session?.ended||!session.summary)return;const sourceId=`offline:${role.id}:${session.id}`;if(library.entries.some(item=>item.sourceId===sourceId)||library.forgottenSourceIds.includes(sourceId))return;library.entries.unshift({id:uid('memory'),sourceId,roleId:role.id,profileId,roleName:role.nickname||role.name||'角色',type:'offline',scope:'shared',sourceContext:'offline',level:'long',title:session.reason?`线下见面：${String(session.reason).slice(0,20)}`:'一次线下见面',summary:String(session.summary),emotion:session.mood||'见面后的情绪被保留下来',keywords:['线下见面'],importance:'重要',importanceScore:.82,createdAt:session.endedAt||Date.now()});created+=1;});const summary=typeof chat.memorySummary==='string'?chat.memorySummary:typeof chat.summary==='string'?chat.summary:'';if(summary.trim()){const sourceId=`legacy-chat:${role.id}:${summary.trim().slice(0,80)}`;if(!library.entries.some(item=>item.sourceId===sourceId)&&!library.forgottenSourceIds.includes(sourceId)){library.entries.push({id:uid('memory'),sourceId,roleId:role.id,profileId,roleName:role.nickname||role.name||'角色',type:'chat',scope:'shared',sourceContext:'online',level:'long',title:'聊天中的记忆',summary:summary.trim(),emotion:'',keywords:['聊天'],importance:'日常',createdAt:Date.now()});created+=1;}}});
-    if(created)saveLibrary(library);return created;
+    const library=readLibrary(),contacts=Array.isArray(data.contacts)?data.contacts.filter(role=>!role?.isGroup):[],chats=data.chats&&typeof data.chats==='object'?data.chats:{};
+    let created=0,updated=false;
+    contacts.forEach(role=>{
+      const chat=chats[role.id]||{},profileId=chat.profileId||'';
+      (chat.offlineSessions||[]).forEach(session=>{
+        if(!session?.ended||!session.summary)return;
+        const sourceId=`offline:${role.id}:${session.id}`;
+        const existing=library.entries.find(item=>item.sourceId===sourceId);
+        if(existing){
+          const summary=String(session.summary||existing.summary||'');
+          const emotion=String(session.emotionArc||summary).slice(0,300);
+          const keywords=offlineMemoryKeywords(session);
+          if(existing.summary!==summary||existing.emotion!==emotion||JSON.stringify(existing.keywords||[])!==JSON.stringify(keywords)){existing.summary=summary;existing.emotion=emotion;existing.keywords=keywords;updated=true;}
+          return;
+        }
+        if(library.forgottenSourceIds.includes(sourceId))return;
+        library.entries.unshift({id:uid('memory'),sourceId,roleId:role.id,profileId,roleName:role.nickname||role.name||'角色',type:'offline',scope:'shared',sourceContext:'offline',level:'long',title:session.reason?`线下见面：${String(session.reason).slice(0,20)}`:'一次线下见面',summary:String(session.summary),emotion:String(session.emotionArc||session.summary).slice(0,300),keywords:offlineMemoryKeywords(session),importance:'重要',importanceScore:.82,createdAt:session.endedAt||Date.now()});
+        created++;
+      });
+      const summary=typeof chat.memorySummary==='string'?chat.memorySummary:typeof chat.summary==='string'?chat.summary:'';
+      if(summary.trim()){
+        const sourceId=`legacy-chat:${role.id}:${summary.trim().slice(0,80)}`;
+        if(!library.entries.some(item=>item.sourceId===sourceId)&&!library.forgottenSourceIds.includes(sourceId)){
+          library.entries.push({id:uid('memory'),sourceId,roleId:role.id,profileId,roleName:role.nickname||role.name||'角色',type:'chat',scope:'shared',sourceContext:'online',level:'long',title:'聊天中的记忆',summary:summary.trim(),emotion:'',keywords:['聊天'],importance:'日常',createdAt:Date.now()});
+          created++;
+        }
+      }
+    });
+    if(created||updated)saveLibrary(library);
+    return created;
   }
   async function deleteEntry(entryId,options={}){const library=readLibrary(),entry=library.entries.find(item=>item.id===entryId);if(!entry)return false;library.entries=library.entries.filter(item=>item.id!==entryId);if(entry.fingerprint&&!library.forgottenFingerprints.includes(entry.fingerprint))library.forgottenFingerprints.push(entry.fingerprint);if(entry.sourceId&&!library.forgottenSourceIds.includes(entry.sourceId))library.forgottenSourceIds.push(entry.sourceId);purgeCore(library,entry.roleId,entry.profileId||'');saveLibrary(library);await rebuildCoreAfterRemoval({library,roleId:entry.roleId,profileId:entry.profileId||'',...options});return true;}
-  async function ingestOffline({roleId,profileId='',role,profile,chat,session}){if(!roleId||!session?.id||!session.ended||!session.summary)return null;const library=readLibrary();migrateRoleScope(library,roleId,profileId);const sourceId=`offline:${roleId}:${session.id}`,existing=library.entries.find(item=>item.sourceId===sourceId);if(existing||library.forgottenSourceIds.includes(sourceId))return existing||null;const settings=settingsFor(chat),entry={id:uid('memory'),sourceId,roleId,profileId,roleName:role?.nickname||role?.name||'角色',type:'offline',scope:'shared',sourceContext:'offline',level:'long',title:session.reason?`线下见面：${String(session.reason).slice(0,20)}`:'一次线下见面',summary:String(session.summary).slice(0,settings.summaryMaxChars),emotion:String(session.mood||'见面后的情绪被保留下来').slice(0,300),keywords:['线下见面',session.place,session.reason].filter(Boolean).map(String).slice(0,8),importance:'重要',importanceScore:.82,createdAt:session.endedAt||Date.now()};if(settings.semanticRecall&&embeddingSignature()){try{storeEmbedding(entry,await embedding(`${entry.title}\n${entry.summary}\n${entry.emotion}`),embeddingSignature());}catch{}}library.entries.unshift(entry);try{await updateCore({roleId,profileId,role,profile,settings,library});}catch{}saveLibrary(library);return entry;}
+  async function ingestOffline({roleId,profileId='',role,profile,chat,session}){
+    if(!roleId||!session?.id||!session.ended||!session.summary)return null;
+    const library=readLibrary();
+    migrateRoleScope(library,roleId,profileId);
+    const sourceId=`offline:${roleId}:${session.id}`;
+    const existing=library.entries.find(item=>item.sourceId===sourceId);
+    const settings=settingsFor(chat);
+    const summary=String(session.summary).slice(0,settings.summaryMaxChars);
+    const emotion=String(session.emotionArc||session.summary).slice(0,300);
+    const keywords=offlineMemoryKeywords(session);
+    if(existing){existing.summary=summary;existing.emotion=emotion;existing.keywords=keywords;saveLibrary(library);return existing;}
+    if(library.forgottenSourceIds.includes(sourceId))return null;
+    const entry={id:uid('memory'),sourceId,roleId,profileId,roleName:role?.nickname||role?.name||'角色',type:'offline',scope:'shared',sourceContext:'offline',level:'long',title:session.reason?`线下见面：${String(session.reason).slice(0,20)}`:'一次线下见面',summary,emotion,keywords,importance:'重要',importanceScore:.82,createdAt:session.endedAt||Date.now()};
+    if(settings.semanticRecall&&embeddingSignature()){try{storeEmbedding(entry,await embedding(`${entry.title}\n${entry.summary}\n${entry.emotion}`),embeddingSignature());}catch{}}
+    library.entries.unshift(entry);
+    try{await updateCore({roleId,profileId,role,profile,settings,library});}catch{}
+    saveLibrary(library);
+    return entry;
+  }
   function stats(roleId,chat){const profileId=chat?.profileId||'',library=readLibrary();const migrated=migrateRoleScope(library,roleId,profileId);const key=scopeKey(roleId,profileId),meta=library.roleMeta[key]||{},entries=library.entries.filter(item=>entryMatchesScope(item,roleId,profileId)&&(item.level==='long'||item.type==='chat'||item.type==='offline')),settings=settingsFor(chat);let startIndex=0;if(meta.lastSummarizedMessageId){const found=(chat?.messages||[]).findIndex(item=>item.id===meta.lastSummarizedMessageId);if(found>=0)startIndex=found+1;}if(migrated)saveLibrary(library);return{longCount:entries.length,hasCore:Boolean(library.cores[key]?.content),pendingRounds:completedRounds(chat?.messages||[],startIndex,profileId).length,settings};}
 
-  window.IdealMachineMemory={defaults,readLibrary,saveLibrary,settingsFor,applySettings,prepareContext,processAvailable,processAllChats,updateCore,stats,embeddingModel,embeddingConfig,invalidateMessages,forgetConversation,forgetRole,forgetProfile,deleteEntry,ingestOffline,syncLegacySources,scopeKey,adoptLegacyScope};
+  window.IdealMachineMemory={defaults,readLibrary,saveLibrary,settingsFor,applySettings,prepareContext,processAvailable,processAllChats,updateCore,stats,embeddingModel,embeddingConfig,invalidateMessages,forgetConversation,forgetRole,forgetProfile,deleteEntry,ingestOffline,syncLegacySources,cleanOfflineKeywords,scopeKey,adoptLegacyScope};
 })();

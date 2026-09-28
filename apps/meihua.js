@@ -24,9 +24,9 @@
   const folderItems = [...document.querySelectorAll('[data-folder-open]')];
   const iconElement = item => item.querySelector('.app-icon, .dock-icon, .folder-app-icon');
   const nameElement = item => item.querySelector('.app-name, .dock-name, .folder-app-name');
-  const ios17IconKeys = new Set(['liaotian','ta','luntan','xiangce','rili','jiyiku','debate','fanfic','magazine','yinyue','doubao','gouwu','ifshikong','shezhi','meihua','shijieshu','qinglvkongjian']);
+  const ios17IconKeys = new Set(['liaotian','ta','luntan','xiangce','rili','jiyiku','debate','fanfic','magazine','yinyue','doubao','gouwu','ifshikong','shezhi','meihua','shijieshu','qinglvkongjian','ideal','jiaocheng']);
   const defaultIconPath = key => `assets/icons/default-ios17/${key}.webp`;
-  const defaultIconUrl = key => `${defaultIconPath(key)}${key === 'qinglvkongjian' ? '?v=20260917-couple-default' : ''}`;
+  const defaultIconUrl = key => `${defaultIconPath(key)}${key === 'qinglvkongjian' ? '?v=20260928-couple-cropped-2' : ''}`;
   const normalizeStoredIconPath = value => String(value || '').split(/[?#]/, 1)[0].replace(/^\.\//, '');
   function removeLegacyDefaultIconSettings() {
     if (!saved.icons || typeof saved.icons !== 'object') return;
