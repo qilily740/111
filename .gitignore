@@ -12,4 +12,5 @@ coverage/
 .turbo/
 .env
 .env.*
+.dev.vars
 .tools/

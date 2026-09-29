@@ -1,6 +1,129 @@
 (() => {
   const key = 'ideal-machine-chat';
-  const initial = { contacts: [], profiles: [], chats: {}, moments: [], contactGroups: [], emojis: { groups: [{ id: 'emoji-default', name: '默认', items: [] }] } };
+  const initial = { contacts: [], profiles: [], chats: {}, moments: [], contactGroups: [], emojis: { groups: [{ id: 'emoji-default', name: '默认', items: [] }] }, pageBeauty: { chat: '', contacts: '', moments: '', me: '', dock: '' } };
+  const chatPageBeautyKeys = Object.freeze(['chat', 'contacts', 'moments', 'me', 'dock']);
+  const chatPageBeautyLabels = Object.freeze({ chat: '聊天', contacts: '联系人', moments: '朋友圈', me: '我', dock: '公用 Dock' });
+  const offlineBeautyStorageKey = 'ideal-machine-offline-beauty-css';
+  let offlineBeautyDraft = null;
+  const offlineBeautyBundleFormat = 'ideal-machine-offline-beauty';
+  const offlineBeautyGroups = Object.freeze([
+    ['顶栏', [
+      ['.chat-offline-v2-topbar', '线下模式顶部栏整体'],
+      ['.chat-offline-v2-topbar > button', '顶部返回按键'],
+      ['.chat-offline-v2-topbar > div', '顶部标题区域'],
+      ['.chat-offline-v2-topbar h2', '顶部标题文字'],
+      ['.chat-offline-v2-topbar nav', '顶部右侧按键组'],
+      ['.chat-offline-beauty-button', '顶部美化按键'],
+      ['[data-offline-theme-button]', '顶部五角星／现场颜色按键'],
+      ['[data-offline-settings]', '顶部现场设置按键']
+    ]],
+    ['场景信息', [
+      ['.chat-offline-v2-scene', '见面地点、原因和状态信息卡'],
+      ['.chat-offline-v2-scene-copy', '场景文字区域'],
+      ['.chat-offline-v2-scene-copy h1', '见面地点标题'],
+      ['.chat-offline-v2-scene-copy p', '见面原因文字'],
+      ['.chat-offline-v2-hero-avatar', '角色场景头像'],
+      ['.chat-offline-v2-scene dl', '场景信息列表'],
+      ['.chat-offline-v2-presence', '角色当前状态栏']
+    ]],
+    ['聊天内容', [
+      ['.chat-offline-messages', '线下消息列表区域'],
+      ['.chat-offline-messages article', '单条线下消息'],
+      ['.chat-offline-v2-message-body', '消息正文外层'],
+      ['.chat-offline-v2-message-text', '消息文字内容'],
+      ['.chat-offline-v2-avatar', '角色消息头像'],
+      ['.chat-offline-v2-user-avatar', '用户消息头像'],
+      ['.chat-offline-empty', '没有消息时的提示']
+    ]],
+    ['底栏', [
+      ['.chat-offline-v2-dock', '底部操作区整体'],
+      ['.chat-offline-v2-shortcuts', '底部快捷按键组'],
+      ['.chat-offline-continue-button', '继续回复按键'],
+      ['.chat-offline-reroll-button', '重 Roll 按键'],
+      ['.chat-offline-summary-button', '总结并结束按键'],
+      ['.chat-offline-v2-dock form', '底部发送表单'],
+      ['.chat-offline-v2-dock input, .chat-offline-v2-dock textarea', '底部消息输入框'],
+      ['.chat-offline-v2-dock form button', '底部发送按键']
+    ]],
+    ['弹层与背景', [
+      ['.chat-offline-modal', '线下模式全屏容器'],
+      ['.offline-meeting-v2', '线下模式页面主体'],
+      ['.offline-theme-picker', '现场颜色／壁纸面板'],
+      ['.chat-offline-v2-settings', '现场设置面板'],
+      ['.chat-offline-backdrop', '页面背景遮罩']
+    ]]
+  ]);
+  function readOfflineBeautyCSS() { try { return String(localStorage.getItem(offlineBeautyStorageKey) || ''); } catch { return ''; } }
+  function applyOfflineBeautyCSS() {
+    let style = document.querySelector('#chatOfflineBeautyStyle');
+    if (!style) { style = document.createElement('style'); style.id = 'chatOfflineBeautyStyle'; document.head.appendChild(style); }
+    style.textContent = String(offlineBeautyDraft ?? readOfflineBeautyCSS());
+  }
+  function saveOfflineBeautyCSS(value) {
+    offlineBeautyDraft = String(value || '');
+    try { localStorage.setItem(offlineBeautyStorageKey, offlineBeautyDraft); } catch {}
+    applyOfflineBeautyCSS();
+  }
+  function offlineBeautyHintMarkup() {
+    return offlineBeautyGroups.map(([title, rows]) => `<section class="offline-beauty-hint-group"><h3>${esc(title)}</h3>${rows.map(([selector, meaning]) => `<div class="offline-beauty-hint-line"><code>${esc(selector)}</code><span>${esc(meaning)}</span></div>`).join('')}</section>`).join('');
+  }
+  function ensureOfflineBeautyButton(modal) {
+    const nav = modal?.querySelector('.offline-meeting-v2 .chat-offline-v2-topbar nav');
+    const star = nav?.querySelector('[data-offline-theme-button]');
+    if (!nav || !star || nav.querySelector('[data-offline-beauty]')) return false;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'chat-offline-beauty-button';
+    button.dataset.offlineBeauty = '';
+    button.setAttribute('aria-label', '打开线下模式美化');
+    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.35 4.15a2 2 0 0 0 1.35 1.35L18.85 10l-4.15 1.35a2 2 0 0 0-1.35 1.35L12 16.85l-1.35-4.15a2 2 0 0 0-1.35-1.35L6.15 10l4.15-1.5A2 2 0 0 0 11.65 7L12 3Zm6.5 11 .55 1.7a1.2 1.2 0 0 0 .75.75l1.7.55-1.7.55a1.2 1.2 0 0 0-.75.75l-.55 1.7-.55-1.7a1.2 1.2 0 0 0-.75-.75l-1.7-.55 1.7-.55a1.2 1.2 0 0 0 .75-.75l.55-1.7Z"/></svg>';
+    nav.insertBefore(button, star);
+    return true;
+  }
+  function renderOfflineBeautyEditor() {
+    document.querySelector('[data-offline-beauty-editor]')?.remove();
+    offlineBeautyDraft ??= readOfflineBeautyCSS();
+    const layer = document.createElement('div');
+    layer.className = 'offline-beauty-editor';
+    layer.dataset.offlineBeautyEditor = '';
+    layer.innerHTML = `<button type="button" class="offline-beauty-backdrop" data-offline-beauty-close aria-label="关闭线下模式美化"></button><section class="offline-beauty-sheet" role="dialog" aria-modal="true" aria-label="线下模式美化"><header><div><span>OFFLINE BEAUTY</span><h2>线下模式美化</h2></div><button type="button" data-offline-beauty-close aria-label="关闭">×</button></header><main><p class="offline-beauty-description">下面列出当前线下模式实际使用的类名，按页面位置分类。输入 CSS 后会实时预览，只作用于线下模式。</p><div class="offline-beauty-hints">${offlineBeautyHintMarkup()}</div><label class="offline-beauty-css-field"><span>自定义 CSS</span><textarea data-offline-beauty-css spellcheck="false" placeholder="例如：.chat-offline-v2-topbar { background: rgba(20,20,20,.8); }">${esc(offlineBeautyDraft)}</textarea></label><p class="offline-beauty-status" data-offline-beauty-status>已自动保存本机草稿</p></main><footer><button type="button" data-offline-beauty-import>选择美化</button><button type="button" data-offline-beauty-export>导出</button><button type="button" data-offline-beauty-reset>清空</button><button type="button" class="is-primary" data-offline-beauty-save>保存</button><input type="file" accept="application/json,.json,text/css,.css" data-offline-beauty-file hidden></footer></section>`;
+    document.body.appendChild(layer);
+    const textarea = layer.querySelector('[data-offline-beauty-css]');
+    textarea?.addEventListener('input', () => { offlineBeautyDraft = textarea.value; applyOfflineBeautyCSS(); layer.querySelector('[data-offline-beauty-status]').textContent = '正在预览，保存后仍会保留'; });
+    textarea?.focus();
+  }
+  function exportOfflineBeauty() {
+    const bundle = { format: offlineBeautyBundleFormat, version: 1, exportedAt: new Date().toISOString(), css: String(offlineBeautyDraft ?? readOfflineBeautyCSS()) };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = '线下模式美化.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function importOfflineBeauty(source, fileName = '') {
+    let css = String(source || '');
+    if (/\.json$/i.test(fileName) || css.trim().startsWith('{')) {
+      const bundle = JSON.parse(css);
+      css = bundle?.css ?? bundle?.customCSS ?? bundle?.offlineBeautyCSS ?? '';
+    }
+    if (typeof css !== 'string') throw new Error('导入文件中没有 CSS 内容');
+    saveOfflineBeautyCSS(css);
+    renderOfflineBeautyEditor();
+  }
+  function installOfflineBeautyObserver() {
+    applyOfflineBeautyCSS();
+    const observer = new MutationObserver(() => {
+      const modal = document.querySelector('[data-chat-offline-modal]');
+      if (modal) ensureOfflineBeautyButton(modal);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+  const chatPageBeautyHints = Object.freeze({
+    chat: [['.chat-page', '聊天 App 页面外壳'], ['.chat-header', '聊天列表页顶栏'], ['.chat-launch-list', '会话列表容器'], ['.chat-launch-head', '会话列表标题区'], ['.chat-message-search', '聊天消息搜索区域外层'], ['.chat-message-search > label', '搜索框外框'], ['.chat-message-search input', '搜索输入框'], ['.chat-message-search-results', '搜索结果列表'], ['.chat-message-search-results > button', '单条搜索结果'], ['.chat-message-search-empty', '无搜索结果提示'], ['.chat-launch-contact', '单个会话入口'], ['.chat-conversation', '具体聊天页面容器'], ['.chat-person', '聊天对象信息栏'], ['.chat-messages', '消息列表区域'], ['.chat-message', '单条消息'], ['.chat-message-line', '消息内容行'], ['.chat-message-avatar', '消息头像'], ['.chat-bubble', '普通消息气泡'], ['.ideal-chat-bilingual-original', '双语气泡里的原文'], ['.ideal-chat-bilingual-translation', '双语气泡里的翻译文本，可单独改样式'], ['.ideal-chat-bilingual-open', '已展开翻译的气泡状态'], ['.chat-compose-wrap', '底部输入区外层'], ['.chat-compose', '输入栏'], ['.chat-emoji', '表情按钮'], ['.chat-plus', '更多功能按钮'], ['.chat-send', '发送按钮'], ['.chat-reply', '回复按钮']],
+    contacts: [['.chat-contacts-page', '联系人页面外壳'], ['.chat-contacts-fixed-head', '联系人页固定顶栏'], ['.chat-subhead', '页面副标题栏'], ['.chat-contact-groups', '联系人分组区域'], ['.chat-contact-list', '联系人列表'], ['.chat-contact-card', '单个联系人卡片'], ['.chat-contact-card-content', '联系人资料内容'], ['.chat-contact-actions', '联系人操作按钮区'], ['.chat-empty', '空状态提示']],
+    moments: [['.chat-moments-page', '朋友圈页面外壳'], ['.chat-moments-cover', '朋友圈封面区域'], ['.chat-moments-topbar', '朋友圈顶部操作栏'], ['.chat-moments-profile', '朋友圈个人资料区'], ['.chat-moments-body', '朋友圈主体内容'], ['.chat-moment-filters', '动态筛选栏'], ['.chat-moments', '动态列表容器'], ['.chat-moment', '单条朋友圈动态'], ['.chat-moment-head', '动态发布者信息栏'], ['.chat-moment-footer', '动态点赞、评论、互动区'], ['.chat-moment-comments', '动态评论区']],
+    me: [['.chat-me-page', '我页面外壳'], ['.chat-me-fixed-head', '我页面固定顶栏'], ['.chat-subhead', '页面副标题栏'], ['.chat-note', '页面说明文字'], ['.chat-profile-list', '用户设定列表'], ['.chat-profile-card', '单个用户设定卡片'], ['.chat-contact-actions', '设定卡片操作按钮区']],
+    dock: [['.chat-tabs', '底部 Dock 外层'], ['.chat-tab-chat', '聊天按键'], ['.chat-tab-contacts', '联系人按键'], ['.chat-tab-moments', '朋友圈按键'], ['.chat-tab-me', '我按键'], ['.chat-tab-icon', 'Dock 图标'], ['.chat-tabs small', 'Dock 页面文字'], ['.chat-tab-unread-badge', 'Dock 未读消息标记']]
+  });
+  function chatPageBeautyHintMarkup(page) { const isDock = page === 'dock'; const rows = (chatPageBeautyHints[page] || []).map(([selector, meaning]) => `<span class="chat-page-beauty-hint-line"><code>${esc(selector)}</code><span>${esc(meaning)}</span></span>`).join(''); return `<span class="chat-css-hint-title">${isDock ? '公用 Dock（四个页面共用）' : chatPageBeautyLabels[page] + '页面'}</span>${rows}${isDock ? '<span class="chat-page-beauty-hint-note">这里写一次，四个页面底部都会生效。</span>' : ''}`; }
   const IDEAL_MOMENT_AUTOMATION_DEFAULT = Object.freeze({
     enabled: false,
     maxPerDay: 2,
@@ -161,15 +284,16 @@
       return raw;
     }
   }
-  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtTranslation = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let momentCoverEditorOpen = false; let momentCoverDraftSource = ''; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineRequestLocked = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0; let chatGroupLongPressTimer = 0; let suppressChatGroupEntryClick = false;
+  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtTranslation = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let chatPageBeautyOpen = false; let chatPageBeautyTab = 'chat'; let chatPageBeautyDraft = null; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let momentCoverEditorOpen = false; let momentCoverDraftSource = ''; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineRequestLocked = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0; let chatGroupLongPressTimer = 0; let suppressChatGroupEntryClick = false;
   let activeContactGroupId = '';
   let chatLaunchScrollTop = 0;
   let chatMainScrollTop = 0;
   let chatMessageSearchQuery = '';
   let momentBusyPostId = '';
   const app = document.createElement('div'); app.className = 'chat-app';
-  app.innerHTML = `<div class="chat-page"><header class="chat-header"><div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">聊天</h1></div><button class="chat-close" data-chat-close type="button">×</button></header><main class="chat-main" id="chatMain"></main><nav class="chat-tabs"><button data-chat-tab="chat" class="is-active" type="button">${tabIcon('chat')}<small>聊天</small></button><button data-chat-tab="contacts" type="button">${tabIcon('contacts')}<small>联系人</small></button><button data-chat-tab="moments" type="button">${tabIcon('moments')}<small>朋友圈</small></button><button data-chat-tab="me" type="button">${tabIcon('me')}<small>我</small></button></nav></div><div class="chat-editor" id="chatEditor" aria-hidden="true"></div><div class="chat-profile-editor" id="chatProfileEditor" aria-hidden="true"></div><div class="chat-thought" id="chatThought" aria-hidden="true"></div><div class="chat-settings" id="chatSettings" aria-hidden="true"></div><div class="chat-moment-composer" id="chatMomentComposer" aria-hidden="true"></div><div class="chat-group-composer" id="chatGroupComposer" aria-hidden="true"></div><div class="chat-role-moment-composer" id="chatRoleMomentComposer" aria-hidden="true"></div><div class="chat-moment-cover-editor" id="chatMomentCoverEditor" aria-hidden="true"></div><input id="chatImageFile" type="file" accept="image/*" multiple hidden><input id="chatMomentImageFile" type="file" accept="image/*" hidden><input id="chatMomentAvatarFile" type="file" accept="image/*" hidden>`;
+  app.innerHTML = `<div class="chat-page"><header class="chat-header"><div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">聊天</h1></div><button class="chat-close" data-chat-close type="button">×</button></header><main class="chat-main" id="chatMain"></main><nav class="chat-tabs"><button data-chat-tab="chat" class="chat-tab-chat is-active" type="button">${tabIcon('chat')}<small>聊天</small></button><button data-chat-tab="contacts" class="chat-tab-contacts" type="button">${tabIcon('contacts')}<small>联系人</small></button><button data-chat-tab="moments" class="chat-tab-moments" type="button">${tabIcon('moments')}<small>朋友圈</small></button><button data-chat-tab="me" class="chat-tab-me" type="button">${tabIcon('me')}<small>我</small></button></nav></div><div class="chat-editor" id="chatEditor" aria-hidden="true"></div><div class="chat-profile-editor" id="chatProfileEditor" aria-hidden="true"></div><div class="chat-thought" id="chatThought" aria-hidden="true"></div><div class="chat-settings" id="chatSettings" aria-hidden="true"></div><div class="chat-page-beauty-editor" id="chatPageBeautyEditor" aria-hidden="true"></div><div class="chat-moment-composer" id="chatMomentComposer" aria-hidden="true"></div><div class="chat-group-composer" id="chatGroupComposer" aria-hidden="true"></div><div class="chat-role-moment-composer" id="chatRoleMomentComposer" aria-hidden="true"></div><div class="chat-moment-cover-editor" id="chatMomentCoverEditor" aria-hidden="true"></div><input id="chatImageFile" type="file" accept="image/*" multiple hidden><input id="chatMomentImageFile" type="file" accept="image/*" hidden><input id="chatMomentAvatarFile" type="file" accept="image/*" hidden>`;
   document.body.appendChild(app);
+  installOfflineBeautyObserver();
   app.addEventListener('click', event => { if (event.target.closest('[data-chat-moments-top]')) document.querySelector('.chat-moments-page')?.scrollTo({ top:0, behavior:'smooth' }); });
   function clearChatGroupLongPress() { if (chatGroupLongPressTimer) { window.clearTimeout(chatGroupLongPressTimer); chatGroupLongPressTimer = 0; } }
   function removeDesktopTaGroup(contact) {
@@ -372,7 +496,7 @@
     return result;
   }
   function read() { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); const profiles = Array.isArray(value.profiles) ? value.profiles.filter(item => !(item.id === 'profile-default' && item.name === '我的设定' && item.persona === '请在这里写下你的性格、身份和说话方式。')) : []; const storedEmojis = Array.isArray(value.emojis) ? { groups: value.emojis } : value.emojis; const emojis = storedEmojis && Array.isArray(storedEmojis.groups) ? storedEmojis : JSON.parse(JSON.stringify(initial.emojis)); return normalizeChatState(restoreThoughtCaches({ ...initial, ...value, profiles, emojis, contactGroupManageOpen: false })); } catch { return normalizeChatState(restoreThoughtCaches(JSON.parse(JSON.stringify(initial)))); } }
-  function normalizeChatState(value) { const result = value && typeof value === 'object' ? value : {}; result.contacts = Array.isArray(result.contacts) ? result.contacts : []; result.contacts.forEach(contact => { contact.groupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; normalizeContactMomentAutomation(contact); }); result.momentAutomation = normalizeMomentAutomation(result.momentAutomation); result.contactGroups = Array.isArray(result.contactGroups) ? result.contactGroups : []; result.profiles = Array.isArray(result.profiles) ? result.profiles : []; result.chats = result.chats && typeof result.chats === 'object' && !Array.isArray(result.chats) ? result.chats : {}; result.momentsCover = typeof result.momentsCover === 'string' ? result.momentsCover : ''; result.moments = Array.isArray(result.moments) ? result.moments : []; result.moments = result.moments.map(post => ({ ...post, authorType: post.authorType || (post.author === '我' ? 'user' : 'character'), likes: Number(post.likes || 0), roleLikeIds: Array.isArray(post.roleLikeIds) ? post.roleLikeIds : [], comments: Array.isArray(post.comments) ? post.comments : [], visibleGroups: Array.isArray(post.visibleGroups) ? post.visibleGroups : [] })); result.moments.forEach(post => { if (post.authorType !== 'user' && post.visibility === 'private') post.userOnly = true; if (post.authorType !== 'user' && !['all', 'private'].includes(post.visibility)) post.visibility = 'all'; if (post.authorType !== 'user' && post.userOnly) post.visibility = 'all'; }); result.emojis = result.emojis && typeof result.emojis === 'object' ? result.emojis : {}; result.emojis.groups = Array.isArray(result.emojis.groups) ? result.emojis.groups : [{ id: 'emoji-default', name: '默认', items: [] }]; result.emojis.groups.forEach(group => { group.items = (Array.isArray(group.items) ? group.items : []).map(item => ({ ...item, url: emojiDisplaySource(cleanEmojiUrl(item?.url)) })).filter(item => item.url); }); return result; }
+  function normalizeChatState(value) { const result = value && typeof value === 'object' ? value : {}; result.contacts = Array.isArray(result.contacts) ? result.contacts : []; result.contacts.forEach(contact => { contact.groupIds = Array.isArray(contact.groupIds) ? contact.groupIds : []; normalizeContactMomentAutomation(contact); }); result.momentAutomation = normalizeMomentAutomation(result.momentAutomation); result.contactGroups = Array.isArray(result.contactGroups) ? result.contactGroups : []; result.profiles = Array.isArray(result.profiles) ? result.profiles : []; result.chats = result.chats && typeof result.chats === 'object' && !Array.isArray(result.chats) ? result.chats : {}; result.pageBeauty = result.pageBeauty && typeof result.pageBeauty === 'object' ? result.pageBeauty : {}; chatPageBeautyKeys.forEach(page => { result.pageBeauty[page] = typeof result.pageBeauty[page] === 'string' ? result.pageBeauty[page] : ''; }); result.momentsCover = typeof result.momentsCover === 'string' ? result.momentsCover : ''; result.moments = Array.isArray(result.moments) ? result.moments : []; result.moments = result.moments.map(post => ({ ...post, authorType: post.authorType || (post.author === '我' ? 'user' : 'character'), likes: Number(post.likes || 0), roleLikeIds: Array.isArray(post.roleLikeIds) ? post.roleLikeIds : [], comments: Array.isArray(post.comments) ? post.comments : [], visibleGroups: Array.isArray(post.visibleGroups) ? post.visibleGroups : [] })); result.moments.forEach(post => { if (post.authorType !== 'user' && post.visibility === 'private') post.userOnly = true; if (post.authorType !== 'user' && !['all', 'private'].includes(post.visibility)) post.visibility = 'all'; if (post.authorType !== 'user' && post.userOnly) post.visibility = 'all'; }); result.emojis = result.emojis && typeof result.emojis === 'object' ? result.emojis : {}; result.emojis.groups = Array.isArray(result.emojis.groups) ? result.emojis.groups : [{ id: 'emoji-default', name: '默认', items: [] }]; result.emojis.groups.forEach(group => { group.items = (Array.isArray(group.items) ? group.items : []).map(item => ({ ...item, url: emojiDisplaySource(cleanEmojiUrl(item?.url)) })).filter(item => item.url); }); return result; }
   function save() { localStorage.setItem(key, JSON.stringify({ ...state, contactGroupManageOpen: false })); window.dispatchEvent(new CustomEvent('ideal-machine-chat-updated')); }
   async function setCharacterAvatar(characterId, image) {
     const id = String(characterId || '');
@@ -640,11 +764,19 @@
   }
   function chatMessageContentForApi(message) {
     if (!message) return '';
-    const withTime = content => `[消息时间：${messageTimeForApi(message)}]\n${content}`;
+    const withQuote = content => {
+      const value = String(content || '');
+      const prefix = String(message.quote?.prefix || '').trim();
+      if (!message.quote || (prefix && value.startsWith(prefix))) return value;
+      const speaker = message.quote.speaker || '消息';
+      const quoted = String(message.quote.text || '').trim();
+      return quoted ? `【引用${speaker}：${quoted}】\n${value}` : value;
+    };
+    const withTime = content => `[消息时间：${messageTimeForApi(message)}]\n${withQuote(content)}`;
     if (message.recalled) return withTime(`[${chatParticipantName(message.role)}撤回了一条消息]`);
     if (message.type === 'image') return withTime(message.sticker ? `[表情包${message.stickerDescription ? `：${message.stickerDescription}` : ''}]` : '[图片]');
     if (message.type === 'image-desc') return withTime(`[图片描述] ${message.text || ''}`.trim());
-    if (message.type === 'voice') return withTime(`[语音消息] ${message.voiceText || message.text || ''}`.trim());
+    if (message.type === 'voice') return withTime(`[语音消息${message.seconds ? `，${Math.round(Number(message.seconds))}秒` : ''}] ${message.voiceText || message.text || ''}`.trim());
     if (message.type === 'location') return withTime(`[位置分享] ${message.locationName || message.text || ''}${message.locationDetail ? `（${message.locationDetail}）` : ''}`.trim());
     if (message.type === 'transfer') return withTime(`[转账] 金额：${message.amount || message.text || ''}，备注：${message.note || '无'}，状态：${message.status || '待处理'}`);
     if (message.type === 'shopping-request') { const item = message.shoppingProduct || {}; const lines = Array.isArray(item.items) && item.items.length ? item.items : [item]; const products = lines.map(line => `${line.name || '商品'} × ${Number(line.quantity || 1)}`).join('、'); return withTime(`[商品代付请求] 这是用户请求你承担商品费用，不是用户向你要钱，也不是普通转账。商品：${products || item.name || message.text || '商品'}，金额：¥${Number(item.total ?? item.price ?? 0).toFixed(2)}，发起人：${item.requester || '用户'}，订单号：${item.orderNo || '未提供'}，状态：${message.shoppingPaymentStatus || '待代付'}`); }
@@ -719,7 +851,7 @@
     return true;
   }
   function createEmojiGroup() { const name = window.prompt('新分组名称'); if (name?.trim()) { const item = { id: uid('emoji-group'), name: name.trim(), items: [] }; state.emojis.groups.push(item); activeEmojiGroup = item.id; save(); render(); } }
-  function render() { document.querySelectorAll('[data-chat-tab]').forEach(button => button.classList.toggle('is-active', button.dataset.chatTab === activeTab)); const contact = state.contacts.find(item => item.id === activeContact); const chatting = activeTab === 'chat' && Boolean(contact); const topName = contact ? `${contact.nickname || contact.name}${isContactReplying(activeContact) ? ' 回复中' : ''}` : ''; const totalUnread = Math.max(0, chatTotalUnreadCount() - (chatting ? chatUnreadCount(activeContact) : 0)); const pageTitle = ({ chat: '聊天', contacts: '联系人', moments: '朋友圈', me: '我' })[activeTab]; const backMarkup = totalUnread ? `<span class="chat-back-unread-badge" aria-label="${totalUnread} 条未读消息">${chatUnreadCountText(totalUnread)}</span>` : actionIcon('back'); document.querySelector('.chat-header').innerHTML = chatting ? `<button class="chat-top-back" data-chat-back type="button" aria-label="返回消息主页，${totalUnread} 条未读消息">${backMarkup}</button><span class="chat-top-name">${esc(topName)}</span><button class="chat-top-settings" data-chat-settings type="button">${actionIcon('settings')}</button>` : `<div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">${pageTitle}</h1></div><button class="chat-close" data-chat-close type="button">×</button>`; app.classList.toggle('is-chatting', chatting); app.classList.toggle('is-contacts-tab', activeTab === 'contacts'); app.classList.toggle('is-me-tab', activeTab === 'me'); app.classList.toggle('is-moments-tab', activeTab === 'moments'); app.classList.toggle('is-emoji-open', emojiOpen); app.classList.toggle('is-menu-open', menuOpen); document.querySelector('#chatMain').innerHTML = ({ chat: renderChat, contacts: renderContacts, moments: renderMoments, me: renderMe })[activeTab](); decorateChatDateDividers(); document.querySelector('[data-emoji-create-group]')?.addEventListener('click', createEmojiGroup); renderEditor(); renderProfileEditor(); renderThought(); renderChatSettings(); renderMomentComposer(); renderGroupComposer(); renderRoleMomentComposer(); renderMomentCoverEditor(); }
+  function render() { document.querySelectorAll('[data-chat-tab]').forEach(button => button.classList.toggle('is-active', button.dataset.chatTab === activeTab)); const contact = state.contacts.find(item => item.id === activeContact); const chatting = activeTab === 'chat' && Boolean(contact); const topName = contact ? `${contact.nickname || contact.name}${isContactReplying(activeContact) ? ' 回复中' : ''}` : ''; const totalUnread = Math.max(0, chatTotalUnreadCount() - (chatting ? chatUnreadCount(activeContact) : 0)); const pageTitle = ({ chat: '聊天', contacts: '联系人', moments: '朋友圈', me: '我' })[activeTab]; const backMarkup = totalUnread ? `<span class="chat-back-unread-badge" aria-label="${totalUnread} 条未读消息">${chatUnreadCountText(totalUnread)}</span>` : actionIcon('back'); document.querySelector('.chat-header').innerHTML = chatting ? `<button class="chat-top-back" data-chat-back type="button" aria-label="返回消息主页，${totalUnread} 条未读消息">${backMarkup}</button><span class="chat-top-name">${esc(topName)}</span><button class="chat-top-settings" data-chat-settings type="button">${actionIcon('settings')}</button>` : `<div><span class="chat-kicker">PRIVATE SPACE</span><h1 id="chatTitle">${pageTitle}</h1></div><button class="chat-close" data-chat-close type="button">×</button>`; app.classList.toggle('is-chatting', chatting); app.classList.toggle('is-chat-tab', activeTab === 'chat'); app.classList.toggle('is-contacts-tab', activeTab === 'contacts'); app.classList.toggle('is-me-tab', activeTab === 'me'); app.classList.toggle('is-moments-tab', activeTab === 'moments'); app.classList.toggle('is-emoji-open', emojiOpen); app.classList.toggle('is-menu-open', menuOpen); document.querySelector('#chatMain').innerHTML = ({ chat: renderChat, contacts: renderContacts, moments: renderMoments, me: renderMe })[activeTab](); decorateChatDateDividers(); applyChatPageBeautyCSS(); document.querySelector('[data-emoji-create-group]')?.addEventListener('click', createEmojiGroup); renderEditor(); renderProfileEditor(); renderThought(); renderChatSettings(); renderChatPageBeautyEditor(); renderMomentComposer(); renderGroupComposer(); renderRoleMomentComposer(); renderMomentCoverEditor(); }
   const renderWithChatLaunchScrollRestore = render;
   render = function(...args) {
     const previousList = activeTab === 'chat' ? app.querySelector('.chat-launch-list') : null;
@@ -2365,9 +2497,17 @@ ${rerollRule}
       if (message && message.role !== 'user' && chatSettingsFor(chat).thoughtEnabled !== false) {
         event.preventDefault();
         event.stopImmediatePropagation();
+        const requestedThoughtKey = thoughtKeyForMessage(chat, message);
+        // 同一轮心声正在请求时，重复点击头像只复用当前请求，不得取消后再次调用 API。
+        // 切换到另一轮时才中止旧请求；“重roll”仍由 rerollThoughtOnly 强制重新请求。
+        if (thoughtLoading && String(thoughtKey) === String(requestedThoughtKey)) {
+          thoughtOpen = true;
+          renderThought();
+          return;
+        }
         if (thoughtLoading) { thoughtRequestId += 1; thoughtLoading = false; }
         thoughtOpen = true;
-        thoughtKey = thoughtKeyForMessage(chat, message);
+        thoughtKey = requestedThoughtKey;
         thoughtText = '';
         thoughtTranslation = '';
         renderThought();
@@ -2770,7 +2910,7 @@ ${rerollRule}
       window.IdealMachineGetImage(wallpaperSource).then(paint).catch(() => paint(''));
     } else paint(wallpaperSource);
   }
-  function openOfflineFullscreen() { const chat = currentChat(); if (!chat) return; const contact = state.contacts.find(item => item.id === activeContact) || {}; const resumableId = offlineSessionId || chat.activeOfflineSessionId || ''; let session = chat.offlineSessions?.find(item => item.id === resumableId && !item.ended); if (!session) { const contextMessages = (chat.messages || []).slice(-8).map(item => ({ role: item.role, text: item.text, type: item.type })); const contextText = contextMessages.map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); session = { id: uid('offline'), place: '从聊天继续', reason: '把刚才的聊天延续到线下', mood: '延续刚才的情绪', contextMessages, messages: [{ role: 'user', text: `【聊天背景】\n${contextText || '你们刚刚结束了一段聊天。'}\n请承接这段关系和情绪，进入线下见面。`, contextPrompt: true }] }; chat.offlineSessions ||= []; chat.offlineSessions.push(session); chat.activeOfflineSessionId = session.id; } offlineSessionId = session.id; save(); let modal = document.querySelector('[data-chat-offline-modal]'); if (!modal) { modal = document.createElement('div'); modal.dataset.chatOfflineModal = ''; document.body.appendChild(modal); } modal.className = 'chat-offline-modal is-open'; const now = new Date(); const stamp = `${now.getMonth() + 1}月${now.getDate()}日 · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; const context = (session.contextMessages || []).map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text || '')}</p></article>`).join(''); const messages = session.messages.filter(item => !item.contextPrompt).map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text || '')}</p></article>`).join(''); modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-immersive is-fullscreen"><header class="chat-offline-topbar"><button type="button" data-offline-close>‹</button><div><span class="chat-kicker">OFFLINE MODE</span><h2>线下见面</h2></div><button type="button" class="chat-offline-more" data-offline-close>×</button></header><div class="chat-offline-meta"><b>${esc(contact.nickname || contact.name || '角色')} · 关系延续</b><span>${stamp}</span></div><section class="chat-offline-context"><div class="chat-offline-context-label"><span>刚才的聊天</span><small>作为这次见面的背景</small></div><div class="chat-offline-context-messages">${context || '<p class="chat-offline-context-empty">你们刚刚从一句话开始走到这里。</p>'}</div></section><section class="chat-offline-atmosphere"><div class="chat-offline-orbit"><div class="chat-offline-orbit"><i></i><strong>现场</strong></div><div><span>你们从刚才的聊天里走到这里</span><b>现在，可以继续发生一点什么</b></div></section><section class="chat-offline-character"><div class="chat-offline-pulse"></div><div><span>角色此刻的状态</span><b>${esc(session.mood)}</b></div><em>在你身边</em></section><main class="chat-offline-messages">${messages || '<div class="chat-offline-empty">现场安静下来，角色正在等你先开口。</div>'}</main><div class="chat-offline-actions"><button type="button" data-offline-action="说些什么">✦<span>说些什么</span></button><button type="button" data-offline-action="做个动作">◌<span>做个动作</span></button><button type="button" data-offline-action="观察周围">⌁<span>观察周围</span></button><button type="button" data-offline-action="结束见面">□<span>结束见面</span></button></div><form data-offline-form><input data-offline-input placeholder="在现场说点什么…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}>发送</button></form></section>`; const box = modal.querySelector('.chat-offline-messages'); if (box) box.scrollTop = box.scrollHeight; }
+  function openOfflineFullscreen() { const chat = currentChat(); if (!chat) return; const contact = state.contacts.find(item => item.id === activeContact) || {}; const resumableId = offlineSessionId || chat.activeOfflineSessionId || ''; let session = chat.offlineSessions?.find(item => item.id === resumableId && !item.ended); if (!session) { const contextMessages = (chat.messages || []).slice(-8).map(item => ({ role: item.role, text: item.text, type: item.type })); const contextText = contextMessages.map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); session = { id: uid('offline'), place: '从聊天继续', reason: '把刚才的聊天延续到线下', mood: '待现场互动形成', contextMessages, messages: [{ role: 'user', text: `【聊天背景】\n${contextText || '你们刚刚结束了一段聊天。'}\n请承接这段关系和情绪，进入线下见面。`, contextPrompt: true }] }; chat.offlineSessions ||= []; chat.offlineSessions.push(session); chat.activeOfflineSessionId = session.id; } offlineSessionId = session.id; save(); let modal = document.querySelector('[data-chat-offline-modal]'); if (!modal) { modal = document.createElement('div'); modal.dataset.chatOfflineModal = ''; document.body.appendChild(modal); } modal.className = 'chat-offline-modal is-open'; const now = new Date(); const stamp = `${now.getMonth() + 1}月${now.getDate()}日 · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; const context = (session.contextMessages || []).map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text || '')}</p></article>`).join(''); const messages = session.messages.filter(item => !item.contextPrompt).map(item => `<article class="${item.role === 'user' ? 'is-user' : ''}"><span>${item.role === 'user' ? '你' : esc(contact.nickname || contact.name || '角色')}</span><p>${esc(item.text || '')}</p></article>`).join(''); modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-immersive is-fullscreen"><header class="chat-offline-topbar"><button type="button" data-offline-close>‹</button><div><span class="chat-kicker">OFFLINE MODE</span><h2>线下见面</h2></div><button type="button" class="chat-offline-more" data-offline-close>×</button></header><div class="chat-offline-meta"><b>${esc(contact.nickname || contact.name || '角色')} · 关系延续</b><span>${stamp}</span></div><section class="chat-offline-context"><div class="chat-offline-context-label"><span>刚才的聊天</span><small>作为这次见面的背景</small></div><div class="chat-offline-context-messages">${context || '<p class="chat-offline-context-empty">你们刚刚从一句话开始走到这里。</p>'}</div></section><section class="chat-offline-atmosphere"><div class="chat-offline-orbit"><div class="chat-offline-orbit"><i></i><strong>现场</strong></div><div><span>你们从刚才的聊天里走到这里</span><b>现在，可以继续发生一点什么</b></div></section><section class="chat-offline-character"><div class="chat-offline-pulse"></div><div><span>角色此刻的状态</span><b>${esc(session.mood)}</b></div><em>在你身边</em></section><main class="chat-offline-messages">${messages || '<div class="chat-offline-empty">现场安静下来，角色正在等你先开口。</div>'}</main><div class="chat-offline-actions"><button type="button" data-offline-action="说些什么">✦<span>说些什么</span></button><button type="button" data-offline-action="做个动作">◌<span>做个动作</span></button><button type="button" data-offline-action="观察周围">⌁<span>观察周围</span></button><button type="button" data-offline-action="结束见面">□<span>结束见面</span></button></div><form data-offline-form><input data-offline-input placeholder="在现场说点什么…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}>发送</button></form></section>`; const box = modal.querySelector('.chat-offline-messages'); if (box) box.scrollTop = box.scrollHeight; }
   function refreshOfflinePrompt(session) { const contextText = (session.contextMessages || []).map(item => `${item.role === 'user' ? '用户' : '角色'}：${item.text || ''}`).join('\n'); const style = offlineWritingStyle(session); const preset = offlineReplyPreset(session, { reply_length:session.replyLength || 500, user_person:session.userPerson || '我', char_person:session.characterPerson || '我', writing_style:`${style.name}\n${style.prompt}` }); const prompt = session.messages.find(item => item.contextPrompt); if (prompt) prompt.text = `请先在内部概括下面前几轮线上聊天发生了什么、双方关系如何、角色此刻的情绪和未说完的话。不要展示这份概括，直接自然进入线下见面。用户输入可能是说的话、动作描写，或两者混合，请结合语境自然识别，不要替用户补写动作或决定。\n\n聊天内容：\n${contextText || '你们刚刚结束了一段聊天。'}\n\n${preset}\n\n${offlineAntiClichePrompt}`;
   }
   function openOfflineSettings(session) {
@@ -2884,7 +3024,7 @@ ${rerollRule}
     const stamp = `${now.getMonth() + 1}月${now.getDate()}日 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const contextCount = (session.contextMessages || []).length;
     modal.className = 'chat-offline-modal is-open is-fullscreen-modal';
-    modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-fullscreen is-immersive offline-meeting-v2"><header class="chat-offline-v2-topbar"><button type="button" data-offline-close aria-label="返回聊天"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg></button><div><span>IN PERSON</span><h2>与 ${esc(roleName)} 见面</h2></div><nav><button type="button" data-offline-theme-button aria-label="切换现场颜色"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.75 5.57 6.15.89-4.45 4.34 1.05 6.13L12 17.24l-5.5 2.89 1.05-6.13L3.1 9.66l6.15-.89L12 3.2z"/></svg></button><button type="button" data-offline-settings aria-label="打开现场设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></button></nav></header>${offlineThemePicker(session)}<section class="chat-offline-v2-scene"><div class="chat-offline-v2-scene-copy"><span><i></i> MEETING IN PROGRESS</span><h1>${esc(session.place)}</h1><p>${esc(session.reason)}</p></div>${avatarMarkup(contact, 'chat-offline-v2-hero-avatar')}<dl><div><dt>时间</dt><dd>${stamp}</dd></div><div><dt>角色状态</dt><dd>${esc(session.mood)}</dd></div><div><dt>关系背景</dt><dd>${contextCount ? `已承接最近 ${contextCount} 条聊天` : '独立现场'}</dd></div></dl></section><section class="chat-offline-v2-presence"><div><i class="${offlineBusy ? 'is-busy' : ''}"></i><span><b>${esc(roleName)}</b>${offlineBusy ? ' 正在组织回应' : ' 此刻就在你身边'}</span></div><small>线下记录不会混入普通聊天</small></section><main class="chat-offline-messages" aria-live="polite">${offlineMeetingMessages(session, contact)}</main><footer class="chat-offline-v2-dock"><div class="chat-offline-v2-shortcuts" style="box-sizing:border-box;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;width:100%!important;max-width:none!important;margin:0!important"><button type="button" data-offline-reply ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 1-2.3-5.7L20 8M20 3v5h-5"/></svg><span>${offlineBusy ? '正在回应' : `让 ${esc(roleName)} 继续`}</span></button><button type="button" data-offline-finish ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg><span>${offlineBusy ? '正在整理现场' : '结束并生成纪念'}</span></button></div><form data-offline-form style="box-sizing:border-box;width:100%!important;max-width:none!important;margin:0!important"><input data-offline-input autocomplete="off" placeholder="说点什么，或描述你的动作…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}><span>发送</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-4 14-3-6zM5 12h7"/></svg></button></form></footer>${offlineSettingsPanel(session)}</section>`;
+    modal.innerHTML = `<div class="chat-offline-backdrop" data-offline-close></div><section class="chat-offline-card is-fullscreen is-immersive offline-meeting-v2"><header class="chat-offline-v2-topbar"><button type="button" data-offline-close aria-label="返回聊天"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg></button><div><span>IN PERSON</span><h2>与 ${esc(roleName)} 见面</h2></div><nav><button type="button" data-offline-theme-button aria-label="切换现场颜色"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.75 5.57 6.15.89-4.45 4.34 1.05 6.13L12 17.24l-5.5 2.89 1.05-6.13L3.1 9.66l6.15-.89L12 3.2z"/></svg></button><button type="button" data-offline-settings aria-label="打开现场设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></button></nav></header>${offlineThemePicker(session)}<section class="chat-offline-v2-scene"><div class="chat-offline-v2-scene-copy"><span><i></i> MEETING IN PROGRESS</span><h1>${esc(session.place)}</h1><p>${esc(session.reason)}</p></div>${avatarMarkup(contact, 'chat-offline-v2-hero-avatar')}<dl><div><dt>时间</dt><dd>${stamp}</dd></div><div><dt>角色状态</dt><dd>${esc(session.mood)}</dd></div><div><dt>关系背景</dt><dd>${contextCount ? `已承接最近 ${contextCount} 条聊天` : '独立现场'}</dd></div></dl></section><section class="chat-offline-v2-presence"><div><i class="${offlineBusy ? 'is-busy' : ''}"></i><span><b>${esc(roleName)}</b>${offlineBusy ? ' 正在组织回应' : ' 此刻就在你身边'}</span></div><small>线下记录不会混入普通聊天</small></section><main class="chat-offline-messages" aria-live="polite">${offlineMeetingMessages(session, contact)}</main><footer class="chat-offline-v2-dock"><div class="chat-offline-v2-shortcuts" style="box-sizing:border-box;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;width:100%!important;max-width:none!important;margin:0!important"><button class="chat-offline-continue-button" type="button" data-offline-reply ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 1-2.3-5.7L20 8M20 3v5h-5"/></svg><span>${offlineBusy ? '正在回应' : `让 ${esc(roleName)} 继续`}</span></button><button class="chat-offline-summary-button" type="button" data-offline-finish ${offlineBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg><span>${offlineBusy ? '正在整理现场' : '结束并生成纪念'}</span></button></div><form data-offline-form style="box-sizing:border-box;width:100%!important;max-width:none!important;margin:0!important"><input data-offline-input autocomplete="off" placeholder="说点什么，或描述你的动作…" ${offlineBusy ? 'disabled' : ''}><button type="submit" ${offlineBusy ? 'disabled' : ''}><span>发送</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-4 14-3-6zM5 12h7"/></svg></button></form></footer>${offlineSettingsPanel(session)}</section>`;
     const singleLineInput = modal.querySelector('.chat-offline-v2-dock [data-offline-input]');
     if (singleLineInput?.tagName === 'INPUT') {
       const multilineInput = document.createElement('textarea');
@@ -2927,6 +3067,7 @@ ${rerollRule}
     if (shortcutBar && finishButton) {
       const rerollButton = document.createElement('button');
       rerollButton.type = 'button';
+      rerollButton.className = 'chat-offline-reroll-button';
       rerollButton.dataset.offlineReroll = '';
       rerollButton.disabled = offlineBusy || !session.messages.some(item => item.role === 'character' || item.role === 'error');
       rerollButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 8.5A7 7 0 0 1 18.7 7M17.9 15.5A7 7 0 0 1 5.3 17"/></svg><span>重 Roll</span>';
@@ -2940,6 +3081,25 @@ ${rerollRule}
     const box = modal.querySelector('.chat-offline-messages');
     if (box) box.scrollTop = box.scrollHeight;
   };
+  function offlineSummaryText(value, max = 200) {
+    const text = String(value || '').replace(/\s+/g, ' ').replace(/^[(（\[【“”"']+|[)）\]】“”"']+$/g, '').trim();
+    if (text.length <= max) return text;
+    const clipped = text.slice(0, max);
+    const boundary = Math.max(clipped.lastIndexOf('。'), clipped.lastIndexOf('！'), clipped.lastIndexOf('？'), clipped.lastIndexOf('；'));
+    return (boundary >= Math.floor(max * .65) ? clipped.slice(0, boundary + 1) : clipped).trim();
+  }
+  function offlineSummaryEmotion(value) {
+    const blocked = /延伸|延续|刚才|之前|上一次|上一轮|上一段|继续|未记录|暂无|未知|不明|待现场|和往常|未特别说明/;
+    const generic = new Set(['情绪', '情绪变化', '情绪脉络', '关系变化', '本次互动', '聊天内容', '现场状态']);
+    const groups = String(value || '').split(/(?:→|->)/).map(group => group.split(/[，,、；;。！？\n]+/).map(item => item.trim().replace(/^[“”"'「」『』【】\[\]（）()]+|[“”"'「」『』【】\[\]（）()]+$/g, '')).filter(item => item && item.length <= 12 && !generic.has(item)).slice(0, 2).join('、')).filter(Boolean).slice(0, 3);
+    const result = groups.join(' → ').slice(0, 80);
+    return result && !blocked.test(result) ? result : '';
+  }
+  function offlineSummaryKeywords(values = []) {
+    const banned = new Set(['线下见面', '情绪变化', '情绪脉络', '本次互动', '见面总结', '聊天内容', '刚才聊天', '情绪未记录', '关系变化', '情绪', '感觉', '氛围', '互动', '回应', '想法', '开始', '结束', '继续', '延续']);
+    const markers = /(?:我|我们|你|你们|他|她|它|的|地|得|了|着|过|把|被|给|从|向|对|在|和|与|而|并|还|很|都|就|才|直接|已经|刚才|一下|一声|一秒|没有|然后|因为|所以|进入|进去|出来|延续|继续|挤进|顶开|打开|提着|走进|响了|勒得|紧张|放松|开心|难过|生气|害怕|期待|犹豫|失落|暧昧|尴尬|奇怪)/;
+    return [...new Set((Array.isArray(values) ? values : []).map(value => String(value || '').trim().replace(/^[“”"'「」『』【】\[\]（）()]+|[“”"'「」『』【】\[\]（）()，。！？；：、,.!?;:]+$/g, '')).filter(value => value.length >= 2 && value.length <= 6 && /^[\u3400-\u9fffA-Za-z0-9]+$/.test(value) && !banned.has(value) && !markers.test(value)))].slice(0, 8);
+  }
   function renderOfflineSummary(session) {
     const modal = document.querySelector('[data-chat-offline-modal]');
     const contact = state.contacts.find(item => item.id === activeContact) || {};
@@ -2947,7 +3107,9 @@ ${rerollRule}
     const roleName = contact.nickname || contact.name || '角色';
     const messageCount = session.messages.filter(item => !item.contextPrompt).length;
     modal.className = 'chat-offline-modal is-open is-fullscreen-modal';
-    modal.innerHTML = `<section class="chat-offline-card is-fullscreen offline-meeting-v2 chat-offline-summary chat-offline-v2-summary"><header><button type="button" data-offline-close aria-label="回到聊天"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg></button><span>MEETING MEMORY</span><i></i></header><main><div class="chat-offline-v2-summary-mark"><span>✓</span></div><small>THE MEETING HAS ENDED</small><h1>这次见面，已经被好好记下</h1><p>${esc(session.summary || '这次见面已经被记录。')}</p><dl><div><dt>见面对象</dt><dd>${esc(roleName)}</dd></div><div><dt>现场消息</dt><dd>${messageCount} 条</dd></div><div><dt>结束时间</dt><dd>${new Date(session.endedAt || Date.now()).toLocaleString('zh-CN')}</dd></div></dl><button type="button" data-offline-close>回到聊天</button></main></section>`;
+    const keywords = offlineSummaryKeywords(session.keywords);
+    const emotionArc = offlineSummaryEmotion(session.emotionArc) || '情绪未记录';
+    modal.innerHTML = `<section class="chat-offline-card is-fullscreen offline-meeting-v2 chat-offline-summary chat-offline-v2-summary"><header><button type="button" data-offline-close aria-label="回到聊天"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg></button><span>MEETING MEMORY</span><i></i></header><main><div class="chat-offline-v2-summary-mark"><span>✓</span></div><small>THE MEETING HAS ENDED</small><h1>这次见面，已经被好好记下</h1><p>${esc(offlineSummaryText(session.summary || '这次见面已经被记录。'))}</p><dl><div><dt>见面对象</dt><dd>${esc(roleName)}</dd></div><div><dt>现场消息</dt><dd>${messageCount} 条</dd></div><div><dt>情绪脉络</dt><dd>${esc(emotionArc)}</dd></div><div><dt>关键词</dt><dd>${esc(keywords.length ? keywords.join(' · ') : '暂无有效关键词')}</dd></div><div><dt>结束时间</dt><dd>${new Date(session.endedAt || Date.now()).toLocaleString('zh-CN')}</dd></div></dl><button type="button" data-offline-close>回到聊天</button></main></section>`;
     applyOfflineTheme(modal);
     applyOfflineWallpaper(modal, session.wallpaper || '');
   }
@@ -3076,14 +3238,13 @@ ${rerollRule}
     let summary = '';
     let emotionArc = '';
     let keywords = [];
-    const compactEmotionArc = value => String(value || '').split(/(?:→|->)/).map(group => group.split(/[，,、；;。！？\n]+/).map(item => item.trim().slice(0, 8)).filter(Boolean).slice(0, 2).join('、')).filter(Boolean).slice(0, 3).join(' → ').slice(0, 80);
     try {
       if (!config.endpoint || !config.key || !model) throw new Error('未配置 API');
       const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
         method:'POST',
         headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` },
         body:JSON.stringify({ model, temperature:.45, messages:[
-          { role:'system', content:'请总结这次线下见面，按时间顺序概括重要经过。情绪脉络只写3—6个情绪名词或简短情绪词组，按变化顺序用“ → ”连接，例如“紧张、戒备 → 好奇、放松 → 亲近、不舍”；不能写句子、解释、事件或一段话。情绪脉络必须从见面初始状态写到具体互动引起的变化，再写到结束时的状态，每个转折都以本次线下言行为依据。线上聊天只能作为关系背景，不能写成“延续刚才的情绪”。关键词必须是本次线下内容里的独立名词或名词短语，每个2—6个汉字，提取具体的人、物、地点、话题或活动名称，输出4—8个，用词语而非完整句子。禁止照抄对话、动作描写或带主谓结构的内容；禁止出现“的、了、着、把、我、你”等语法词，禁止标签“线下见面”“情绪变化”“聊天内容”。例如互动提到旧皮绳、蔬菜、门锁声，就写“旧皮绳、蔬菜、门锁声”，不要写成“手腕上那条旧皮绳勒得很紧”。区分用户与角色的言行，不得推断用户未表达的内心。只返回合法 JSON：{"summary":"约200字的一段自然摘要，其中写出本次经过和情绪变化","emotionArc":"紧张、戒备 → 好奇、放松 → 亲近、不舍","keywords":["旧皮绳","蔬菜","门锁声"]}。不要 Markdown 或其他文字。' },
+          { role:'system', content:'请总结这次线下见面，按时间顺序概括重要经过。情绪脉络字段必须始终填写，只写3—6个情绪名词或简短情绪词组，按变化顺序用“ → ”连接，例如“紧张、戒备 → 好奇、放松 → 亲近、不舍”；不能写句子、解释、事件或一段话。情绪脉络必须从见面初始状态写到具体互动引起的变化，再写到结束时的状态，每个转折都以本次线下言行为依据。线上聊天只能作为关系背景，不能写成“延续刚才的情绪”。关键词字段必须始终填写，只能从本次线下内容提取具体的人、物、地点、话题或活动名称；每个必须是2—6个汉字的独立名词或名词短语，输出4—8个，用词语而非完整句子，不要输出情绪形容词、抽象关系词或奇怪的网络词。禁止照抄对话、动作描写或带主谓结构的内容；禁止出现“的、了、着、把、我、你”等语法词，禁止标签“线下见面”“情绪变化”“聊天内容”。例如互动提到旧皮绳、蔬菜、门锁声，就写“旧皮绳、蔬菜、门锁声”，不要写成“手腕上那条旧皮绳勒得很紧”。区分用户与角色的言行，不得推断用户未表达的内心。只返回合法 JSON：{"summary":"严格控制在160—200字的一段自然摘要，绝不超过200字；必须写出本次经过和情绪变化","emotionArc":"紧张、戒备 → 好奇、放松 → 亲近、不舍","keywords":["旧皮绳","蔬菜","门锁声"]}。不要 Markdown 或其他文字。' },
           { role:'user', content:`角色：${contact.name || '角色'}\n见面前背景（仅作关系背景）：\n${contextText || '无'}\n角色见面初始状态：\n${session.mood || '未特别说明'}\n本次线下经过（情绪变化的主要依据）：\n${meetingText || '刚刚见面，尚未发生更多互动。'}` }
         ] })
       });
@@ -3095,24 +3256,26 @@ ${rerollRule}
         const jsonSummary = cleanedSummary.match(/\{[\s\S]*\}/)?.[0] || cleanedSummary;
         const parsed = JSON.parse(jsonSummary);
         summary = String(parsed.summary || '').trim();
-        emotionArc = compactEmotionArc(parsed.emotionArc);
-        keywords = window.IdealMachineMemory?.cleanOfflineKeywords?.(parsed.keywords) || [];
+        emotionArc = offlineSummaryEmotion(parsed.emotionArc);
+        keywords = offlineSummaryKeywords(window.IdealMachineMemory?.cleanOfflineKeywords?.(parsed.keywords) || parsed.keywords);
       } catch {
         summary = rawSummary;
       }
       summary ||= rawSummary || '这次见面已经结束，彼此的互动被保留下来。';
-      emotionArc ||= compactEmotionArc(session.mood) || '情绪未记录';
+      emotionArc ||= offlineSummaryEmotion(session.mood) || '情绪未记录';
     } catch {
       const last = session.messages.filter(item => !item.contextPrompt).slice(-3).map(item => item.text).join('；');
       summary = last ? `这次见面中，你们经历了：${last}` : '这次见面刚刚开始便结束了，现场记录没有更多互动，无法归纳后续的情绪转变。';
-      emotionArc = compactEmotionArc(session.mood) || '情绪未记录';
+      emotionArc = offlineSummaryEmotion(session.mood) || '情绪未记录';
     } finally {
+      summary = offlineSummaryText(summary || '这次见面已经结束，彼此的互动被保留下来。');
+      keywords = offlineSummaryKeywords(keywords);
       // 同步过程可能已经替换过 chat/session 引用；结束时按 ID 找回当前对象再保存。
       const currentChatState = state.chats?.[roleId] || chat;
       const currentSession = currentChatState?.offlineSessions?.find(item => item.id === sessionId);
       if (currentSession) {
         currentSession.summary = summary;
-        currentSession.emotionArc = emotionArc || summary;
+        currentSession.emotionArc = offlineSummaryEmotion(emotionArc) || '情绪未记录';
         currentSession.keywords = keywords;
         currentSession.endedAt = Date.now();
         currentSession.ended = true;
@@ -3165,7 +3328,7 @@ ${rerollRule}
   function renderTransfer() { const portal = document.querySelector('#chatTransferPortal'); if (!portal) return; portal.innerHTML = transferOpen ? '<div class="chat-transfer-modal"><section class="chat-transfer-card"><header><span>TRANSFER</span><button data-transfer-cancel type="button">×</button></header><h2>转账</h2><label>金额<input id="transferAmount" inputmode="decimal" type="number" min="0.01" step="0.01" placeholder="0.00"></label><label>备注<span class="chat-transfer-optional">可选</span><input id="transferNote" type="text" maxlength="60" placeholder="写一句备注"></label><footer><button data-transfer-cancel type="button">取消</button><button data-transfer-send type="button">发送转账</button></footer></section></div>' : ''; }
   function addMessage(text, role = 'user', type = '', meta = {}) { const chat = currentChat(); if (!chat) return; const targetContactId = activeContact; const raw = String(text || ''); const profileId = chat.profileId || ''; const transfer = role === 'character' ? raw.match(/\[\[TRANSFER\s+amount\s*=\s*([\d.,]+)\s+note\s*=\s*([^\]]*)\]\]/i) : null; if (transfer) { const remaining = raw.replace(transfer[0], '').trim(); const transferNote = transfer[2].trim(); chat.messages.push({ id: uid('message'), text: transferNote, role, type: 'transfer', amount: transfer[1], note: transferNote, status: 'pending', profileId, ...meta, time: time(), createdAt: Date.now() }); if (remaining) chat.messages.push({ id: uid('message'), text: remaining, role, type: '', profileId, ...meta, time: time(), createdAt: Date.now() }); } else chat.messages.push({ id: uid('message'), text: raw, role, type, profileId, ...meta, time: time(), createdAt: Date.now() }); save(); render(); setTimeout(() => { if (targetContactId && activeContact === targetContactId) { requestChatScrollToLatest(targetContactId); const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight); } }, 0); }
   function messageHtml(message) { const transferStatus = message.status === 'accepted' ? '已收下' : message.status === 'returned' ? '已退回' : '待处理'; const transferActions = message.type === 'transfer' && message.role === 'character' && message.status === 'pending' ? `<div class="chat-transfer-actions"><button data-transfer-action="${message.id}" data-transfer-value="accept" type="button">收下</button><button data-transfer-action="${message.id}" data-transfer-value="return" type="button">退回</button></div>` : ''; const body = message.type === 'image' ? `<img src="${message.text}" alt="图片">` : message.type === 'image-desc' ? `<div class="chat-image-description"><strong>文字图片</strong><p>${esc(message.text)}</p></div>` : message.type === 'transfer' ? `<div class="chat-transfer-message"><strong>转账</strong><b>¥ ${esc(message.amount || message.text)}</b><p>${esc(message.note || '无备注')}</p><small>${transferStatus}</small>${transferActions}</div>` : message.type === 'voice' ? `<span class="chat-voice">◖ ${esc(message.text)}</span>` : message.type === 'video' ? `▣ ${esc(message.text)}` : message.type === 'location' ? `⌖ ${esc(message.text)}` : message.type === 'share' ? `♫ ${esc(message.text)}` : message.type === 'together' ? `▤ ${esc(message.text)}` : esc(message.text); return `<div class="chat-message ${message.role === 'user' ? 'is-user' : 'is-character'}"><div class="chat-bubble ${message.type || ''}">${body}</div><small>${message.time || ''}</small></div>`; }
-  async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => item && item.type !== 'image').map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: chatMessageContentForApi(item) })).filter(item => item.content); const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const answer = requireCharacterReplyText(data); const completionFinishReason = data.choices?.[0]?.finish_reason || ''; const videoCall = answer.match(/\[\[VIDEO_CALL\]\]/i); if (videoCall) { await addMessage('角色发起了视频通话', 'character', 'video'); setTimeout(() => openVideoCallModal(), 0); } const voice = answer.match(/\[\[VOICE\s+seconds\s*=\s*(\d+)\s+text\s*=\s*([\s\S]*?)\]\]/i); if (voice) { await addMessage(voice[2].trim(), 'character', 'voice', { voiceText: voice[2].trim(), seconds: Number(voice[1]), completionFinishReason }); } else if (!videoCall) await addMessage(answer, 'character', '', { completionFinishReason }); } catch (error) { if (error?.name !== 'AbortError') await addMessage(`回复失败：${error.message}`, 'character'); } finally { replying = false; render(); } }
+  async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => item && item.type !== 'image').map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: chatMessageContentForApi(item) })).filter(item => item.content); const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const answer = requireCharacterReplyText(data); const completionFinishReason = data.choices?.[0]?.finish_reason || ''; const videoCall = answer.match(/\[\[VIDEO_CALL\]\]/i); if (videoCall) { await addMessage('角色发起了视频通话', 'character', 'video'); setTimeout(() => openVideoCallModal(), 0); } if (!videoCall) await addMessage(answer, 'character', '', { completionFinishReason }); } catch (error) { if (error?.name !== 'AbortError') await addMessage(`回复失败：${error.message}`, 'character'); } finally { replying = false; render(); } }
   function ensureWallet(profile) { profile.wallet ||= { balance: 0, records: [] }; profile.wallet.records ||= []; return profile.wallet; }
   function walletCardNumber(ownerKey) {
     const storage='ideal-machine-wallet-card-numbers';let cards={};try{cards=JSON.parse(localStorage.getItem(storage)||'{}')||{};}catch{}
@@ -3174,7 +3337,27 @@ ${rerollRule}
     cards[key]=number;localStorage.setItem(storage,JSON.stringify(cards));return number.replace(/(.{4})/g,'$1 ').trim();
   }
   function renderUserHome() { const portal = document.querySelector('#chatUserHome'); const profile = state.profiles.find(item => item.id === userHomeProfileId); if (!portal || !profile) { if (portal) portal.innerHTML = ''; return; } const wallet = ensureWallet(profile); portal.innerHTML = `<div class="chat-user-home-page"><header><button data-user-home-close type="button">${actionIcon('back')}</button><h1>个人主页</h1><span></span></header><main><section class="chat-user-home-hero">${avatarMarkup({ name: profile.nickname || profile.realName || '我', avatar: profile.avatar }, 'chat-user-home-avatar')}<h2>${esc(profile.nickname || profile.realName || '未命名用户')}</h2><p>${esc(profile.realName || '尚未填写真实姓名')}</p><small>${esc(profile.persona || '还没有写下个人设定。')}</small></section><section class="chat-user-wallet"><div><span>WALLET</span><h3>钱包余额</h3><b>¥ ${Number(wallet.balance || 0).toFixed(2)}</b></div><div class="chat-wallet-actions"><button data-user-wallet-add type="button">充值</button><button data-user-wallet-spend type="button">记一笔支出</button></div>${wallet.records.length ? `<div class="chat-wallet-records">${wallet.records.slice().reverse().slice(0, 8).map(record => `<div><span>${esc(record.note || (record.type === 'in' ? '充值' : '支出'))}</span><b class="${record.type === 'in' ? 'is-in' : 'is-out'}">${record.type === 'in' ? '+' : '-'}¥ ${Number(record.amount).toFixed(2)}</b></div>`).join('')}</div>` : '<p class="chat-wallet-empty">还没有收支记录</p>'}</section><section class="chat-user-home-actions"><button type="button">朋友圈</button><button type="button">收藏</button><button type="button">二维码</button><button type="button">更多</button></section></main></div>`; }
-  function renderMe() { return `<div class="chat-me-page"><div class="chat-me-fixed-head"><div class="chat-subhead"><div><span>IDENTITY</span></div><button data-chat-add-profile type="button">＋ 新建设定</button></div><p class="chat-note">点击设定条目进入个人主页；编辑和删除仍可从条目右侧操作。</p></div><div class="chat-profile-list">${state.profiles.map(profile => `<article class="chat-profile-card" data-chat-open-profile="${profile.id}">${avatarMarkup({ name: profile.name, avatar: profile.avatar })}<div><b>${esc(profile.nickname || profile.realName || '未命名用户')}</b><p>${esc(profile.realName ? `${profile.realName} · ` : '')}${esc(profile.persona)}</p></div><div class="chat-contact-actions"><button data-chat-edit-profile="${profile.id}" type="button">编辑</button><button data-chat-delete-profile="${profile.id}" type="button">删除</button></div></article>`).join('')}</div></div>`; }
+  function renderMe() { return `<div class="chat-me-page"><div class="chat-me-fixed-head"><div class="chat-subhead"><div><span>IDENTITY</span></div><div class="chat-subhead-actions"><button class="chat-page-beauty-trigger" data-chat-page-beauty-open type="button">✦ 页面美化</button><button data-chat-add-profile type="button">＋ 新建设定</button></div></div><p class="chat-note">点击设定条目进入个人主页；编辑和删除仍可从条目右侧操作。</p></div><div class="chat-profile-list">${state.profiles.map(profile => `<article class="chat-profile-card" data-chat-open-profile="${profile.id}">${avatarMarkup({ name: profile.name, avatar: profile.avatar })}<div><b>${esc(profile.nickname || profile.realName || '未命名用户')}</b><p>${esc(profile.realName ? `${profile.realName} · ` : '')}${esc(profile.persona)}</p></div><div class="chat-contact-actions"><button data-chat-edit-profile="${profile.id}" type="button">编辑</button><button data-chat-delete-profile="${profile.id}" type="button">删除</button></div></article>`).join('')}</div></div>`; }
+  function chatPageBeautyState() { state.pageBeauty ||= {}; chatPageBeautyKeys.forEach(page => { if (typeof state.pageBeauty[page] !== 'string') state.pageBeauty[page] = ''; }); return state.pageBeauty; }
+  function syncChatPageBeautyDraft() { const input = document.querySelector('#chatPageBeautyEditor [data-chat-page-beauty-input]'); if (input && chatPageBeautyDraft) chatPageBeautyDraft[chatPageBeautyTab] = input.value; }
+  function applyChatPageBeautyCSS() { let style = document.querySelector('#chatPageBeautyStyle'); if (!style) { style = document.createElement('style'); style.id = 'chatPageBeautyStyle'; } if (style.parentNode !== document.head) document.head.appendChild(style); const saved = chatPageBeautyState(); const pageSource = chatPageBeautyDraft && Object.prototype.hasOwnProperty.call(chatPageBeautyDraft, activeTab) ? chatPageBeautyDraft[activeTab] : saved[activeTab]; const dockSource = chatPageBeautyDraft && Object.prototype.hasOwnProperty.call(chatPageBeautyDraft, 'dock') ? chatPageBeautyDraft.dock : saved.dock; style.textContent = app.classList.contains('is-open') ? String(pageSource || '') + '\n' + String(dockSource || '') : ''; const custom = document.querySelector('#chatCustomStyle'); if (custom) document.head.appendChild(custom); }
+  const chatPageBeautyBundleFormat = 'ideal-machine-page-beauty';
+  function chatPageBeautyPresetPages(source) { const pages = source?.pages || source?.pageBeauty || source || {}; return Object.fromEntries(chatPageBeautyKeys.map(page => [page, typeof pages[page] === 'string' ? pages[page] : ''])); }
+  function chatPageBeautyPresets() { state.pageBeautyPresets ||= []; return (Array.isArray(state.pageBeautyPresets) ? state.pageBeautyPresets : []).map(item => ({ id: String(item?.id || uid('chat-page-beauty')), name: String(item?.name || '未命名聊天美化').trim(), pages: chatPageBeautyPresetPages(item) })).filter(item => item.name); }
+  function chatPageBeautyPresetName(fileName = '') { return String(fileName || '').replace(/\.[^.]+$/, '').trim() || '导入的聊天美化'; }
+  function saveChatPageBeautyPreset(name, source = chatPageBeautyDraft || chatPageBeautyState()) { const cleanName = String(name || '').trim(); if (!cleanName) return null; const item = { id: uid('chat-page-beauty'), name: cleanName, pages: chatPageBeautyPresetPages(source) }; state.pageBeautyPresets = [...chatPageBeautyPresets().filter(entry => entry.name !== cleanName), item]; save(); return item; }
+  function mergeChatPageBeautyPresets(items) { const imported = (Array.isArray(items) ? items : []).map(item => ({ id: String(item?.id || uid('chat-page-beauty')), name: String(item?.name || '').trim(), pages: chatPageBeautyPresetPages(item) })).filter(item => item.name); if (!imported.length) return; const current = chatPageBeautyPresets(); imported.forEach(item => { const index = current.findIndex(entry => entry.name === item.name); if (index >= 0) current[index] = item; else current.push(item); }); state.pageBeautyPresets = current; save(); }
+  function chatPageBeautyPresetOptions() { return chatPageBeautyPresets().map(item => `<option value="${esc(item.id)}">${esc(item.name)}</option>`).join(''); }
+  function syncChatPageBeautyEditorControls() { const panel = document.querySelector('#chatPageBeautyEditor'); const saveCurrent = panel?.querySelector('[data-chat-page-beauty-save-current]'); if (!saveCurrent) return; const saved = chatPageBeautyState(); const draft = chatPageBeautyDraft || saved; const label = String(draft[chatPageBeautyTab] || '') === String(saved[chatPageBeautyTab] || '') ? '已保存' : '保存本页'; if (saveCurrent.textContent !== label) saveCurrent.textContent = label; }
+  function ensureChatPageBeautyControls() { const panel = document.querySelector('#chatPageBeautyEditor'); const sheet = panel?.querySelector('.chat-page-beauty-sheet'); if (!sheet) return; const header = sheet.querySelector(':scope > header'); const close = header?.querySelector('[data-chat-page-beauty-close]'); if (header && close && !header.querySelector('[data-chat-page-beauty-save-current]')) { const actions = document.createElement('div'); actions.className = 'chat-page-beauty-header-actions'; const saveCurrent = document.createElement('button'); saveCurrent.type = 'button'; saveCurrent.dataset.chatPageBeautySaveCurrent = ''; saveCurrent.textContent = '保存本页'; actions.append(saveCurrent, close); header.appendChild(actions); } const footer = sheet.querySelector(':scope > footer'); const saveAll = footer?.querySelector('[data-chat-page-beauty-save]'); if (footer && saveAll && !footer.querySelector('[data-chat-page-beauty-add]')) { const add = document.createElement('button'); add.type = 'button'; add.dataset.chatPageBeautyAdd = ''; add.textContent = '添加'; const select = document.createElement('select'); select.dataset.chatPageBeautyPreset = ''; select.setAttribute('aria-label', '选择美化'); select.innerHTML = '<option value="">选择美化</option>' + chatPageBeautyPresetOptions(); footer.insertBefore(add, saveAll); footer.insertBefore(select, saveAll); } syncChatPageBeautyEditorControls(); }
+  function chatPageBeautyBundleFor() { const pages = chatPageBeautyDraft || chatPageBeautyState(); return { format: chatPageBeautyBundleFormat, version: 2, exportedAt: new Date().toISOString(), pageBeauty: Object.fromEntries(chatPageBeautyKeys.map(page => [page, String(pages[page] || '')])), presets: chatPageBeautyPresets() }; }
+  function downloadChatPageBeautyBundle() { const blob = new Blob([JSON.stringify(chatPageBeautyBundleFor(), null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = '聊天四页面美化.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  function importChatPageBeautyBundle(raw, fileName = '') { const source = String(raw || ''); let bundle; try { bundle = JSON.parse(source); } catch (error) { if (/\.css$/i.test(fileName)) { chatPageBeautyDraft ||= { ...chatPageBeautyState() }; chatPageBeautyDraft[chatPageBeautyTab] = source; return 'css'; } throw new Error('页面美化文件不是有效的 JSON 或 CSS。'); } const pages = bundle?.pageBeauty || bundle?.pages || bundle; if (!pages || typeof pages !== 'object') throw new Error('页面美化文件格式不正确。'); const next = {}; chatPageBeautyKeys.forEach(page => { if (typeof pages[page] === 'string') next[page] = pages[page]; }); if (!Object.keys(next).length) throw new Error('文件中没有可导入的页面美化内容。'); Object.assign(chatPageBeautyState(), next); chatPageBeautyDraft = { ...chatPageBeautyState() }; save(); return 'bundle'; }
+  function renderChatPageBeautyEditor() { const panel = document.querySelector('#chatPageBeautyEditor'); if (!panel) return; panel.classList.toggle('is-open', chatPageBeautyOpen); panel.setAttribute('aria-hidden', String(!chatPageBeautyOpen)); if (!chatPageBeautyOpen) { panel.innerHTML = ''; return; } const saved = chatPageBeautyState(); const draft = chatPageBeautyDraft || saved; const currentCSS = String(draft[chatPageBeautyTab] || ''); const tabs = chatPageBeautyKeys.map(page => `<button class="${page === chatPageBeautyTab ? 'is-active' : ''}" data-chat-page-beauty-tab="${page}" type="button" aria-selected="${page === chatPageBeautyTab}">${chatPageBeautyLabels[page]}</button>`).join(''); panel.innerHTML = `<div class="chat-page-beauty-backdrop" data-chat-page-beauty-close></div><section class="chat-page-beauty-sheet" role="dialog" aria-modal="true" aria-labelledby="chatPageBeautyTitle"><header><div><span class="chat-kicker">PAGE STYLE</span><h2 id="chatPageBeautyTitle">页面美化</h2><small>分别编辑聊天、联系人、朋友圈、我，以及公用 Dock 的 CSS</small></div><button type="button" data-chat-page-beauty-close aria-label="关闭">×</button></header><main><nav class="chat-page-beauty-tabs" aria-label="选择要美化的页面">${tabs}</nav><div class="chat-page-beauty-current"><b>${chatPageBeautyLabels[chatPageBeautyTab]}</b><span>${chatPageBeautyTab === 'dock' ? '四个页面底部都会生效' : '仅在“' + chatPageBeautyLabels[chatPageBeautyTab] + '”页面生效；公用 Dock 另行生效'}</span></div><p class="chat-page-beauty-hint">${chatPageBeautyHintMarkup(chatPageBeautyTab)}</p><textarea data-chat-page-beauty-input placeholder="例如：\n.chat-${chatPageBeautyTab === 'moments' ? 'moment' : chatPageBeautyTab === 'me' ? 'profile-card' : chatPageBeautyTab === 'contacts' ? 'contact-card' : chatPageBeautyTab === 'dock' ? 'tab-chat' : 'bubble'} { border-radius: 22px; }">${esc(currentCSS)}</textarea></main><footer><button type="button" data-chat-page-beauty-close>关闭</button><button type="button" data-chat-page-beauty-reset>清空当前分类</button><button type="button" data-chat-page-beauty-import>导入</button><input data-chat-page-beauty-file type="file" accept=".css,.json,text/css,application/json"><button type="button" data-chat-page-beauty-export>导出</button><button class="is-primary" type="button" data-chat-page-beauty-save>保存全部</button></footer></section>`; }
+  document.addEventListener('input', event => { const input = event.target.closest?.('[data-chat-page-beauty-input]'); if (!input || !chatPageBeautyDraft) return; chatPageBeautyDraft[chatPageBeautyTab] = input.value; applyChatPageBeautyCSS(); }, true);
+  document.addEventListener('click', event => { const importButton = event.target.closest('[data-chat-page-beauty-import]'); if (importButton) { importButton.parentElement?.querySelector('[data-chat-page-beauty-file]')?.click(); return; } if (event.target.closest('[data-chat-page-beauty-export]')) downloadChatPageBeautyBundle(); });
+  document.addEventListener('change', event => { const input = event.target.closest('[data-chat-page-beauty-file]'); const source = input?.files?.[0]; if (!input || !source) return; const reader = new FileReader(); reader.onload = () => { try { const kind = importChatPageBeautyBundle(String(reader.result || ''), source.name || ''); renderChatPageBeautyEditor(); applyChatPageBeautyCSS(); if (kind === 'bundle') window.alert('四个页面与公用 Dock 的美化已导入。'); } catch (error) { window.alert(`导入页面美化失败：${error.message}`); } finally { input.value = ''; } }; reader.onerror = () => window.alert('导入页面美化失败：无法读取文件。'); reader.readAsText(source); });
+  document.addEventListener('click', event => { const open = event.target.closest('[data-chat-page-beauty-open]'); const close = event.target.closest('[data-chat-page-beauty-close]'); const tab = event.target.closest('[data-chat-page-beauty-tab]'); const reset = event.target.closest('[data-chat-page-beauty-reset]'); const saveButton = event.target.closest('[data-chat-page-beauty-save]'); if (!open && !close && !tab && !reset && !saveButton) return; event.preventDefault(); event.stopImmediatePropagation(); if (open) { chatPageBeautyOpen = true; chatPageBeautyTab = 'chat'; chatPageBeautyDraft = { ...chatPageBeautyState() }; renderChatPageBeautyEditor(); return; } if (close) { chatPageBeautyOpen = false; chatPageBeautyDraft = null; applyChatPageBeautyCSS(); renderChatPageBeautyEditor(); return; } if (tab) { syncChatPageBeautyDraft(); chatPageBeautyTab = chatPageBeautyKeys.includes(tab.dataset.chatPageBeautyTab) ? tab.dataset.chatPageBeautyTab : 'chat'; renderChatPageBeautyEditor(); return; } if (reset) { if (chatPageBeautyDraft) chatPageBeautyDraft[chatPageBeautyTab] = ''; renderChatPageBeautyEditor(); applyChatPageBeautyCSS(); return; } if (saveButton) { syncChatPageBeautyDraft(); Object.assign(chatPageBeautyState(), chatPageBeautyDraft || {}); save(); applyChatPageBeautyCSS(); saveButton.textContent = '已保存'; setTimeout(() => { if (saveButton.isConnected) saveButton.textContent = '保存全部'; }, 900); } }, true);
   document.addEventListener('click', event => { const open = event.target.closest('[data-chat-open-profile]'); const close = event.target.closest('[data-user-home-close]'); const moments = event.target.closest('[data-user-home-moments]'); const add = event.target.closest('[data-user-wallet-add]'); const spend = event.target.closest('[data-user-wallet-spend]'); const editing = event.target.closest('[data-chat-edit-profile], [data-chat-delete-profile]'); if (editing) return; if (!open && !close && !moments && !add && !spend) return; event.stopImmediatePropagation(); if (open) { userHomeProfileId = open.dataset.chatOpenProfile; renderUserHome(); return; } if (moments) { userHomeProfileId = null; walletModalType = ''; activeTab = 'moments'; activeContact = null; app.classList.add('is-open'); render(); renderUserHome(); return; } if (close) { userHomeProfileId = null; walletModalType = ''; renderUserHome(); return; } walletModalType = add ? 'in' : 'out'; renderUserHome(); }, true);
   function billTime() { const now = new Date(); const pad = value => String(value).padStart(2, '0'); return `${now.getFullYear()}年${pad(now.getMonth() + 1)}月${pad(now.getDate())}日 ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`; }
   function readBills() { try { const bills = JSON.parse(localStorage.getItem('ideal-machine-bills') || '[]'); return Array.isArray(bills) ? bills.map(record => ({ ...record, category: record.app === '聊天' && record.category === '聊天' ? '转账' : (record.category || record.app || '其他') })) : []; } catch { return []; } }
@@ -3457,8 +3640,29 @@ ${rerollRule}
   new MutationObserver(() => scheduleChatObserverJob(simplifyChatBubblePreview)).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
   function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const isSticker = Boolean(message.sticker || (message.type === 'image' && state.emojis.groups.some(group => group.items.some(item => item.url === message.text)))); const body = message.recalled ? `<span class="chat-recalled">${message.role === 'user' ? '你' : '角色'}撤回了一条消息</span>` : message.type === 'image' ? `<img src="${esc(message.text)}" alt="图片">` : message.type === 'image-desc' ? `<div class="chat-image-description"><strong>文字图片</strong><p>${esc(message.text)}</p></div>` : message.type === 'transfer' ? `<div class="chat-transfer-message"><strong>转账</strong><b>¥ ${esc(message.amount || message.text)}</b><p>${esc(message.note || '无备注')}</p><small>${message.status === 'accepted' ? '已收下' : message.status === 'returned' ? '已退回' : '待处理'}</small></div>` : message.type === 'voice' ? `<span class="chat-voice">◖ ${esc(message.text)}</span>` : message.type === 'video' ? `▣ ${esc(message.text)}` : message.type === 'location' ? `⌖ ${esc(message.text)}` : message.type === 'together' ? `▤ ${esc(message.text)}` : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp ? '' : `<small>${esc(message.time || '')}</small>`; const typeClass = `${message.type || ''}${isSticker ? ' sticker' : ''}`; return `<div class="chat-message ${message.role === 'user' ? 'is-user' : 'is-character'} ${selectedChatMessageIds.has(message.id) ? 'is-selected' : ''}" data-chat-message-id="${esc(message.id)}"><div class="chat-message-line">${avatar}<div class="chat-bubble ${typeClass}">${body}</div>${stamp}</div></div>`; }
   document.addEventListener('click', event => { const bubbleToggle = event.target.closest('[data-chat-bubble-toggle]'); if (bubbleToggle) { const section = bubbleToggle.closest('.chat-color-settings'); const open = section?.classList.toggle('is-open'); section?.classList.toggle('is-collapsed', !open); return; } const replyButton = event.target.closest('[data-chat-reply]'); if (!replyButton || !app.classList.contains('is-open')) return; const contact = state.contacts.find(item => item.id === activeContact); if (!contact?.blocked) return; event.stopImmediatePropagation(); addMessage('发送失败', 'character', 'blocked-failure', { internalNotice: '你已被对方拉黑，无法回复。' }); });
-  function applyCustomChatCSS() { let style = document.querySelector('#chatCustomStyle'); if (!style) { style = document.createElement('style'); style.id = 'chatCustomStyle'; document.head.appendChild(style); } const chat = currentChat(); const css = app.classList.contains('is-chatting') ? (chatSettingsFor(chat).customCSS || '') : ''; style.textContent = css; }
-  function ensureChatCSSEditor() { const panel = document.querySelector('#chatSettings'); const main = panel?.querySelector('.chat-settings-page main'); if (!main || main.querySelector('[data-chat-css-editor]')) return; const chat = currentChat(); const settings = chatSettingsFor(chat); const section = document.createElement('section'); section.className = 'chat-css-editor'; section.dataset.chatCssEditor = ''; section.innerHTML = `<button class="chat-css-editor-head" data-chat-css-toggle type="button"><span><b>聊天页面美化</b><small>使用 CSS 调整当前聊天页面</small></span><i>⌄</i></button><div class="chat-css-editor-body"><p class="chat-css-hint">可用类名：.chat-conversation、.chat-messages、.chat-message、.chat-message-line、.chat-message-avatar、.chat-bubble、.chat-compose-wrap、.chat-compose、.chat-person</p><textarea data-chat-css-input placeholder="例如：\n.chat-bubble { border-radius: 22px; }\n.chat-compose { opacity: .9; }">${esc(settings.customCSS || '')}</textarea><div class="chat-css-actions"><button data-chat-css-import type="button">导入</button><input data-chat-css-file type="file" accept=".css,.json,text/css,application/json"><button data-chat-css-export type="button">导出</button><button class="is-primary" data-chat-css-save type="button">保存</button></div></div>`; const host = main.querySelector('[data-chat-appearance-settings]') || main; const target = host.querySelector('.chat-color-settings') || host.firstChild; host.insertBefore(section, target || null); }
+  function scopeChatCustomCSS(css) {
+    const source = String(css || '');
+    const scopeSelector = header => {
+      const trimmed = header.trim();
+      if (!trimmed || trimmed.startsWith('@')) return header;
+      const leading = header.slice(0, header.indexOf(trimmed));
+      const selectors = trimmed.split(',').map(selector => {
+        const value = selector.trim();
+        if (!value || value.includes('.chat-app') || /^(?:html|body|:root)/.test(value)) return value;
+        return `.chat-app.is-chatting ${value}`;
+      });
+      return leading + selectors.join(', ');
+    };
+    const findOpen = (text, from) => { let quote = ''; let comment = false; for (let index = from; index < text.length; index += 1) { const char = text[index]; const next = text[index + 1]; if (comment) { if (char === '*' && next === '/') { comment = false; index += 1; } continue; } if (quote) { if (char === '\\' && next) { index += 1; continue; } if (char === quote) quote = ''; continue; } if (char === '/' && next === '*') { comment = true; index += 1; continue; } if (char === '"' || char === "'") { quote = char; continue; } if (char === '{') return index; } return -1; };
+    const findClose = (text, open) => { let depth = 1; let quote = ''; let comment = false; for (let index = open + 1; index < text.length; index += 1) { const char = text[index]; const next = text[index + 1]; if (comment) { if (char === '*' && next === '/') { comment = false; index += 1; } continue; } if (quote) { if (char === '\\' && next) { index += 1; continue; } if (char === quote) quote = ''; continue; } if (char === '/' && next === '*') { comment = true; index += 1; continue; } if (char === '"' || char === "'") { quote = char; continue; } if (char === '{') depth += 1; if (char === '}' && --depth === 0) return index; } return text.length - 1; };
+    const transform = text => { let output = ''; let cursor = 0; while (cursor < text.length) { const open = findOpen(text, cursor); if (open < 0) { output += text.slice(cursor); break; } const close = findClose(text, open); const header = text.slice(cursor, open); const normalized = header.trim().toLowerCase(); output += normalized.includes('@keyframes') || normalized.includes('@-webkit-keyframes') ? header : normalized.startsWith('@') ? header : scopeSelector(header); output += '{'; const body = text.slice(open + 1, close); output += normalized.startsWith('@') && !normalized.includes('keyframes') ? transform(body) : body; output += '}'; cursor = close + 1; } return output; };
+    return transform(source);
+  }
+  function ensureChatCustomStyle() { let style = document.querySelector('#chatCustomStyle'); if (!style) { style = document.createElement('style'); style.id = 'chatCustomStyle'; } if (style.parentNode !== document.head || document.head.lastElementChild !== style) document.head.appendChild(style); return style; }
+  function updateChatCSSStatus(message) { const status = document.querySelector('[data-chat-css-status]'); if (status) status.textContent = message; }
+  function applyCustomChatCSS() { const style = ensureChatCustomStyle(); const chat = currentChat(); const active = app.classList.contains('is-chatting') && Boolean(chat); const input = document.querySelector('[data-chat-css-input]'); const css = active ? (input?.isConnected ? input.value : (chatSettingsFor(chat).customCSS || '')) : ''; style.textContent = active ? scopeChatCustomCSS(css) : ''; updateChatCSSStatus(active ? (css.trim() ? '已应用到当前具体聊天 · 输入会实时预览' : '已进入具体聊天 · 等待输入 CSS') : '请先进入一个具体聊天，CSS 才会作用于聊天内容'); }
+  function chatCSSHintMarkup() { return '<span class="chat-css-hint-title">顶栏</span><span class="chat-css-hint-line"><code>.chat-app.is-chatting</code> 具体聊天状态　<code>.chat-header</code> 顶栏　<code>.chat-top-back</code> 返回　<code>.chat-top-name</code> 角色名　<code>.chat-top-settings</code> 设置</span><span class="chat-css-hint-title">聊天内容</span><span class="chat-css-hint-line"><code>.chat-main</code> 主内容　<code>.chat-conversation</code> 聊天页　<code>.chat-person</code> 角色栏　<code>.chat-messages</code> 消息列表　<code>.chat-date-divider</code> 日期分隔</span><span class="chat-css-hint-line"><code>.chat-message</code> 单条消息　<code>.chat-message-line</code> 消息行　<code>.chat-message-avatar</code> 头像　<code>.chat-bubble</code> 气泡</span><span class="chat-css-hint-line"><code>.chat-message.is-user</code> 用户消息　<code>.chat-message.is-character</code> 角色消息　<code>.chat-message.is-user .chat-bubble</code> 用户气泡　<code>.chat-message.is-character .chat-bubble</code> 角色气泡</span><span class="chat-css-hint-line"><code>.ideal-chat-bilingual-original</code> 双语原文　<code>.ideal-chat-bilingual-translation</code> 翻译文本（可独立改背景、边框、间距、文字）　<code>.ideal-chat-bilingual-open</code> 已展开翻译</span><span class="chat-css-hint-line"><code>.chat-group-conversation</code> 群聊页　<code>.chat-group-message-content</code> 群消息　<code>.chat-group-sender</code> 群成员名　<code>.chat-group-bubble-row</code> 气泡行</span><span class="chat-css-hint-title">底部输入区</span><span class="chat-css-hint-line"><code>.chat-compose-wrap</code> 输入区域　<code>.chat-compose</code> 输入框行　<code>.chat-compose input</code> 输入框　<code>.chat-tools</code> 更多功能　<code>.chat-emoji-panel</code> 表情面板</span><span class="chat-css-hint-line"><code>.chat-emoji</code> 表情　<code>.chat-plus</code> 更多　<code>.chat-send</code> 发送　<code>.chat-reply</code> 回复</span><span class="chat-css-hint-title">公用 Dock（四个页面共用）</span><span class="chat-css-hint-line"><code>.chat-tabs</code> Dock 外层　<code>.chat-tabs button</code> Dock 按键　<code>.chat-tab-icon</code> 图标　<code>.chat-tabs small</code> 文字　<code>.chat-tab-unread-badge</code> 未读标记</span><span class="chat-css-hint-note">普通样式直接写即可；气泡颜色、文字色若被内置气泡设置覆盖，请在属性后加 <code>!important</code>。</span>'; }
+  function ensureChatCSSEditor() { const panel = document.querySelector('#chatSettings'); const main = panel?.querySelector('.chat-settings-page main'); if (!main || main.querySelector('[data-chat-css-editor]')) return; const chat = currentChat(); const settings = chatSettingsFor(chat); const section = document.createElement('section'); section.className = 'chat-css-editor'; section.dataset.chatCssEditor = ''; section.innerHTML = `<button class="chat-css-editor-head" data-chat-css-toggle type="button"><span><b>聊天页面美化</b><small>输入时实时预览，保存后保留</small></span><i>⌄</i></button><div class="chat-css-editor-body"><p class="chat-css-hint">${chatCSSHintMarkup()}</p><textarea data-chat-css-input placeholder="输入完整 CSS 规则，例如：\n.chat-bubble { border-radius: 22px; }\n.chat-message.is-user .chat-bubble { background: #ffd6e7 !important; }\n.chat-compose { opacity: .9; }">${esc(settings.customCSS || '')}</textarea><small class="chat-css-status" data-chat-css-status></small><div class="chat-css-actions"><button data-chat-css-import type="button">导入</button><input data-chat-css-file type="file" accept=".css,.json,text/css,application/json"><button data-chat-css-export type="button">导出</button><button class="is-primary" data-chat-css-save type="button">保存</button></div></div>`; const host = main.querySelector('[data-chat-appearance-settings]') || main; const target = host.querySelector('.chat-color-settings') || host.firstChild; host.insertBefore(section, target || null); updateChatCSSStatus('正在检查当前聊天样式…'); }
   const chatBeautyBundleFormat = 'ideal-machine-chat-beauty';
   const chatBeautyBubbleKeys = Object.freeze(['userBubbleColor', 'userBubbleTextColor', 'userBubbleBorderColor', 'characterBubbleColor', 'characterBubbleTextColor', 'characterBubbleBorderColor']);
   function chatBeautyBundleFor(chat) {
@@ -3513,14 +3717,14 @@ ${rerollRule}
   }
   document.addEventListener('click', event => { const toggle = event.target.closest('[data-chat-css-toggle]'); if (toggle) { const editor = toggle.closest('[data-chat-css-editor]'); editor?.classList.toggle('is-open'); return; } const saveButton = event.target.closest('[data-chat-css-save]'); if (saveButton) { const chat = currentChat(); if (!chat) return; chatSettingsFor(chat).customCSS = document.querySelector('[data-chat-css-input]')?.value || ''; save(); applyCustomChatCSS(); saveButton.textContent = '已保存'; setTimeout(() => { if (saveButton.isConnected) saveButton.textContent = '保存'; }, 900); return; } const importButton = event.target.closest('[data-chat-css-import]'); if (importButton) { importButton.parentElement.querySelector('[data-chat-css-file]')?.click(); return; } if (event.target.closest('[data-chat-css-export]')) downloadChatBeautyBundle(); });
   document.addEventListener('change', event => { const file = event.target.closest('[data-chat-css-file]'); const source = file?.files?.[0]; if (!file || !source) return; const isJson = /\.json$/i.test(source.name || '') || /json/i.test(source.type || ''); if (isJson) source.__idealMachineChatBeautyBundle = true; const reader = new FileReader(); reader.onload = () => { try { const kind = importChatBeautyBundle(String(reader.result || ''), source.name || ''); if (kind === 'css') { const input = document.querySelector('[data-chat-css-input]'); if (input) input.value = String(reader.result || ''); previewChatBeautyPreset('custom'); } else { render(); chatSettingsOpen = true; renderChatSettings(); applyCustomChatCSS(); window.alert('聊天页面美化与气泡设置已导入。'); } } catch (error) { window.alert(`导入美化失败：${error.message}`); } finally { file.value = ''; } }; reader.onerror = () => window.alert('导入美化失败：无法读取文件。'); reader.readAsText(source); });
-  function annotateChatCSSHints() { document.querySelectorAll('.chat-css-hint').forEach(item => { if (item.dataset.annotated) return; item.dataset.annotated = 'true'; item.innerHTML = '可用类名说明：<br><code>.chat-conversation</code> 整个聊天页面　<code>.chat-person</code> 顶部角色栏　<code>.chat-messages</code> 消息列表　<code>.chat-message</code> 单条消息　<code>.chat-message-avatar</code> 头像　<code>.chat-bubble</code> 消息气泡　<code>.chat-compose-wrap</code> 底部输入区域　<code>.chat-compose</code> 输入框与操作按钮'; }); }
+  function annotateChatCSSHints() { document.querySelectorAll('.chat-css-hint').forEach(item => { if (item.dataset.annotated) return; item.dataset.annotated = 'true'; item.innerHTML = chatCSSHintMarkup(); }); }
   function collapseChatBubbleSettings() { document.querySelectorAll('.chat-color-settings').forEach(section => { const title = section.querySelector('h3'); if (!title || section.dataset.collapsible) return; section.dataset.collapsible = 'true'; section.classList.add('is-collapsed'); title.dataset.chatBubbleToggle = 'true'; }); }
-  function annotateChatRoleHints() { document.querySelectorAll('.chat-css-hint').forEach(item => { if (item.dataset.roleAnnotated) return; item.dataset.roleAnnotated = 'true'; item.insertAdjacentHTML('beforeend', '<br><code>.chat-message.is-user</code> 用户消息　<code>.chat-message.is-character</code> 角色消息　<code>.chat-message.is-user .chat-bubble</code> 用户气泡　<code>.chat-message.is-character .chat-bubble</code> 角色气泡　<code>.chat-message.is-user .chat-message-avatar</code> 用户头像　<code>.chat-message.is-character .chat-message-avatar</code> 角色头像'); }); }
+  function annotateChatRoleHints() { document.querySelectorAll('.chat-css-hint').forEach(item => { item.dataset.roleAnnotated = 'true'; }); }
   new MutationObserver(() => scheduleChatObserverJob(() => { ensureChatCSSEditor(); annotateChatCSSHints(); annotateChatRoleHints(); collapseChatBubbleSettings(); applyCustomChatCSS(); })).observe(document.querySelector('#chatSettings'), { childList: true, subtree: true });
   const chatBeautyPresets = { default: '' };
   function chatBeautyPresetKey(css) { const value = String(css || '').trim(); return Object.entries(chatBeautyPresets).find(([, preset]) => preset.trim() === value)?.[0] || 'custom'; }
-  function previewChatBeautyPreset(key) { const css = chatBeautyPresets[key] ?? document.querySelector('[data-chat-css-input]')?.value ?? ''; const input = document.querySelector('[data-chat-css-input]'); if (input && key !== 'custom') input.value = css; let style = document.querySelector('#chatCustomStyle'); if (!style) { style = document.createElement('style'); style.id = 'chatCustomStyle'; document.head.appendChild(style); } style.textContent = app.classList.contains('is-chatting') ? css : ''; }
-  function ensureChatBeautyPresetSelect() { const editor = document.querySelector('[data-chat-css-editor]'); const actions = editor?.querySelector('.chat-css-actions'); if (!actions || actions.querySelector('[data-chat-css-preset]')) return; const select = document.createElement('select'); select.dataset.chatCssPreset = ''; select.setAttribute('aria-label', '聊天页面美化方案'); const addButton = document.createElement('button'); addButton.type = 'button'; addButton.dataset.chatCssAdd = ''; addButton.textContent = '添加'; const current = document.querySelector('[data-chat-css-input]')?.value || ''; const chat = currentChat(); const settings = chatSettingsFor(chat); const saved = Array.isArray(settings.cssPresets) ? settings.cssPresets : []; select.innerHTML = '<option value="default">默认</option>' + saved.map(item => `<option value="saved:${esc(item.id)}">${esc(item.name)}</option>`).join(''); const matched = saved.find(item => String(item.css || '').trim() === String(current).trim()); select.value = matched ? `saved:${matched.id}` : 'default'; select.addEventListener('change', () => { const value = select.value; if (value.startsWith('saved:')) { const item = saved.find(entry => entry.id === value.slice(6)); if (item) { const input = document.querySelector('[data-chat-css-input]'); if (input) input.value = item.css || ''; previewChatBeautyPreset('custom'); } } else previewChatBeautyPreset(value); }); const importButton = actions.querySelector('[data-chat-css-import]'); actions.insertBefore(select, importButton || actions.firstChild); actions.insertBefore(addButton, importButton || actions.lastChild); }
+  function previewChatBeautyPreset(key) { const css = chatBeautyPresets[key] ?? document.querySelector('[data-chat-css-input]')?.value ?? ''; const input = document.querySelector('[data-chat-css-input]'); if (input && key !== 'custom') input.value = css; const style = ensureChatCustomStyle(); const active = app.classList.contains('is-chatting') && Boolean(currentChat()); style.textContent = active ? scopeChatCustomCSS(css) : ''; updateChatCSSStatus(active ? (String(css).trim() ? '已应用到当前具体聊天 · 输入会实时预览' : '已进入具体聊天 · 等待输入 CSS') : '请先进入一个具体聊天，CSS 才会作用于聊天内容'); }
+  function ensureChatBeautyPresetSelect() { const editor = document.querySelector('[data-chat-css-editor]'); const actions = editor?.querySelector('.chat-css-actions'); if (!actions || actions.querySelector('[data-chat-css-preset]')) return; const select = document.createElement('select'); select.dataset.chatCssPreset = ''; select.setAttribute('aria-label', '选择美化'); const addButton = document.createElement('button'); addButton.type = 'button'; addButton.dataset.chatCssAdd = ''; addButton.textContent = '添加'; const current = document.querySelector('[data-chat-css-input]')?.value || ''; const chat = currentChat(); const settings = chatSettingsFor(chat); const saved = Array.isArray(settings.cssPresets) ? settings.cssPresets : []; select.innerHTML = '<option value="default">选择美化</option>' + saved.map(item => `<option value="saved:${esc(item.id)}">${esc(item.name)}</option>`).join(''); const matched = saved.find(item => String(item.css || '').trim() === String(current).trim()); select.value = matched ? `saved:${matched.id}` : 'default'; select.addEventListener('change', () => { const value = select.value; if (value.startsWith('saved:')) { const item = saved.find(entry => entry.id === value.slice(6)); if (item) { const input = document.querySelector('[data-chat-css-input]'); if (input) input.value = item.css || ''; previewChatBeautyPreset('custom'); } } else previewChatBeautyPreset(value); }); const importButton = actions.querySelector('[data-chat-css-import]'); actions.insertBefore(select, importButton || actions.firstChild); actions.insertBefore(addButton, importButton || actions.lastChild); }
   document.addEventListener('change', event => { const file = event.target.closest('[data-chat-css-file]'); if (!file || file.files?.[0]?.__idealMachineChatBeautyBundle) return; setTimeout(() => { const select = document.querySelector('[data-chat-css-preset]'); if (select) select.value = 'default'; }, 0); });
   document.addEventListener('click', event => { const add = event.target.closest('[data-chat-css-add]'); if (!add) return; if (document.querySelector('[data-chat-css-name-modal]')) return; const modal = document.createElement('div'); modal.dataset.chatCssNameModal = ''; modal.innerHTML = '<div class="chat-css-name-backdrop" data-chat-css-name-cancel></div><section class="chat-css-name-card" role="dialog" aria-modal="true"><header><b>添加美化</b><button type="button" data-chat-css-name-cancel>×</button></header><p>给当前聊天页面美化方案取一个名字。</p><input data-chat-css-name-input type="text" maxlength="24" placeholder="例如：我的聊天风格"><footer><button type="button" data-chat-css-name-cancel>取消</button><button type="button" data-chat-css-name-confirm>确定</button></footer></section>'; document.body.appendChild(modal); });
   document.addEventListener('click', event => { const cancel = event.target.closest('[data-chat-css-preset-cancel]'); if (cancel) { cancel.closest('.chat-css-preset-form')?.remove(); return; } const savePreset = event.target.closest('[data-chat-css-preset-save]'); if (!savePreset) return; const form = savePreset.closest('.chat-css-preset-form'); const name = form?.querySelector('[data-chat-css-preset-name]')?.value.trim(); const css = document.querySelector('[data-chat-css-input]')?.value || ''; if (!name) return window.alert('请输入美化方案名称。'); const settings = chatSettingsFor(currentChat()); settings.cssPresets = Array.isArray(settings.cssPresets) ? settings.cssPresets : []; const item = { id: uid('css-preset'), name, css }; settings.cssPresets = settings.cssPresets.filter(entry => entry.name !== name); settings.cssPresets.push(item); save(); form.remove(); const editor = document.querySelector('[data-chat-css-editor]'); const select = editor?.querySelector('[data-chat-css-preset]'); if (select) { const option = document.createElement('option'); option.value = `saved:${item.id}`; option.textContent = item.name; select.appendChild(option); select.value = option.value; } });
@@ -3528,6 +3732,7 @@ ${rerollRule}
   document.addEventListener('click', event => { const cancel = event.target.closest('[data-chat-css-name-cancel]'); if (cancel) { document.querySelector('[data-chat-css-name-modal]')?.remove(); return; } const confirm = event.target.closest('[data-chat-css-name-confirm]'); if (!confirm) return; const modal = confirm.closest('[data-chat-css-name-modal]'); const name = modal?.querySelector('[data-chat-css-name-input]')?.value.trim(); if (!name) return window.alert('请输入美化方案名称。'); const settings = chatSettingsFor(currentChat()); settings.cssPresets = Array.isArray(settings.cssPresets) ? settings.cssPresets : []; const css = document.querySelector('[data-chat-css-input]')?.value || ''; const item = { id: uid('css-preset'), name, css }; settings.cssPresets = settings.cssPresets.filter(entry => entry.name !== name); settings.cssPresets.push(item); save(); const select = document.querySelector('[data-chat-css-preset]'); if (select) { const option = document.createElement('option'); option.value = `saved:${item.id}`; option.textContent = item.name; select.appendChild(option); select.value = option.value; } const editor = document.querySelector('[data-chat-css-editor]'); if (editor) editor.dataset.chatCssActivePreset = item.id; modal.remove(); });
   document.addEventListener('click', event => { const saveButton = event.target.closest('[data-chat-css-save]'); if (!saveButton) return; const select = document.querySelector('[data-chat-css-preset]'); const id = select?.value.startsWith('saved:') ? select.value.slice(6) : document.querySelector('[data-chat-css-editor]')?.dataset.chatCssActivePreset; if (!id) return; const settings = chatSettingsFor(currentChat()); const item = (settings.cssPresets || []).find(entry => entry.id === id); if (!item) return; item.css = document.querySelector('[data-chat-css-input]')?.value || ''; save(); });
   document.addEventListener('change', event => { const file = event.target.closest('[data-chat-css-file]'); if (!file?.files?.[0]) return; const source = file.files[0]; if (source.__idealMachineChatBeautyBundle) return; const reader = new FileReader(); reader.onload = () => { const settings = chatSettingsFor(currentChat()); settings.cssPresets = Array.isArray(settings.cssPresets) ? settings.cssPresets : []; const baseName = source.name.replace(/\.[^.]+$/, '').trim() || '导入的美化'; const name = settings.cssPresets.some(item => item.name === baseName) ? `${baseName} ${settings.cssPresets.length + 1}` : baseName; const item = { id: uid('css-preset'), name, css: String(reader.result || '') }; settings.cssPresets.push(item); save(); const select = document.querySelector('[data-chat-css-preset]'); if (select) { const option = document.createElement('option'); option.value = `saved:${item.id}`; option.textContent = item.name; select.appendChild(option); select.value = option.value; } const input = document.querySelector('[data-chat-css-input]'); if (input) input.value = item.css; const editor = document.querySelector('[data-chat-css-editor]'); if (editor) editor.dataset.chatCssActivePreset = item.id; previewChatBeautyPreset('custom'); }; reader.readAsText(source); });
+  document.addEventListener('input', event => { const input = event.target.closest?.('[data-chat-css-input]'); if (!input || !app.classList.contains('is-chatting')) return; previewChatBeautyPreset('custom'); }, true);
   function syncChatBeautyActionLayout(actions) {
     if (!actions) return;
     const width = Math.round(actions.getBoundingClientRect().width || actions.clientWidth || 0);
@@ -3548,9 +3753,32 @@ ${rerollRule}
   ensureChatBeautyPresetSelect();
   ensureChatBeautyActionLayout();
   const expandedVoiceMessages = new Set();
-  function voiceMessageBody(message) { const text = message.voiceText || message.text || ''; const seconds = Math.max(1, Math.round(Number(message.seconds) || Math.max(1, Math.ceil(String(text).length / 5)))); const expanded = expandedVoiceMessages.has(message.id); return '<div class="chat-voice-wrap"><button class="chat-voice-bubble" data-chat-voice-toggle="' + esc(message.id) + '" type="button" aria-label="点击转文字"><span class="chat-voice-wave"><i></i><i></i><i></i><i></i><i></i></span><b>' + seconds + '"</b></button>' + (expanded ? '<p class="chat-voice-text">' + esc(text) + '</p>' : '') + '</div>'; }
+  const collapsedVoiceMessages = new Set();
+  function voiceMessageBody(message) { const rawText = message.voiceText || message.text || ''; const bilingual = idealChatBilingualFor(currentChat()); const parsed = message.translation ? { text:String(message.originalText || rawText), translation:String(message.translation) } : idealChatBilingualParse(rawText); const original = cleanCharacterVisibleText(parsed.text); const translation = bilingual.enabled ? cleanCharacterVisibleText(parsed.translation) : ''; const seconds = Math.max(1, Math.round(Number(message.seconds) || Math.max(1, Math.ceil(String(original || rawText).length / 5)))); const expanded = (expandedVoiceMessages.has(message.id) || (bilingual.autoExpandTranslation && Boolean(translation))) && !collapsedVoiceMessages.has(message.id); const textMarkup = translation ? '<span class="ideal-chat-bilingual-original">' + esc(original) + '</span><span class="ideal-chat-bilingual-translation">' + esc(translation) + '</span>' : esc(original || rawText); return '<div class="chat-voice-wrap"><button class="chat-voice-bubble" data-chat-voice-toggle="' + esc(message.id) + '" type="button" aria-expanded="' + (expanded ? 'true' : 'false') + '" aria-label="' + (expanded ? '收起语音文字' : '展开语音文字') + '"><span class="chat-voice-wave"><i></i><i></i><i></i><i></i><i></i></span><b>' + seconds + '"</b></button>' + (expanded ? '<p class="chat-voice-text' + (translation ? ' ideal-chat-bilingual-open' : '') + '">' + textMarkup + '</p>' : '') + '</div>'; }
   function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const body = message.recalled ? '<span class="chat-recalled">' + (message.role === 'user' ? '你' : '角色') + '撤回了一条消息</span>' : message.type === 'voice' ? voiceMessageBody(message) : message.type === 'image' ? '<img src="' + esc(message.text) + '" alt="图片">' : message.type === 'image-desc' ? '<div class="chat-image-description"><strong>文字图片</strong><p>' + esc(message.text) + '</p></div>' : message.type === 'transfer' ? '<div class="chat-transfer-message"><strong>转账</strong><b>¥ ' + esc(message.amount || message.text) + '</b><p>' + esc(message.note || '无备注') + '</p><small>' + (message.status === 'accepted' ? '已收下' : message.status === 'returned' ? '已退回' : '待处理') + '</small></div>' : message.type === 'video' ? (message.text === '已拒绝通话' ? '<span class="chat-call-rejected"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.2 4.8 9 7.6l-2 2.2a12.6 12.6 0 0 0 7.2 7.2l2.2-2 2.8 2.8-1.7 1.7c-.7.7-1.8 1-2.8.7A17.2 17.2 0 0 1 4.8 8.5c-.3-1 0-2.1.7-2.8z"/><path d="m4 4 16 16"/></svg>已拒绝通话</span>' : '▣ ' + esc(message.text)) : message.type === 'location' ? '⌖ ' + esc(message.text) : message.type === 'together' ? '▤ ' + esc(message.text) : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp || message.recalled ? '' : '<small>' + esc(message.time || '') + '</small>'; const typeClass = (message.type || '') + (message.sticker ? ' sticker' : ''); return '<div class="chat-message ' + (message.role === 'user' ? 'is-user' : 'is-character') + '" data-chat-message-id="' + esc(message.id) + '"><div class="chat-message-line">' + avatar + '<div class="chat-bubble ' + typeClass + '">' + body + '</div>' + stamp + '</div></div>'; }
-  document.addEventListener('click', event => { const toggle = event.target.closest('[data-chat-voice-toggle]'); if (!toggle) return; const box = document.querySelector('#chatMessages'); const scrollTop = box?.scrollTop || 0; const id = toggle.dataset.chatVoiceToggle; if (expandedVoiceMessages.has(id)) expandedVoiceMessages.delete(id); else expandedVoiceMessages.add(id); event.preventDefault(); event.stopImmediatePropagation(); render(); requestAnimationFrame(() => { const nextBox = document.querySelector('#chatMessages'); if (nextBox) nextBox.scrollTop = scrollTop; }); }, true);
+  document.addEventListener('pointerdown', event => { const toggle = event.target.closest?.('[data-chat-voice-toggle]'); if (!toggle) return; event.preventDefault(); }, true);
+  document.addEventListener('click', event => {
+    const toggle = event.target.closest('[data-chat-voice-toggle]');
+    if (!toggle) return;
+    const id = toggle.dataset.chatVoiceToggle;
+    const chat = currentChat();
+    const bilingual = idealChatBilingualFor(chat);
+    const message = chat?.messages?.find(item => item.id === id);
+    if (!message) return;
+    const hasTranslation = Boolean((message.translation || idealChatBilingualParse(message.voiceText || message.text || '').translation) && bilingual.enabled);
+    const isExpanded = (expandedVoiceMessages.has(id) || (bilingual.autoExpandTranslation && hasTranslation)) && !collapsedVoiceMessages.has(id);
+    if (isExpanded) {
+      expandedVoiceMessages.delete(id);
+      collapsedVoiceMessages.add(id);
+    } else {
+      collapsedVoiceMessages.delete(id);
+      expandedVoiceMessages.add(id);
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const bubble = toggle.closest('.chat-bubble');
+    if (bubble) bubble.innerHTML = voiceMessageBody(message);
+  }, true);
   document.addEventListener('click', event => { const tool = event.target.closest('[data-chat-tool="voice"]'); if (!tool || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); menuOpen = false; emojiOpen = false; syncChatPanelDOM(); openVoiceComposer(); }, true);
   document.addEventListener('click', event => { if (event.target.closest('[data-chat-voice-cancel]')) { document.querySelector('[data-chat-voice-modal]')?.remove(); return; } const send = event.target.closest('[data-chat-voice-send]'); if (!send) return; const modal = send.closest('[data-chat-voice-modal]'); const text = modal?.querySelector('[data-chat-voice-text]')?.value.trim(); const seconds = Number(modal?.querySelector('[data-chat-voice-seconds]')?.value); if (!text) return window.alert('请输入语音文字。'); if (!Number.isFinite(seconds) || seconds < 1) return window.alert('请输入正确的语音秒数。'); addMessage(text, 'user', 'voice', { voiceText: text, seconds: Math.min(300, Math.round(seconds)) }); modal.remove(); });
   function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const body = message.recalled ? '<span class="chat-recalled">' + (message.role === 'user' ? '你' : '角色') + '撤回了一条消息</span>' : message.type === 'voice' ? voiceMessageBody(message) : message.type === 'image' ? '<img src="' + esc(message.text) + '" alt="图片">' : message.type === 'image-desc' ? '<div class="chat-image-description"><strong>文字图片</strong><p>' + esc(message.text) + '</p></div>' : message.type === 'transfer' ? '<div class="chat-transfer-message"><strong>转账</strong><b>¥ ' + esc(message.amount || message.text) + '</b><p>' + esc(message.note || '无备注') + '</p><small>' + (message.status === 'accepted' ? '已收下' : message.status === 'returned' ? '已退回' : '待处理') + '</small></div>' : message.type === 'video' ? '▣ ' + esc(message.text) : message.type === 'location' ? '⌖ ' + esc(message.text) : message.type === 'together' ? '▤ ' + esc(message.text) : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp || message.recalled ? '' : '<small>' + esc(message.time || '') + '</small>'; const typeClass = (message.type || '') + (message.sticker ? ' sticker' : ''); return '<div class="chat-message ' + (message.role === 'user' ? 'is-user' : 'is-character') + '" data-chat-message-id="' + esc(message.id) + '"><div class="chat-message-line">' + avatar + '<div class="chat-bubble ' + typeClass + '">' + body + '</div>' + stamp + '</div></div>'; }
@@ -3623,7 +3851,7 @@ ${rerollRule}
   document.addEventListener('click', event => { const toggle = event.target.closest('[data-chat-tap-toggle]'); if (!toggle) return; event.preventDefault(); event.stopImmediatePropagation(); tapSettingsOpen = !tapSettingsOpen; renderChatSettings(); }, true);
   function applyChatBubbleSettingsCSS() { let style = document.querySelector('#chatBubbleSettingsStyle'); if (!style) { style = document.createElement('style'); style.id = 'chatBubbleSettingsStyle'; document.head.appendChild(style); } const settings = chatSettingsFor(currentChat()); const userBubble = settings.userBubbleColor || '#222222'; const userText = settings.userBubbleTextColor || '#ffffff'; const characterBubble = settings.characterBubbleColor || '#ffffff'; const characterText = settings.characterBubbleTextColor || '#111111'; const normalBubble = ':not(.transfer):not(.location):not(.tap):not(.image):not(.image-stack):not(.image-desc):not(.shopping-request):not(.recalled-bubble):not(:has(.chat-recalled))'; style.textContent = '.chat-message.is-user .chat-bubble' + normalBubble + ' { background: ' + userBubble + ' !important; color: ' + userText + ' !important; } .chat-message.is-character .chat-bubble' + normalBubble + ' { background: ' + characterBubble + ' !important; color: ' + characterText + ' !important; } .chat-message.is-user .chat-bubble.recalled-bubble, .chat-message.is-character .chat-bubble.recalled-bubble, .chat-message .chat-bubble:has(.chat-recalled) { background: rgba(255,255,255,.3) !important; background-image: none !important; color: #555 !important; border: 1px solid rgba(255,255,255,.62) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.58), 0 5px 16px rgba(0,0,0,.08) !important; filter: none !important; -webkit-backdrop-filter: blur(18px) saturate(145%) !important; backdrop-filter: blur(18px) saturate(145%) !important; } .chat-message .chat-bubble.recalled-bubble .chat-recalled, .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled, .chat-message .chat-bubble.recalled-bubble .chat-recalled-original, .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled-original { color: #555 !important; } .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble.recalled-bubble, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble:has(.chat-recalled) { background: rgba(255,255,255,.22) !important; color: #fff !important; border-color: rgba(255,255,255,.52) !important; } .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble.recalled-bubble .chat-recalled, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble.recalled-bubble .chat-recalled-original, .chat-conversation.chat-wallpaper-dark .chat-message .chat-bubble:has(.chat-recalled) .chat-recalled-original { color: #fff !important; }'; }
   const baseApplyCustomChatCSS = applyCustomChatCSS;
-  applyCustomChatCSS = function() { baseApplyCustomChatCSS(); applyChatBubbleSettingsCSS(); const input = document.querySelector('[data-chat-css-input]'); if (input) input.placeholder = '输入 CSS 代码…'; };
+  applyCustomChatCSS = function() { applyChatBubbleSettingsCSS(); baseApplyCustomChatCSS(); const input = document.querySelector('[data-chat-css-input]'); if (input) input.placeholder = '输入 CSS 代码…'; };
   const baseTapSettingsRender3 = renderChatSettings;
   renderChatSettings = function() { baseTapSettingsRender3(); const section = document.querySelector('[data-chat-tap-settings]'); if (!section || !tapSettingsOpen) return; const labels = section.querySelectorAll('.chat-tap-settings-body label'); if (labels[0]?.firstChild) labels[0].firstChild.nodeValue = tapName('user') + '拍一拍提示'; if (labels[1]?.firstChild) labels[1].firstChild.nodeValue = tapName('character') + '拍一拍提示'; };
   const baseTapSettingsFinal = chatSettingsFor;
@@ -4074,7 +4302,7 @@ ${rerollRule}
       return ' ';
     });
     let parts = plainText.replace(/\s+/g, ' ').trim().match(/[^。！？!?；;…]+[。！？!?；;…]*|.+$/g)?.map(item => item.trim()).filter(Boolean) || [];
-    if (!parts.length) return [];
+    if (!parts.length) return markers.length ? [markers.join(' ')] : [];
     while (parts.length < target) {
       let longestIndex = 0;
       for (let index = 1; index < parts.length; index += 1) if (parts[index].length > parts[longestIndex].length) longestIndex = index;
@@ -4122,6 +4350,54 @@ ${rerollRule}
       return ' ';
     });
     return { clean, songs };
+  }
+
+  function characterQuoteFromMarker(attributes, chat) {
+    const values = {};
+    String(attributes || '').replace(/([a-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s]+))/ig, (match, key, doubleValue, singleValue, plainValue) => {
+      values[key.toLowerCase()] = String(doubleValue ?? singleValue ?? plainValue ?? '').trim();
+      return match;
+    });
+    const targetId = values.id || values.message || values.messageid || '';
+    const target = targetId
+      ? (chat?.messages || []).find(message => String(message?.id || '') === String(targetId))
+      : null;
+    const text = target ? quoteMessageText(target) : String(values.text || '').trim();
+    if (!text) return null;
+    const speaker = target ? quoteMessageSpeaker(target) : String(values.speaker || '消息').trim();
+    return {
+      id: target?.id || targetId || '',
+      role: target?.role || '',
+      text,
+      speaker,
+      prefix: `【引用${speaker}：${text}】\n`
+    };
+  }
+
+  function parseCharacterQuoteMarker(text, chat) {
+    let quote = null;
+    const clean = String(text || '').replace(/\[\[QUOTE\b([^\]]*)\]\]/ig, (match, attributes) => {
+      quote ||= characterQuoteFromMarker(attributes, chat);
+      return ' ';
+    });
+    return { clean, quote };
+  }
+
+  function parseCharacterVoiceParts(text) {
+    const parts = [];
+    const marker = /\[\[VOICE\s+seconds\s*=\s*(\d+)\s+text\s*=\s*(?:"([\s\S]*?)"|'([\s\S]*?)'|([\s\S]*?))\s*\]\]/ig;
+    let cursor = 0;
+    let match;
+    while ((match = marker.exec(String(text || '')))) {
+      const before = String(text || '').slice(cursor, match.index).trim();
+      if (before) parts.push({ type: 'text', text: before });
+      const voiceText = String(match[2] ?? match[3] ?? match[4] ?? '').trim();
+      if (voiceText) parts.push({ type: 'voice', text: voiceText, seconds: Math.min(300, Math.max(1, Math.round(Number(match[1]) || 1))) });
+      cursor = marker.lastIndex;
+    }
+    const rest = String(text || '').slice(cursor).trim();
+    if (rest) parts.push({ type: 'text', text: rest });
+    return parts;
   }
 
   // 角色发出的音乐标记不能直接当成歌曲数据：模型可能会把歌名和歌手拼错。
@@ -4191,7 +4467,7 @@ ${rerollRule}
       const current = String(value || '').trim();
       if (!current) return;
       const previous = result[result.length - 1] || '';
-      const hasControlMarker = /\[\[(?:MSG|STICKER|SHOPPING_PAID)\b/i.test(`${previous} ${current}`);
+      const hasControlMarker = /\[\[(?:MSG|STICKER|SHOPPING_PAID|QUOTE|VOICE)\b/i.test(`${previous} ${current}`);
       const previousEndsNaturally = /[。！？!?；;…]$/.test(previous);
       // [[MSG]] 不是“必须换气泡”的命令。没有自然断句且片段明显过短时，
       // 合并相邻内容，避免“看见了就 / 烂在肚子里”或“觉悟 / 倒”这类半句气泡。
@@ -4230,6 +4506,9 @@ ${rerollRule}
       .replace(/\[\[STICKER\s*:[^\]]+\]\]/ig, '')
       // 无法校验的音乐分享也不能把控制标记漏到聊天气泡里。
       .replace(/\[\[MUSIC\b[^\]]*\]\]/ig, '')
+      // 角色引用和语音标记在最终入库前也必须被消费，避免旧回复路径把它们显示出来。
+      .replace(/\[\[QUOTE\b[^\]]*\]\]/ig, '')
+      .replace(/\[\[VOICE\b[^\]]*\]\]/ig, '')
       .replace(/\[\[\s*THOUGHT\s*\]\][\s\S]*?(?:\[\[\s*\/\s*THOUGHT\s*\]\]|$)/ig, '')
       .replace(/\[\[\s*\/?\s*THOUGHT\s*\]\]/ig, '')
       // API 截断或模型漏写结尾时，清掉残留的“[[”及其后半个控制标记。
@@ -4419,36 +4698,52 @@ ${rerollRule}
       const chunkTranslation = chunkTranslations[chunkIndex] || '';
       const translationMeta = chunkTranslation ? { translation:chunkTranslation } : {};
       let translationAttached = false;
-      const musicParsed = parseCharacterMusicMarkers(chunk);
-      chunk = musicParsed.clean;
-      let cursor = 0;
-      const marker = /\[\[STICKER\s*:\s*([^\]]+)\]\]/ig;
-      let match;
-      while ((match = marker.exec(chunk))) {
-        const before = chunk.slice(cursor, match.index).trim();
-        if (before) { await appendCharacterMessage(before, '', !translationAttached ? translationMeta : {}); translationAttached = true; sent += 1; }
-        const item = byId.get(match[1].trim());
-        if (item) { await appendCharacterMessage(emojiDisplaySource(item.url), 'image', { sticker: true, stickerDescription: item.text || '' }); sent += 1; stickerSent = true; }
-        cursor = marker.lastIndex;
-      }
-      const rest = chunk.slice(cursor).trim();
-      if (rest) { await appendCharacterMessage(rest, '', !translationAttached ? translationMeta : {}); sent += 1; }
-      for (const song of musicParsed.songs) {
-        const verifiedSong = await resolveCharacterMusic(song);
-        // 找不到标题和歌手同时完全匹配的网易云曲目时，不发送这张卡片，避免出现“歌名对了但歌手错了”的假分享。
-        if (!verifiedSong) continue;
-        await appendCharacterMessage(verifiedSong.title, 'music', {
-          musicTitle: verifiedSong.title,
-          musicArtist: verifiedSong.artist,
-          musicAlbum: verifiedSong.album,
-          musicCover: verifiedSong.cover,
-          musicId: verifiedSong.id,
-          musicSource: verifiedSong.source,
-          musicPlayUrl: verifiedSong.playUrl || '',
-          musicPlayable: Boolean(verifiedSong.playUrl),
-          musicVerified: true
-        });
-        sent += 1;
+      let quoteAttached = false;
+      const quoteParsed = parseCharacterQuoteMarker(chunk, chat);
+      const quote = quoteParsed.quote;
+      const attachQuote = meta => {
+        if (!quote || quoteAttached) return meta;
+        quoteAttached = true;
+        return { ...meta, quote };
+      };
+      const richParts = parseCharacterVoiceParts(quoteParsed.clean);
+      for (const richPart of richParts.length ? richParts : [{ type:'text', text:quoteParsed.clean }]) {
+        if (richPart.type === 'voice') {
+          await appendCharacterMessage(richPart.text, 'voice', attachQuote({ voiceText: richPart.text, seconds: richPart.seconds }));
+          sent += 1;
+          continue;
+        }
+        const musicParsed = parseCharacterMusicMarkers(richPart.text);
+        const cleanChunk = musicParsed.clean;
+        let cursor = 0;
+        const marker = /\[\[STICKER\s*:\s*([^\]]+)\]\]/ig;
+        let match;
+        while ((match = marker.exec(cleanChunk))) {
+          const before = cleanChunk.slice(cursor, match.index).trim();
+          if (before) { await appendCharacterMessage(before, '', attachQuote(!translationAttached ? translationMeta : {})); translationAttached = true; sent += 1; }
+          const item = byId.get(match[1].trim());
+          if (item) { await appendCharacterMessage(emojiDisplaySource(item.url), 'image', { sticker: true, stickerDescription: item.text || '' }); sent += 1; stickerSent = true; }
+          cursor = marker.lastIndex;
+        }
+        const rest = cleanChunk.slice(cursor).trim();
+        if (rest) { await appendCharacterMessage(rest, '', attachQuote(!translationAttached ? translationMeta : {})); translationAttached = true; sent += 1; }
+        for (const song of musicParsed.songs) {
+          const verifiedSong = await resolveCharacterMusic(song);
+          // 找不到标题和歌手同时完全匹配的网易云曲目时，不发送这张卡片，避免出现“歌名对了但歌手错了”的假分享。
+          if (!verifiedSong) continue;
+          await appendCharacterMessage(verifiedSong.title, 'music', {
+            musicTitle: verifiedSong.title,
+            musicArtist: verifiedSong.artist,
+            musicAlbum: verifiedSong.album,
+            musicCover: verifiedSong.cover,
+            musicId: verifiedSong.id,
+            musicSource: verifiedSong.source,
+            musicPlayUrl: verifiedSong.playUrl || '',
+            musicPlayable: Boolean(verifiedSong.playUrl),
+            musicVerified: true
+          });
+          sent += 1;
+        }
       }
     }
     if (!stickerSent && characterStickerFallbackRequested && items.length) {
@@ -4469,7 +4764,7 @@ ${rerollRule}
   const baseNaturalAddMessage = addMessage;
   addMessage = function(text, role = 'user', type = '', meta = {}) {
     const raw = String(text || '').trim();
-    const hasControlMarker = /\[\[(?:MSG|STICKER|MUSIC|TRANSFER|LOCATION|VOICE|VIDEO_CALL|IMAGE_PROMPT|SHOPPING_PAID)\b/i.test(raw);
+    const hasControlMarker = /\[\[(?:MSG|STICKER|MUSIC|TRANSFER|LOCATION|VOICE|QUOTE|VIDEO_CALL|IMAGE_PROMPT|SHOPPING_PAID)\b/i.test(raw);
     const settings = currentChat() ? chatSettingsFor(currentChat()) : {};
     if (role === 'character' && !type && raw && !hasControlMarker && !settings.characterMultiMessage) {
       const chunks = splitCharacterReplyNaturally(raw);
@@ -4501,6 +4796,15 @@ ${rerollRule}
     const rangeMax = replyBounds.max;
     characterReplyTargetCount = settings.characterMultiMessage ? rangeMin + Math.floor(Math.random() * (rangeMax - rangeMin + 1)) : 1;
     const latestUserMessage = [...(chat?.messages || [])].reverse().find(item => item.role === 'user');
+    const quoteCandidates = (chat?.messages || [])
+      .filter(message => message?.id && !message.recalled)
+      .slice(-12)
+      .map(message => String(message.id) + '｜' + (message.role === 'user' ? '用户' : (contact.nickname || contact.name || '角色')) + '：' + quoteMessageText(message).replace(/\s+/g, ' ').slice(0, 180));
+    const quoteInstruction = quoteCandidates.length ? [
+      '【引用消息气泡】如果角色需要明确回应某一条已有消息，可以在该条角色消息最前面使用严格格式 [[QUOTE id="消息ID"]]。消息ID只能从下面的候选列表中选择；系统会把真实消息内容显示在角色气泡顶部，标记本身不会显示给用户。没有必要时不要引用，每条角色消息最多引用一条。',
+      '可引用消息：',
+      quoteCandidates.join('\n')
+    ].join('\n') : '';
     const explicitStickerRequest = /(?:发|来|回|用|要|想看).{0,6}(?:表情包|表情|贴图|emoji)|(?:表情包|贴图).{0,6}(?:发|来|回|用|要)/i.test(latestUserMessage?.text || '');
     const recentlySentSticker = (chat?.messages || []).filter(item => item.role === 'character').slice(-2).some(item => item.sticker || item.type === 'image');
     characterStickerFallbackRequested = Boolean(selected.length && (explicitStickerRequest || (!recentlySentSticker && Math.random() < .55)));
@@ -4517,6 +4821,8 @@ ${rerollRule}
 默认只发送 1 条自然消息。${settings.characterMultiMessage ? `用户已允许连续消息，本次最多发送 ${characterReplyTargetCount} 条，使用 [[MSG]] 分隔。条数是上限而不是必须凑满：自然说完就停。每条按想表达的意思自然决定长短，不能为了短而停在半句；整轮回复也没有固定字数上限。` : '当前未开启连续消息，不要使用 [[MSG]]，不要主动拆成多条；按想表达的意思自然决定长短，不要为了短而截断句子。'}
 每条消息必须是完整、自然、能独立表达意思的语义单位；不要只输出半个短语或半句话，不要在不自然的位置插入 [[MSG]]。
 ${idealChatBilingualInstruction(chat)}
+${quoteInstruction}
+【语音气泡】角色确实想用语音表达时，可以发送严格格式 [[VOICE seconds=数字 text="语音内容"]]。这会生成一条可点击展开文字的语音气泡；语音内容必须是角色真正会说的话，秒数使用 1～300 的正整数，不要在语音内容里写控制标记。不要为了凑功能每轮发语音。
 短小不代表敷衍或冷淡。短句也必须保留角色原本的情绪温度：活泼、犬系、开朗、黏人或直球型角色应当轻快、柔和、有亲近感，可以主动接话、好奇追问、撒娇、逗人或表达期待，但不要用命令、训斥、逼问或过多感叹号制造热情。冷淡克制或强势的表达只适用于角色设定和当前情节确实如此。保持角色的性格、关系、口癖和情绪连续。普通闲聊必须优先短回，绝大多数情况下不要连续输出大段文字；只有解释复杂事情、认真安慰、争执或推进重要情节时才展开。每一轮都要根据语境改变长度，不能把一段小作文平均切成几段或为了满足数量破坏自然对话。
 根据用户刚刚那句话决定长度：用户说得很短或只是普通闲聊时，通常也短回；不要复述对方的话，不要补完整前因后果，不要每轮都剖析自己的心理。
 每个聊天气泡不要求以句号或其他符号结尾。是否使用标点、使用哪种标点，都必须看角色的性格、平时打字习惯和这一刻的情绪；不要自动补句号，也不要为了形式完整强行加符号。像“来啦”“给我看看嘛”“等我一下”这样无结尾标点的消息是正常输出。
@@ -4700,6 +5006,54 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   requestAnimationFrame(moveChatUnreadBadge);
   window.addEventListener('resize', () => requestAnimationFrame(updateChatDockContrast));
 
+  document.addEventListener('click', event => {
+    const openBeauty = event.target.closest?.('[data-offline-beauty]');
+    const closeBeauty = event.target.closest?.('[data-offline-beauty-close]');
+    const editor = event.target.closest?.('[data-offline-beauty-editor]');
+    if (openBeauty) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      renderOfflineBeautyEditor();
+      return;
+    }
+    if (closeBeauty) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      editor?.remove();
+      return;
+    }
+    if (!editor) return;
+    if (event.target.closest('[data-offline-beauty-reset]')) {
+      saveOfflineBeautyCSS('');
+      renderOfflineBeautyEditor();
+      return;
+    }
+    if (event.target.closest('[data-offline-beauty-import]')) {
+      editor.querySelector('[data-offline-beauty-file]')?.click();
+      return;
+    }
+    if (event.target.closest('[data-offline-beauty-export]')) {
+      saveOfflineBeautyCSS(editor.querySelector('[data-offline-beauty-css]')?.value || '');
+      exportOfflineBeauty();
+      editor.querySelector('[data-offline-beauty-status]').textContent = '已导出 JSON 文件';
+      return;
+    }
+    if (event.target.closest('[data-offline-beauty-save]')) {
+      saveOfflineBeautyCSS(editor.querySelector('[data-offline-beauty-css]')?.value || '');
+      editor.querySelector('[data-offline-beauty-status]').textContent = '已保存并应用';
+    }
+  }, true);
+  document.addEventListener('change', event => {
+    const fileInput = event.target.closest?.('[data-offline-beauty-file]');
+    const file = fileInput?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try { importOfflineBeauty(reader.result, file.name); } catch (error) { window.alert(`导入失败：${error.message || '文件格式不正确'}`); }
+    };
+    reader.readAsText(file);
+    fileInput.value = '';
+  });
   document.addEventListener('click', event => {
     const wallpaper = event.target.closest('[data-offline-theme-button]');
     if (wallpaper) {
@@ -8953,6 +9307,56 @@ ${recentConversation}
   window.addEventListener('focus', () => scheduleActiveMessageWake(1500));
   window.addEventListener('ideal-machine-chat-updated', () => scheduleActiveMessageWake(30000));
   window.addEventListener('ideal-machine-keepalive-state', () => scheduleActiveMessageWake(1500));
+  const chatPageBeautyImportOriginal = importChatPageBeautyBundle;
+  importChatPageBeautyBundle = function(raw, fileName = '') {
+    const kind = chatPageBeautyImportOriginal(raw, fileName);
+    let bundle = null;
+    try { bundle = JSON.parse(String(raw || '')); } catch {}
+    if (bundle?.presets) mergeChatPageBeautyPresets(bundle.presets);
+    if (kind === 'css' || (kind === 'bundle' && !Array.isArray(bundle?.presets))) saveChatPageBeautyPreset(chatPageBeautyPresetName(fileName), chatPageBeautyDraft || chatPageBeautyState());
+    return kind;
+  };
+  const chatPageBeautyEditorObserver = new MutationObserver(() => ensureChatPageBeautyControls());
+  chatPageBeautyEditorObserver.observe(document.querySelector('#chatPageBeautyEditor'), { childList: true, subtree: true });
+  document.addEventListener('input', event => {
+    if (event.target.closest?.('[data-chat-page-beauty-input]')) syncChatPageBeautyEditorControls();
+  }, true);
+  document.addEventListener('change', event => {
+    const select = event.target.closest?.('[data-chat-page-beauty-preset]');
+    if (!select) return;
+    const item = chatPageBeautyPresets().find(entry => entry.id === select.value);
+    if (!item) return;
+    chatPageBeautyDraft ||= { ...chatPageBeautyState() };
+    Object.assign(chatPageBeautyDraft, item.pages);
+    renderChatPageBeautyEditor();
+    applyChatPageBeautyCSS();
+  }, true);
+  document.addEventListener('click', event => {
+    const add = event.target.closest?.('[data-chat-page-beauty-add]');
+    if (add) {
+      syncChatPageBeautyDraft();
+      const name = window.prompt('给这套聊天页面美化取一个名字：');
+      if (!name?.trim()) return;
+      saveChatPageBeautyPreset(name, chatPageBeautyDraft || chatPageBeautyState());
+      ensureChatPageBeautyControls();
+      const select = document.querySelector('[data-chat-page-beauty-preset]');
+      if (select) { select.innerHTML = '<option value="">选择美化</option>' + chatPageBeautyPresetOptions(); select.value = chatPageBeautyPresets().find(item => item.name === name.trim())?.id || ''; }
+      return;
+    }
+    const saveCurrent = event.target.closest?.('[data-chat-page-beauty-save-current]');
+    if (saveCurrent) {
+      syncChatPageBeautyDraft();
+      const saved = chatPageBeautyState();
+      saved[chatPageBeautyTab] = String(chatPageBeautyDraft?.[chatPageBeautyTab] || '');
+      save();
+      chatPageBeautyDraft = { ...(chatPageBeautyDraft || {}), ...saved };
+      applyChatPageBeautyCSS();
+      saveCurrent.textContent = '已保存';
+    }
+  }, true);
+  document.addEventListener('click', event => {
+    if (event.target.closest?.('[data-chat-page-beauty-save], [data-chat-page-beauty-tab], [data-chat-page-beauty-reset]')) setTimeout(() => syncChatPageBeautyEditorControls(), 0);
+  }, true);
   window.IdealMachineActiveMessages = {
     runNow: () => runActiveMessageAutomation(),
     getState() { return JSON.parse(JSON.stringify(state.chats || {})); }

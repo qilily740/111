@@ -5,8 +5,22 @@
   const noticeKey = 'ideal-machine-forum-notices';
   const profileKey = 'ideal-machine-forum-profile';
   const settingsKey = 'ideal-machine-forum-settings';
+  const forumBeautyKey = 'ideal-machine-forum-beauty';
+  const forumBeautyPresetsKey = 'ideal-machine-forum-beauty-presets';
+  const forumBeautyKeys = Object.freeze(['home', 'search', 'notice', 'profile', 'common']);
+  const forumBeautyLabels = Object.freeze({ home: '首页', search: '发现', notice: '通知', profile: '我的', common: '公用区域' });
+  const forumBeautyHints = Object.freeze({
+    home: [['.forum-home-page', '首页内容外壳'], ['.forum-feed-intro', '首页说明区'], ['.forum-post', '单条帖子'], ['.forum-post-avatar', '帖子头像'], ['.forum-post-body', '帖子内容'], ['.forum-post-text', '帖子正文'], ['.forum-post-replies', '帖子评论区'], ['.forum-empty', '空状态提示']],
+    search: [['.forum-discover-page', '发现页外壳'], ['.forum-search-box', '搜索框'], ['.forum-discover-top', '热门话题区域'], ['.forum-discover-topics', '话题列表'], ['.forum-discover-roles', '角色讨论列表'], ['.forum-discover-filters', '发现筛选栏'], ['.forum-discover-feed', '推荐动态区域'], ['.forum-post', '发现页帖子']],
+    notice: [['.forum-notice-page', '通知页外壳'], ['.forum-notice-tools', '通知操作区'], ['.forum-notice-filters', '通知筛选栏'], ['.forum-notice-list', '通知列表'], ['.forum-notice-item', '单条通知'], ['.forum-notice-avatar', '通知头像'], ['.forum-notice-copy', '通知文字内容']],
+    profile: [['.forum-me-page', '我的页面外壳'], ['.forum-home-card', '账号资料卡'], ['.forum-home-card-avatar', '账号头像'], ['.forum-me-row', '我的页面功能项'], ['.forum-settings-page', '设置页面外壳'], ['.forum-profile-card', '账号设置卡片'], ['.forum-role-selector', '角色选择区域']],
+    common: [['.forum-header', '论坛顶栏'], ['.forum-brand', '论坛标题区域'], ['.forum-header-actions', '顶栏按键区域'], ['.forum-beauty-trigger', '美化按键'], ['.forum-refresh', '刷新按键'], ['.forum-header-avatar', '账号头像按键'], ['.forum-tabs', '底部 Dock 外层'], ['.forum-tab-home', '首页按键'], ['.forum-tab-search', '发现按键'], ['.forum-tab-notice', '通知按键'], ['.forum-tab-profile', '我的按键'], ['.forum-tab-compose', '发帖按键'], ['.forum-tabs small', 'Dock 文字']]
+  });
   const npcRotationKey = 'ideal-machine-forum-npc-rotation';
   let activeTab = 'home';
+  let forumBeautyOpen = false;
+  let forumBeautyTab = 'home';
+  let forumBeautyDraft = null;
   let refreshBusy = false;
   let interactionBusy = false;
   let discoverBusy = false;
@@ -16,7 +30,7 @@
   let commentReplyTargetId = '';
   const app = document.createElement('div');
   app.className = 'forum-app';
-  app.innerHTML = '<div class="forum-page"><header class="forum-header"><div class="forum-brand"><span>FORUM</span><h1>论坛</h1></div><div class="forum-header-actions"><button class="forum-refresh" type="button" data-forum-refresh aria-label="刷新论坛动态"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M38 18a15 15 0 0 0-26-4L8 18M10 30a15 15 0 0 0 26 4l4-4"/><path d="M8 11v7h7M40 37v-7h-7"/></svg></button><button type="button" data-forum-profile aria-label="论坛账号设置"></button><button type="button" data-forum-close aria-label="关闭论坛">×</button></div></header><main class="forum-main"><section class="forum-feed" data-forum-feed></section></main><nav class="forum-tabs" aria-label="论坛导航"><button class="is-active" type="button" data-forum-tab="home"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m8 22 16-13 16 13v17H29V28h-10v11H8z"/></svg><small>首页</small></button><button type="button" data-forum-tab="search"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="21" cy="21" r="11"/><path d="m30 30 10 10"/></svg><small>发现</small></button><button class="forum-tab-compose" type="button" data-forum-compose aria-label="发帖"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 10v28M10 24h28"/></svg></button><button type="button" data-forum-tab="notice"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 34h24l-3-5V20a9 9 0 0 0-18 0v9zM20 39h8"/></svg><small>通知</small></button><button type="button" data-forum-tab="profile"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="16" r="7"/><path d="M11 39c1-8 5-12 13-12s12 4 13 12"/></svg><small>我的</small></button></nav></div><div class="forum-compose-sheet" data-forum-compose-sheet aria-hidden="true"></div><div class="forum-profile-sheet" data-forum-profile-sheet aria-hidden="true"></div>';
+  app.innerHTML = '<div class="forum-page"><header class="forum-header"><div class="forum-brand"><span>FORUM</span><h1>论坛</h1></div><div class="forum-header-actions"><button class="forum-beauty-trigger" type="button" data-forum-beauty-open aria-label="论坛页面美化">✦</button><button class="forum-refresh" type="button" data-forum-refresh aria-label="刷新论坛动态"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M38 18a15 15 0 0 0-26-4L8 18M10 30a15 15 0 0 0 26 4l4-4"/><path d="M8 11v7h7M40 37v-7h-7"/></svg></button><button type="button" data-forum-profile aria-label="论坛账号设置"></button><button type="button" data-forum-close aria-label="关闭论坛">×</button></div></header><main class="forum-main"><section class="forum-feed" data-forum-feed></section></main><nav class="forum-tabs" aria-label="论坛导航"><button class="forum-tab-home is-active" type="button" data-forum-tab="home"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m8 22 16-13 16 13v17H29V28h-10v11H8z"/></svg><small>首页</small></button><button class="forum-tab-search" type="button" data-forum-tab="search"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="21" cy="21" r="11"/><path d="m30 30 10 10"/></svg><small>发现</small></button><button class="forum-tab-compose" type="button" data-forum-compose aria-label="发帖"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 10v28M10 24h28"/></svg></button><button class="forum-tab-notice" type="button" data-forum-tab="notice"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 34h24l-3-5V20a9 9 0 0 0-18 0v9zM20 39h8"/></svg><small>通知</small></button><button class="forum-tab-profile" type="button" data-forum-tab="profile"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="16" r="7"/><path d="M11 39c1-8 5-12 13-12s12 4 13 12"/></svg><small>我的</small></button></nav></div><div class="forum-compose-sheet" data-forum-compose-sheet aria-hidden="true"></div><div class="forum-profile-sheet" data-forum-profile-sheet aria-hidden="true"></div><div class="forum-page-beauty-editor" data-forum-page-beauty-editor aria-hidden="true"></div>';
   document.body.appendChild(app);
   const customFontStyle = document.createElement('style');
   customFontStyle.dataset.forumCustomFont = '';
@@ -112,14 +126,17 @@
     brand.innerHTML = '<span>' + headerCopy[0] + '</span><h1>' + headerCopy[1] + '</h1>';
     headerProfile.style.display = activeTab === 'home' ? 'grid' : 'none';
     app.querySelector('[data-forum-refresh]').style.display = activeTab === 'home' ? 'grid' : 'none';
+    forumBeautyKeys.filter(page => page !== 'common').forEach(page => app.classList.toggle(`is-forum-${page}`, activeTab === page));
     app.querySelector('[data-forum-profile]').innerHTML = '<span class="forum-header-avatar">' + avatar(current.avatar, current.nickname) + '</span>';
     app.querySelector('[data-forum-tab="notice"]')?.classList.toggle('has-unread', getNotices().some(item => !item.read));
     const posts = getPosts();
-    if (activeTab === 'profile') { renderMePage(feed); return; }
-    if (activeTab === 'search') { renderDiscover(feed, posts); return; }
-    if (activeTab === 'notice') { renderNotice(feed); return; }
-    feed.innerHTML = posts.length ? posts.map(postHtml).join('') : '<div class="forum-empty"><div>◌</div><h2>还没有动态</h2><p>发布第一条帖子，开始你的论坛时间线。</p></div>';
+    if (activeTab === 'profile') { renderMePage(feed); applyForumBeautyCSS(); renderForumBeautyEditor(); return; }
+    if (activeTab === 'search') { renderDiscover(feed, posts); applyForumBeautyCSS(); renderForumBeautyEditor(); return; }
+    if (activeTab === 'notice') { renderNotice(feed); applyForumBeautyCSS(); renderForumBeautyEditor(); return; }
+    feed.innerHTML = '<div class="forum-home-page">' + (posts.length ? posts.map(postHtml).join('') : '<div class="forum-empty"><div>◌</div><h2>还没有动态</h2><p>发布第一条帖子，开始你的论坛时间线。</p></div>') + '</div>';
     resolveStoredAvatars();
+    applyForumBeautyCSS();
+    renderForumBeautyEditor();
   }
 
   function resolveStoredAvatars() { if (!window.IdealMachineGetImage) return; app.querySelectorAll('img[src^="idb:image:"]').forEach(image => window.IdealMachineGetImage(image.getAttribute('src')).then(value => { if (value) image.src = value; })); }
@@ -170,6 +187,42 @@
     save(npcRotationKey, { recent: next, updatedAt: now() });
   }
   function applyForumSettings() { const settings = getForumSettings(); const selectedFont = settings.fontPackages.find(item => item.id === settings.fontId) || settings.fontPackages[0]; const customSource = String(selectedFont?.source || '').replace(/["\\\r\n]/g, value => '\\' + value); customFontStyle.textContent = settings.fontFamily === 'custom' && customSource ? `@font-face{font-family:"IdealForumCustom";src:url("${customSource}")}` : ''; const font = settings.fontFamily === 'custom' && customSource ? "'IdealForumCustom', -apple-system, sans-serif" : settings.fontFamily === 'serif' ? "Georgia, 'Songti SC', serif" : settings.fontFamily === 'mono' ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"; app.style.setProperty('--forum-font-family', font); app.style.setProperty('--forum-font-size', `${Math.max(11, Math.min(24, settings.fontSize))}px`); }
+  function forumBeautyState() { const value = read(forumBeautyKey, {}); return Object.fromEntries(forumBeautyKeys.map(page => [page, typeof value[page] === 'string' ? value[page] : ''])); }
+  function forumBeautyHintMarkup(page) { return (forumBeautyHints[page] || []).map(([selector, meaning]) => `<span class="forum-beauty-hint-line"><code>${esc(selector)}</code><span>${esc(meaning)}</span></span>`).join(''); }
+  function scopeForumBeautyCSS(css, page) {
+    const source = String(css || '');
+    const scope = page === 'common' ? '.forum-app' : `.forum-app.is-forum-${page}`;
+    const scopeSelector = header => {
+      const trimmed = header.trim();
+      if (!trimmed || trimmed.startsWith('@')) return header;
+      const leading = header.slice(0, header.indexOf(trimmed));
+      const selectors = trimmed.split(',').map(selector => {
+        const value = selector.trim();
+        if (!value || value.includes('.forum-app') || /^(?:html|body|:root)/.test(value)) return value;
+        return `${scope} ${value}`;
+      });
+      return leading + selectors.join(', ');
+    };
+    const findOpen = (text, from) => { let quote = ''; let comment = false; for (let index = from; index < text.length; index += 1) { const char = text[index]; const next = text[index + 1]; if (comment) { if (char === '*' && next === '/') { comment = false; index += 1; } continue; } if (quote) { if (char === '\\' && next) { index += 1; continue; } if (char === quote) quote = ''; continue; } if (char === '/' && next === '*') { comment = true; index += 1; continue; } if (char === '"' || char === "'") { quote = char; continue; } if (char === '{') return index; } return -1; };
+    const findClose = (text, open) => { let depth = 1; let quote = ''; let comment = false; for (let index = open + 1; index < text.length; index += 1) { const char = text[index]; const next = text[index + 1]; if (comment) { if (char === '*' && next === '/') { comment = false; index += 1; } continue; } if (quote) { if (char === '\\' && next) { index += 1; continue; } if (char === quote) quote = ''; continue; } if (char === '/' && next === '*') { comment = true; index += 1; continue; } if (char === '"' || char === "'") { quote = char; continue; } if (char === '{') depth += 1; if (char === '}' && --depth === 0) return index; } return text.length - 1; };
+    const transform = text => { let output = ''; let cursor = 0; while (cursor < text.length) { const open = findOpen(text, cursor); if (open < 0) { output += text.slice(cursor); break; } const close = findClose(text, open); const header = text.slice(cursor, open); const normalized = header.trim().toLowerCase(); output += normalized.includes('@keyframes') || normalized.includes('@-webkit-keyframes') ? header : normalized.startsWith('@') ? header : scopeSelector(header); output += '{'; const body = text.slice(open + 1, close); output += normalized.startsWith('@') && !normalized.includes('keyframes') ? transform(body) : body; output += '}'; cursor = close + 1; } return output; };
+    return transform(source);
+  }
+  function applyForumBeautyCSS() { let style = document.querySelector('#forumPageBeautyStyle'); if (!style) { style = document.createElement('style'); style.id = 'forumPageBeautyStyle'; } if (style.parentNode !== document.head) document.head.appendChild(style); const saved = forumBeautyState(); const pageCSS = forumBeautyDraft && Object.prototype.hasOwnProperty.call(forumBeautyDraft, activeTab) ? forumBeautyDraft[activeTab] : saved[activeTab]; const commonCSS = forumBeautyDraft && Object.prototype.hasOwnProperty.call(forumBeautyDraft, 'common') ? forumBeautyDraft.common : saved.common; style.textContent = app.classList.contains('is-open') ? `${scopeForumBeautyCSS(pageCSS, activeTab)}\n${scopeForumBeautyCSS(commonCSS, 'common')}` : ''; }
+  function syncForumBeautyDraft() { const input = app.querySelector('[data-forum-page-beauty-input]'); if (input && forumBeautyDraft) forumBeautyDraft[forumBeautyTab] = input.value; }
+  function renderForumBeautyEditor() { const panel = app.querySelector('[data-forum-page-beauty-editor]'); if (!panel) return; panel.classList.toggle('is-open', forumBeautyOpen); panel.setAttribute('aria-hidden', String(!forumBeautyOpen)); if (!forumBeautyOpen) { panel.innerHTML = ''; return; } const saved = forumBeautyState(); const draft = forumBeautyDraft || saved; const currentCSS = String(draft[forumBeautyTab] || ''); const tabs = forumBeautyKeys.map(page => `<button class="${page === forumBeautyTab ? 'is-active' : ''}" data-forum-beauty-tab="${page}" type="button" aria-selected="${page === forumBeautyTab}">${forumBeautyLabels[page]}</button>`).join(''); const example = forumBeautyTab === 'home' ? 'forum-post' : forumBeautyTab === 'search' ? 'forum-discover-page' : forumBeautyTab === 'notice' ? 'forum-notice-item' : forumBeautyTab === 'profile' ? 'forum-home-card' : 'forum-tab-home'; panel.innerHTML = `<div class="forum-page-beauty-backdrop" data-forum-beauty-close></div><section class="forum-page-beauty-sheet" role="dialog" aria-modal="true" aria-labelledby="forumBeautyTitle"><header><div><span class="forum-kicker">FORUM STYLE</span><h2 id="forumBeautyTitle">论坛页面美化</h2><small>分别编辑首页、发现、通知、我的，以及公用顶栏和 Dock</small></div><button type="button" data-forum-beauty-close aria-label="关闭">×</button></header><main><nav class="forum-page-beauty-tabs" aria-label="选择论坛页面分类">${tabs}</nav><div class="forum-page-beauty-current"><b>${forumBeautyLabels[forumBeautyTab]}</b><span>${forumBeautyTab === 'common' ? '所有论坛页面共用' : '仅在“' + forumBeautyLabels[forumBeautyTab] + '”页面生效'}</span></div><p class="forum-page-beauty-hint">${forumBeautyHintMarkup(forumBeautyTab)}</p><textarea data-forum-page-beauty-input placeholder="例如：\n.${example} { border-radius: 18px; }">${esc(currentCSS)}</textarea></main><footer><button type="button" data-forum-beauty-close>关闭</button><button type="button" data-forum-beauty-reset>清空当前分类</button><button type="button" data-forum-beauty-import>导入</button><input data-forum-beauty-file type="file" accept=".css,.json,text/css,application/json"><button type="button" data-forum-beauty-export>导出</button><button class="is-primary" type="button" data-forum-beauty-save>保存全部</button></footer></section>`; }
+  const forumBeautyBundleFormat = 'ideal-machine-forum-beauty';
+  function forumBeautyPresetPages(source) { const pages = source?.pages || source?.forumBeauty || source || {}; return Object.fromEntries(forumBeautyKeys.map(page => [page, typeof pages[page] === 'string' ? pages[page] : ''])); }
+  function forumBeautyPresets() { const value = read(forumBeautyPresetsKey, []); return (Array.isArray(value) ? value : []).map(item => ({ id: String(item?.id || uid('forum-beauty')), name: String(item?.name || '未命名论坛美化').trim(), pages: forumBeautyPresetPages(item) })).filter(item => item.name); }
+  function forumBeautyPresetName(fileName = '') { return String(fileName || '').replace(/\.[^.]+$/, '').trim() || '导入的论坛美化'; }
+  function saveForumBeautyPreset(name, source = forumBeautyDraft || forumBeautyState()) { const cleanName = String(name || '').trim(); if (!cleanName) return null; const item = { id: uid('forum-beauty'), name: cleanName, pages: forumBeautyPresetPages(source) }; const next = [...forumBeautyPresets().filter(entry => entry.name !== cleanName), item]; save(forumBeautyPresetsKey, next); return item; }
+  function mergeForumBeautyPresets(items) { const imported = (Array.isArray(items) ? items : []).map(item => ({ id: String(item?.id || uid('forum-beauty')), name: String(item?.name || '').trim(), pages: forumBeautyPresetPages(item) })).filter(item => item.name); if (!imported.length) return; const current = forumBeautyPresets(); imported.forEach(item => { const index = current.findIndex(entry => entry.name === item.name); if (index >= 0) current[index] = item; else current.push(item); }); save(forumBeautyPresetsKey, current); }
+  function forumBeautyPresetOptions() { return forumBeautyPresets().map(item => `<option value="${esc(item.id)}">${esc(item.name)}</option>`).join(''); }
+  function syncForumBeautyEditorControls() { const panel = app.querySelector('[data-forum-page-beauty-editor]'); const saveCurrent = panel?.querySelector('[data-forum-beauty-save-current]'); if (!saveCurrent) return; const saved = forumBeautyState(); const draft = forumBeautyDraft || saved; const label = String(draft[forumBeautyTab] || '') === String(saved[forumBeautyTab] || '') ? '已保存' : '保存本页'; if (saveCurrent.textContent !== label) saveCurrent.textContent = label; }
+  function ensureForumBeautyEditorControls() { const panel = app.querySelector('[data-forum-page-beauty-editor]'); const sheet = panel?.querySelector('.forum-page-beauty-sheet'); if (!sheet) return; const header = sheet.querySelector(':scope > header'); const close = header?.querySelector('[data-forum-beauty-close]'); if (header && close && !header.querySelector('[data-forum-beauty-save-current]')) { const actions = document.createElement('div'); actions.className = 'forum-page-beauty-header-actions'; const saveCurrent = document.createElement('button'); saveCurrent.type = 'button'; saveCurrent.dataset.forumBeautySaveCurrent = ''; saveCurrent.textContent = '保存本页'; actions.append(saveCurrent, close); header.appendChild(actions); } const footer = sheet.querySelector(':scope > footer'); const saveAll = footer?.querySelector('[data-forum-beauty-save]'); if (footer && saveAll && !footer.querySelector('[data-forum-beauty-add]')) { const add = document.createElement('button'); add.type = 'button'; add.dataset.forumBeautyAdd = ''; add.textContent = '添加'; const select = document.createElement('select'); select.dataset.forumBeautyPreset = ''; select.setAttribute('aria-label', '选择美化'); select.innerHTML = '<option value="">选择美化</option>' + forumBeautyPresetOptions(); footer.insertBefore(add, saveAll); footer.insertBefore(select, saveAll); } syncForumBeautyEditorControls(); }
+  function forumBeautyBundleFor() { const pages = forumBeautyDraft || forumBeautyState(); return { format: forumBeautyBundleFormat, version: 2, exportedAt: new Date().toISOString(), forumBeauty: Object.fromEntries(forumBeautyKeys.map(page => [page, String(pages[page] || '')])), presets: forumBeautyPresets() }; }
+  function downloadForumBeautyBundle() { const blob = new Blob([JSON.stringify(forumBeautyBundleFor(), null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = '论坛页面美化.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  function importForumBeautyBundle(raw, fileName = '') { const source = String(raw || ''); let bundle; try { bundle = JSON.parse(source); } catch (error) { if (/\.css$/i.test(fileName)) { forumBeautyDraft ||= { ...forumBeautyState() }; forumBeautyDraft[forumBeautyTab] = source; return 'css'; } throw new Error('论坛美化文件不是有效的 JSON 或 CSS。'); } const pages = bundle?.forumBeauty || bundle?.pages || bundle; if (!pages || typeof pages !== 'object') throw new Error('论坛美化文件格式不正确。'); const next = {}; forumBeautyKeys.forEach(page => { if (typeof pages[page] === 'string') next[page] = pages[page]; }); if (!Object.keys(next).length) throw new Error('文件中没有可导入的论坛美化内容。'); const saved = forumBeautyState(); Object.assign(saved, next); save(forumBeautyKey, saved); forumBeautyDraft = { ...saved }; return 'bundle'; }
   function renderMePage(feed) {
     const current = getProfile();
     const settings = getForumSettings();
@@ -405,6 +458,14 @@
 
   app.addEventListener('click', event => {
     if (event.target.closest('[data-forum-close]')) { app.classList.remove('is-open'); closeCompose(); closeProfile(); return; }
+    if (event.target.closest('[data-forum-beauty-open]')) { forumBeautyOpen = true; forumBeautyTab = 'home'; forumBeautyDraft = { ...forumBeautyState() }; renderForumBeautyEditor(); applyForumBeautyCSS(); return; }
+    if (event.target.closest('[data-forum-beauty-close]')) { forumBeautyOpen = false; forumBeautyDraft = null; renderForumBeautyEditor(); applyForumBeautyCSS(); return; }
+    if (event.target.closest('[data-forum-beauty-import]')) { app.querySelector('[data-forum-beauty-file]')?.click(); return; }
+    if (event.target.closest('[data-forum-beauty-export]')) { syncForumBeautyDraft(); downloadForumBeautyBundle(); return; }
+    const beautyTab = event.target.closest('[data-forum-beauty-tab]');
+    if (beautyTab) { syncForumBeautyDraft(); forumBeautyTab = forumBeautyKeys.includes(beautyTab.dataset.forumBeautyTab) ? beautyTab.dataset.forumBeautyTab : 'home'; renderForumBeautyEditor(); return; }
+    if (event.target.closest('[data-forum-beauty-reset]')) { if (forumBeautyDraft) forumBeautyDraft[forumBeautyTab] = ''; renderForumBeautyEditor(); applyForumBeautyCSS(); return; }
+    if (event.target.closest('[data-forum-beauty-save]')) { syncForumBeautyDraft(); save(forumBeautyKey, forumBeautyDraft || forumBeautyState()); applyForumBeautyCSS(); const saveButton = event.target.closest('[data-forum-beauty-save]'); saveButton.textContent = '已保存'; setTimeout(() => { if (saveButton.isConnected) saveButton.textContent = '保存全部'; }, 900); return; }
     if (event.target.closest('[data-forum-refresh]')) { refreshForumPosts(); return; }
     if (event.target.closest('[data-forum-compose]')) { openCompose(); return; }
     if (event.target.closest('[data-forum-profile]')) { openProfile(); return; }
@@ -467,6 +528,8 @@
     if (event.target.closest('[data-forum-delete]')) { if (!canDelete) return window.alert('只能删除自己发布的动态。'); if (window.confirm('确定删除这条动态吗？')) { save(feedKey, list.filter(entry => entry.id !== item.id)); render(); } }
   });
   app.addEventListener('input', event => {
+    const beautyInput = event.target.closest('[data-forum-page-beauty-input]');
+    if (beautyInput && forumBeautyDraft) { forumBeautyDraft[forumBeautyTab] = beautyInput.value; applyForumBeautyCSS(); return; }
     const input = event.target.closest('[data-forum-search-input]');
     if (!input || activeTab !== 'search') return;
     discoverQuery = input.value;
@@ -476,6 +539,18 @@
     nextInput?.setSelectionRange(discoverQuery.length, discoverQuery.length);
   });
   app.addEventListener('change', event => {
+    const beautyFile = event.target.closest('[data-forum-beauty-file]')?.files?.[0];
+    if (beautyFile) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try { const kind = importForumBeautyBundle(String(reader.result || ''), beautyFile.name || ''); renderForumBeautyEditor(); applyForumBeautyCSS(); if (kind === 'bundle') window.alert('论坛页面与公用区域美化已导入。'); }
+        catch (error) { window.alert(`导入论坛美化失败：${error.message}`); }
+        finally { event.target.value = ''; }
+      };
+      reader.onerror = () => window.alert('导入论坛美化失败：无法读取文件。');
+      reader.readAsText(beautyFile);
+      return;
+    }
     const setting = event.target.closest('[data-forum-worldbook], [data-forum-font-family], [data-forum-font-size], [data-forum-font-package]');
     if (setting) {
       const current = getForumSettings();
@@ -510,6 +585,57 @@
   });
   app.addEventListener('click', event => { if (event.target.closest('[data-forum-profile-delete]')) { if (window.confirm('确定删除论坛账号设置吗？已发布的动态会保留。')) { localStorage.removeItem(profileKey); closeProfile(); render(); } return; } if (!event.target.closest('[data-forum-profile-save]')) return; const nickname = app.querySelector('[data-forum-nickname]')?.value.trim(); if (!nickname) return window.alert('请输入论坛网名。'); const file = app.querySelector('[data-forum-avatar-file]')?.files?.[0]; const allowedRoles = [...app.querySelectorAll('[data-forum-role-toggle].is-selected')].map(input => input.dataset.forumRoleToggle); const persist = value => { save(profileKey, { nickname, avatar: value, allowedRoles }); closeProfile(); render(); }; const readAvatar = file ? (window.IdealMachineReadImage ? window.IdealMachineReadImage(file, 500, .72) : Promise.resolve('')) : Promise.resolve(getProfile().avatar); readAvatar.then(value => persist(value || getProfile().avatar)); });
   document.addEventListener('click', event => { if (!event.target.closest('[data-app-key="luntan"]')) return; app.classList.add('is-open'); render(); });
+  const forumBeautyImportOriginal = importForumBeautyBundle;
+  importForumBeautyBundle = function(raw, fileName = '') {
+    const kind = forumBeautyImportOriginal(raw, fileName);
+    let bundle = null;
+    try { bundle = JSON.parse(String(raw || '')); } catch {}
+    if (bundle?.presets) mergeForumBeautyPresets(bundle.presets);
+    if (kind === 'css' || (kind === 'bundle' && !Array.isArray(bundle?.presets))) saveForumBeautyPreset(forumBeautyPresetName(fileName), forumBeautyDraft || forumBeautyState());
+    return kind;
+  };
+  const forumBeautyEditorObserver = new MutationObserver(() => ensureForumBeautyEditorControls());
+  forumBeautyEditorObserver.observe(app.querySelector('[data-forum-page-beauty-editor]'), { childList: true, subtree: true });
+  app.addEventListener('input', event => {
+    if (event.target.closest('[data-forum-page-beauty-input]')) syncForumBeautyEditorControls();
+  }, true);
+  app.addEventListener('change', event => {
+    const select = event.target.closest('[data-forum-beauty-preset]');
+    if (!select) return;
+    const item = forumBeautyPresets().find(entry => entry.id === select.value);
+    if (!item) return;
+    forumBeautyDraft ||= { ...forumBeautyState() };
+    Object.assign(forumBeautyDraft, item.pages);
+    renderForumBeautyEditor();
+    applyForumBeautyCSS();
+  }, true);
+  app.addEventListener('click', event => {
+    const add = event.target.closest('[data-forum-beauty-add]');
+    if (add) {
+      syncForumBeautyDraft();
+      const name = window.prompt('给这套论坛页面美化取一个名字：');
+      if (!name?.trim()) return;
+      saveForumBeautyPreset(name, forumBeautyDraft || forumBeautyState());
+      ensureForumBeautyEditorControls();
+      const select = app.querySelector('[data-forum-beauty-preset]');
+      if (select) { select.innerHTML = '<option value="">选择美化</option>' + forumBeautyPresetOptions(); select.value = forumBeautyPresets().find(item => item.name === name.trim())?.id || ''; }
+      return;
+    }
+    const saveCurrent = event.target.closest('[data-forum-beauty-save-current]');
+    if (saveCurrent) {
+      syncForumBeautyDraft();
+      const saved = forumBeautyState();
+      saved[forumBeautyTab] = String(forumBeautyDraft?.[forumBeautyTab] || '');
+      save(forumBeautyKey, saved);
+      forumBeautyDraft = { ...(forumBeautyDraft || {}), ...saved };
+      applyForumBeautyCSS();
+      saveCurrent.textContent = '已保存';
+      return;
+    }
+  }, true);
+  app.addEventListener('click', event => {
+    if (event.target.closest('[data-forum-beauty-save], [data-forum-beauty-tab], [data-forum-beauty-reset]')) setTimeout(() => syncForumBeautyEditorControls(), 0);
+  }, true);
   apps.luntan = { name: '论坛' };
   applyForumSettings();
 })();

@@ -167,11 +167,11 @@
   function forgetRole(roleId){if(!roleId)return 0;const library=readLibrary(),before=library.entries.length;library.entries=library.entries.filter(item=>item.roleId!==roleId);Object.keys(library.cores).forEach(key=>{if(key===roleId||key.startsWith(`${roleId}::`))delete library.cores[key];});Object.keys(library.roleMeta).forEach(key=>{if(key===roleId||key.startsWith(`${roleId}::`))delete library.roleMeta[key];});saveLibrary(library);return before-library.entries.length;}
   function forgetProfile(profileId){if(!profileId)return 0;const library=readLibrary(),before=library.entries.length;library.entries=library.entries.filter(item=>item.profileId!==profileId);Object.keys(library.cores).forEach(key=>{if(key.endsWith(`::${profileId}`)||library.cores[key]?.profileId===profileId)delete library.cores[key];});Object.keys(library.roleMeta).forEach(key=>{if(key.endsWith(`::${profileId}`)||library.roleMeta[key]?.profileId===profileId)delete library.roleMeta[key];});saveLibrary(library);return before-library.entries.length;}
   function cleanOfflineKeywords(values=[]){
-    const generic=new Set(['线下见面','情绪变化','情绪脉络','本次互动','见面总结','聊天内容','刚才聊天']);
-    const sentenceMarkers=/(?:我|我们|你|你们|他|她|它|的|地|得|了|着|过|把|被|给|从|向|对|在|和|与|而|并|还|很|都|就|才|直接|已经|刚才|一下|一声|一秒|没有|然后|因为|所以|进入|进去|出来|延续|继续|挤进|顶开|打开|提着|走进|响了|勒得)/;
+    const generic=new Set(['线下见面','情绪变化','情绪脉络','本次互动','见面总结','聊天内容','刚才聊天','情绪未记录','关系变化','情绪','感觉','氛围','互动','回应','想法','开始','结束','继续','延续']);
+    const sentenceMarkers=/(?:我|我们|你|你们|他|她|它|的|地|得|了|着|过|把|被|给|从|向|对|在|和|与|而|并|还|很|都|就|才|直接|已经|刚才|一下|一声|一秒|没有|然后|因为|所以|进入|进去|出来|延续|继续|挤进|顶开|打开|提着|走进|响了|勒得|紧张|放松|开心|难过|生气|害怕|期待|犹豫|失落|暧昧|尴尬|奇怪)/;
     const clean=value=>{
       const word=String(value||'').trim().replace(/^[“”"'「」『』【】\[\]（）()]+|[“”"'「」『』【】\[\]（）()，。！？；：、,.!?;:]+$/g,'');
-      if(word.length<2||word.length>8||/[\s，。！？；：、,.!?;:\n]/.test(word)||generic.has(word)||sentenceMarkers.test(word))return'';
+      if(word.length<2||word.length>6||!/^[\u3400-\u9fffA-Za-z0-9]+$/.test(word)||generic.has(word)||sentenceMarkers.test(word))return'';
       return word;
     };
     return[...new Set((Array.isArray(values)?values:[]).map(clean).filter(Boolean))].slice(0,8);
@@ -193,14 +193,14 @@
         const sourceId=`offline:${role.id}:${session.id}`;
         const existing=library.entries.find(item=>item.sourceId===sourceId);
         if(existing){
-          const summary=String(session.summary||existing.summary||'');
-          const emotion=String(session.emotionArc||summary).slice(0,300);
+          const summary=String(session.summary||existing.summary||'').slice(0,200);
+          const emotion=String(session.emotionArc||'').slice(0,300);
           const keywords=offlineMemoryKeywords(session);
           if(existing.summary!==summary||existing.emotion!==emotion||JSON.stringify(existing.keywords||[])!==JSON.stringify(keywords)){existing.summary=summary;existing.emotion=emotion;existing.keywords=keywords;updated=true;}
           return;
         }
         if(library.forgottenSourceIds.includes(sourceId))return;
-        library.entries.unshift({id:uid('memory'),sourceId,roleId:role.id,profileId,roleName:role.nickname||role.name||'角色',type:'offline',scope:'shared',sourceContext:'offline',level:'long',title:session.reason?`线下见面：${String(session.reason).slice(0,20)}`:'一次线下见面',summary:String(session.summary),emotion:String(session.emotionArc||session.summary).slice(0,300),keywords:offlineMemoryKeywords(session),importance:'重要',importanceScore:.82,createdAt:session.endedAt||Date.now()});
+        library.entries.unshift({id:uid('memory'),sourceId,roleId:role.id,profileId,roleName:role.nickname||role.name||'角色',type:'offline',scope:'shared',sourceContext:'offline',level:'long',title:session.reason?`线下见面：${String(session.reason).slice(0,20)}`:'一次线下见面',summary:String(session.summary).slice(0,200),emotion:String(session.emotionArc||'').slice(0,300),keywords:offlineMemoryKeywords(session),importance:'重要',importanceScore:.82,createdAt:session.endedAt||Date.now()});
         created++;
       });
       const summary=typeof chat.memorySummary==='string'?chat.memorySummary:typeof chat.summary==='string'?chat.summary:'';
@@ -223,8 +223,8 @@
     const sourceId=`offline:${roleId}:${session.id}`;
     const existing=library.entries.find(item=>item.sourceId===sourceId);
     const settings=settingsFor(chat);
-    const summary=String(session.summary).slice(0,settings.summaryMaxChars);
-    const emotion=String(session.emotionArc||session.summary).slice(0,300);
+    const summary=String(session.summary).slice(0,Math.min(200,settings.summaryMaxChars));
+    const emotion=String(session.emotionArc||'').slice(0,300);
     const keywords=offlineMemoryKeywords(session);
     if(existing){existing.summary=summary;existing.emotion=emotion;existing.keywords=keywords;saveLibrary(library);return existing;}
     if(library.forgottenSourceIds.includes(sourceId))return null;
