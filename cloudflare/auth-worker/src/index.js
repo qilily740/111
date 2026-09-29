@@ -166,7 +166,8 @@ async function checkDiscordCredentials(env, credentials) {
   try {
     const current = await refreshDiscordCredentials(env, credentials);
     return { ...(await discordMember(env, current.accessToken)), credentials: current };
-  } catch {
+  } catch (error) {
+    console.warn(JSON.stringify({ event: 'discord_credential_check_failed', reason: String(error?.message || 'unknown').slice(0, 80) }));
     return { status: 'check_failed', httpStatus: 503, credentials };
   }
 }
@@ -329,7 +330,10 @@ async function finishDiscordOAuth(request, env) {
     const existing = await env.DB.prepare('SELECT id FROM user WHERE discordUserId = ? LIMIT 1').bind(discordUserId).first();
     if (existing) return frontendRedirect(env, { auth: 'error', reason: 'discord_already_registered' }, frontendUrl);
     const access = await checkDiscordCredentials(env, credentials);
-    if (access.status === 'check_failed') return frontendRedirect(env, { auth: 'error', reason: 'discord_check_failed' }, frontendUrl);
+    if (access.status === 'check_failed') {
+      console.warn(JSON.stringify({ event: 'discord_eligibility_check_failed', status: access.httpStatus || 503 }));
+      return frontendRedirect(env, { auth: 'error', reason: 'discord_check_failed' }, frontendUrl);
+    }
     if (access.status === 'not_in_guild') return frontendRedirect(env, { auth: 'error', reason: 'not_in_guild' }, frontendUrl);
     if (access.status !== 'active') return frontendRedirect(env, { auth: 'error', reason: 'required_role_missing' }, frontendUrl);
     const ticket = randomToken(32);
@@ -341,7 +345,7 @@ async function finishDiscordOAuth(request, env) {
         access.credentials.expiresAt, Date.now() + TICKET_TTL_MS, Date.now()).run();
     return frontendRedirect(env, { auth: 'register', ticket }, frontendUrl);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'discord_oauth_callback_failed', errorType: error?.name || 'Error' }));
+    console.error(JSON.stringify({ event: 'discord_oauth_callback_failed', errorType: error?.name || 'Error', reason: String(error?.message || 'unknown').slice(0, 80) }));
     return frontendRedirect(env, { auth: 'error', reason: 'discord_check_failed' }, frontendUrl);
   }
 }
@@ -374,6 +378,9 @@ async function sendEmailCode(request, env) {
   const email = String(body?.email || '').trim().toLowerCase();
   if (!ticket) return json(request, env, { error: 'REGISTRATION_TICKET_INVALID' }, 403);
   if (!EMAIL_PATTERN.test(email)) return json(request, env, { error: 'QQ_EMAIL_REQUIRED' }, 400);
+  if (!env.QQ_SMTP_USER || !env.QQ_SMTP_AUTH_CODE) {
+    return json(request, env, { error: 'EMAIL_SENDER_NOT_CONFIGURED' }, 503);
+  }
   const access = await checkAndUpdateRegistrationTicket(env, ticket);
   if (access.status === 'check_failed') return json(request, env, { error: 'DISCORD_CHECK_FAILED' }, 503);
   if (access.status !== 'active') return json(request, env, { error: 'DISCORD_ACCESS_REVOKED' }, 403);

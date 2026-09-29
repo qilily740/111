@@ -80,6 +80,8 @@
       PASSWORD_INVALID: '密码至少 12 位，且两次输入必须一致。',
       QQ_EMAIL_REQUIRED: '请填写 QQ 邮箱（@qq.com）。',
       RATE_LIMITED: '操作太频繁，请稍后再试。',
+      EMAIL_SENDER_NOT_CONFIGURED: '邮箱验证码暂时无法发送：管理员还没有配置 QQ 邮箱 SMTP 授权码。',
+      AUTH_SERVICE_UNAVAILABLE: '认证服务暂时不可用，请稍后重试。',
       DISCORD_CHECK_FAILED: '暂时无法核验 Discord 资格，请稍后再试。',
       DISCORD_ACCESS_REVOKED: 'Discord 服务器资格已失效，账号暂时无法使用。',
       INVALID_CREDENTIALS: '用户名或密码不正确。'
@@ -154,7 +156,7 @@
   }
 
   function emailForm() {
-    return '<label>QQ 邮箱<div class="ideal-auth-inline"><input name="email" type="email" autocomplete="email" placeholder="name@qq.com" required><button type="button" data-action="send-code">发送验证码</button></div></label><label>邮箱验证码<div class="ideal-auth-inline"><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required><button type="button" data-action="verify-email">验证邮箱</button></div></label>';
+    return '<label>QQ 邮箱<div class="ideal-auth-inline"><input name="email" type="email" autocomplete="email" placeholder="name@qq.com" required><button type="button" data-action="send-code">发送验证码</button></div></label><label>邮箱验证码<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="输入 6 位验证码" required></label><button type="button" class="ideal-auth-submit" data-action="verify-email">确认验证码并继续</button>';
   }
 
   function accountForm() {

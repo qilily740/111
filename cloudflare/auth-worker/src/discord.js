@@ -23,18 +23,22 @@ export async function discordMember(env, accessToken, fetchFn = fetch) {
   const apiBase = String(env.DISCORD_API_BASE_URL || 'https://discord.com/api/v10').replace(/\/$/, '');
   let memberFound = false;
   try {
-    for (const requirement of requirements) {
+    for (const [requirementIndex, requirement] of requirements.entries()) {
       const response = await fetchFn(`${apiBase}/users/@me/guilds/${encodeURIComponent(requirement.guildId)}/member`, {
         headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }
       });
       if (response.status === 404) continue;
-      if (!response.ok) return { status: 'check_failed', httpStatus: 503 };
+      if (!response.ok) {
+        console.warn(JSON.stringify({ event: 'discord_member_api_rejected', status: response.status, requirementIndex }));
+        return { status: 'check_failed', httpStatus: response.status };
+      }
       memberFound = true;
       const member = await response.json();
       const roles = Array.isArray(member?.roles) ? member.roles.map(String) : [];
       if (roles.some(roleId => requirement.roleIds.includes(roleId))) return { status: 'active', httpStatus: 200 };
     }
   } catch {
+    console.warn(JSON.stringify({ event: 'discord_member_api_unreachable' }));
     return { status: 'check_failed', httpStatus: 503 };
   }
   return { status: memberFound ? 'no_role' : 'not_in_guild', httpStatus: 200 };
