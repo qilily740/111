@@ -106,6 +106,13 @@
   function machineRequestUrl(input) {
     try { return new URL(input?.url || String(input), location.href); } catch { return null; }
   }
+  function isOfficialWorkerUrl(url) {
+    if (!url) return false;
+    const config = window.IdealMachineConfig || {};
+    const bases = [config.authApiBase, config.activationApiBase, config.imageApiBase, config.neteaseApiBase, config.neteaseAuthApiBase, config.pushApiBase]
+      .filter(Boolean).map(value => { try { return new URL(value, location.href).origin; } catch { return ''; } }).filter(Boolean);
+    return bases.includes(url.origin);
+  }
   function machineApiConfig() {
     try { return window.IdealMachineAPI?.getConfig?.() || {}; } catch { return {}; }
   }
@@ -176,6 +183,15 @@
     const prepared = prepareMachineRequest(input, init);
     input = prepared.input;
     init = prepared.init;
+    const requestUrl = machineRequestUrl(input);
+    if (isOfficialWorkerUrl(requestUrl) && window.IdealMachineAuth?.getToken?.()) {
+      const headers = new Headers(typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined);
+      new Headers(init.headers || {}).forEach((value, key) => headers.set(key, value));
+      const needsSeparateMusicSession = /(?:music-api|music-auth)\./i.test(requestUrl.hostname) && headers.has('Authorization');
+      const idealHeader = needsSeparateMusicSession ? 'X-Ideal-Authorization' : 'Authorization';
+      if (!headers.has(idealHeader)) headers.set(idealHeader, `Bearer ${window.IdealMachineAuth.getToken()}`);
+      init = { ...init, headers };
+    }
     const scope = String(init.idealScope || 'shared');
     // 所有外部请求统一至少保留 180 秒，批量生成等场景仍可传入更长时限。
     const timeout = Math.max(180000, Number(init.timeout) || 180000);
@@ -202,7 +218,15 @@
           return await nativeFetch(input, { ...fetchInit, signal: controller.signal });
         }
       }
-      return await nativeFetch(input, { ...fetchInit, signal: controller.signal });
+      const response = await nativeFetch(input, { ...fetchInit, signal: controller.signal });
+      if (isOfficialWorkerUrl(requestUrl) && (response.status === 401 || response.status === 403)) {
+        let errorCode = '';
+        try { errorCode = String((await response.clone().json())?.error || ''); } catch {}
+        if (errorCode === 'UNAUTHORIZED' || ['DISCORD_ACCESS_REVOKED', 'DISCORD_NOT_IN_GUILD', 'DISCORD_REQUIRED_ROLE_MISSING', 'ACCOUNT_NOT_LINKED'].includes(errorCode)) {
+          window.IdealMachineAuth?.handleAuthorizationFailure?.(errorCode || 'UNAUTHORIZED');
+        }
+      }
+      return response;
     }
     finally {
       clearTimeout(timer);
@@ -873,6 +897,73 @@
     if (isIOS && isStandalone()) [120, 500, 1500, 3000].forEach(delay => window.setTimeout(sync, delay));
   }
 
+  function installIdealInputKeyboardAvoidance() {
+    let focusedEditable = null;
+    let frame = 0;
+    const timers = new Set();
+    const editableSelector = 'textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]), [contenteditable="true"]';
+    const editable = target => target?.closest?.(editableSelector) || null;
+    const scrollParent = element => {
+      let parent = element?.parentElement;
+      while (parent && parent !== document.body) {
+        const style = window.getComputedStyle(parent);
+        const scrollable = /(auto|scroll|overlay)/i.test(style.overflowY) && parent.scrollHeight > parent.clientHeight + 1;
+        if (scrollable) return parent;
+        parent = parent.parentElement;
+      }
+      return null;
+    };
+    const keepVisible = element => {
+      if (!element?.isConnected || document.activeElement !== element) return;
+      const viewport = window.visualViewport;
+      const top = Math.round(viewport?.offsetTop || 0) + 12;
+      const bottom = Math.round((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) - 14;
+      const rect = element.getBoundingClientRect();
+      const bottomGap = rect.bottom - bottom;
+      const topGap = top - rect.top;
+      if (bottomGap <= 0 && topGap <= 0) return;
+      const parent = scrollParent(element);
+      if (parent) {
+        parent.scrollTop += bottomGap > 0 ? bottomGap : -topGap;
+      } else {
+        element.scrollIntoView({ block:'center', inline:'nearest', behavior:'auto' });
+      }
+      window.requestAnimationFrame(() => {
+        if (!element?.isConnected || document.activeElement !== element) return;
+        const nextRect = element.getBoundingClientRect();
+        if (nextRect.bottom > bottom || nextRect.top < top) element.scrollIntoView({ block:'center', inline:'nearest', behavior:'auto' });
+      });
+    };
+    const schedule = () => {
+      if (!focusedEditable) return;
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => { frame = 0; keepVisible(focusedEditable); });
+      timers.forEach(timer => window.clearTimeout(timer));
+      timers.clear();
+      [40, 120, 260, 520].forEach(delay => {
+        const timer = window.setTimeout(() => { timers.delete(timer); keepVisible(focusedEditable); }, delay);
+        timers.add(timer);
+      });
+    };
+    document.addEventListener('focusin', event => {
+      const target = editable(event.target);
+      if (!target) return;
+      focusedEditable = target;
+      schedule();
+    }, true);
+    document.addEventListener('focusout', event => {
+      const target = editable(event.target);
+      if (target && target === focusedEditable) {
+        window.setTimeout(() => { if (document.activeElement !== target) focusedEditable = null; }, 120);
+      }
+    }, true);
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', schedule, { passive:true });
+    viewport?.addEventListener('scroll', schedule, { passive:true });
+    window.addEventListener('resize', schedule, { passive:true });
+    window.addEventListener('orientationchange', schedule, { passive:true });
+  }
+
   function registerIdealMachineServiceWorker() {
     if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
     let refreshing = false;
@@ -1006,5 +1097,6 @@
     }
   };
   installIdealViewportSizing();
+  installIdealInputKeyboardAvoidance();
   registerIdealMachineServiceWorker();
 })();

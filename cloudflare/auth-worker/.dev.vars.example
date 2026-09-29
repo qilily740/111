@@ -1,0 +1,6 @@
+BETTER_AUTH_SECRET=replace-with-a-random-secret-of-at-least-32-bytes
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+DISCORD_TOKEN_ENCRYPTION_KEY=replace-with-a-random-secret-of-at-least-32-bytes
+QQ_SMTP_USER=
+QQ_SMTP_AUTH_CODE=
