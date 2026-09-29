@@ -49,7 +49,7 @@
       root = document.createElement('div');
       root.id = 'idealAuthRoot';
       root.className = 'ideal-auth-root';
-      root.innerHTML = '<main class="ideal-auth-card" role="dialog" aria-modal="true" aria-labelledby="idealAuthTitle"><div class="ideal-auth-mark">理想机</div><h1 id="idealAuthTitle">账号认证</h1><p class="ideal-auth-intro">请选择注册新账号或登录已有账号。</p><div class="ideal-auth-progress" hidden></div><div class="ideal-auth-notice" role="status" aria-live="polite" hidden></div><div class="ideal-auth-actions"><div class="ideal-auth-choice"><button type="button" data-mode="register-verify">注册新账号</button><button type="button" data-mode="login">登录已有账号</button></div><button type="button" class="ideal-auth-discord" data-action="discord" hidden>使用 Discord 验证</button></div><nav class="ideal-auth-switch" aria-label="账号操作"></nav><form class="ideal-auth-form" novalidate></form><div class="ideal-auth-footer"><span>忘记账号或密码请联系管理员</span><button type="button" data-action="logout" hidden>退出登录</button></div></main>';
+      root.innerHTML = '<main class="ideal-auth-card" role="dialog" aria-modal="true" aria-labelledby="idealAuthTitle"><div class="ideal-auth-mark">理想机</div><h1 id="idealAuthTitle">账号认证</h1><p class="ideal-auth-intro">请选择注册新账号或登录已有账号。</p><div class="ideal-auth-progress" hidden></div><div class="ideal-auth-notice" role="status" aria-live="polite" hidden></div><div class="ideal-auth-actions"><div class="ideal-auth-choice"><button type="button" data-mode="register-verify">注册新账号</button><button type="button" data-mode="login">登录已有账号</button></div><button type="button" class="ideal-auth-discord" data-action="discord" hidden>使用 Discord 验证</button></div><form class="ideal-auth-form" novalidate></form><nav class="ideal-auth-switch" aria-label="账号操作"></nav><div class="ideal-auth-footer"><span>忘记账号或密码请联系管理员</span><button type="button" data-action="logout" hidden>退出登录</button></div></main>';
       document.body.append(root);
       root.addEventListener('click', handleClick);
       root.addEventListener('submit', handleSubmit);
@@ -80,7 +80,7 @@
       PASSWORD_INVALID: '密码至少 12 位，且两次输入必须一致。',
       QQ_EMAIL_REQUIRED: '请填写 QQ 邮箱（@qq.com）。',
       RATE_LIMITED: '操作太频繁，请稍后再试。',
-      EMAIL_SENDER_NOT_CONFIGURED: '邮箱验证码暂时无法发送：管理员还没有配置 QQ 邮箱 SMTP 授权码。',
+      EMAIL_SENDER_NOT_CONFIGURED: '需要先配置 QQ 邮箱 SMTP 授权码，才能发送验证码。',
       AUTH_SERVICE_UNAVAILABLE: '认证服务暂时不可用，请稍后重试。',
       DISCORD_CHECK_FAILED: '暂时无法核验 Discord 资格，请稍后再试。',
       DISCORD_ACCESS_REVOKED: 'Discord 服务器资格已失效，账号暂时无法使用。',
