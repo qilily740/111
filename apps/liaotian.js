@@ -3422,7 +3422,7 @@ ${rerollRule}
   function chatMessageFormatLabel(type) { return ({'':'普通文字',translation:'原文＋译文',tap:'拍一拍',image:'图片', 'image-desc':'图片描述',voice:'语音',video:'视频通话',music:'音乐分享',together:'一起听',location:'定位',transfer:'转账','shopping-request':'商品代付'})[String(type || '')] || '特殊消息'; }
   function chatMessageEditorBaseText(message) { const raw=String(message?.text || ''); return message?.quote?.prefix && raw.startsWith(message.quote.prefix) ? raw.slice(message.quote.prefix.length) : raw; }
   function chatMessageEditorBilingualParts(message) { const text = chatMessageEditorBaseText(message); if (message?.translation) return { text, translation:String(message.translation || '') }; const parsed = idealChatBilingualParse(text); return { text:parsed.text, translation:parsed.translation }; }
-  function chatMessageFormatOptions(message) { const formats=[['','普通文字'],['translation','原文＋译文'],['tap','拍一拍'],['image','图片'],['image-desc','图片描述'],['voice','语音'],['video','视频通话'],['music','音乐分享'],['together','一起听']]; const parts=chatMessageEditorBilingualParts(message); const current=parts.translation ? 'translation' : String(message?.type || ''); if (!formats.some(([value]) => value === current)) formats.push([current, `${chatMessageFormatLabel(current)}（当前格式）`]); return formats.map(([value,label]) => `<option value="${esc(value)}" ${value === current ? 'selected' : ''}>${label}</option>`).join(''); }
+  function chatMessageFormatOptions(message) { const formats=[['','普通文字'],['translation','原文＋译文'],['tap','拍一拍'],['image','图片'],['image-desc','图片描述'],['voice','语音'],['video','视频通话'],['music','音乐分享'],['together','一起听']]; const current=String(message?.type || ''); if (!formats.some(([value]) => value === current)) formats.push([current, `${chatMessageFormatLabel(current)}（当前格式）`]); return formats.map(([value,label]) => `<option value="${esc(value)}" ${value === current ? 'selected' : ''}>${label}</option>`).join(''); }
   function chatMessageEditorText(message) { return chatMessageEditorBilingualParts(message).text; }
   function chatMessageEditorTranslation(message) { return chatMessageEditorBilingualParts(message).translation; }
   function syncChatMessageTranslationEditor() {
@@ -3443,8 +3443,7 @@ ${rerollRule}
       portal.innerHTML = `${backdrop}<section class="chat-transfer-card chat-message-special-editor"><header><span>EDIT TRANSFER</span><button data-chat-message-editor-cancel type="button">×</button></header><h2>编辑转账</h2><label>金额<input id="chatMessageTransferAmount" inputmode="decimal" type="number" min="0.01" step="0.01" value="${esc(message.amount || '')}"></label><label>备注<span class="chat-transfer-optional">可选</span><input id="chatMessageTransferNote" type="text" maxlength="60" value="${esc(message.note || message.text || '')}"></label><footer><button data-chat-message-editor-cancel type="button">取消</button><button data-chat-message-editor-save type="button">保存转账</button></footer></section>`;
     } else {
       const quoteInfo = message.quote ? `<div class="chat-message-editor-quote"><b>引用消息</b><span>${esc(message.quote.speaker || '消息')}：${esc(message.quote.text || '')}</span></div>` : '';
-      const editorParts = chatMessageEditorBilingualParts(message);
-      const translationEditorVisible = editorParts.translation || message.type === 'translation';
+      const translationEditorVisible = message.type === 'translation';
       portal.innerHTML = `${backdrop}<section class="chat-message-editor-card"><header><h2>编辑消息</h2><button data-chat-message-editor-cancel type="button">×</button></header><label class="chat-message-format-editor"><span>消息格式</span><select id="chatMessageEditorType">${chatMessageFormatOptions(message)}</select><small>选择“原文＋译文”后分别填写两种语言，避免内容混在同一个输入框里。</small></label>${quoteInfo}<textarea id="chatMessageEditorInput">${esc(chatMessageEditorText(message))}</textarea><label class="chat-message-translation-editor" data-chat-message-translation-field ${translationEditorVisible ? '' : 'hidden'}><span>译文</span><textarea id="chatMessageEditorTranslation">${esc(chatMessageEditorTranslation(message))}</textarea></label><footer><button data-chat-message-editor-cancel type="button">取消</button><button data-chat-message-editor-save type="button">保存</button></footer></section>`;
     }
     portal.classList.add('is-open');
@@ -3489,6 +3488,7 @@ ${rerollRule}
       const previousType = message.type || '';
       const nextType = document.querySelector('#chatMessageEditorType')?.value || '';
       const translationValue = document.querySelector('#chatMessageEditorTranslation')?.value.trim() || '';
+      const existingTranslation = message.translation || chatMessageEditorBilingualParts(message).translation;
       const quotePrefix = message.quote?.prefix || (message.quote ? `【引用${message.quote.speaker || '消息'}：${message.quote.text || ''}】\n` : '');
       const fullValue = message.quote ? quotePrefix + value : value;
       if (nextType === 'translation') {
@@ -3499,8 +3499,15 @@ ${rerollRule}
         else delete message.translation;
       } else {
         message.type = nextType;
-        delete message.originalText;
-        delete message.translation;
+        if (nextType === '' && existingTranslation) {
+          // Plain messages are edited from one text box. Keep any stored
+          // translated companion attached without showing a second editor.
+          message.originalText = fullValue;
+          message.translation = existingTranslation;
+        } else {
+          delete message.originalText;
+          delete message.translation;
+        }
       }
       if (nextType === 'tap') {
         message.tapActor ||= message.role === 'user' ? 'user' : 'character';
