@@ -846,6 +846,7 @@
   let idealStableStandaloneWidth = 0;
   function installIdealViewportSizing() {
     const root = document.documentElement;
+    let viewportSyncTimer = 0;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || !!window.navigator.standalone;
     const sync = () => {
@@ -872,109 +873,72 @@
         root.style.removeProperty('--ideal-fullscreen-height');
         idealStableStandaloneHeight = 0;
         idealStableStandaloneWidth = 0;
+        // Safari and other mobile browsers keep innerHeight at the layout viewport
+        // while shrinking visualViewport for the on-screen keyboard.
+        keyboardOpen = visualHeight > 150 && visualHeight < layoutHeight - 120;
       }
       // 仅键盘打开时覆盖内容高度；关闭后恢复 CSS 全屏高度和实时安全区。
       if (keyboardOpen) {
-        root.style.setProperty('--ideal-app-height', `${visualHeight + visualTop}px`);
+        root.style.setProperty('--ideal-keyboard-viewport-top', `${visualTop}px`);
+        root.style.setProperty('--ideal-keyboard-viewport-height', `${visualHeight}px`);
+        if (standaloneIOS) root.style.setProperty('--ideal-app-height', `${visualHeight + visualTop}px`);
+        else root.style.removeProperty('--ideal-app-height');
         root.style.setProperty('--ideal-safe-bottom', '0px');
       } else {
+        root.style.removeProperty('--ideal-keyboard-viewport-top');
+        root.style.removeProperty('--ideal-keyboard-viewport-height');
         root.style.removeProperty('--ideal-app-height');
         root.style.removeProperty('--ideal-safe-bottom');
       }
       document.body.classList.toggle('ideal-keyboard-open', keyboardOpen);
-      if (keyboardOpen && visualTop > 0) window.scrollTo(0, 0);
     };
-    window.addEventListener('resize', sync);
+    const scheduleSync = () => {
+      window.clearTimeout(viewportSyncTimer);
+      viewportSyncTimer = window.setTimeout(() => { viewportSyncTimer = 0; sync(); }, 140);
+    };
+    window.addEventListener('resize', scheduleSync);
     window.addEventListener('orientationchange', () => {
       idealStableStandaloneHeight = 0;
       idealStableStandaloneWidth = 0;
-      sync();
-      window.setTimeout(sync, 250);
+      scheduleSync();
+      window.setTimeout(scheduleSync, 250);
     });
-    window.visualViewport?.addEventListener('resize', sync);
-    window.visualViewport?.addEventListener('scroll', sync);
+    window.visualViewport?.addEventListener('resize', scheduleSync);
     sync();
     if (isIOS && isStandalone()) [120, 500, 1500, 3000].forEach(delay => window.setTimeout(sync, delay));
   }
 
   function installIdealInputKeyboardAvoidance() {
     let focusedEditable = null;
-    let frame = 0;
-    const timers = new Set();
+    let adjustTimer = 0;
     const editableSelector = 'textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]), [contenteditable]:not([contenteditable="false"])';
     const editable = target => target?.closest?.(editableSelector) || null;
-    const scrollParents = element => {
-      const parents = [];
-      const root = document.scrollingElement;
-      let parent = element?.parentElement;
-      while (parent && parent !== document.body && parent !== root) {
-        const style = window.getComputedStyle(parent);
-        const canScroll = /(auto|scroll|overlay|hidden)/i.test(style.overflowY) && parent.scrollHeight > parent.clientHeight + 1;
-        if (canScroll) parents.push(parent);
-        parent = parent.parentElement;
-      }
-      if (root && root.scrollHeight > root.clientHeight + 1) parents.push(root);
-      return parents;
-    };
-    const keepVisible = element => {
-      if (!element?.isConnected || document.activeElement !== element) return;
-      const viewport = window.visualViewport;
-      const viewportTop = Math.round(viewport?.offsetTop || 0) + 12;
-      const viewportBottom = Math.round((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) - 14;
-      const parents = scrollParents(element);
-
-      // 从内层编辑面板一路检查到页面滚动区。只滚最近一层时，输入框仍可能
-      // 被外层的固定弹窗或页面容器裁掉。
-      parents.forEach(parent => {
-        const parentRect = parent === document.scrollingElement
-          ? { top: viewportTop, bottom: viewportBottom }
-          : parent.getBoundingClientRect();
-        const style = parent === document.scrollingElement ? null : window.getComputedStyle(parent);
-        const clipsY = parent === document.scrollingElement || !style || /(auto|scroll|overlay|hidden|clip)/i.test(style.overflowY);
-        const top = Math.max(viewportTop, clipsY ? parentRect.top + (parent.clientTop || 0) : viewportTop) + 8;
-        const bottom = Math.min(viewportBottom, clipsY ? parentRect.bottom - (parent.clientTop || 0) : viewportBottom) - 8;
-        const rect = element.getBoundingClientRect();
-        const bottomGap = rect.bottom - bottom;
-        const topGap = top - rect.top;
-        if (bottomGap > 0) parent.scrollTop += bottomGap;
-        else if (topGap > 0) parent.scrollTop -= topGap;
-      });
-      // 只有页面本身没有可滚动祖先时才交给浏览器滚页面；
-      // 对嵌套滚动区再调用 scrollIntoView 会和 iOS 键盘自动平移互相拉扯。
-      if (!parents.length) {
-        const rect = element.getBoundingClientRect();
-        if (rect.bottom > viewportBottom || rect.top < viewportTop) {
-          element.scrollIntoView({ block:'nearest', inline:'nearest', behavior:'auto' });
-        }
-      }
-    };
-    const schedule = () => {
-      if (!focusedEditable) return;
-      if (frame) window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => { frame = 0; keepVisible(focusedEditable); });
-      timers.forEach(timer => window.clearTimeout(timer));
-      timers.clear();
-      [120, 280].forEach(delay => {
-        const timer = window.setTimeout(() => { timers.delete(timer); keepVisible(focusedEditable); }, delay);
-        timers.add(timer);
-      });
-    };
     document.addEventListener('focusin', event => {
       const target = editable(event.target);
       if (!target || target.matches('#chatInput')) return;
       focusedEditable = target;
-      schedule();
+      window.clearTimeout(adjustTimer);
+      // 让 iOS 先完成键盘动画和自身的焦点定位，只在仍被遮挡时校正一次。
+      adjustTimer = window.setTimeout(() => {
+        adjustTimer = 0;
+        if (!target.isConnected || document.activeElement !== target) return;
+        const viewport = window.visualViewport;
+        const top = Math.round(viewport?.offsetTop || 0) + 12;
+        const bottom = Math.round((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) - 16;
+        const rect = target.getBoundingClientRect();
+        if (rect.bottom > bottom || rect.top < top) {
+          target.scrollIntoView({ block:rect.height > bottom - top ? 'start' : 'nearest', inline:'nearest', behavior:'auto' });
+        }
+      }, 320);
     }, true);
     document.addEventListener('focusout', event => {
       const target = editable(event.target);
       if (target && target === focusedEditable) {
-        window.setTimeout(() => { if (document.activeElement !== target) focusedEditable = null; }, 120);
+        window.clearTimeout(adjustTimer);
+        adjustTimer = 0;
+        if (document.activeElement !== target) focusedEditable = null;
       }
     }, true);
-    const viewport = window.visualViewport;
-    viewport?.addEventListener('resize', schedule, { passive:true });
-    window.addEventListener('resize', schedule, { passive:true });
-    window.addEventListener('orientationchange', schedule, { passive:true });
   }
 
   function registerIdealMachineServiceWorker() {

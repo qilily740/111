@@ -13582,3 +13582,36 @@ button.fanfic-home-row-main:active { opacity:.58; }
 .love-letter-log-dock .love-letter-letter-paper { max-height:calc(100vh - 32px); max-height:calc(100dvh - 32px); }
 .love-letter-log-dock .love-letter-letter-paper { overflow:visible; background-color:#f7ede3; background-size:calc(100% - 18px) calc(100% - 18px); background-position:center; background-repeat:no-repeat; }
 .love-letter-log-dock .love-letter-letter-paper { border:0; border-radius:0; background-color:#f7ede3; background-size:calc(100% - 18px) calc(100% - 18px); box-shadow:none; }
+
+/* Keep editing surfaces and their scroll areas above the mobile keyboard. */
+body.ideal-keyboard-open .beauty-modal.is-open,
+body.ideal-keyboard-open .world-editor.is-open,
+body.ideal-keyboard-open > [data-chat-offline-modal].is-open {
+  top:var(--ideal-keyboard-viewport-top, 0px);
+  right:0;
+  bottom:auto;
+  left:0;
+  height:var(--ideal-keyboard-viewport-height, 100dvh);
+}
+body.ideal-keyboard-open .beauty-sheet { min-height:0; }
+body.ideal-keyboard-open .beauty-content {
+  min-height:0;
+  flex:1 1 0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+body.ideal-keyboard-open .world-editor-sheet {
+  max-height:calc(var(--ideal-keyboard-viewport-height, 100dvh) - 24px);
+}
+body.ideal-keyboard-open .world-editor-sheet #worldEditorForm {
+  min-height:0;
+  flex:1 1 auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+body.ideal-keyboard-open .chat-offline-modal .offline-meeting-v2 { min-height:0; }
+body.ideal-keyboard-open .chat-offline-modal .offline-meeting-v2 > .chat-offline-messages {
+  min-height:0;
+  flex:1 1 0;
+}
