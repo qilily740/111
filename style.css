@@ -13583,6 +13583,17 @@ body.ideal-keyboard-open > [data-chat-offline-modal].is-open {
   left:0;
   height:var(--ideal-keyboard-viewport-height, 100dvh);
 }
+/* The chat app is position:fixed, so resizing body alone does not move its
+   composer above iOS's visual keyboard viewport. Resize the app itself while
+   the keyboard is open; the conversation flex layout then keeps its composer
+   at the viewport bottom, including when a quote preview is present. */
+body.ideal-keyboard-open .chat-app.is-open.is-chatting {
+  top:var(--ideal-keyboard-viewport-top, 0px);
+  right:0;
+  bottom:auto;
+  left:0;
+  height:var(--ideal-keyboard-viewport-height, 100dvh);
+}
 body.ideal-keyboard-open .beauty-sheet { min-height:0; }
 body.ideal-keyboard-open .beauty-content {
   min-height:0;

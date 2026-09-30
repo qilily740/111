@@ -6295,16 +6295,6 @@ ${recentConversation}
     if (chatKeyboardPositionFrame) return;
     chatKeyboardPositionFrame = requestAnimationFrame(syncChatKeyboardPosition);
   }
-  function keepQuotedChatInputVisible(input) {
-    if (!input?.isConnected || document.activeElement !== input) return;
-    const viewport = window.visualViewport;
-    const viewportTop = Math.round(viewport?.offsetTop || 0) + 8;
-    const viewportBottom = Math.round((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) - 12;
-    const rect = input.getBoundingClientRect();
-    if (rect.bottom > viewportBottom || rect.top < viewportTop) {
-      input.scrollIntoView({ block: rect.height > viewportBottom - viewportTop ? 'start' : 'nearest', inline: 'nearest', behavior: 'auto' });
-    }
-  }
   window.visualViewport?.addEventListener('resize', scheduleChatKeyboardPosition);
   window.visualViewport?.addEventListener('scroll', scheduleChatKeyboardPosition);
   window.addEventListener('resize', scheduleChatKeyboardPosition);
@@ -6355,11 +6345,8 @@ ${recentConversation}
       syncChatComposerControls(input);
       scheduleChatKeyboardPosition();
       // iOS finishes opening the keyboard after this trusted swipe ends.
-      // Check once after that animation so the focused input stays above it.
-      setTimeout(() => {
-        scheduleChatKeyboardPosition();
-        keepQuotedChatInputVisible(input);
-      }, 360);
+      // Let the keyboard viewport sizing settle before following the latest message.
+      setTimeout(scheduleChatKeyboardPosition, 360);
     }
   }
   const baseRenderWithQuote = render;
