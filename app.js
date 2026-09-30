@@ -901,37 +901,50 @@
     let focusedEditable = null;
     let frame = 0;
     const timers = new Set();
-    const editableSelector = 'textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]), [contenteditable="true"]';
+    const editableSelector = 'textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]), [contenteditable]:not([contenteditable="false"])';
     const editable = target => target?.closest?.(editableSelector) || null;
-    const scrollParent = element => {
+    const scrollParents = element => {
+      const parents = [];
+      const root = document.scrollingElement;
       let parent = element?.parentElement;
-      while (parent && parent !== document.body) {
+      while (parent && parent !== document.body && parent !== root) {
         const style = window.getComputedStyle(parent);
-        const scrollable = /(auto|scroll|overlay)/i.test(style.overflowY) && parent.scrollHeight > parent.clientHeight + 1;
-        if (scrollable) return parent;
+        const canScroll = /(auto|scroll|overlay|hidden)/i.test(style.overflowY) && parent.scrollHeight > parent.clientHeight + 1;
+        if (canScroll) parents.push(parent);
         parent = parent.parentElement;
       }
-      return null;
+      if (root && root.scrollHeight > root.clientHeight + 1) parents.push(root);
+      return parents;
     };
     const keepVisible = element => {
       if (!element?.isConnected || document.activeElement !== element) return;
       const viewport = window.visualViewport;
-      const top = Math.round(viewport?.offsetTop || 0) + 12;
-      const bottom = Math.round((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) - 14;
-      const rect = element.getBoundingClientRect();
-      const bottomGap = rect.bottom - bottom;
-      const topGap = top - rect.top;
-      if (bottomGap <= 0 && topGap <= 0) return;
-      const parent = scrollParent(element);
-      if (parent) {
-        parent.scrollTop += bottomGap > 0 ? bottomGap : -topGap;
-      } else {
-        element.scrollIntoView({ block:'center', inline:'nearest', behavior:'auto' });
-      }
+      const viewportTop = Math.round(viewport?.offsetTop || 0) + 12;
+      const viewportBottom = Math.round((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) - 14;
+      const parents = scrollParents(element);
+
+      // 从内层编辑面板一路检查到页面滚动区。只滚最近一层时，输入框仍可能
+      // 被外层的固定弹窗或页面容器裁掉。
+      parents.forEach(parent => {
+        const parentRect = parent === document.scrollingElement
+          ? { top: viewportTop, bottom: viewportBottom }
+          : parent.getBoundingClientRect();
+        const style = parent === document.scrollingElement ? null : window.getComputedStyle(parent);
+        const clipsY = parent === document.scrollingElement || !style || /(auto|scroll|overlay|hidden|clip)/i.test(style.overflowY);
+        const top = Math.max(viewportTop, clipsY ? parentRect.top + (parent.clientTop || 0) : viewportTop) + 8;
+        const bottom = Math.min(viewportBottom, clipsY ? parentRect.bottom - (parent.clientTop || 0) : viewportBottom) - 8;
+        const rect = element.getBoundingClientRect();
+        const bottomGap = rect.bottom - bottom;
+        const topGap = top - rect.top;
+        if (bottomGap > 0) parent.scrollTop += bottomGap;
+        else if (topGap > 0) parent.scrollTop -= topGap;
+      });
       window.requestAnimationFrame(() => {
         if (!element?.isConnected || document.activeElement !== element) return;
-        const nextRect = element.getBoundingClientRect();
-        if (nextRect.bottom > bottom || nextRect.top < top) element.scrollIntoView({ block:'center', inline:'nearest', behavior:'auto' });
+        const rect = element.getBoundingClientRect();
+        if (rect.bottom > viewportBottom || rect.top < viewportTop) {
+          element.scrollIntoView({ block:'nearest', inline:'nearest', behavior:'auto' });
+        }
       });
     };
     const schedule = () => {
@@ -947,7 +960,7 @@
     };
     document.addEventListener('focusin', event => {
       const target = editable(event.target);
-      if (!target) return;
+      if (!target || target.matches('#chatInput')) return;
       focusedEditable = target;
       schedule();
     }, true);
