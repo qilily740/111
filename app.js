@@ -187,7 +187,13 @@
     if (isOfficialWorkerUrl(requestUrl) && window.IdealMachineAuth?.getToken?.()) {
       const headers = new Headers(typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined);
       new Headers(init.headers || {}).forEach((value, key) => headers.set(key, value));
-      const needsSeparateMusicSession = /(?:music-api|music-auth)\./i.test(requestUrl.hostname) && headers.has('Authorization');
+      const musicApiOrigins = [window.IdealMachineConfig?.neteaseApiBase, window.IdealMachineConfig?.neteaseAuthApiBase]
+        .filter(Boolean)
+        .map(value => { try { return new URL(value, location.href).origin; } catch { return ''; } })
+        .filter(Boolean);
+      const needsSeparateMusicSession = headers.has('Authorization') && (
+        musicApiOrigins.includes(requestUrl.origin) || /(?:music-api|music-auth)\./i.test(requestUrl.hostname)
+      );
       const idealHeader = needsSeparateMusicSession ? 'X-Ideal-Authorization' : 'Authorization';
       if (!headers.has(idealHeader)) headers.set(idealHeader, `Bearer ${window.IdealMachineAuth.getToken()}`);
       init = { ...init, headers };
