@@ -9,7 +9,7 @@
     yinyue:['音乐','assets/icons/default-ios17/yinyue.webp'], doubao:['豆包','assets/icons/default-ios17/doubao.webp'],
     gouwu:['购物','assets/icons/default-ios17/gouwu.webp'], ifshikong:['if时空','assets/icons/default-ios17/ifshikong.webp'],
     qinglvkongjian:['情侣空间','assets/icons/default-ios17/qinglvkongjian.webp?v=20260928-couple-cropped-2'], shijieshu:['世界书','assets/icons/default-ios17/shijieshu.webp'],
-    shezhi:['设置','assets/icons/default-ios17/shezhi.webp'], ideal:['IDEAL','assets/icons/default-ios17/ideal.webp'], jiaocheng:['教程','assets/icons/default-ios17/jiaocheng.webp'], debate:['辩论','assets/icons/default-ios17/debate.webp'],
+    shezhi:['设置','assets/icons/default-ios17/shezhi.webp'], ideal:['Ideal','assets/icons/default-ios17/ideal.webp'], jiaocheng:['教程','assets/icons/default-ios17/jiaocheng.webp'], debate:['辩论','assets/icons/default-ios17/debate.webp'],
     fanfic:['同人文','assets/icons/default-ios17/fanfic.webp'], magazine:['杂志社','assets/icons/default-ios17/magazine.webp']
   };
   const defaults = { enabled:true, idleOpacity:.18, size:60, mode:'pill', apps:['liaotian','ta','jiyiku','shezhi'], side:'right', y:.56 };

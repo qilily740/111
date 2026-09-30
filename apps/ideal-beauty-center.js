@@ -83,6 +83,23 @@
     $('[data-toggle-account]')?.classList.remove('ideal-beauty-hidden');
   }
 
+  function setEditedPreview(source, label = '已选择图片') {
+    const value = String(source || '').trim();
+    const preview = root.querySelector('[data-edit-preview-output]');
+    const status = root.querySelector('[data-edit-preview-name]');
+    if (!preview) return;
+    editedPreviewImage = value;
+    editedPreviewDirty = true;
+    if (value) {
+      preview.src = value;
+      preview.classList.remove('ideal-beauty-hidden');
+    } else {
+      preview.removeAttribute('src');
+      preview.classList.add('ideal-beauty-hidden');
+    }
+    if (status) status.textContent = label;
+  }
+
   function toggleIcon() {
     return view === 'beauty'
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.2 20c.5-3.4 2.8-5.2 6.8-5.2s6.3 1.8 6.8 5.2"/></svg>'
@@ -120,24 +137,28 @@
     const item = selectedAsset();
     if (!item) { screen = 'categories'; return renderCategory(); }
     const source = item.source === 'imported-code' ? '导入的美化码' : item.source === 'generated' ? '线上美化码' : '本地美化';
-    $('[data-content]').innerHTML = `<div class="ideal-beauty-asset-detail"><div class="ideal-beauty-asset-preview">${previewMarkup(item, true)}</div><span class="ideal-beauty-asset-category">${esc(categoryName(categoryForAsset(item)))}</span><h2>${esc(item.name || '未命名美化')}</h2><p>${esc(targetName(item))}</p><div class="ideal-beauty-inline"><b>来源</b><span>${source}</span></div>${item.code ? `<div class="ideal-beauty-inline"><b>美化码</b><span>${esc(item.code)}</span></div>` : ''}<div class="ideal-beauty-actions"><button class="ideal-beauty-action is-primary" data-use-asset type="button">应用</button>${item.code ? '<button class="ideal-beauty-action" data-copy-code type="button">复制美化码</button>' : ''}<button class="ideal-beauty-action" data-edit-asset type="button">编辑效果图</button><button class="ideal-beauty-action is-danger" data-delete-asset type="button">删除</button></div></div>`;
+    const category = categoryName(categoryForAsset(item));
+    const target = targetName(item);
+    const targetMarkup = target && target !== category && target !== item.name ? `<p>${esc(target)}</p>` : '';
+    $('[data-content]').innerHTML = `<div class="ideal-beauty-asset-detail"><div class="ideal-beauty-asset-preview">${previewMarkup(item, true)}</div><div class="ideal-beauty-asset-info"><div class="ideal-beauty-asset-title"><span class="ideal-beauty-asset-category">${esc(category)}</span><h2>${esc(item.name || '未命名美化')}</h2>${targetMarkup}</div><div class="ideal-beauty-asset-meta"><div class="ideal-beauty-inline"><b>来源</b><span>${source}</span></div>${item.code ? `<div class="ideal-beauty-inline"><b>美化码</b><span>${esc(item.code)}</span></div>` : ''}</div></div><div class="ideal-beauty-actions"><button class="ideal-beauty-action is-primary" data-use-asset type="button">应用</button>${item.code ? '<button class="ideal-beauty-action" data-copy-code type="button">复制美化码</button>' : ''}<button class="ideal-beauty-action" data-edit-asset type="button">编辑效果图</button><button class="ideal-beauty-action is-danger" data-delete-asset type="button">删除</button></div></div>`;
   }
 
   function renderAccount() {
     const user = window.IdealMachineAuth?.getUser?.();
     if (!user) {
-      $('[data-content]').innerHTML = '<div class="ideal-beauty-account-page ideal-beauty-profile"><span class="ideal-beauty-kicker">ACCOUNT</span><h2>Ideal-账号</h2><div class="ideal-beauty-inline"><b>登录状态</b><span>未登录</span></div><p class="ideal-beauty-caption">登录后可以同步和管理你的账号。</p><button class="ideal-beauty-action is-primary" data-login type="button">登录或注册</button></div>';
+      $('[data-content]').innerHTML = '<div class="ideal-beauty-account-page ideal-beauty-profile"><div class="ideal-beauty-inline"><b>登录状态</b><span>未登录</span></div><p class="ideal-beauty-caption">登录后可以同步和管理你的账号。</p><button class="ideal-beauty-action is-primary ideal-beauty-account-action" data-login type="button">登录或注册</button></div>';
       return;
     }
     const username = String(user.username || user.name || user.email || '已登录');
     const status = user.discordUserId ? 'Discord 已关联' : user.discordVerifiedAt ? 'Discord 已验证' : '账号已登录';
-    $('[data-content]').innerHTML = `<div class="ideal-beauty-account-page ideal-beauty-profile"><span class="ideal-beauty-kicker">ACCOUNT</span><h2>Ideal-账号</h2><div class="ideal-beauty-inline"><b>账号</b><span>${esc(username)}</span></div><div class="ideal-beauty-inline"><b>状态</b><span>${esc(status)}</span></div><button class="ideal-beauty-action is-danger" data-logout type="button">退出账号</button></div>`;
+    $('[data-content]').innerHTML = `<div class="ideal-beauty-account-page ideal-beauty-profile"><div class="ideal-beauty-inline"><b>账号</b><span>${esc(username)}</span></div><div class="ideal-beauty-inline"><b>状态</b><span>${esc(status)}</span></div><button class="ideal-beauty-action is-danger ideal-beauty-account-action" data-logout type="button">退出账号</button></div>`;
   }
 
   function render() {
     try {
       $('[data-view-title]').textContent = view === 'beauty' ? 'Ideal-美化' : 'Ideal-账号';
       $('[data-category-tabs]').classList.toggle('ideal-beauty-hidden', view !== 'beauty');
+      $('.ideal-beauty-page').classList.toggle('is-asset-view', view === 'beauty' && screen === 'asset');
       const toggle = $('[data-toggle-account]');
       toggle.innerHTML = toggleIcon();
       toggle.setAttribute('aria-label', view === 'beauty' ? '切换到 Ideal-账号' : '切换到 Ideal-美化');
@@ -210,6 +231,10 @@
     });
   }
 
+  function announceImportedAsset(asset) {
+    window.dispatchEvent(new CustomEvent('ideal-machine-beauty-imported', { detail: { appId:asset.appId, sectionId:asset.sectionId, name:asset.name || '导入的美化', css:String(asset.css || ''), code:asset.code || '', previewImage:asset.previewImage || '' } }));
+  }
+
   async function importBatch(codes, jsonFiles, button) {
     const codeList = String(codes || '').split(/[\n,，]+/).map(value => value.trim().toUpperCase()).filter(Boolean);
     if (!codeList.length && !jsonFiles.length) return toast('请填写美化码或选择 JSON 文件');
@@ -226,7 +251,7 @@
           const target = api.find(item.appId, item.sectionId);
           if (typeof item.css !== 'string' || !target) throw new Error('美化码对应的分类当前不可用。');
           const asset = api.library.add({ name:item.name || '未命名美化', appId:item.appId, sectionId:item.sectionId, css:item.css, code:item.code || code, previewImage:item.previewImage || '', source:'imported-code' });
-          api.applyBeauty(item); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
+          api.applyBeauty(item); announceImportedAsset(asset); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
         } catch (error) { errors.push(`${code}：${error.message || '导入失败'}`); }
       }
       for (const file of jsonFiles) {
@@ -234,7 +259,7 @@
           const entries = parseJsonEntries(await file.text(), file.name);
           for (const entry of entries) {
             const asset = api.library.add({ name:entry.name || '未命名美化', appId:entry.appId, sectionId:entry.sectionId, css:entry.css, code:entry.code || '', previewImage:entry.previewImage || '', source:'json' });
-            api.applyBeauty(entry); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
+            api.applyBeauty(entry); announceImportedAsset(asset); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
           }
         } catch (error) { errors.push(error.message || `${file.name} 导入失败`); }
       }
@@ -278,7 +303,28 @@
     if (button.matches('[data-edit-asset]')) {
       const item = selectedAsset(); if (!item) return;
       editedPreviewImage = item.previewImage || ''; editedPreviewDirty = false;
-      openDialog(`<h2>编辑效果图</h2><label class="ideal-beauty-field">名称<input data-edit-name maxlength="60" value="${esc(item.name || '')}"></label><label class="ideal-beauty-field">替换最终效果图<span class="ideal-beauty-file-picker"><strong>&#x9009;&#x62e9;&#x6548;&#x679c;&#x56fe;</strong><small data-edit-preview-name>&#x5c1a;&#x672a;&#x9009;&#x62e9;&#x6587;&#x4ef6;</small><input data-edit-preview type="file" accept="image/png,image/jpeg,image/webp"></span></label>${item.previewImage ? `<img class="ideal-beauty-dialog-image" data-edit-preview-output src="${esc(item.previewImage)}" alt="效果图预览">` : '<img class="ideal-beauty-dialog-image ideal-beauty-hidden" data-edit-preview-output alt="效果图预览">'}<div class="ideal-beauty-dialog-actions"><button class="ideal-beauty-action" data-dialog-cancel type="button">取消</button><button class="ideal-beauty-action is-primary" data-save-asset type="button">保存</button></div>`);
+      openDialog(`<h2>编辑效果图</h2><label class="ideal-beauty-field">名称<input data-edit-name maxlength="60" value="${esc(item.name || '')}"></label><div class="ideal-beauty-field"><span>替换最终效果图</span><div class="ideal-beauty-preview-sources"><button class="ideal-beauty-file-picker" data-edit-preview-album type="button"><strong>相册选择</strong><small data-edit-preview-name>${item.previewImage ? '当前效果图' : '选择图片'}</small></button><label class="ideal-beauty-file-picker"><strong>本地选择</strong><small>PNG、JPG、WEBP</small><input data-edit-preview-file type="file" accept="image/png,image/jpeg,image/webp"></label><button class="ideal-beauty-preview-reset" data-edit-preview-reset type="button">恢复默认</button></div><div class="ideal-beauty-preview-url"><input data-edit-preview-url type="url" placeholder="粘贴图片 URL"><button class="ideal-beauty-action" data-edit-preview-url-apply type="button">使用 URL</button></div></div>${item.previewImage ? `<img class="ideal-beauty-dialog-image" data-edit-preview-output src="${esc(item.previewImage)}" alt="效果图预览">` : '<img class="ideal-beauty-dialog-image ideal-beauty-hidden" data-edit-preview-output alt="效果图预览">'}<div class="ideal-beauty-dialog-actions"><button class="ideal-beauty-action" data-dialog-cancel type="button">取消</button><button class="ideal-beauty-action is-primary" data-save-asset type="button">保存</button></div>`);
+      return;
+    }
+    if (button.matches('[data-edit-preview-album]')) {
+      if (!window.IdealMachineAlbum?.pick) return toast('相册 App 还没有准备好，请先打开相册导入图片。');
+      window.IdealMachineAlbum.pick(value => {
+        const source = typeof value === 'string' ? value : value?.url || value?.source || value?.src || '';
+        if (!source) return;
+        const resolved = source.startsWith('idb:image:') && window.IdealMachineGetImage ? window.IdealMachineGetImage(source) : Promise.resolve(source);
+        Promise.resolve(resolved).then(image => { if (image) setEditedPreview(image, '已从相册选择'); }).catch(() => toast('相册图片读取失败'));
+      });
+      return;
+    }
+    if (button.matches('[data-edit-preview-url-apply]')) {
+      const value = root.querySelector('[data-edit-preview-url]')?.value.trim() || '';
+      if (!value) return toast('请先输入图片 URL');
+      if (!/^(?:https?:\/\/|data:image\/)/i.test(value)) return toast('请输入有效的图片 URL');
+      setEditedPreview(value, '已使用图片 URL');
+      return;
+    }
+    if (button.matches('[data-edit-preview-reset]')) {
+      setEditedPreview('', '已恢复默认效果图');
       return;
     }
     if (button.matches('[data-save-asset]')) {
@@ -334,12 +380,12 @@
       if (label) label.textContent = files.length ? `\u5df2\u9009\u62e9 ${files.length} \u5f20\u56fe\u7247` : '\u5c1a\u672a\u9009\u62e9\u6587\u4ef6';
       return;
     }
-    if (event.target.matches('[data-edit-preview]')) {
-      const file = event.target.files?.[0]; const preview = root.querySelector('[data-edit-preview-output]');
+    if (event.target.matches('[data-edit-preview-file]')) {
+      const file = event.target.files?.[0];
+      if (!file) return;
       const label = root.querySelector('[data-edit-preview-name]');
-      if (label) label.textContent = file ? file.name : '\u5c1a\u672a\u9009\u62e9\u6587\u4ef6';
-      if (!file || !preview) return;
-      api.safeImage(file).then(value => { editedPreviewImage = value; editedPreviewDirty = true; preview.src = value; preview.classList.remove('ideal-beauty-hidden'); }).catch(error => toast(error.message));
+      if (label) label.textContent = file.name;
+      api.safeImage(file).then(value => setEditedPreview(value, '已选择本地图片')).catch(error => toast(error.message));
     }
   });
 

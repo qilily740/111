@@ -152,6 +152,11 @@
     // 同一个 App 可能同时有文件夹入口和隐藏的真实桌面来源，真实来源优先。
     return matches.find(item => item.dataset.desktopApp) || matches[0];
   }
+  function normalizeIdealAppName() {
+    document.querySelectorAll('[data-app-key="ideal"] .app-name, [data-app-key="ideal"] .dock-name, [data-folder-app="ideal"] .folder-app-name, [data-created-folder-app="ideal"] .folder-app-name').forEach(node => {
+      if (node.textContent.trim().toUpperCase() === 'IDEAL') node.textContent = 'Ideal';
+    });
+  }
   function syncFolderMiniIcon(mini, sourceIcon) {
     if (!mini) return;
     const customImage = sourceIcon?.classList.contains('has-custom-image') && sourceIcon.style.backgroundImage;
@@ -1554,6 +1559,7 @@
   desktop.scrollLeft = 0;
   document.body.classList.remove('desktop-layout-pending');
   state.folders.forEach(folder => refreshFolderLauncher(folder));
+  normalizeIdealAppName();
   refreshCreativeFolderIcon();
   window.IdealMachineRefreshCreativeFolderIcon = refreshCreativeFolderIcon;
   ensureWidgetControls();

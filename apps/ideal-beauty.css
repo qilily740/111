@@ -45,6 +45,18 @@
 .ideal-beauty-file-picker strong::before{content:'↥';display:grid;place-items:center;width:25px;height:25px;border-radius:8px;background:#242424;color:#fff;font-size:15px}
 .ideal-beauty-file-picker small{min-width:0;overflow:hidden;color:#92928d;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
 .ideal-beauty-file-picker input[type=file]{position:absolute;inset:0;width:100%;height:100%;min-height:0;padding:0;border:0;opacity:0;cursor:pointer}
+.ideal-beauty-file-picker[data-edit-preview-album]{font:inherit;text-align:left}
+.ideal-beauty-preview-sources{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ideal-beauty-preview-sources .ideal-beauty-file-picker{box-sizing:border-box;min-width:0;min-height:40px;padding:6px 8px}
+.ideal-beauty-preview-sources .ideal-beauty-file-picker strong{justify-content:center;font-size:11px;white-space:nowrap}
+.ideal-beauty-preview-sources .ideal-beauty-file-picker strong::before{display:none}
+.ideal-beauty-preview-sources .ideal-beauty-file-picker small{font-size:9px;text-align:right}
+.ideal-beauty-preview-url{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:8px}
+.ideal-beauty-preview-url input{box-sizing:border-box;width:100%;min-width:0;min-height:42px;padding:0 11px;border:1px solid rgba(0,0,0,.12);border-radius:11px;background:#fff;color:#222;font:inherit;font-size:12px;outline:0}
+.ideal-beauty-preview-url .ideal-beauty-action{min-height:42px;padding:0 12px;white-space:nowrap}
+.ideal-beauty-preview-reset{box-sizing:border-box;min-width:0;min-height:40px;padding:6px 8px;border:1px solid rgba(0,0,0,.14);border-radius:13px;background:linear-gradient(135deg,rgba(255,255,255,.92),rgba(242,242,238,.84));color:#555;font:inherit;font-size:11px;cursor:pointer;text-align:center;white-space:nowrap;transition:border-color .14s ease,transform .14s ease}
+.ideal-beauty-preview-reset:hover{border-color:rgba(0,0,0,.28)}
+.ideal-beauty-preview-reset:active{transform:scale(.98)}
 .ideal-beauty-import-items{display:grid;gap:5px;max-height:130px;overflow:auto;margin:0 0 14px;padding:0 0 0 19px;color:#555;font-size:11px;line-height:1.5}
 .ideal-beauty-import-items small{margin-left:4px;color:#999;font-size:9px}
 .ideal-beauty-code-card{padding:8px 8px 14px;border:1px solid #e7e4de;border-radius:4px;background:#fff;color:#202020;box-shadow:2px 5px 15px rgba(0,0,0,.1);transform:rotate(-.35deg)}
@@ -56,3 +68,86 @@
 .ideal-beauty-code-copy b{font-size:13px;font-weight:650}
 .ideal-beauty-code-copy span{color:#777;font-size:10px;letter-spacing:.04em}
 @media(prefers-color-scheme:dark){.ideal-beauty-file-picker{border-color:rgba(255,255,255,.13);background:linear-gradient(135deg,#30302e,#252524);color:#eee}.ideal-beauty-file-picker strong::before{background:#eee;color:#222}.ideal-beauty-file-picker small,.ideal-beauty-import-note{color:#aaa}.ideal-beauty-import-items{color:#ddd}.ideal-beauty-code-card,.ideal-beauty-code-copy{background:#fff;color:#202020;border-color:#e7e4de}.ideal-beauty-code-copy span{color:#777}}
+
+/* 具体美化详情：按视口自适应，预览和详情固定在一整面内。 */
+.ideal-beauty-page.is-asset-view .ideal-beauty-content{display:flex;min-height:0;overflow:hidden;padding:clamp(4px,1.2vw,14px) 1px 0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-detail{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(230px,.92fr);gap:clamp(12px,2.4vw,28px);width:100%;height:100%;min-height:0;padding:0 1px}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-preview{width:100%;height:auto;min-height:0;max-height:min(76svh,700px);aspect-ratio:9/16;align-self:center;justify-self:center;border-radius:clamp(14px,2vw,20px)}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-preview .ideal-beauty-code-image,.ideal-beauty-page.is-asset-view .ideal-beauty-asset-preview .ideal-beauty-code-placeholder{width:100%;height:100%;min-height:0;max-height:none;aspect-ratio:auto;object-fit:contain}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info{display:flex;min-width:0;min-height:0;flex-direction:column;justify-content:center;overflow:hidden;padding:clamp(2px,1vw,12px) 0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info h2{font-size:clamp(18px,2.6vw,26px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info>p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info .ideal-beauty-inline{min-width:0;padding:clamp(8px,1.2vh,15px) 0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info .ideal-beauty-inline span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info .ideal-beauty-actions{margin-top:clamp(10px,1.8vh,18px)}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info .ideal-beauty-action{min-height:clamp(32px,5vh,42px);padding:clamp(6px,1vh,9px) clamp(8px,1.2vw,13px);font-size:clamp(10px,1.4vw,12px)}
+@media(max-width:600px){.ideal-beauty-page.is-asset-view .ideal-beauty-content{padding-top:2px}.ideal-beauty-page.is-asset-view .ideal-beauty-asset-detail{grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);gap:10px}.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info .ideal-beauty-actions{gap:6px}.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info .ideal-beauty-action{padding-left:7px;padding-right:7px}}
+
+/* 详情页保持左图右信息；效果图按竖版壁纸比例显示。 */
+@media(max-width:700px){
+  .ideal-beauty-page.is-asset-view .ideal-beauty-content{overflow:hidden;padding:4px 0 0}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-detail{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);grid-template-rows:minmax(0,1fr);gap:clamp(10px,2.4vw,18px);height:100%;padding:0}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-preview{width:100%;height:auto;min-height:0;max-height:min(72svh,620px);aspect-ratio:9/16;justify-self:center}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-preview .ideal-beauty-code-image,.ideal-beauty-page.is-asset-view .ideal-beauty-asset-preview .ideal-beauty-code-placeholder{height:100%;min-height:0;max-height:none;aspect-ratio:auto}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-info{justify-content:center;overflow:visible;padding:0 2px}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-info h2{font-size:clamp(18px,5vw,26px)}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-info .ideal-beauty-inline{padding:clamp(8px,1.2vh,13px) 0}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-info .ideal-beauty-actions{display:flex;flex-wrap:wrap;margin-top:clamp(10px,1.6vh,16px);gap:7px}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-info .ideal-beauty-action{min-height:36px;padding:7px 9px;font-size:clamp(10px,2.1vw,12px)}
+}
+
+/* 详情页精确布局：左侧预览跨行，右侧信息分层，底部按钮横跨整行。 */
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-detail{grid-template-columns:minmax(0,1.25fr) minmax(190px,.9fr);grid-template-rows:auto auto auto;align-items:start;gap:clamp(12px,2vw,24px)}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-preview{grid-column:1;grid-row:1 / span 2;width:100%;height:auto;max-height:none;aspect-ratio:9/16;align-self:start}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info{display:contents}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title{grid-column:2;grid-row:1;min-width:0;padding:clamp(4px,1vw,12px) 0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title h2{margin:6px 0 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title p{margin:0;color:#888;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta{grid-column:2;grid-row:2;min-width:0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline{min-width:0;padding:clamp(9px,1.3vh,15px) 0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.ideal-beauty-page.is-asset-view .ideal-beauty-actions{grid-column:1 / -1;grid-row:3;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;margin:0;padding-top:clamp(4px,1vh,10px)}
+@media(max-width:700px){
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-detail{grid-template-columns:minmax(0,1.25fr) minmax(0,.9fr);grid-template-rows:auto auto auto;gap:10px}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-title{padding:2px 0}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-title h2{font-size:clamp(18px,5vw,25px)}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline{padding:8px 0}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-actions{gap:7px;padding-top:4px}
+  .ideal-beauty-page.is-asset-view .ideal-beauty-actions .ideal-beauty-action{min-height:36px;padding:7px 10px;font-size:clamp(10px,2.1vw,12px)}
+}
+
+/* 详情信息收紧；美化码允许完整换行，底部四个操作等宽铺满。 */
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title{padding:0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title .ideal-beauty-asset-category{margin-top:0;line-height:1.2}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title h2{margin:3px 0 2px;line-height:1.15;white-space:normal}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title p{line-height:1.25}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:12px;padding:6px 0;line-height:1.3}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline span{white-space:normal;overflow-wrap:anywhere;text-align:right;line-height:1.3}
+.ideal-beauty-page.is-asset-view .ideal-beauty-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(7px,1.6vw,14px);align-items:stretch}
+.ideal-beauty-page.is-asset-view .ideal-beauty-actions .ideal-beauty-action{width:100%;min-width:0;margin:0;padding-left:6px;padding-right:6px;white-space:nowrap}
+
+/* 详情最终结构：右侧独立信息列，底部四个按钮始终同一行。 */
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-detail{grid-template-columns:minmax(0,1.25fr) minmax(190px,.9fr);grid-template-rows:minmax(0,1fr) auto;align-items:start;gap:clamp(12px,2vw,24px)}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-preview{grid-column:1;grid-row:1;width:100%;height:auto;max-height:min(72svh,620px);aspect-ratio:9/16;align-self:start}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info{grid-column:2;grid-row:1;display:flex;min-width:0;min-height:0;flex-direction:column;justify-content:flex-start;overflow:hidden;padding:0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info{padding-top:clamp(12px,2.4vh,28px)}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title{padding:0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title h2{margin:3px 0 2px;line-height:1.15}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title p{line-height:1.25}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta{margin-top:clamp(10px,2vh,22px)}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:12px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.1);line-height:1.3}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline span{min-width:0;overflow-wrap:anywhere;white-space:normal;text-align:right;line-height:1.3}
+.ideal-beauty-page.is-asset-view .ideal-beauty-actions{grid-column:1 / -1;grid-row:2;display:flex!important;flex-wrap:nowrap!important;align-items:stretch;gap:clamp(8px,1.6vw,14px);width:100%;margin:0;padding-top:4px}
+.ideal-beauty-page.is-asset-view .ideal-beauty-actions .ideal-beauty-action{flex:1 1 0!important;width:auto!important;min-width:0!important;margin:0;padding:8px 6px;white-space:nowrap}
+.ideal-beauty-account-action{display:block;margin:clamp(24px,4vh,42px) auto 0}
+.ideal-beauty-account-page .ideal-beauty-inline{justify-content:flex-start;gap:18px}
+.ideal-beauty-account-page .ideal-beauty-inline span{flex:0 0 auto;text-align:left}
+
+/* 详情信息使用标题行 + 具体内容行；按钮紧跟内容区，而不是贴页面底部。 */
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-detail{height:max-content;min-height:0;align-content:start}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta{margin-top:clamp(12px,2vh,20px)}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:9px 0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline + .ideal-beauty-inline{margin-top:8px}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline b{font-size:14px;line-height:1.2}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline span{width:100%;text-align:left;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
+.ideal-beauty-page.is-asset-view .ideal-beauty-actions{margin-top:8px;padding-top:0}

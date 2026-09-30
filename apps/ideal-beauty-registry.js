@@ -37,7 +37,9 @@
     const panel = document.createElement('section');
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-labelledby', 'idealExportTitle');
     panel.style.cssText = 'box-sizing:border-box;width:min(420px,100%);padding:24px;border:1px solid rgba(0,0,0,.08);border-radius:22px;background:#fff;color:#202124;box-shadow:0 24px 80px rgba(0,0,0,.24);font:14px/1.5 system-ui,-apple-system,sans-serif';
-    panel.innerHTML = '<h2 id="idealExportTitle" style="margin:0 0 8px;font-size:20px">选择导出方式</h2><p style="margin:0 0 18px;color:#696b70">导出为 JSON 文件，或生成可分享的美化码。</p><div data-export-message style="display:none;margin:0 0 16px;padding:12px;border-radius:12px;background:#f4f5f7;overflow-wrap:anywhere"></div><div data-export-actions style="display:grid;gap:10px"><button type="button" data-export-json>导出 JSON</button><button type="button" data-export-code>生成美化码</button><button type="button" data-export-cancel>取消</button></div>';
+    const exportableAssets = codeAssets.filter(asset => String(asset.css || '').trim());
+    const nameFields = exportableAssets.map((asset, index) => `<label style="display:grid;gap:6px;color:#696b70;font-size:12px">${exportableAssets.length > 1 ? `<span>${esc(asset.name || `第 ${index + 1} 个美化`)}</span>` : '<span>美化名称</span>'}<input data-export-name-index="${index}" type="text" maxlength="60" value="${esc(asset.name || '')}" placeholder="例如：紫色聊天主题" style="box-sizing:border-box;width:100%;min-height:40px;border:1px solid #dedfe3;border-radius:10px;padding:9px 11px;background:#fff;color:#202124;font:inherit"></label>`).join('');
+    panel.innerHTML = `<h2 id="idealExportTitle" style="margin:0 0 8px;font-size:20px">选择导出方式</h2><p style="margin:0 0 18px;color:#696b70">导出为 JSON 文件，或生成可分享的美化码。</p><div data-export-name-fields style="display:grid;gap:10px;margin:0 0 16px">${nameFields}</div><div data-export-message style="display:none;margin:0 0 16px;padding:12px;border-radius:12px;background:#f4f5f7;overflow-wrap:anywhere"></div><div data-export-actions style="display:grid;gap:10px"><button type="button" data-export-json>导出 JSON</button><button type="button" data-export-code>生成美化码</button><button type="button" data-export-cancel>取消</button></div>`;
     panel.querySelectorAll('button').forEach(button => { button.style.cssText = 'min-height:42px;padding:10px 14px;border:1px solid #dedfe3;border-radius:12px;background:#fff;color:inherit;font:inherit;font-weight:600;cursor:pointer'; });
     panel.querySelector('[data-export-code]').style.background = '#202124'; panel.querySelector('[data-export-code]').style.color = '#fff';
     overlay.appendChild(panel); document.body.appendChild(overlay);
@@ -47,7 +49,7 @@
     panel.querySelector('[data-export-json]').addEventListener('click', () => { close(); jsonExport?.(); });
     panel.querySelector('[data-export-code]').addEventListener('click', async event => {
       const button = event.currentTarget; const message = panel.querySelector('[data-export-message]');
-      const assets = codeAssets.filter(asset => String(asset.css || '').trim());
+      const assets = exportableAssets.map((asset, index) => ({ ...asset, name:panel.querySelector(`[data-export-name-index="${index}"]`)?.value.trim() || asset.name || '未命名美化' }));
       if (!assets.length) { message.textContent = '当前没有可生成美化码的 CSS。'; message.style.display = 'block'; return; }
       button.disabled = true; button.textContent = '生成中…';
       panel.querySelector('[data-export-json]').disabled = true; panel.querySelector('[data-export-cancel]').disabled = true;
