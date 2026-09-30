@@ -2,6 +2,7 @@
   const adapters = window.IdealMachineBeautyAdapters || {};
   const registry = new Map();
   const libraryKey = 'ideal-machine-my-beauties-v1';
+  const beautyEndpoint = { base:'', checkedAt:0, pending:null };
   const readLibrary = () => { try { const value = JSON.parse(localStorage.getItem(libraryKey) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
   const writeLibrary = value => localStorage.setItem(libraryKey, JSON.stringify(value));
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
@@ -35,10 +36,32 @@
   }
   function updateAsset(id, patch) { const list = readLibrary(); const item = list.find(entry => entry.id === id); if (!item) return null; Object.assign(item, patch, { updatedAt:new Date().toISOString() }); writeLibrary(list); return item; }
   function removeAsset(id) { writeLibrary(readLibrary().filter(item => item.id !== id)); }
+  async function chooseBeautyBase(primary, fallback) {
+    if (!fallback || primary === fallback) return primary;
+    if (beautyEndpoint.base && Date.now() - beautyEndpoint.checkedAt < 60_000) return beautyEndpoint.base;
+    if (!beautyEndpoint.pending) {
+      beautyEndpoint.pending = (async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3000);
+        try {
+          const response = await fetch(`${primary}/api/beauty/codes`, { method:'OPTIONS', credentials:'omit', cache:'no-store', signal:controller.signal });
+          return response.ok ? primary : fallback;
+        } catch { return fallback; }
+        finally { clearTimeout(timer); }
+      })().then(base => {
+        beautyEndpoint.base = base;
+        beautyEndpoint.checkedAt = Date.now();
+        return base;
+      }).finally(() => { beautyEndpoint.pending = null; });
+    }
+    return beautyEndpoint.pending;
+  }
   async function api(path, options = {}) {
     const config = window.IdealMachineConfig || {};
-    const base = String(config.beautyApiBase || '').replace(/\/+$/, '');
-    if (!base) throw new Error('美化码云端服务尚未配置。请先部署 cloudflare/beauty-worker 并设置 beautyApiBase。');
+    const primary = String(config.beautyApiBase || '').replace(/\/+$/, '');
+    if (!primary) throw new Error('美化码云端服务尚未配置。请先部署 cloudflare/beauty-worker 并设置 beautyApiBase。');
+    const fallback = String(config.beautyApiFallbackBase || '').replace(/\/+$/, '');
+    const base = await chooseBeautyBase(primary, fallback);
     const token = window.IdealMachineAuth?.getToken?.() || '';
     const headers = new Headers(options.headers || {}); if (token) headers.set('Authorization', `Bearer ${token}`);
     if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
