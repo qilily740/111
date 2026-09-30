@@ -20,6 +20,7 @@ html.ideal-auth-locked body {
 .ideal-auth-progress[hidden], .ideal-auth-actions[hidden] { display: none; }
 .ideal-auth-notice { margin: 0 0 12px; padding: 9px 11px; border: 1px solid #d5d5d5; border-radius: 10px; background: #f1f1f1; color: #333; font-size: 12px; line-height: 1.45; }
 .ideal-auth-notice[hidden] { display: none; }
+.ideal-auth-notice[data-type="banned"] { border: 2px solid #cf2525; background: #fff0f0; color: #a20e0e; font-weight: 750; font-size: 14px; }
 .ideal-auth-actions { margin: 0 0 13px; }
 .ideal-auth-banned-export { display: grid; gap: 8px; margin: 0 0 12px; }
 .ideal-auth-banned-export[hidden] { display: none; }

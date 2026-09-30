@@ -68,6 +68,63 @@
     box.textContent = text || '';
   }
 
+  async function exportLocalBackup() {
+    try { await window.IdealMachineStorageReady; } catch {}
+    const localStorageData = {};
+    Object.keys(localStorage).forEach(key => {
+      try { localStorageData[key] = JSON.parse(localStorage.getItem(key)); }
+      catch { localStorageData[key] = localStorage.getItem(key); }
+    });
+    const stores = [
+      { database: 'ideal-machine-data', store: 'records', keyPath: true },
+      { database: 'ideal-machine-images', store: 'images', keyPath: true },
+      { database: 'ideal-machine-assets', store: 'images', keyPath: false },
+      { database: 'ideal-machine-music-files', store: 'tracks', keyPath: false }
+    ];
+    const indexedDBData = {};
+    const blobDataUrl = blob => new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(blob);
+    });
+    for (const source of stores) {
+      const db = await new Promise(resolve => {
+        if (!window.indexedDB) return resolve(null);
+        const request = indexedDB.open(source.database);
+        request.onupgradeneeded = () => {
+          if (!request.result.objectStoreNames.contains(source.store)) request.result.createObjectStore(source.store, source.keyPath ? { keyPath: 'key' } : undefined);
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => resolve(null);
+      });
+      let rows = [];
+      if (db?.objectStoreNames.contains(source.store)) rows = await new Promise(resolve => {
+        const transaction = db.transaction(source.store);
+        const store = transaction.objectStore(source.store);
+        const keys = store.getAllKeys(), values = store.getAll();
+        transaction.oncomplete = () => resolve((keys.result || []).map((key, index) => ({ key, value: (values.result || [])[index] })));
+        transaction.onerror = () => resolve([]);
+      });
+      db?.close();
+      indexedDBData[source.database] ||= {};
+      indexedDBData[source.database][source.store] = [];
+      for (const row of rows) {
+        let value = source.keyPath && row.value && typeof row.value === 'object' && Object.prototype.hasOwnProperty.call(row.value, 'value') ? row.value.value : row.value;
+        if (value instanceof Blob) value = { kind: 'blob', data: await blobDataUrl(value), type: value.type || '', name: value.name || '', lastModified: value.lastModified || 0 };
+        else value = { kind: 'value', value };
+        indexedDBData[source.database][source.store].push({ key: row.key, value });
+      }
+    }
+    const backup = { format: 'ideal-machine-backup', version: 3, exportedAt: new Date().toISOString(), localStorage: localStorageData, indexedDB: indexedDBData };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `理想机-全部数据-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   function friendlyError(error) {
     const errors = {
       DISCORD_NOT_CONFIGURED: '管理员尚未配置 Discord 验证。',
@@ -189,7 +246,7 @@
     try { await action(); }
     catch (error) {
       if (error?.code === 'ACCOUNT_BANNED') bannedReason = error?.details?.reason || '管理员封禁';
-      message(friendlyError(error));
+      message(friendlyError(error), error?.code === 'ACCOUNT_BANNED' ? 'banned' : 'error');
     }
     finally { busy = false; render(); }
   }
@@ -199,9 +256,7 @@
     if (!button) return;
     if (button.dataset.action === 'back-to-login') { bannedReason = ''; mode = 'login'; message(''); render(); return; }
     if (button.dataset.action === 'export-local-data') {
-      const exportData = window.IdealMachineExportLocalData;
-      if (typeof exportData !== 'function') return message('数据导出模块尚未准备好，请稍后重试。');
-      await run(() => exportData());
+      await run(exportLocalBackup);
       return;
     }
     if (button.dataset.mode) {
