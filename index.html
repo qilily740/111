@@ -15,7 +15,8 @@
   <link id="idealMachineAppleTouchIcon" rel="apple-touch-icon" href="assets/icons/ideal-orbit-day.png">
   <link id="idealMachineManifest" rel="manifest" href="site.webmanifest">
   <link rel="stylesheet" href="style.css?v=20260930-plain-message-editor-2">
-  <link rel="stylesheet" href="apps/ideal-auth.css?v=20260930-ban-location-export-2">
+  <link rel="stylesheet" href="apps/ideal-beauty.css?v=20260930-final-preview-3">
+  <link rel="stylesheet" href="apps/ideal-auth.css?v=20260930-auth-charset-1">
 </head>
 <body class="desktop-layout-pending">
   <main class="desktop-scroll-wrap">
@@ -108,6 +109,7 @@
     if (!window.IdealMachineConfig.neteaseApiBase) window.IdealMachineConfig.neteaseApiBase = 'https://music.ideal-laedi.cc.cd/api';
     if (!window.IdealMachineConfig.pushApiBase) window.IdealMachineConfig.pushApiBase = 'https://push.ideal-laedi.cc.cd';
     if (!window.IdealMachineConfig.authApiBase) window.IdealMachineConfig.authApiBase = 'https://auth.ideal-laedi.cc.cd';
+    if (!window.IdealMachineConfig.beautyApiBase) window.IdealMachineConfig.beautyApiBase = 'https://ideal-machine-beauty.ideal-machine.workers.dev';
     if (!window.IdealMachineConfig.activationApiBase) window.IdealMachineConfig.activationApiBase = 'https://activation.ideal-laedi.cc.cd';
     window.IdealMachineConfig.neteaseAuthApiBase = window.IdealMachineConfig.neteaseApiBase;
     if (!window.IdealMachineConfig.aiProxyBase) window.IdealMachineConfig.aiProxyBase = 'http://localhost:3210/api/ai';
@@ -150,6 +152,9 @@
             script.onload = script.onerror = resolve;
             document.body.appendChild(script);
           });
+        }
+        for (const source of ['apps/ideal-beauty-registry.js?v=20260930-final-preview-3', 'apps/ideal-beauty-center.js?v=20260930-final-preview-3']) {
+          await new Promise(resolve => { const script = document.createElement('script'); script.src = source; script.onload = script.onerror = resolve; document.body.appendChild(script); });
         }
       })();
     </script>

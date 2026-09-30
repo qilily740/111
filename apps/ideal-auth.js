@@ -388,7 +388,7 @@
     getToken: () => token,
     getUser: () => user,
     isAuthenticated: () => Boolean(user),
-    logout: () => { setToken(''); user = null; render(); },
+    logout: async () => { try { if (token) await api('/api/auth/sign-out', { method:'POST' }); } catch {} setToken(''); user = null; render(); },
     refresh: restoreSession,
     handleAuthorizationFailure(code) {
       setToken('');

@@ -599,6 +599,7 @@
   }
 
   function close() { swapIconKey = ''; closeIconPicker(); closeBatchIconPanel(); closeOtherImportPanel(); applySettings(); modal.classList.remove('is-open'); }
+  window.IdealMachineOpenDesktopBeauty = () => open();
   function restoreDefaults() {
     delete saved.names;
     delete saved.icons;

@@ -637,5 +637,10 @@
     if (event.target.closest('[data-forum-beauty-save], [data-forum-beauty-tab], [data-forum-beauty-reset]')) setTimeout(() => syncForumBeautyEditorControls(), 0);
   }, true);
   apps.luntan = { name: '论坛' };
+  window.IdealMachineBeautyAdapters = window.IdealMachineBeautyAdapters || {};
+  window.IdealMachineBeautyAdapters.luntan = {
+    appId:'luntan', appName:'论坛',
+    sections:() => forumBeautyKeys.map(id => ({ id, name:forumBeautyLabels[id], getCss:() => String(forumBeautyState()[id] || ''), setCss:value => { const next = forumBeautyState(); next[id] = String(value ?? ''); save(forumBeautyKey, next); forumBeautyDraft = null; applyForumBeautyCSS(); }, resetCss:() => { const next = forumBeautyState(); next[id] = ''; save(forumBeautyKey, next); forumBeautyDraft = null; applyForumBeautyCSS(); }, runtimeApply:applyForumBeautyCSS }))
+  };
   applyForumSettings();
 })();

@@ -284,7 +284,7 @@
       return raw;
     }
   }
-  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtTranslation = ''; let thoughtKey = ''; let thoughtRequestId = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let chatPageBeautyOpen = false; let chatPageBeautyTab = 'chat'; let chatPageBeautyDraft = null; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let momentCoverEditorOpen = false; let momentCoverDraftSource = ''; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineRequestLocked = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0; let chatGroupLongPressTimer = 0; let suppressChatGroupEntryClick = false;
+  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtTranslation = ''; let thoughtKey = ''; let thoughtRequestId = 0; let thoughtAvatarClickTimer = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let chatPageBeautyOpen = false; let chatPageBeautyTab = 'chat'; let chatPageBeautyDraft = null; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let momentCoverEditorOpen = false; let momentCoverDraftSource = ''; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineRequestLocked = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0; let chatGroupLongPressTimer = 0; let suppressChatGroupEntryClick = false;
   let activeContactGroupId = '';
   let chatLaunchScrollTop = 0;
   let chatMainScrollTop = 0;
@@ -2497,21 +2497,36 @@ ${rerollRule}
       if (message && message.role !== 'user' && chatSettingsFor(chat).thoughtEnabled !== false) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        const requestedThoughtKey = thoughtKeyForMessage(chat, message);
-        // 同一轮心声正在请求时，重复点击头像只复用当前请求，不得取消后再次调用 API。
-        // 切换到另一轮时才中止旧请求；“重roll”仍由 rerollThoughtOnly 强制重新请求。
-        if (thoughtLoading && String(thoughtKey) === String(requestedThoughtKey)) {
-          thoughtOpen = true;
-          renderThought();
+        // 双击头像会先触发两次 click；延迟单击，等 dblclick 判断完成后再打开心声。
+        if (event.detail > 1) {
+          if (thoughtAvatarClickTimer) {
+            window.clearTimeout(thoughtAvatarClickTimer);
+            thoughtAvatarClickTimer = 0;
+          }
           return;
         }
-        if (thoughtLoading) { thoughtRequestId += 1; thoughtLoading = false; }
-        thoughtOpen = true;
-        thoughtKey = requestedThoughtKey;
-        thoughtText = '';
-        thoughtTranslation = '';
-        renderThought();
-        loadCurrentThought(false, thoughtKey);
+        if (thoughtAvatarClickTimer) window.clearTimeout(thoughtAvatarClickTimer);
+        thoughtAvatarClickTimer = window.setTimeout(() => {
+          thoughtAvatarClickTimer = 0;
+          if (!app.classList.contains('is-open') || !avatar.isConnected) return;
+          const currentChatData = currentChat();
+          if (!currentChatData || chatSettingsFor(currentChatData).thoughtEnabled === false) return;
+          const currentMessage = (currentChatData.messages || []).find(item => String(item.id || '') === String(message.id || '')) || message;
+          const currentThoughtKey = thoughtKeyForMessage(currentChatData, currentMessage);
+          // 同一轮心声正在请求时，重复点击头像只复用当前请求，不得取消后再次调用 API。
+          if (thoughtLoading && String(thoughtKey) === String(currentThoughtKey)) {
+            thoughtOpen = true;
+            renderThought();
+            return;
+          }
+          if (thoughtLoading) { thoughtRequestId += 1; thoughtLoading = false; }
+          thoughtOpen = true;
+          thoughtKey = currentThoughtKey;
+          thoughtText = '';
+          thoughtTranslation = '';
+          renderThought();
+          loadCurrentThought(false, thoughtKey);
+        }, 280);
         return;
       }
     }
@@ -3851,7 +3866,7 @@ ${rerollRule}
   const baseTapSettingsRender = renderChatSettings;
   renderChatSettings = function() { baseTapSettingsRender(); const panel = document.querySelector('#chatSettings'); const bind = panel?.querySelector('[data-chat-bind]'); if (!panel || !chatSettingsOpen || !bind || panel.querySelector('[data-chat-tap-settings]')) return; const settings = chatSettingsFor(currentChat()); bind.insertAdjacentHTML('afterend', '<section class="chat-tap-settings" data-chat-tap-settings><h3>拍一拍设置</h3><p>双击聊天中的头像，可以拍自己或拍一拍对方。</p><label>用户拍一拍提示<input type="text" data-chat-tap-setting="userTapText" value="' + esc(settings.userTapText) + '"></label><label>角色拍一拍提示<input type="text" data-chat-tap-setting="characterTapText" value="' + esc(settings.characterTapText) + '"></label><small>提示文字会显示在拍一拍消息中。</small></section>'); };
   document.addEventListener('change', event => { const input = event.target.closest('[data-chat-tap-setting]'); if (!input) return; const settings = chatSettingsFor(currentChat()); settings[input.dataset.chatTapSetting] = input.value.trim() || '拍了拍'; save(); }, true);
-  document.addEventListener('dblclick', event => { const avatar = event.target.closest?.('.chat-message-avatar'); if (!avatar || !app.classList.contains('is-open')) return; const message = avatar.closest('[data-chat-message-id]'); if (!message) return; event.preventDefault(); event.stopImmediatePropagation(); const isUserMessage = message.classList.contains('is-user'); if (!isUserMessage) { thoughtRequestId += 1; thoughtLoading = false; thoughtOpen = false; thoughtKey = ''; thoughtText = ''; thoughtTranslation = ''; renderThought(); } addTapMessage('user', isUserMessage ? 'user' : 'character'); }, true);
+  document.addEventListener('dblclick', event => { const avatar = event.target.closest?.('.chat-message-avatar'); if (!avatar || !app.classList.contains('is-open')) return; const message = avatar.closest('[data-chat-message-id]'); if (!message) return; event.preventDefault(); event.stopImmediatePropagation(); if (thoughtAvatarClickTimer) { window.clearTimeout(thoughtAvatarClickTimer); thoughtAvatarClickTimer = 0; } const isUserMessage = message.classList.contains('is-user'); if (!isUserMessage) { thoughtRequestId += 1; thoughtLoading = false; thoughtOpen = false; thoughtKey = ''; thoughtText = ''; thoughtTranslation = ''; renderThought(); } addTapMessage('user', isUserMessage ? 'user' : 'character'); }, true);
   let tapSettingsOpen = false;
   const baseTapSettingsRender2 = renderChatSettings;
   renderChatSettings = function() { baseTapSettingsRender2(); const section = document.querySelector('[data-chat-tap-settings]'); if (!section) return; const settings = chatSettingsFor(currentChat()); section.innerHTML = '<button class="chat-tap-settings-head" data-chat-tap-toggle type="button"><span><b>拍一拍设置</b><small>双击聊天中的头像，可以拍自己或拍一拍对方</small></span><i class="' + (tapSettingsOpen ? 'is-open' : '') + '">⌄</i></button>' + (tapSettingsOpen ? '<div class="chat-tap-settings-body"><label>用户网名拍一拍提示<input type="text" data-chat-tap-setting="userTapText" value="' + esc(settings.userTapText) + '"></label><label>角色网名拍一拍提示<input type="text" data-chat-tap-setting="characterTapText" value="' + esc(settings.characterTapText) + '"></label><small>拍一拍消息会使用双方各自的网名。</small></div>' : ''); };
@@ -9363,6 +9378,16 @@ ${recentConversation}
   window.IdealMachineActiveMessages = {
     runNow: () => runActiveMessageAutomation(),
     getState() { return JSON.parse(JSON.stringify(state.chats || {})); }
+  };
+  window.IdealMachineBeautyAdapters = window.IdealMachineBeautyAdapters || {};
+  window.IdealMachineBeautyAdapters.chat = {
+    appId:'liaotian', appName:'聊天',
+    sections() {
+      const sections = chatPageBeautyKeys.map(id => ({ id, name:chatPageBeautyLabels[id], getCss:() => String(chatPageBeautyState()[id] || ''), setCss:value => { chatPageBeautyState()[id] = String(value ?? ''); save(); applyChatPageBeautyCSS(); }, resetCss:() => { chatPageBeautyState()[id] = ''; save(); applyChatPageBeautyCSS(); }, runtimeApply:applyChatPageBeautyCSS }));
+      (state.contacts || []).filter(contact => contact && !contact.isGroup).forEach(contact => sections.push({ id:`online:${contact.id}`, name:`线上 · ${contact.nickname || contact.name || '角色'}`, getCss:() => String(chatSettingsFor(state.chats?.[contact.id] || {}).customCSS || ''), setCss:value => { const chat = state.chats[contact.id] ||= { profileId:'', messages:[] }; chatSettingsFor(chat).customCSS = String(value ?? ''); save(); if (activeContact === contact.id) applyCustomChatCSS(); }, resetCss:() => { const chat = state.chats[contact.id] ||= { profileId:'', messages:[] }; chatSettingsFor(chat).customCSS = ''; save(); if (activeContact === contact.id) applyCustomChatCSS(); }, runtimeApply:() => { if (activeContact === contact.id) applyCustomChatCSS(); } }));
+      sections.push({ id:'offline', name:'线下', getCss:readOfflineBeautyCSS, setCss:saveOfflineBeautyCSS, resetCss:() => saveOfflineBeautyCSS(''), runtimeApply:applyOfflineBeautyCSS });
+      return sections;
+    }
   };
   startActiveMessageAutomation();
 })();
