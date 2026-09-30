@@ -10,6 +10,7 @@
   let registrationStep = 'email';
   let mode = 'choose';
   let busy = false;
+  let lastInteractionAt = Date.now();
 
   try { token = localStorage.getItem(TOKEN_KEY) || ''; } catch {}
   let restoringSession = Boolean(token);
@@ -85,7 +86,9 @@
       AUTH_SERVICE_UNAVAILABLE: '认证服务暂时不可用，请稍后重试。',
       DISCORD_CHECK_FAILED: '暂时无法核验 Discord 资格，请稍后再试。',
       DISCORD_ACCESS_REVOKED: 'Discord 服务器资格已失效，账号暂时无法使用。',
-      INVALID_CREDENTIALS: '用户名或密码不正确。'
+      INVALID_CREDENTIALS: '用户名或密码不正确。',
+      IDENTITY_BLOCKED: '该 Discord 账号或邮箱已被管理员封禁，无法注册。',
+      identity_blocked: '该 Discord 账号或邮箱已被封禁，无法注册。'
     };
     return errors[error?.code] || '操作失败，请检查信息后重试。';
   }
@@ -267,6 +270,21 @@
       render();
     }
   }
+
+  for (const eventName of ['pointerdown', 'keydown', 'touchstart', 'scroll']) {
+    document.addEventListener(eventName, () => { lastInteractionAt = Date.now(); }, { passive: true });
+  }
+
+  window.setInterval(() => {
+    if (!token || !user || document.visibilityState !== 'visible' || Date.now() - lastInteractionAt > 90_000) return;
+    api('/auth/activity', { method: 'POST' }).catch(error => {
+      if (error.status === 401 || error.status === 403) {
+        setToken('');
+        user = null;
+        render();
+      }
+    });
+  }, 30_000);
 
   function acceptOAuthResult() {
     const params = new URLSearchParams(location.hash.slice(1));
