@@ -7,15 +7,7 @@ cloudflare/
 !cloudflare/
 cloudflare/*
 !cloudflare/beauty-worker/
-cloudflare/beauty-worker/*
-!cloudflare/beauty-worker/src/
-!cloudflare/beauty-worker/src/**
-!cloudflare/beauty-worker/test/
-!cloudflare/beauty-worker/test/**
-!cloudflare/beauty-worker/package.json
-!cloudflare/beauty-worker/schema.sql
-!cloudflare/beauty-worker/wrangler.jsonc
-!cloudflare/beauty-worker/README.md
+cloudflare/beauty-worker/
 dist/
 **/dist/
 .wrangler/
