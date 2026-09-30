@@ -42,6 +42,10 @@
     return categoryForTarget(api.find(item.appId, item.sectionId));
   }
 
+  function isImportedAsset(item) {
+    return item?.source === 'imported-code' || item?.source === 'json' || Boolean(item?.imported);
+  }
+
   function categoryName(id) {
     return categories.find(item => item.id === id)?.name || '我的';
   }
@@ -136,11 +140,12 @@
   function renderAsset() {
     const item = selectedAsset();
     if (!item) { screen = 'categories'; return renderCategory(); }
-    const source = item.source === 'imported-code' ? '导入的美化码' : item.source === 'generated' ? '线上美化码' : '本地美化';
+    const imported = isImportedAsset(item);
+    const source = item.source === 'imported-code' ? '导入的美化码（可编辑，不可二次分享）' : item.source === 'json' ? '导入的 JSON（可编辑，不可二次分享）' : item.source === 'generated' ? '线上美化码' : '本地美化';
     const category = categoryName(categoryForAsset(item));
     const target = targetName(item);
     const targetMarkup = target && target !== category && target !== item.name ? `<p>${esc(target)}</p>` : '';
-    $('[data-content]').innerHTML = `<div class="ideal-beauty-asset-detail"><div class="ideal-beauty-asset-preview">${previewMarkup(item, true)}</div><div class="ideal-beauty-asset-info"><div class="ideal-beauty-asset-title"><span class="ideal-beauty-asset-category">${esc(category)}</span><h2>${esc(item.name || '未命名美化')}</h2>${targetMarkup}</div><div class="ideal-beauty-asset-meta"><div class="ideal-beauty-inline"><b>来源</b><span>${source}</span></div>${item.code ? `<div class="ideal-beauty-inline"><b>美化码</b><span>${esc(item.code)}</span></div>` : ''}</div></div><div class="ideal-beauty-actions"><button class="ideal-beauty-action is-primary" data-use-asset type="button">应用</button>${item.code ? '<button class="ideal-beauty-action" data-copy-code type="button">复制美化码</button>' : ''}<button class="ideal-beauty-action" data-edit-asset type="button">编辑效果图</button><button class="ideal-beauty-action is-danger" data-delete-asset type="button">删除</button></div></div>`;
+    $('[data-content]').innerHTML = `<div class="ideal-beauty-asset-detail"><div class="ideal-beauty-asset-preview">${previewMarkup(item, true)}</div><div class="ideal-beauty-asset-info"><div class="ideal-beauty-asset-title"><span class="ideal-beauty-asset-category">${esc(category)}</span><h2>${esc(item.name || '未命名美化')}</h2>${targetMarkup}</div><div class="ideal-beauty-asset-meta"><div class="ideal-beauty-inline"><b>来源</b><span>${source}</span></div>${item.author ? `<div class="ideal-beauty-inline"><b>作者</b><span>${esc(item.author)}</span></div>` : ''}${item.code ? `<div class="ideal-beauty-inline"><b>美化码</b><span>${esc(item.code)}</span></div>` : ''}</div></div><div class="ideal-beauty-actions"><button class="ideal-beauty-action is-primary" data-use-asset type="button">应用</button>${item.code && !imported ? '<button class="ideal-beauty-action" data-copy-code type="button">复制美化码</button>' : ''}<button class="ideal-beauty-action" data-edit-css type="button">编辑美化</button><button class="ideal-beauty-action" data-edit-asset type="button">编辑效果图</button><button class="ideal-beauty-action is-danger" data-delete-asset type="button">删除</button></div></div>`;
   }
 
   function renderAccount() {
@@ -232,7 +237,7 @@
   }
 
   function announceImportedAsset(asset) {
-    window.dispatchEvent(new CustomEvent('ideal-machine-beauty-imported', { detail: { appId:asset.appId, sectionId:asset.sectionId, name:asset.name || '导入的美化', css:String(asset.css || ''), code:asset.code || '', previewImage:asset.previewImage || '' } }));
+    window.dispatchEvent(new CustomEvent('ideal-machine-beauty-imported', { detail: { appId:asset.appId, sectionId:asset.sectionId, name:asset.name || '导入的美化', author:asset.author || '', css:String(asset.css || ''), code:asset.code || '', previewImage:asset.previewImage || '' } }));
   }
 
   async function importBatch(codes, jsonFiles, button) {
@@ -250,7 +255,7 @@
           const item = result.item || result;
           const target = api.find(item.appId, item.sectionId);
           if (typeof item.css !== 'string' || !target) throw new Error('美化码对应的分类当前不可用。');
-          const asset = api.library.add({ name:item.name || '未命名美化', appId:item.appId, sectionId:item.sectionId, css:item.css, code:item.code || code, previewImage:item.previewImage || '', source:'imported-code' });
+          const asset = api.library.add({ name:item.name || '未命名美化', author:item.author || '', appId:item.appId, sectionId:item.sectionId, css:item.css, code:item.code || code, previewImage:item.previewImage || '', source:'imported-code' });
           api.applyBeauty(item); announceImportedAsset(asset); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
         } catch (error) { errors.push(`${code}：${error.message || '导入失败'}`); }
       }
@@ -258,7 +263,7 @@
         try {
           const entries = parseJsonEntries(await file.text(), file.name);
           for (const entry of entries) {
-            const asset = api.library.add({ name:entry.name || '未命名美化', appId:entry.appId, sectionId:entry.sectionId, css:entry.css, code:entry.code || '', previewImage:entry.previewImage || '', source:'json' });
+            const asset = api.library.add({ name:entry.name || '未命名美化', author:entry.author || '', appId:entry.appId, sectionId:entry.sectionId, css:entry.css, code:entry.code || '', previewImage:entry.previewImage || '', source:'json' });
             api.applyBeauty(entry); announceImportedAsset(asset); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
           }
         } catch (error) { errors.push(error.message || `${file.name} 导入失败`); }
@@ -300,6 +305,21 @@
     if (button.matches('[data-save-post-previews]')) { await savePostImportPreviews(importedAssetsForPreview, button); return; }
     if (button.matches('[data-use-asset]')) { const item = selectedAsset(); if (!item) return; try { api.applyBeauty(item); toast('美化已应用'); } catch (error) { toast(error.message); } return; }
     if (button.matches('[data-copy-code]')) { const item = selectedAsset(); if (!item?.code) return; try { await navigator.clipboard.writeText(item.code); toast('美化码已复制'); } catch { window.prompt('复制美化码', item.code); } return; }
+    if (button.matches('[data-edit-css]')) {
+      const item = selectedAsset(); if (!item) return;
+      openDialog(`<h2>编辑美化</h2><p class="ideal-beauty-import-note">只修改本机副本，不会改变作者的原始美化码。修改后的导入副本仍不能再次导出或分享。</p><label class="ideal-beauty-field">名称<input data-edit-css-name maxlength="60" value="${esc(item.name || '')}"></label><label class="ideal-beauty-field">CSS 美化代码<textarea data-edit-css-input rows="12" spellcheck="false">${esc(item.css || '')}</textarea></label><div class="ideal-beauty-dialog-actions"><button class="ideal-beauty-action" data-dialog-cancel type="button">取消</button><button class="ideal-beauty-action is-primary" data-save-css type="button">保存并应用</button></div>`);
+      return;
+    }
+    if (button.matches('[data-save-css]')) {
+      const item = selectedAsset(); if (!item) return;
+      const css = root.querySelector('[data-edit-css-input]')?.value || '';
+      if (!css.trim()) return toast('CSS 不能为空');
+      const updated = api.library.update(item.id, { name:root.querySelector('[data-edit-css-name]')?.value.trim() || item.name, css });
+      try { api.applyBeauty(updated); } catch (error) { return toast(error.message || '美化应用失败'); }
+      if (isImportedAsset(updated)) announceImportedAsset(updated);
+      closeDialog(); render(); toast('美化已修改并应用');
+      return;
+    }
     if (button.matches('[data-edit-asset]')) {
       const item = selectedAsset(); if (!item) return;
       editedPreviewImage = item.previewImage || ''; editedPreviewDirty = false;

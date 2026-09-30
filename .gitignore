@@ -7,7 +7,17 @@ cloudflare/
 !cloudflare/
 cloudflare/*
 !cloudflare/beauty-worker/
-cloudflare/beauty-worker/
+cloudflare/beauty-worker/*
+!cloudflare/beauty-worker/src/
+!cloudflare/beauty-worker/src/**
+!cloudflare/beauty-worker/test/
+!cloudflare/beauty-worker/test/**
+!cloudflare/beauty-worker/package.json
+!cloudflare/beauty-worker/schema.sql
+!cloudflare/beauty-worker/migrations/
+!cloudflare/beauty-worker/migrations/**
+!cloudflare/beauty-worker/wrangler.jsonc
+!cloudflare/beauty-worker/README.md
 dist/
 **/dist/
 .wrangler/
@@ -19,3 +29,6 @@ coverage/
 .env.*
 .dev.vars
 .tools/
+
+# Keep private Worker source out of the public repository.
+cloudflare/beauty-worker/
