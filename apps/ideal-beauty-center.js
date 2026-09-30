@@ -288,8 +288,28 @@
       api.library.update(item.id, patch); closeDialog(); render(); toast('效果图已更新'); return;
     }
     if (button.matches('[data-delete-asset]')) {
-      const item = selectedAsset(); if (!item || !window.confirm(`删除“${item.name}”？`)) return;
-      api.library.remove(item.id); screen = 'categories'; render(); toast('美化已删除'); return;
+      const item = selectedAsset(); if (!item || !window.confirm(`删除“${item.name}”？如果当前登录账户是美化码原作者，将同时删除云端码；否则只删除本地副本。`)) return;
+      button.disabled = true;
+      try {
+        const authenticated = Boolean(window.IdealMachineAuth?.isAuthenticated?.());
+        let removedRemote = false;
+        if (item.code && authenticated) {
+          try {
+            await api.api(`/api/beauty/codes/${encodeURIComponent(item.code)}`, { method:'DELETE' });
+            removedRemote = true;
+          } catch (error) {
+            if (error.message !== 'NOT_FOUND' && error.message !== 'CODE_NOT_FOUND') throw error;
+          }
+        } else if (item.code && item.source === 'generated') {
+          throw new Error('请先登录原作者账号，再删除云端美化码。');
+        }
+        api.library.remove(item.id); screen = 'categories'; render();
+        toast(removedRemote ? '美化码已从云端和本地删除' : item.code && !authenticated ? '本地副本已删除；登录原作者账号后才能删除云端码' : item.code ? '本地副本已删除；云端原作者码保留' : '本地美化已删除');
+      } catch (error) {
+        button.disabled = false;
+        toast(`删除失败：${error.message || '云端暂时不可用'}`);
+      }
+      return;
     }
     if (button.matches('[data-login]')) { document.querySelector('#idealAuthRoot')?.classList.remove('is-hidden'); return; }
     if (button.matches('[data-logout]')) { if (!window.confirm('退出当前账号？')) return; await window.IdealMachineAuth?.logout?.(); render(); return; }
