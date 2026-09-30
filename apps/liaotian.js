@@ -6285,17 +6285,7 @@ ${recentConversation}
     const wrap = conversation?.querySelector(':scope > .chat-compose-wrap');
     const input = wrap?.querySelector('#chatInput');
     if (!wrap || !input) return;
-    const visualViewport = window.visualViewport;
     const focused = document.activeElement === input;
-    const viewportBottom = visualViewport ? visualViewport.offsetTop + visualViewport.height : window.innerHeight;
-    // Measure remaining occlusion after the global viewport sizing has run.
-    // iOS standalone already shrinks the app; subtracting keyboard height again
-    // would lift the composer twice. Padding shrinks the list in normal flow.
-    const keyboardInset = focused
-      ? Math.max(0, conversation.getBoundingClientRect().bottom - viewportBottom)
-      : 0;
-    conversation.classList.toggle('is-input-focused', focused);
-    conversation.style.setProperty('--chat-keyboard-inset', `${Math.ceil(keyboardInset)}px`);
     const messages = conversation.querySelector('#chatMessages');
     if (focused && messages && chatLatestFollowing) {
       messages.scrollTop = Math.max(0, messages.scrollHeight - messages.clientHeight);

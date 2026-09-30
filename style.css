@@ -6011,16 +6011,6 @@ body > .desktop-scroll-wrap {
 .chat-conversation > .chat-compose-wrap .chat-compose > .chat-plus .chat-action-icon,
 .chat-conversation > .chat-compose-wrap .chat-compose > .chat-send .chat-action-icon,
 .chat-conversation > .chat-compose-wrap .chat-compose > .chat-reply .chat-action-icon { width:18px !important; height:18px !important; }
-/* Keep the composer and message list together above the visible keyboard. */
-.chat-app.is-chatting .chat-conversation.is-input-focused {
-  box-sizing:border-box;
-  min-height:0;
-  padding-bottom:var(--chat-keyboard-inset, 0px);
-}
-.chat-app.is-chatting .chat-conversation.is-input-focused > .chat-compose-wrap {
-  /* Keep a small visible gap above iOS' keyboard/accessory edge. */
-  margin-bottom:16px !important;
-}
 .chat-app.is-chatting .chat-conversation > .chat-messages {
   min-height:0;
 }
