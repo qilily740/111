@@ -477,19 +477,36 @@
   function mergeRoleMusic(previous, incoming) { const rows = [...(Array.isArray(previous) ? previous : []), ...(Array.isArray(incoming) ? incoming : [])].filter(item => item && String(item.title || item.name || '').trim()).map(item => ({ ...item, title:String(item.title || item.name).trim(), artist:String(item.artist || item.singer || '').trim(), text:String(item.text || item.mood || '').trim() })); const merged = new Map(); rows.forEach(item => { const identity = `${item.title.toLocaleLowerCase()}\u0000${item.artist.toLocaleLowerCase()}` || String(item.id || item.musicId || item.songId || '').trim(); merged.set(identity, { ...(merged.get(identity) || {}), ...item }); }); return [...merged.values()]; }
   async function hydrateRoleMusic(rows) {
     if (!Array.isArray(rows) || typeof window.IdealMachineMusicSearch !== 'function') return rows;
-    return Promise.all(rows.map(async item => {
-      if (!item?.title || item.cover) return item;
-      try {
-        const matches = await window.IdealMachineMusicSearch(`${item.title} ${item.artist || ''}`.trim());
-        const clean = value => String(value || '').toLocaleLowerCase().replace(/[\s·•\-—_()（）《》【】\[\]]/g, '');
-        const title = clean(item.title), artist = clean(item.artist);
-        const target = matches.find(song => clean(song.title) === title && (!artist || clean(song.artist).includes(artist) || artist.includes(clean(song.artist))))
-          || matches.find(song => clean(song.title) === title)
-          || matches.find(song => artist && (clean(song.artist).includes(artist) || artist.includes(clean(song.artist))))
-          || matches[0];
-        return target ? { ...item, id:target.id || item.id, musicId:target.id || item.musicId, album:target.album || item.album || '', cover:target.cover || item.cover || '', source:target.source || 'netease' } : item;
-      } catch { return item; }
-    }));
+    const hydrated = rows.slice();
+    const clean = value => String(value || '').toLocaleLowerCase().replace(/[\s·•\-—_()（）《》【】\[\]]/g, '');
+    const searchPromises = new Map();
+    const pending = rows.map((item, index) => ({ item, index }))
+      .filter(({ item }) => item?.title && !item.cover)
+      .slice(-12);
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < pending.length) {
+        const { item, index } = pending[cursor++];
+        const term = `${item.title} ${item.artist || ''}`.trim();
+        const key = term.toLocaleLowerCase().replace(/\s+/g, ' ');
+        try {
+          let search = searchPromises.get(key);
+          if (!search) {
+            search = window.IdealMachineMusicSearch(term);
+            searchPromises.set(key, search);
+          }
+          const matches = await search;
+          const title = clean(item.title), artist = clean(item.artist);
+          const target = matches.find(song => clean(song.title) === title && (!artist || clean(song.artist).includes(artist) || artist.includes(clean(song.artist))))
+            || matches.find(song => clean(song.title) === title)
+            || matches.find(song => artist && (clean(song.artist).includes(artist) || artist.includes(clean(song.artist))))
+            || matches[0];
+          if (target) hydrated[index] = { ...item, id:target.id || item.id, musicId:target.id || item.musicId, album:target.album || item.album || '', cover:target.cover || item.cover || '', source:target.source || 'netease' };
+        } catch {}
+      }
+    };
+    await Promise.all(Array.from({ length:Math.min(2, pending.length) }, () => worker()));
+    return hydrated;
   }
   async function refreshPhone(owner) { if (refreshing) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('worldbook') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) return window.alert('请先在设置中配置 AI 接口。'); const chat = read(chatKey, {}); const current = chat.chats?.[owner.id] || {}; const profile = (chat.profiles || []).find(item => item.id === current.profileId); const book = worldbook(owner); refreshing = true; render(); try { const prompt = `请刷新角色“${owner.nickname || owner.name}”手机中的七个 App 内容。根据角色设定、绑定用户和局部世界书生成自然、具体、彼此一致的内容。只返回 JSON，不要 Markdown，格式为：{"npcs":[{"name":"","identity":"","reason":""}],"forum":[{"title":"","text":"","time":""}],"calendar":[{"title":"","text":"","date":""}],"couple":[{"title":"","text":"","date":""}],"music":[{"title":"","text":"","artist":""}],"doubao":[{"role":"user或assistant","text":""}],"shopping":[{"title":"","text":"","price":""}]}。豆包数组是角色本人和豆包的真实聊天顺序：role=user 代表角色本人向豆包提问，role=assistant 代表豆包回答。不要编造与世界书完全无关的重要人物；没有内容的数组返回空数组。\n角色设定：${owner.details || owner.signature || '暂无'}\n绑定用户：${profile?.persona || profile?.nickname || '暂无'}\n局部世界书：${book ? (book.entries || []).map(item => `【${item.name}】${item.content}`).join('\n') : '未绑定局部世界书'}\n已有聊天摘要：${(current.messages || []).slice(-8).map(item => item.text || item.content || '').join('；') || '暂无'}`; const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({model, temperature:.8, messages:[{role:'system',content:'你是角色手机内容刷新器，只返回合法 JSON。'},{role:'user',content:prompt}]}) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi,'').trim(); const result = JSON.parse(raw); const previous = read('ideal-machine-ta-snapshots', {})[owner.id]; saveDoubaoHistory(owner.id, previous); const all = read('ideal-machine-ta-snapshots', {}); result.music = await hydrateRoleMusic(mergeRoleMusic(previous?.music, result.music)); all[owner.id] = result; localStorage.setItem('ideal-machine-ta-snapshots', JSON.stringify(all)); const npcs = read('ideal-machine-ta-npcs', {}); npcs[owner.id] = Array.isArray(result.npcs) ? result.npcs : []; localStorage.setItem('ideal-machine-ta-npcs', JSON.stringify(npcs)); } catch (error) { window.alert(`刷新角色手机失败：${error.message}`); } finally { refreshing = false; render(); } }
   async function refreshDoubaoChat(owner) { if (refreshing) return; const config = window.IdealMachineAPI?.getConfig?.() || {}; const model = window.IdealMachineAPI?.getModel?.('ta') || window.IdealMachineAPI?.getModel?.('chat'); if (!config.endpoint || !config.key || !model) return window.alert('请先在设置中配置 AI 接口。'); const chat = read(chatKey, {}); const current = chat.chats?.[owner.id] || {}; const profile = (chat.profiles || []).find(item => item.id === current.profileId); const book = worldbook(owner); refreshing = true; render(); try { const bookText = book ? (book.entries || []).map(item => `【${item.name}】${item.content}`).join('\n').slice(-6000) : '未绑定局部世界书'; const recentText = (current.messages || []).slice(-6).map(item => item.text || item.content || '').join('；') || '暂无'; const prompt = `请模拟角色“${owner.nickname || owner.name}”正在使用豆包。只返回 JSON：{"doubao":[{"role":"user或assistant","text":"消息内容"}]}。role=user 是角色本人，role=assistant 是豆包。生成 1—3 轮真实、简洁、长短自然的聊天，符合角色设定和世界书，不要提及 AI、系统或提示词。\n角色设定：${String(owner.details || owner.signature || '暂无').slice(0,3000)}\n绑定用户设定：${String(profile?.persona || profile?.nickname || '暂无').slice(0,1500)}\n局部世界书：${bookText}\n角色最近聊天：${recentText}`; const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({model, temperature:.82, max_tokens:600, stream:false, messages:[{role:'system',content:'你是角色手机里的豆包聊天记录生成器，只返回合法 JSON。'},{role:'user',content:prompt}]}) }); if (response.status === 429) throw new Error('接口已接通，但当前触发了限流（429）。请等待几十秒后再刷新，或检查服务商的额度和并发限制。'); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi,'').trim(); const result = JSON.parse(raw); const dialogue = Array.isArray(result.doubao) ? result.doubao.filter(item => item && item.text).map(item => ({ role:item.role === 'assistant' ? 'assistant' : 'user', text:String(item.text) })) : []; if (!dialogue.length) throw new Error('API 没有返回有效聊天记录'); const all = read('ideal-machine-ta-snapshots', {}); const previous = all[owner.id]; saveDoubaoHistory(owner.id, previous); all[owner.id] = { ...(previous || {}), doubao:dialogue }; localStorage.setItem('ideal-machine-ta-snapshots', JSON.stringify(all)); } catch (error) { const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError' ? `接口在 120 秒内没有返回（${model}），请检查接口地址、网络和模型服务状态。` : error.message; window.alert(`刷新角色豆包失败：${reason}`); } finally { refreshing = false; render(); } }
