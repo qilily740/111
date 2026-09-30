@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260928-love-letter-cover-1';
+const CACHE_NAME = 'ideal-machine-shell-v20260930-ideal-label-1';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
