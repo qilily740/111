@@ -21,6 +21,10 @@ html.ideal-auth-locked body {
 .ideal-auth-notice { margin: 0 0 12px; padding: 9px 11px; border: 1px solid #d5d5d5; border-radius: 10px; background: #f1f1f1; color: #333; font-size: 12px; line-height: 1.45; }
 .ideal-auth-notice[hidden] { display: none; }
 .ideal-auth-actions { margin: 0 0 13px; }
+.ideal-auth-banned-export { display: grid; gap: 8px; margin: 0 0 12px; }
+.ideal-auth-banned-export[hidden] { display: none; }
+.ideal-auth-banned-export p { margin: 0; color: #696969; font-size: 12px; line-height: 1.5; }
+.ideal-auth-banned-export button { width: 100%; background: #171717; color: #fff; }
 .ideal-auth-choice { display: grid; gap: 9px; }
 .ideal-auth-choice[hidden], .ideal-auth-discord[hidden] { display: none; }
 .ideal-auth-choice button:first-child { background: #171717; color: #fff; }

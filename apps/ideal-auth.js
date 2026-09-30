@@ -10,6 +10,7 @@
   let registrationStep = 'email';
   let mode = 'choose';
   let busy = false;
+  let bannedReason = '';
   let lastInteractionAt = Date.now();
 
   try { token = localStorage.getItem(TOKEN_KEY) || ''; } catch {}
@@ -52,7 +53,7 @@
       root = document.createElement('div');
       root.id = 'idealAuthRoot';
       root.className = 'ideal-auth-root';
-      root.innerHTML = '<main class="ideal-auth-card" role="dialog" aria-modal="true" aria-labelledby="idealAuthTitle"><div class="ideal-auth-mark">理想机</div><h1 id="idealAuthTitle">账号认证</h1><p class="ideal-auth-intro">请选择注册新账号或登录已有账号。</p><div class="ideal-auth-progress" hidden></div><div class="ideal-auth-notice" role="status" aria-live="polite" hidden></div><div class="ideal-auth-actions"><div class="ideal-auth-choice"><button type="button" data-mode="register-verify">注册新账号</button><button type="button" data-mode="login">登录已有账号</button></div><button type="button" class="ideal-auth-discord" data-action="discord" hidden>使用 Discord 验证</button></div><form class="ideal-auth-form" novalidate></form><nav class="ideal-auth-switch" aria-label="账号操作"></nav><div class="ideal-auth-footer"><span>忘记账号或密码请联系管理员</span><button type="button" data-action="logout" hidden>退出登录</button></div></main>';
+      root.innerHTML = '<main class="ideal-auth-card" role="dialog" aria-modal="true" aria-labelledby="idealAuthTitle"><div class="ideal-auth-mark">理想机</div><h1 id="idealAuthTitle">账号认证</h1><p class="ideal-auth-intro">请选择注册新账号或登录已有账号。</p><div class="ideal-auth-progress" hidden></div><div class="ideal-auth-notice" role="status" aria-live="polite" hidden></div><div class="ideal-auth-actions"><div class="ideal-auth-choice"><button type="button" data-mode="register-verify">注册新账号</button><button type="button" data-mode="login">登录已有账号</button></div><button type="button" class="ideal-auth-discord" data-action="discord" hidden>使用 Discord 验证</button></div><form class="ideal-auth-form" novalidate></form><section class="ideal-auth-banned-export" hidden><p>你可以导出此设备上保存的理想机数据。导出不会恢复账号登录，也不会开放其他页面。</p><button type="button" data-action="export-local-data">导出此设备数据</button></section><nav class="ideal-auth-switch" aria-label="账号操作"></nav><div class="ideal-auth-footer"><span>忘记账号或密码请联系管理员</span><button type="button" data-action="logout" hidden>退出登录</button></div></main>';
       document.body.append(root);
       root.addEventListener('click', handleClick);
       root.addEventListener('submit', handleSubmit);
@@ -105,6 +106,7 @@
     const logout = root.querySelector('[data-action="logout"]');
     const progress = root.querySelector('.ideal-auth-progress');
     const loggedIn = Boolean(user);
+    const bannedExport = root.querySelector('.ideal-auth-banned-export');
     root.querySelector('.ideal-auth-footer').hidden = loggedIn || mode !== 'login';
     root.classList.toggle('is-hidden', loggedIn);
     root.classList.toggle('is-restoring', restoringSession && !loggedIn);
@@ -114,16 +116,19 @@
     actions.hidden = loggedIn || (mode !== 'choose' && mode !== 'verify');
     switcher.hidden = loggedIn;
     logout.hidden = !loggedIn;
+    bannedExport.hidden = !bannedReason;
     if (loggedIn) {
       root.querySelector('#idealAuthTitle').textContent = '已登录';
       root.querySelector('.ideal-auth-intro').textContent = `${user.username || user.email} · Discord 资格已核验`;
       form.hidden = true;
       return;
     }
-    root.querySelector('#idealAuthTitle').textContent = mode === 'register'
+    root.querySelector('#idealAuthTitle').textContent = bannedReason ? '账号已封禁' : mode === 'register'
       ? registrationStep === 'email' ? '验证 QQ 邮箱' : '创建账号'
       : mode === 'login' ? '账号登录' : mode === 'verify' ? '注册资格验证' : '欢迎使用理想机';
-    root.querySelector('.ideal-auth-intro').textContent = mode === 'register'
+    root.querySelector('.ideal-auth-intro').textContent = bannedReason
+      ? '封禁期间可以导出当前设备上保存的数据。'
+      : mode === 'register'
       ? registrationStep === 'email'
         ? '社区资格已通过。验证 QQ 邮箱后即可设置账号。'
         : '邮箱已验证。设置账号和密码完成注册。'
@@ -132,11 +137,13 @@
         : mode === 'verify'
           ? '注册前先确认 Discord 账号属于指定社区并拥有指定身份组。'
           : '请选择注册新账号或登录已有账号。';
-    progress.hidden = mode !== 'register';
+    progress.hidden = Boolean(bannedReason) || mode !== 'register';
     progress.textContent = registrationStep === 'email'
       ? '✓ Discord 已通过  ·  验证 QQ 邮箱'
       : '✓ Discord 已通过  ·  ✓ QQ 邮箱已验证';
-    switcher.innerHTML = mode === 'choose'
+    switcher.innerHTML = bannedReason
+      ? '<button type="button" data-action="back-to-login">返回登录</button>'
+      : mode === 'choose'
       ? ''
       : mode === 'register'
         ? `${registrationStep === 'account' ? '<button type="button" data-action="change-email">更换 QQ 邮箱</button>' : ''}<button type="button" data-mode="login">已有账号？登录</button>`
@@ -145,7 +152,7 @@
     const priorValues = form.dataset.mode === mode
       ? Object.fromEntries([...form.elements].filter(input => input.name).map(input => [input.name, input.value]))
       : {};
-    form.hidden = mode === 'choose' || mode === 'verify';
+    form.hidden = Boolean(bannedReason) || mode === 'choose' || mode === 'verify';
     form.innerHTML = mode === 'register'
       ? registrationStep === 'email' ? emailForm() : accountForm()
       : loginForm();
@@ -180,13 +187,23 @@
     ensureRoot().querySelectorAll('button').forEach(control => { control.disabled = true; });
     message('正在处理…', 'info');
     try { await action(); }
-    catch (error) { message(friendlyError(error)); }
+    catch (error) {
+      if (error?.code === 'ACCOUNT_BANNED') bannedReason = error?.details?.reason || '管理员封禁';
+      message(friendlyError(error));
+    }
     finally { busy = false; render(); }
   }
 
   async function handleClick(event) {
     const button = event.target.closest('button');
     if (!button) return;
+    if (button.dataset.action === 'back-to-login') { bannedReason = ''; mode = 'login'; message(''); render(); return; }
+    if (button.dataset.action === 'export-local-data') {
+      const exportData = window.IdealMachineExportLocalData;
+      if (typeof exportData !== 'function') return message('数据导出模块尚未准备好，请稍后重试。');
+      await run(() => exportData());
+      return;
+    }
     if (button.dataset.mode) {
       mode = button.dataset.mode === 'register-verify' ? 'verify' : button.dataset.mode;
       if (mode === 'verify') {
