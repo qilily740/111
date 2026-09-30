@@ -926,6 +926,19 @@
         const top = Math.round(viewport?.offsetTop || 0) + 12;
         const bottom = Math.round((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) - 16;
         const rect = target.getBoundingClientRect();
+        if (target.matches('.beauty-app-name')) {
+          const scroller = target.closest('.beauty-content');
+          if (scroller) {
+            const scrollerRect = scroller.getBoundingClientRect();
+            const visibleTop = Math.max(top, scrollerRect.top);
+            const visibleBottom = Math.min(bottom, scrollerRect.bottom);
+            const targetCenter = rect.top + rect.height / 2;
+            const visibleCenter = (visibleTop + visibleBottom) / 2;
+            const nextScrollTop = scroller.scrollTop + targetCenter - visibleCenter;
+            scroller.scrollTop = Math.max(0, Math.min(scroller.scrollHeight - scroller.clientHeight, nextScrollTop));
+            return;
+          }
+        }
         if (rect.bottom > bottom || rect.top < top) {
           target.scrollIntoView({ block:rect.height > bottom - top ? 'start' : 'nearest', inline:'nearest', behavior:'auto' });
         }
