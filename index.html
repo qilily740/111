@@ -156,7 +156,7 @@
             document.body.appendChild(script);
           });
         }
-        for (const source of ['apps/ideal-beauty-registry.js?v=20260930-export-choice-1', 'apps/ideal-beauty-center.js?v=20260930-final-preview-3']) {
+        for (const source of ['apps/ideal-beauty-registry.js?v=20260930-export-choice-1', 'apps/ideal-beauty-center.js?v=20260930-code-prefix-1']) {
           await new Promise(resolve => { const script = document.createElement('script'); script.src = source; script.onload = script.onerror = resolve; document.body.appendChild(script); });
         }
       })();
