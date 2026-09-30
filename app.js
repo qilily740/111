@@ -939,13 +939,14 @@
         if (bottomGap > 0) parent.scrollTop += bottomGap;
         else if (topGap > 0) parent.scrollTop -= topGap;
       });
-      window.requestAnimationFrame(() => {
-        if (!element?.isConnected || document.activeElement !== element) return;
+      // 只有页面本身没有可滚动祖先时才交给浏览器滚页面；
+      // 对嵌套滚动区再调用 scrollIntoView 会和 iOS 键盘自动平移互相拉扯。
+      if (!parents.length) {
         const rect = element.getBoundingClientRect();
         if (rect.bottom > viewportBottom || rect.top < viewportTop) {
           element.scrollIntoView({ block:'nearest', inline:'nearest', behavior:'auto' });
         }
-      });
+      }
     };
     const schedule = () => {
       if (!focusedEditable) return;
@@ -953,7 +954,7 @@
       frame = window.requestAnimationFrame(() => { frame = 0; keepVisible(focusedEditable); });
       timers.forEach(timer => window.clearTimeout(timer));
       timers.clear();
-      [40, 120, 260, 520].forEach(delay => {
+      [120, 280].forEach(delay => {
         const timer = window.setTimeout(() => { timers.delete(timer); keepVisible(focusedEditable); }, delay);
         timers.add(timer);
       });
@@ -972,7 +973,6 @@
     }, true);
     const viewport = window.visualViewport;
     viewport?.addEventListener('resize', schedule, { passive:true });
-    viewport?.addEventListener('scroll', schedule, { passive:true });
     window.addEventListener('resize', schedule, { passive:true });
     window.addEventListener('orientationchange', schedule, { passive:true });
   }
