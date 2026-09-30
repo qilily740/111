@@ -2388,7 +2388,7 @@ ${rerollRule}
     return headers;
   }
   async function searchMusicShareNetease(keyword, idealScope = 'music') {
-    const configuredBase = String(window.IdealMachineConfig?.neteaseApiBase || 'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/, '');
+    const configuredBase = String(window.IdealMachineConfig?.neteaseApiBase || 'https://music.ideal-laedi.cc.cd/api').replace(/\/$/, '');
     const request = window.IdealMachineFetch || window.fetch.bind(window);
     const searchUrl = `${configuredBase}/search?keywords=${encodeURIComponent(keyword)}&limit=24&type=1`;
     const response = await request(searchUrl, { idealScope, credentials: 'omit', cache: 'no-store', headers: neteaseMusicRequestHeaders() });
@@ -4419,7 +4419,7 @@ ${rerollRule}
 
   async function getNeteaseMusicPlayUrl(id) {
     if (!id) return '';
-    const configuredBase = String(window.IdealMachineConfig?.neteaseApiBase || 'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/, '');
+    const configuredBase = String(window.IdealMachineConfig?.neteaseApiBase || 'https://music.ideal-laedi.cc.cd/api').replace(/\/$/, '');
     const request = window.IdealMachineFetch || window.fetch.bind(window);
     try {
       const response = await request(`${configuredBase}/song/${encodeURIComponent(id)}/url?br=320000`, { idealScope: 'chat-music-play', credentials: 'omit', cache: 'no-store', headers: neteaseMusicRequestHeaders() });

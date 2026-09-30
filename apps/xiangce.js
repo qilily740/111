@@ -1,6 +1,6 @@
 (() => {
   const storageKey = 'ideal-machine-album-v1';
-  const currentRelayUrl = 'https://ideal-machine-catbox-relay.ideal-machine.workers.dev';
+  const currentRelayUrl = 'https://images.ideal-laedi.cc.cd';
   const imageHostProvider = 'catbox';
   const imageApiBase = currentRelayUrl;
   const imageUploadToken = '';

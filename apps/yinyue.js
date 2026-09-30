@@ -2,9 +2,9 @@
   const key='ideal-machine-music', chatKey='ideal-machine-chat', dbName='ideal-machine-music-files', sessionKey='ideal-machine-netease-session';
   // 与理想机同域部署时保持 '/api'；如果 Worker 是独立域名，可在页面初始化前配置：
   // window.IdealMachineConfig={neteaseApiBase:'https://music-api.example.com'}
-  const neteaseApiBase=String(window.IdealMachineConfig?.neteaseApiBase||'https://ideal-machine-music-api.ideal-machine.workers.dev/api').replace(/\/$/,'');
+  const neteaseApiBase=String(window.IdealMachineConfig?.neteaseApiBase||'https://music.ideal-laedi.cc.cd/api').replace(/\/$/,'');
   // 登录认证与音乐数据接口分离；账号和歌单同步仍然走 neteaseApiBase。
-  const localAuthApiBase=/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin)?'http://127.0.0.1:3211/api':'https://ideal-machine-music-auth.ideal-machine.workers.dev/api';
+  const localAuthApiBase=/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin)?'http://127.0.0.1:3211/api':'https://music.ideal-laedi.cc.cd/api';
   const neteaseAuthApiBase=String(window.IdealMachineConfig?.neteaseAuthApiBase||localAuthApiBase).replace(/\/$/,'');
   const app=document.createElement('div');app.className='music-app';document.body.appendChild(app);
   const audio=new Audio();audio.preload='auto';audio.autoplay=false;audio.playsInline=true;audio.className='music-global-audio';document.body.appendChild(audio);

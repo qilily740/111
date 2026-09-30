@@ -11,7 +11,7 @@
   function deviceCode() { if (!/^IM-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){1,2}$/.test(state.deviceCode || '')) { const raw = randomChars(12); state.deviceCode = `IM-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`; save(); } return state.deviceCode; }
   // The verification endpoint is built into the app. Users receive the activation
   // website through the separate activation card or another official channel.
-  function apiBase() { return 'https://ideal-machine-activation.ideal-machine.workers.dev'; }
+  function apiBase() { return String(window.IdealMachineConfig?.activationApiBase || 'https://activation.ideal-laedi.cc.cd').replace(/\/+$/, ''); }
   function isUnlocked() { return state.license?.feature === feature && state.license?.status === 'active'; }
   function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char])); }
   function portal() { let node = document.querySelector('#idealActivationPortal'); if (!node) { node = document.createElement('div'); node.id = 'idealActivationPortal'; document.body.appendChild(node); } return node; }
