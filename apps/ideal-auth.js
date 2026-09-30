@@ -78,7 +78,7 @@
       EMAIL_VERIFICATION_TICKET_INVALID: '邮箱验证已失效，请重新验证。',
       USERNAME_OR_EMAIL_TAKEN: '用户名或邮箱已被使用。',
       USERNAME_INVALID: '用户名需为 3–32 位字母、数字、点、下划线或短横线。',
-      PASSWORD_INVALID: '密码至少 12 位，且两次输入必须一致。',
+      PASSWORD_INVALID: '密码至少 8 位，且两次输入必须一致。',
       QQ_EMAIL_REQUIRED: '请填写 QQ 邮箱（@qq.com）。',
       RATE_LIMITED: '操作太频繁，请稍后再试。',
       EMAIL_SENDER_NOT_CONFIGURED: '需要先配置 QQ 邮箱 SMTP 授权码，才能发送验证码。',
@@ -162,7 +162,7 @@
   }
 
   function accountForm() {
-    return '<label>账号<input name="username" autocomplete="username" minlength="3" maxlength="32" required></label><label>密码（至少 12 位）<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><label>确认密码<input name="passwordConfirmation" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><button class="ideal-auth-submit" type="submit">创建账号</button>';
+    return '<label>账号<input name="username" autocomplete="username" minlength="3" maxlength="32" required></label><label>密码（至少 8 位）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><label>确认密码<input name="passwordConfirmation" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><button class="ideal-auth-submit" type="submit">创建账号</button>';
   }
 
   function formValues() {
