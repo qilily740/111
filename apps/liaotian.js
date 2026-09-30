@@ -6295,6 +6295,16 @@ ${recentConversation}
     if (chatKeyboardPositionFrame) return;
     chatKeyboardPositionFrame = requestAnimationFrame(syncChatKeyboardPosition);
   }
+  function keepQuotedChatInputVisible(input) {
+    if (!input?.isConnected || document.activeElement !== input) return;
+    const viewport = window.visualViewport;
+    const viewportTop = Math.round(viewport?.offsetTop || 0) + 8;
+    const viewportBottom = Math.round((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) - 12;
+    const rect = input.getBoundingClientRect();
+    if (rect.bottom > viewportBottom || rect.top < viewportTop) {
+      input.scrollIntoView({ block: rect.height > viewportBottom - viewportTop ? 'start' : 'nearest', inline: 'nearest', behavior: 'auto' });
+    }
+  }
   window.visualViewport?.addEventListener('resize', scheduleChatKeyboardPosition);
   window.visualViewport?.addEventListener('scroll', scheduleChatKeyboardPosition);
   window.addEventListener('resize', scheduleChatKeyboardPosition);
@@ -6344,7 +6354,12 @@ ${recentConversation}
       try { input.setSelectionRange(end, end); } catch {}
       syncChatComposerControls(input);
       scheduleChatKeyboardPosition();
-      setTimeout(scheduleChatKeyboardPosition, 80);
+      // iOS finishes opening the keyboard after this trusted swipe ends.
+      // Check once after that animation so the focused input stays above it.
+      setTimeout(() => {
+        scheduleChatKeyboardPosition();
+        keepQuotedChatInputVisible(input);
+      }, 360);
     }
   }
   const baseRenderWithQuote = render;
@@ -7806,6 +7821,10 @@ ${recentConversation}
     } finally {
       if (!useIndependentRequest) legacyReplyBusy = false;
       replyingContacts.delete(contactId);
+      // A reply that arrives while its conversation is still on screen has
+      // already been seen. Clear any stale unread flags left by async delivery
+      // or storage synchronization before the user returns to the contact list.
+      if (isViewingChat(contactId)) markChatRead(contactId);
       if (app.classList.contains('is-open')) {
         requestChatScrollToLatest(contactId);
         render();
