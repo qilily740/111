@@ -34,6 +34,7 @@
       const error = new Error(payload.error || `HTTP_${response.status}`);
       error.code = payload.error || `HTTP_${response.status}`;
       error.status = response.status;
+      error.details = payload;
       throw error;
     }
     return { response, payload };
@@ -86,6 +87,7 @@
       AUTH_SERVICE_UNAVAILABLE: '认证服务暂时不可用，请稍后重试。',
       DISCORD_CHECK_FAILED: '暂时无法核验 Discord 资格，请稍后再试。',
       DISCORD_ACCESS_REVOKED: 'Discord 服务器资格已失效，账号暂时无法使用。',
+      ACCOUNT_BANNED: `账号已被封禁。原因：${error?.details?.reason || '管理员封禁'}`,
       INVALID_CREDENTIALS: '用户名或密码不正确。',
       IDENTITY_BLOCKED: '该 Discord 账号或邮箱已被管理员封禁，无法注册。',
       identity_blocked: '该 Discord 账号或邮箱已被封禁，无法注册。'
