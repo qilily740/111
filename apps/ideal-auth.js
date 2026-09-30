@@ -12,6 +12,7 @@
   let busy = false;
 
   try { token = localStorage.getItem(TOKEN_KEY) || ''; } catch {}
+  let restoringSession = Boolean(token);
 
   function requestHeaders(headers) {
     const next = new Headers(headers || {});
@@ -101,6 +102,7 @@
     const loggedIn = Boolean(user);
     root.querySelector('.ideal-auth-footer').hidden = loggedIn || mode !== 'login';
     root.classList.toggle('is-hidden', loggedIn);
+    root.classList.toggle('is-restoring', restoringSession && !loggedIn);
     document.documentElement.classList.toggle('ideal-auth-locked', !loggedIn);
     discord.hidden = loggedIn || mode !== 'verify';
     choice.hidden = loggedIn || mode !== 'choose';
@@ -260,8 +262,10 @@
     } catch (error) {
       if (error.status === 401 || error.status === 403) setToken('');
       message(friendlyError(error));
+    } finally {
+      restoringSession = false;
+      render();
     }
-    render();
   }
 
   function acceptOAuthResult() {

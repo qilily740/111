@@ -10,6 +10,8 @@ html.ideal-auth-locked body {
 .ideal-auth-locked body > :not(#idealAuthRoot) { visibility: hidden; }
 .ideal-auth-root { position: fixed; z-index: 100000; inset: 0; display: grid; place-items: center; box-sizing: border-box; width: 100%; height: 100vh; height: var(--ideal-app-height, 100dvh); overflow: hidden; overscroll-behavior: none; padding: max(12px, env(safe-area-inset-top)) 14px max(12px, var(--ideal-safe-bottom, env(safe-area-inset-bottom))); background: #e9e9e9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #171717; }
 .ideal-auth-root.is-hidden { display: none; }
+.ideal-auth-root.is-restoring .ideal-auth-card { visibility: hidden; }
+.ideal-auth-root.is-restoring::after { content: '正在进入理想机…'; position: absolute; inset: 0; display: grid; place-items: center; color: #666; font-size: 13px; letter-spacing: .04em; }
 .ideal-auth-card { box-sizing: border-box; width: min(100%, 420px); max-height: 100%; overflow: hidden; padding: 26px 28px; border: 1px solid #d5d5d5; border-radius: 22px; background: #fff; box-shadow: 0 16px 56px rgba(0,0,0,.12); }
 .ideal-auth-mark { display: inline-flex; padding: 6px 11px; border: 1px solid #dedede; border-radius: 999px; background: #f5f5f5; color: #252525; font-size: 12px; font-weight: 700; letter-spacing: .08em; }
 .ideal-auth-card h1 { margin: 16px 0 6px; font-size: 25px; letter-spacing: -.03em; }
