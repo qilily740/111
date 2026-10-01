@@ -9,15 +9,17 @@
     yinyue:['音乐','assets/icons/default-ios17/yinyue.webp'], doubao:['豆包','assets/icons/default-ios17/doubao.webp'],
     gouwu:['购物','assets/icons/default-ios17/gouwu.webp'], ifshikong:['if时空','assets/icons/default-ios17/ifshikong.webp'],
     qinglvkongjian:['情侣空间','assets/icons/default-ios17/qinglvkongjian.webp?v=20260928-couple-cropped-2'], shijieshu:['世界书','assets/icons/default-ios17/shijieshu.webp'],
-    shezhi:['设置','assets/icons/default-ios17/shezhi.webp'], ideal:['Ideal','assets/icons/default-ios17/ideal.webp'], jiaocheng:['教程','assets/icons/default-ios17/jiaocheng.webp'], debate:['辩论','assets/icons/default-ios17/debate.webp'],
+    shezhi:['设置','assets/icons/default-ios17/shezhi.webp'], ideal:['Ideal','assets/icons/default-ios17/ideal.webp'], jiaocheng:['教程','assets/icons/default-ios17/jiaocheng.webp'], debate:['辩论','assets/icons/default-ios17/debate.webp'], bookapp:['图书','assets/icons/default-ios17/tushu.webp?v=20261001-book-icon-4'], meihua:['美化','assets/icons/default-ios17/meihua.webp'],
     fanfic:['同人文','assets/icons/default-ios17/fanfic.webp'], magazine:['杂志社','assets/icons/default-ios17/magazine.webp']
   };
-  const defaults = { enabled:true, idleOpacity:.18, size:60, mode:'pill', apps:['liaotian','ta','jiyiku','shezhi'], side:'right', y:.56 };
+  const defaults = { enabled:true, idleOpacity:.18, size:60, mode:'pill', apps:['liaotian','ta','jiyiku','shezhi','bookapp','meihua'], side:'right', y:.56 };
   const readJson = (key, fallback) => { try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value ?? fallback; } catch { return fallback; } };
   const writeJson = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
   const readSettings = () => {
     const stored = readJson(settingsKey, {});
     const next = { ...defaults, ...stored };
+    const legacyDefaultApps = ['liaotian','ta','jiyiku','shezhi'];
+    if (Array.isArray(stored.apps) && stored.apps.length === legacyDefaultApps.length && stored.apps.every((app, index) => app === legacyDefaultApps[index])) next.apps = defaults.apps.slice();
     // 将旧版的默认 48px 迁移到新的默认 60px；迁移后用户仍可自行输入其他尺寸。
     if (stored.size === 48 && stored.sizeMigration !== '60px-v1') {
       next.size = 60;
@@ -50,10 +52,10 @@
   calls = calls.map(item => ({
     ...item,
     purpose: /^forum(?:-|$)/.test(String(item?.scope || '')) ? callPurpose(String(item?.scope || 'forum'), '', {}) : item?.purpose,
-    model: item?.model || ((item?.isModelCall || /^(?:chat(?:-|$)|debate$|ta$|ifshikong$|couple$|shopping$|magazine-background$|worldbook$|vector$)/.test(String(item?.scope || ''))) ? (() => { try { return cleanText(window.IdealMachineAPI?.getModel?.(item.scope) || window.IdealMachineAPI?.getModel?.('chat') || assignedModel(item.scope) || ''); } catch { return assignedModel(item.scope); } })() : ''),
+    model: item?.model || ((item?.isModelCall || /^(?:chat(?:-|$)|bookapp$|debate$|ta$|ifshikong$|couple$|shopping$|magazine-background$|worldbook$|vector$)/.test(String(item?.scope || ''))) ? (() => { try { return cleanText(window.IdealMachineAPI?.getModel?.(item.scope) || window.IdealMachineAPI?.getModel?.('chat') || assignedModel(item.scope) || ''); } catch { return assignedModel(item.scope); } })() : ''),
     isModelCall: typeof item?.isModelCall === 'boolean'
       ? item.isModelCall
-      : /^(?:chat(?:-|$)|debate$|ta$|ifshikong$|couple$|shopping$|magazine-background$|worldbook$|vector$)/.test(String(item?.scope || ''))
+      : /^(?:chat(?:-|$)|bookapp$|debate$|ta$|ifshikong$|couple$|shopping$|magazine-background$|worldbook$|vector$)/.test(String(item?.scope || ''))
         && !/^chat-music/.test(String(item?.scope || ''))
   }));
   let activeCalls = 0;
@@ -105,7 +107,7 @@
       if (match(/续写下一章|沿用以下故事设定续写/)) return '同人文 App－续写下一章';
       if (match(/重新创作下面这篇同人文|章节重写/)) return '同人文 App－重新生成章节';
       if (match(/记忆压缩|核心记忆|长期记忆/)) return '记忆库 App－整理聊天摘要与核心记忆';
-      if (match(/平行时空|本时空生成预设/)) return 'if 时空 App－生成时空故事回复';
+      if (match(/平行时空|本时空生成(?:预设|提示词)/)) return 'if 时空 App－生成时空故事回复';
       if (match(/角色日程生成器|CALENDAR｜/)) return 'Ta App－生成角色日程';
       if (match(/顶号功能|Takeover Sender|takeoverMessages/)) return 'Ta App－生成角色顶号消息';
       if (match(/查手机|查岗|SECRET CHECK/)) return 'Ta App－生成角色查手机剧情';
@@ -178,6 +180,18 @@
     if (scope === 'ifshikong') return match(/创建|开篇|世界前提/) ? 'if 时空 App－创建平行时空' : 'if 时空 App－生成时空故事回复';
     return labels[scope] || `${scope || '系统'}－调用服务`;
   }
+
+  function appPurposeLabel(purpose, scope) {
+    const text = cleanText(purpose);
+    const named = text.match(/^(?:系统|设置|聊天|图书|Ta|论坛|辩论|同人文|杂志社|豆包|购物|日历|情侣空间|音乐|if 时空|世界书|记忆库|生图|相册) App/);
+    if (named) return named[0];
+    const base = String(scope || '').split('-')[0];
+    return ({ chat:'聊天 App', bookapp:'图书 App', ta:'Ta App', forum:'论坛 App', debate:'辩论 App', fanfic:'同人文 App', magazine:'杂志社 App', 'magazine-background':'杂志社 App', doubao:'豆包 App', shopping:'购物 App', calendar:'日历 App', couple:'情侣空间 App', music:'音乐 App', ifshikong:'if 时空 App', worldbook:'世界书 App', memory:'记忆库 App', vector:'记忆库 App', image:'生图 App', album:'相册 App', notifications:'设置 App', settings:'设置 App' })[base] || text || `${base || '系统'} App`;
+  }
+  const detailedCallPurpose = callPurpose;
+  callPurpose = (scope, rawUrl = '', init = {}) => appPurposeLabel(detailedCallPurpose(scope, rawUrl, init), scope);
+  calls = calls.map(item => ({ ...item, purpose:appPurposeLabel(item?.purpose, item?.scope) }));
+  writeJson(callsKey, calls);
 
   function usageParts(usage = {}) {
     const inputTokens = Number(usage?.prompt_tokens ?? usage?.input_tokens ?? usage?.promptTokens ?? 0) || 0;
@@ -350,7 +364,7 @@
   function applySettings() {
     settings = readSettings();
     root.hidden = !settings.enabled;
-    const edge = ['left','right','top','bottom'].includes(settings.side) ? settings.side : 'right';
+    const edge = ['left','right','top','bottom','free'].includes(settings.side) ? settings.side : 'right';
     const horizontalSide = edge === 'top' || edge === 'bottom' ? (Number(settings.x ?? .9) < .5 ? 'left' : 'right') : edge;
     root.dataset.side = horizontalSide;
     root.dataset.edge = edge;
@@ -482,18 +496,15 @@
       const x = Math.max(7, Math.min(innerWidth-size-7, event.clientX-finishedDrag.offsetX));
       const y = Math.max(7, Math.min(innerHeight-size-7, event.clientY-finishedDrag.offsetY));
       const distances = { left:x, right:innerWidth-size-x, top:y, bottom:innerHeight-size-y };
-      settings.side = Object.keys(distances).reduce((nearest, edge) => distances[edge] < distances[nearest] ? edge : nearest, 'left');
       settings.x = x / innerWidth;
       settings.y = y / innerHeight;
-      const targetX = settings.side === 'left' ? 7 : settings.side === 'right' ? innerWidth-size-7 : x;
-      const targetY = settings.side === 'top' ? 7 : settings.side === 'bottom' ? innerHeight-size-7 : y;
+      settings.side = Object.keys(distances).reduce((nearest, edge) => distances[edge] < distances[nearest] ? edge : nearest, 'left');
       root.classList.remove('is-active');
       root.classList.add('is-snapping');
       orb.style.left = `${x}px`;
       orb.style.top = `${y}px`;
       orb.style.right = 'auto';
       orb.style.bottom = 'auto';
-      requestAnimationFrame(() => { orb.style.left = `${targetX}px`; orb.style.top = `${targetY}px`; });
       writeJson(settingsKey, settings);
       clearTimeout(snapTimer);
       snapTimer = window.setTimeout(() => {

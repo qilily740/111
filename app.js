@@ -120,8 +120,17 @@
     const base = String(endpoint || '').trim().replace(/\/+$/, '');
     const suffix = String(route || '').replace(/^\/+/, '');
     if (!base) return '';
-    return new RegExp(`/${suffix.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`, 'i').test(base) ? base : `${base}/${suffix}`;
+    const url = new URL(base, location.href);
+    url.pathname = `${url.pathname.replace(/\/+$/, '').replace(/\/(?:models|chat\/completions|responses|embeddings|images\/generations)$/i, '')}/${suffix}`;
+    return url.href;
   }
+  function machineRequestHeaders(options, config) {
+    const headers = new Headers(options.headers || {});
+    const key = Object.prototype.hasOwnProperty.call(options, 'key') ? options.key : config.key;
+    if (!headers.has('Authorization') && key) headers.set('Authorization', `Bearer ${key}`);
+    return headers;
+  }
+
   async function machineResponseError(response, fallback = 'API 请求失败') {
     const status = response?.status ? `HTTP ${response.status}` : '';
     let detail = '';
@@ -151,7 +160,7 @@
     const headers = new Headers(typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined);
     new Headers(init.headers || {}).forEach((value, key) => headers.set(key, value));
     // 生图配置有自己的密钥；只有主 API、向量 API 和模型列表才自动使用主配置。
-    if (sharedMachineAuthPaths.test(url.pathname) && !headers.has('Authorization') && config.key) headers.set('Authorization', `Bearer ${config.key}`);
+    if (init.idealUseDefaultKey !== false && sharedMachineAuthPaths.test(url.pathname) && !headers.has('Authorization') && config.key) headers.set('Authorization', `Bearer ${config.key}`);
     const hasBody = typeof init.body === 'string' && init.body.trim();
     const isJson = hasBody && /^(?:\{|\[)/.test(init.body.trim());
     let body = init.body;
@@ -171,7 +180,8 @@
   function localAIProxyRequest(input, init) {
     const configuredProxy = window.IdealMachineConfig?.aiProxyBase;
     if (!configuredProxy || !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin)) return null;
-    const source = new URL(String(input), location.href);
+    const source = machineRequestUrl(input);
+    if (!source) return null;
     if (!/^https?:$/i.test(source.protocol) || !/\/(?:models|chat\/completions|embeddings)$/i.test(source.pathname)) return null;
     const proxy = new URL(configuredProxy, location.href);
     proxy.pathname = `${proxy.pathname.replace(/\/$/, '')}${source.pathname}`;
@@ -202,7 +212,7 @@
     // 所有外部请求统一至少保留 180 秒，批量生成等场景仍可传入更长时限。
     const timeout = Math.max(180000, Number(init.timeout) || 180000);
     const controller = new AbortController();
-    const externalSignal = init.signal;
+    const externalSignal = init.signal || (typeof Request !== 'undefined' && input instanceof Request ? input.signal : undefined);
     const abortFromExternal = () => controller.abort(externalSignal?.reason);
     if (externalSignal) {
       if (externalSignal.aborted) abortFromExternal();
@@ -212,7 +222,7 @@
     requests.add(controller);
     activeRequests.set(scope, requests);
     const timer = setTimeout(() => controller.abort(new DOMException('请求超时', 'TimeoutError')), timeout);
-    const { idealScope, idealPurpose, timeout: ignoredTimeout, ...fetchInit } = init;
+    const { idealScope, idealPurpose, idealUseDefaultKey, timeout: ignoredTimeout, ...fetchInit } = init;
     const proxied = localAIProxyRequest(input, fetchInit);
     try {
       if (proxied) {
@@ -256,12 +266,8 @@
       const endpoint = machineRouteUrl(options.endpoint || config.endpoint, route);
       if (!endpoint) return Promise.reject(new Error('请先配置 API 接口地址'));
       const { endpoint: ignoredEndpoint, route: ignoredRoute, body, key: ignoredKey, ...requestOptions } = options;
-      const next = { ...requestOptions, idealScope: String(options.idealScope || 'shared') };
+      const next = { ...requestOptions, body, headers: machineRequestHeaders(options, config), idealUseDefaultKey: false, idealScope: String(options.idealScope || 'shared') };
       if (body && typeof body === 'object' && !(body instanceof FormData) && !(body instanceof Blob)) next.body = JSON.stringify(body);
-      if (options.key) {
-        next.headers = new Headers(next.headers || {});
-        if (!next.headers.has('Authorization')) next.headers.set('Authorization', `Bearer ${options.key}`);
-      }
       return window.IdealMachineFetch(endpoint, next);
     },
     chat(messages, options = {}) {
@@ -275,6 +281,8 @@
       const { endpoint: ignoredEndpoint, model: ignoredModel, body: ignoredBody, key: ignoredKey, ...requestOptions } = options;
       return window.IdealMachineFetch(endpoint, {
         ...requestOptions,
+        headers: machineRequestHeaders(options, config),
+        idealUseDefaultKey: false,
         idealScope: scope,
         method: 'POST',
         body: JSON.stringify(payload)
@@ -289,6 +297,8 @@
       const { endpoint: ignoredEndpoint, model: ignoredModel, body: ignoredBody, key: ignoredKey, ...requestOptions } = options;
       return window.IdealMachineFetch(endpoint, {
         ...requestOptions,
+        headers: machineRequestHeaders(options, config),
+        idealUseDefaultKey: false,
         idealScope: String(options.idealScope || 'vector'),
         method: 'POST',
         body: JSON.stringify(payload)
@@ -972,7 +982,7 @@
       if (event.data?.type !== 'ideal-open-chat') return;
       window.dispatchEvent(new CustomEvent('ideal-machine-open-chat', { detail:{ contactId:String(event.data.contactId || '') } }));
     });
-    navigator.serviceWorker.register('./sw.js?v=20261001-asset-info-height-2', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=20261002-api-repair-1', { updateViaCache: 'none' }).catch(() => {});
   }
   // 所有角色型 API 请求共用的身份顺序：先读角色，再读当前绑定用户。
   // 基础资料只认明确字段，避免模型从称呼、名字或语气反推生日和性别。

@@ -73,7 +73,7 @@
           <div class="beauty-wallpaper-box"><div class="beauty-wallpaper-preview" id="beautyWallpaperPreview"></div><input class="beauty-input" id="beautyWallpaperUrl" type="url" placeholder="粘贴图片 URL"><label class="beauty-file-label">从本地选择<input class="beauty-file" id="beautyWallpaperFile" type="file" accept="image/*"></label><button class="beauty-wallpaper-album" data-beauty-wallpaper-album type="button">从相册选择</button></div>
         </section>
         <section class="beauty-section">
-          <div class="beauty-section-head beauty-icon-section-head"><h3 class="beauty-section-title">App 图标与名称</h3><div class="beauty-icon-section-actions"><button class="beauty-btn beauty-batch-icons" data-beauty-batch-icons type="button">从相册批量设置</button><button class="beauty-btn beauty-other-import" data-beauty-other-import type="button">从其他导入</button><button class="beauty-btn beauty-inline-reset" id="beautyReset" type="button">恢复默认图标与名称</button></div></div>
+          <div class="beauty-section-head beauty-icon-section-head"><h3 class="beauty-section-title">App 图标与名称</h3><div class="beauty-icon-section-actions"><button class="beauty-btn beauty-batch-icons" data-beauty-batch-icons type="button">从相册批量设置</button><button class="beauty-btn beauty-other-import" data-beauty-other-import type="button">从其他导入</button><button class="beauty-btn beauty-inline-reset" id="beautyReset" type="button">恢复默认图标与名称</button><button class="beauty-btn beauty-inline-reset" data-icon-set-toggle type="button" aria-expanded="false" aria-controls="beautyIconSets">选择整套图标 ▾</button><button class="beauty-btn beauty-inline-reset" data-icon-set-add type="button" aria-label="添加整套图标">＋</button></div></div><div id="beautyIconSets" class="beauty-icon-sets" hidden></div>
           <p class="beauty-icon-swap-hint" data-beauty-swap-hint>依次点击两个 App 图标即可交换，保存更改后生效。</p><div class="beauty-app-list" id="beautyAppList"></div>
         </section>
       </div>
@@ -177,6 +177,115 @@
       window.alert('图标已准备好。请点击浏览器的分享按钮，再选择“添加到主屏幕”。');
     } catch { window.alert('图标保存失败，请稍后重试。'); }
   }
+
+  const iconSetsKey = 'ideal-machine-beauty-icon-sets';
+  const builtInIconSets = [
+    { id: 'builtin', name: '内置iOS图标' }
+  ];
+  let activeIconSetId = 'builtin';
+  const deletedBuiltInSetsKey = 'ideal-machine-beauty-deleted-builtin-sets';
+  let deletedBuiltInSets = [];
+  try {
+    const stored = JSON.parse(localStorage.getItem(deletedBuiltInSetsKey) || '[]');
+    if (Array.isArray(stored)) deletedBuiltInSets = stored.filter(id => builtInIconSets.some(item => item.id === id));
+  } catch {}
+  let iconSets = [];
+  try {
+    const stored = JSON.parse(localStorage.getItem(iconSetsKey) || '[]');
+    if (Array.isArray(stored)) iconSets = stored.filter(item => item && typeof item.id === 'string' && typeof item.name === 'string' && item.icons && typeof item.icons === 'object');
+  } catch {}
+  function persistIconSets(next) {
+    try { localStorage.setItem(iconSetsKey, JSON.stringify(next)); iconSets = next; return true; }
+    catch { window.alert('图标套装保存失败，本地存储空间不足，请清理后重试。'); return false; }
+  }
+  function renderIconSets() {
+    const row = item => `<div class="beauty-icon-set-row${item.id === activeIconSetId ? ' is-active' : ''}"><button type="button" data-icon-set-pick="${esc(item.id)}">${esc(item.name)}</button><button class="beauty-icon-set-delete" type="button" data-icon-set-delete="${esc(item.id)}" aria-label="删除${esc(item.name)}" title="删除这套图标">删除</button></div>`;
+    modal.querySelector('#beautyIconSets').innerHTML = builtInIconSets.filter(item => !deletedBuiltInSets.includes(item.id)).map(row).join('') + iconSets.map(row).join('') || '<div class="beauty-icon-set-row">暂无图标套装，点击 ＋ 添加</div>';
+  }
+  function closeIconSets() {
+    modal.querySelector('#beautyIconSets').hidden = true;
+    modal.querySelector('[data-icon-set-toggle]').setAttribute('aria-expanded', 'false');
+  }
+  function closeIconSetEditor() {
+    modal.querySelector('[data-icon-set-editor]')?.remove();
+    modal.querySelector('[data-icon-set-backdrop]')?.remove();
+  }
+  modal.addEventListener('click', async event => {
+    if (event.target.closest('[data-icon-set-toggle]')) {
+      const list = modal.querySelector('#beautyIconSets');
+      renderIconSets(); list.hidden = !list.hidden;
+      modal.querySelector('[data-icon-set-toggle]').setAttribute('aria-expanded', String(!list.hidden));
+      return;
+    }
+    const pick = event.target.closest('[data-icon-set-pick]');
+    if (pick) {
+      const set = [...builtInIconSets, ...iconSets].find(item => item.id === pick.dataset.iconSetPick);
+      if (!set) return;
+      swapIconKey = '';
+      appItems.forEach(item => {
+        const key = item.dataset.appKey;
+        const value = typeof set.icons?.[key] === 'string' ? set.icons[key] : builtInIconToken(key);
+        batchIconDraft[key] = value;
+        showIconDraft(key, value);
+        modal.querySelector(`[data-beauty-name="${key}"]`).value = set?.names?.[key] || defaultApps.get(key)?.name || '';
+        modal.querySelector(`[data-beauty-file="${key}"]`).value = '';
+      });
+      modal.querySelectorAll('[data-beauty-swap]').forEach(button => button.setAttribute('aria-pressed', 'false'));
+      activeIconSetId = set.id;
+      modal.querySelector('[data-icon-set-toggle]').textContent = set.name + ' ▾';
+      closeIconSets(); return;
+    }
+    const remove = event.target.closest('[data-icon-set-delete]');
+    if (remove) {
+      event.preventDefault();
+      event.stopPropagation();
+      const id = remove.dataset.iconSetDelete;
+      if (builtInIconSets.some(item => item.id === id)) {
+        const next = [...new Set([...deletedBuiltInSets, id])];
+        try { localStorage.setItem(deletedBuiltInSetsKey, JSON.stringify(next)); deletedBuiltInSets = next; }
+        catch { window.alert('删除未能保存，请重试。'); return; }
+      } else if (!persistIconSets(iconSets.filter(item => item.id !== id))) return;
+      if (activeIconSetId === id) {
+        activeIconSetId = '';
+        modal.querySelector('[data-icon-set-toggle]').textContent = '选择整套图标 ▾';
+      }
+      renderIconSets();
+      return;
+    }
+    if (event.target.closest('[data-icon-set-add]')) {
+      closeIconSets(); closeIconSetEditor();
+      modal.querySelector('.beauty-sheet').insertAdjacentHTML('beforeend', '<div class="beauty-confirm-backdrop" data-icon-set-backdrop></div><form class="beauty-confirm-card" data-icon-set-editor role="dialog" aria-modal="true" aria-labelledby="beautyIconSetTitle"><h3 id="beautyIconSetTitle">保存整套图标</h3><input class="beauty-input" name="setName" aria-label="图标套装名称" placeholder="输入这套图标的名字" maxlength="30" required><div><button class="beauty-btn" type="button" data-icon-set-cancel>取消</button><button class="beauty-btn beauty-save" type="submit">保存</button></div></form>');
+      modal.querySelector('[name="setName"]').focus(); return;
+    }
+    if (event.target.closest('[data-icon-set-cancel], [data-icon-set-backdrop]')) closeIconSetEditor();
+    if (!event.target.closest('#beautyIconSets')) closeIconSets();
+  });
+  modal.addEventListener('submit', async event => {
+    if (!event.target.matches('[data-icon-set-editor]')) return;
+    event.preventDefault();
+    const form = event.target;
+    const name = form.elements.setName.value.trim();
+    if (!name) { form.elements.setName.focus(); return; }
+    if (iconSets.some(item => item.name === name)) { window.alert('已存在同名图标套装，请换一个名字。'); return; }
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true;
+    try {
+      const icons = {}, names = {};
+      for (const item of appItems) {
+        const key = item.dataset.appKey;
+        icons[key] = iconDraftValue(key);
+        names[key] = modal.querySelector(`[data-beauty-name="${key}"]`).value.trim() || defaultApps.get(key)?.name || '';
+      }
+      for (const key of Object.keys(icons)) {
+        if (icons[key].startsWith('data:image/') && window.IdealMachinePutImage) icons[key] = await window.IdealMachinePutImage(icons[key]) || icons[key];
+      }
+      if (persistIconSets([...iconSets, { id: 'set-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8), name, icons, names }])) {
+        closeIconSetEditor(); renderIconSets();
+        modal.querySelector('[data-icon-set-toggle]').textContent = name + ' ▾';
+      }
+    } catch { window.alert('图标套装保存失败，请重试。'); }
+    finally { button.disabled = false; }
+  });
 
   function appRow(item) {
     const key = item.dataset.appKey;
@@ -551,6 +660,9 @@
   window.addEventListener('storage', event => { if (event.key === storageKey) scheduleAutoContrast(); });
 
   function open() {
+    closeIconSets();
+    closeIconSetEditor();
+    modal.querySelector('[data-icon-set-toggle]').textContent = '选择整套图标 ▾';
     closeIconPicker();
     swapIconKey = '';
     batchIconDraft = Object.fromEntries(appItems.map(item => { const key = item.dataset.appKey; return [key, saved.icons?.[key] || builtInIconToken(key)]; }));
@@ -598,7 +710,7 @@
     close();
   }
 
-  function close() { swapIconKey = ''; closeIconPicker(); closeBatchIconPanel(); closeOtherImportPanel(); applySettings(); modal.classList.remove('is-open'); }
+  function close() { closeIconSets(); closeIconSetEditor(); swapIconKey = ''; closeIconPicker(); closeBatchIconPanel(); closeOtherImportPanel(); applySettings(); modal.classList.remove('is-open'); }
   window.IdealMachineOpenDesktopBeauty = () => open();
   function restoreDefaults() {
     delete saved.names;

@@ -205,6 +205,92 @@
   function roles() { const data = read(chatKey, {}); return Array.isArray(data.contacts) ? data.contacts.filter(item => !item?.isGroup) : []; }
   function role() { return roles().find(item => item.id === state.roleId) || roles()[0]; }
   function esc(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char])); }
+  const taCurrencies = [
+    { code:'CNY', symbol:'¥', name:'人民币', toCny:1 },
+    { code:'USD', symbol:'$', name:'美元', toCny:7.18 },
+    { code:'EUR', symbol:'€', name:'欧元', toCny:7.78 },
+    { code:'GBP', symbol:'£', name:'英镑', toCny:9.05 },
+    { code:'JPY', symbol:'¥', name:'日元', toCny:.049 },
+    { code:'KRW', symbol:'₩', name:'韩元', toCny:.0052 },
+    { code:'HKD', symbol:'HK$', name:'港币', toCny:.92 },
+    { code:'TWD', symbol:'NT$', name:'新台币', toCny:.223 },
+    { code:'SGD', symbol:'S$', name:'新加坡元', toCny:5.35 },
+    { code:'AUD', symbol:'A$', name:'澳元', toCny:4.68 },
+    { code:'CAD', symbol:'C$', name:'加元', toCny:5.18 },
+    { code:'CHF', symbol:'CHF', name:'瑞士法郎', toCny:8.32 },
+    { code:'RUB', symbol:'₽', name:'卢布', toCny:.078 },
+    { code:'INR', symbol:'₹', name:'印度卢比', toCny:.086 },
+    { code:'THB', symbol:'฿', name:'泰铢', toCny:.20 },
+    { code:'MYR', symbol:'RM', name:'马来西亚令吉', toCny:1.70 },
+    { code:'VND', symbol:'₫', name:'越南盾', toCny:.00028 },
+    { code:'PHP', symbol:'₱', name:'菲律宾比索', toCny:.127 },
+    { code:'IDR', symbol:'Rp', name:'印尼盾', toCny:.00045 },
+    { code:'AED', symbol:'د.إ', name:'阿联酋迪拉姆', toCny:1.95 },
+    { code:'BRL', symbol:'R$', name:'巴西雷亚尔', toCny:1.30 },
+    { code:'MXN', symbol:'MX$', name:'墨西哥比索', toCny:.41 }
+  ];
+  const taCurrencyByCode = new Map(taCurrencies.map(item => [item.code, item]));
+  const taNationalityCurrencyRules = [
+    [/中国(?!香港|台湾)|中华|中国大陆|中国内地|china|chinese/i, 'CNY'],
+    [/美国|美利坚|usa|u\.s\.?a?\.?|united states|american/i, 'USD'],
+    [/加拿大|canada|canadian/i, 'CAD'],
+    [/英国|英格兰|苏格兰|威尔士|britain|british|england|scotland|wales|united kingdom/i, 'GBP'],
+    [/法国|france|french/i, 'EUR'],
+    [/德国|意大利|西班牙|葡萄牙|荷兰|比利时|奥地利|爱尔兰|欧洲|german|italian|spanish|portuguese|dutch|belgian|austrian|irish/i, 'EUR'],
+    [/日本|japan|japanese/i, 'JPY'],
+    [/韩国|南韩|korea|korean/i, 'KRW'],
+    [/中国台湾|台湾|taiwan|taiwanese/i, 'TWD'],
+    [/中国香港|香港|hong kong/i, 'HKD'],
+    [/新加坡|singapore|singaporean/i, 'SGD'],
+    [/澳大利亚|澳洲|australia|australian/i, 'AUD'],
+    [/瑞士|switzerland|swiss/i, 'CHF'],
+    [/俄罗斯|俄国|russia|russian/i, 'RUB'],
+    [/印度|india|indian/i, 'INR'],
+    [/泰国|thailand|thai/i, 'THB'],
+    [/马来西亚|malaysia|malaysian/i, 'MYR'],
+    [/越南|vietnam|vietnamese/i, 'VND'],
+    [/菲律宾|philippines|filipino/i, 'PHP'],
+    [/印度尼西亚|印尼|indonesia|indonesian/i, 'IDR'],
+    [/阿联酋|迪拜|uae|emirati/i, 'AED'],
+    [/巴西|brazil|brazilian/i, 'BRL'],
+    [/墨西哥|mexico|mexican/i, 'MXN']
+  ];
+  function taCurrency(value) {
+    const raw = String(value || '').trim();
+    const code = raw.toUpperCase().replace(/[^A-Z]/g, '');
+    const countryCodeCurrency = { CN:'CNY', US:'USD', GB:'GBP', FR:'EUR', DE:'EUR', IT:'EUR', ES:'EUR', JP:'JPY', KR:'KRW', HK:'HKD', TW:'TWD', SG:'SGD', AU:'AUD', CA:'CAD', CH:'CHF', RU:'RUB', IN:'INR', TH:'THB', MY:'MYR', VN:'VND', PH:'PHP', ID:'IDR', AE:'AED', BR:'BRL', MX:'MXN' };
+    if (countryCodeCurrency[code]) return taCurrencyByCode.get(countryCodeCurrency[code]);
+    if (taCurrencyByCode.has(code)) return taCurrencyByCode.get(code);
+    const match = [...taCurrencies].sort((a, b) => b.symbol.length - a.symbol.length).find(item => raw === item.symbol || raw.includes(item.symbol) || raw.includes(item.name));
+    return match || null;
+  }
+  function taRoleCurrency(owner) {
+    const explicit = [owner?.currency, owner?.currencyCode, owner?.nationality, owner?.country, owner?.countryCode].map(taCurrency).find(Boolean);
+    if (explicit) return explicit;
+    const text = [owner?.nationality, owner?.country, owner?.identity, owner?.details, owner?.signature].filter(Boolean).join(' ');
+    for (const [pattern, code] of taNationalityCurrencyRules) if (pattern.test(text)) return taCurrencyByCode.get(code);
+    return taCurrencyByCode.get('CNY');
+  }
+  function taAmountValue(value) {
+    const match = String(value ?? '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : 0;
+  }
+  function taRowCurrency(item) {
+    return taCurrency(item?.currency || item?.currencyCode || item?.amount) || taCurrencyByCode.get('CNY');
+  }
+  function taDisplayAmount(item, targetCurrency) {
+    const sourceCurrency = taRowCurrency(item);
+    const amount = taAmountValue(item?.amount ?? item?.price);
+    return amount * sourceCurrency.toCny / targetCurrency.toCny;
+  }
+  function taFormatMoney(value, currency) {
+    const digits = ['JPY', 'KRW', 'VND', 'IDR'].includes(currency.code) ? 0 : 2;
+    return `${currency.symbol} ${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits:digits, maximumFractionDigits:digits })}`;
+  }
+  function taCnyEquivalent(value, currency) {
+    if (!currency || currency.code === 'CNY') return '';
+    return `≈¥ ${Number((Number(value || 0) * currency.toCny) || 0).toLocaleString('zh-CN', { minimumFractionDigits:2, maximumFractionDigits:2 })}`;
+  }
   function avatar(item) { return item?.avatar ? `<img src="${esc(item.avatar)}" alt="">` : esc((item?.nickname || item?.name || 'Ta').slice(0, 1)); }
   function icon(type) { const paths = { chat:'<path d="M8 10h32v22H19l-9 7v-7H8z"/><path d="M15 17h18M15 23h12"/>', forum:'<path d="M9 11h30v21H19l-8 6v-6H9z"/><path d="M16 18h16M16 24h10"/>', calendar:'<rect x="10" y="11" width="28" height="27" rx="4"/><path d="M16 8v7M32 8v7M10 19h28M17 26h.01M24 26h.01M31 26h.01M17 32h.01M24 32h.01"/>', couple:'<path d="M24 38S8 28 8 17a8 8 0 0 1 15-4 8 8 0 0 1 15 4c0 11-14 21-14 21z"/>', music:'<path d="M31 10v22M31 10l9-2v21M31 32c0 4-4 7-8 7s-7-2-7-5 3-6 7-6 8 1 8 4zM40 29c0 4-4 7-8 7"/>', doubao:'<path d="M10 27c0-10 7-17 16-17s12 5 12 13c0 9-7 16-17 16H10z"/><path d="M18 23h.01M30 23h.01M18 30c3 3 7 3 10 0"/>', shop:'<path d="M10 20h28v19H10zM8 20l3-9h26l3 9M16 20v4M24 20v4M32 20v4M16 39V29h16v10"/>', wallet:'<path d="M8 14h30v25H8zM8 18h30M31 25h10v9H31zM35 29h.01"/>', beauty:'<path d="M24 7c2 8 5 11 13 13-8 2-11 5-13 13-2-8-5-11-13-13 8-2 11-5 13-13zM37 31c1 4 3 6 7 7-4 1-6 3-7 7-1-4-3-6-7-7 4-1 6-3 7-7z"/>' }; return `<svg viewBox="0 0 48 48" aria-hidden="true">${paths[type] || ''}</svg>`; }
   const ios17IconKeys = new Set(['liaotian','luntan','xiangce','rili','qinglvkongjian','yinyue','doubao','gouwu','qianbao','meihua','debate','fanfic','magazine']);
@@ -630,7 +716,7 @@
       if (key === 'calendar' && /^(?:CALENDAR|CALENDAR_UPDATE|日历|行程|日程更新)$/.test(label)) { const [start, end, rawStatus, title, ...text] = parts; if (title) rows.push({ start, end, date:`${start}—${end}`, status:calendarStatus(rawStatus), title, text:text.join('｜') }); }
       if (key === 'music' && /^(?:MUSIC|音乐|歌曲)$/.test(label)) { const [artist, title, playCount, ...mood] = parts; if (title) rows.push({ artist, title, playCount, text:mood.join('｜') }); }
       if (key === 'shopping' && /^(?:SHOPPING|SHOP|购物|商品)$/.test(label)) { const typed=!/^[¥￥\d]/.test(parts[0]);const type=typed?parts.shift():'普通购物';const [price, title, status, ...purpose] = parts; if (title) { lastRow = { type, price, title, status, text:purpose.join('｜') }; rows.push(lastRow); } }
-      if (key === 'wallet' && /^(?:WALLET|钱包|账单)$/.test(label)) { const [type, amount, title, time, ...note] = parts; if (title) rows.push({ type:/收入|income|in/i.test(type)?'income':'expense', amount, title, time, text:note.join('｜') }); }
+      if (key === 'wallet' && /^(?:WALLET|钱包|账单)$/.test(label)) { const [type, amount, title, time, ...note] = parts; if (title) rows.push({ type:/收入|income|in/i.test(type)?'income':'expense', amount, currency:taRowCurrency({ amount }).code, title, time, text:note.join('｜') }); }
     });
     if (!rows.length && key === 'calendar' && /(?:NO_CHANGE|没有变化|无变化)/i.test(String(value || ''))) return { calendar:[], noChange:true };
     if (!rows.length) throw new Error('API 没有返回可识别的内容，请重新刷新');
@@ -827,24 +913,25 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
   }
   async function completeWalletRows(owner, config, model, rows) {
     let merged=Array.isArray(rows)?rows.slice():[];
+    const walletCurrency = taRoleCurrency(owner);
     for(let attempt=0;attempt<2&&merged.length<8;attempt+=1){
       try{
         const existing=merged.map(item=>`${item.type==='income'?'收入':'支出'}｜${item.amount}｜${item.title}｜${item.time||''}`).join('\n')||'暂无有效流水';
-        const response=await fetch(`${config.endpoint.replace(/\/$/,'')}/chat/completions`,{timeout:120000,method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${config.key}`},body:JSON.stringify({model,temperature:.68,max_tokens:1200,stream:false,messages:[{role:'system',content:'你负责补齐角色钱包流水。只输出 WALLET 逐行记录，不要 JSON、Markdown 或解释。'},{role:'user',content:`角色“${owner.nickname||owner.name}”的钱包流水数量不足。请补充 ${Math.max(8-merged.length,4)} 笔不重复记录，至少包含收入和支出两类。每行严格使用“WALLET｜收入或支出｜金额｜流水名称｜时间｜具体说明”。金额使用 ¥0.00 格式，内容符合角色设定。\n角色设定：${String(owner.details||owner.signature||owner.identity||'暂无').slice(0,3000)}\n已有流水，不得重复：\n${existing}`} ]})});
+        const response=await fetch(`${config.endpoint.replace(/\/$/,'')}/chat/completions`,{timeout:120000,method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${config.key}`},body:JSON.stringify({model,temperature:.68,max_tokens:1200,stream:false,messages:[{role:'system',content:'你负责补齐角色钱包流水。只输出 WALLET 逐行记录，不要 JSON、Markdown 或解释。'},{role:'user',content:`角色“${owner.nickname||owner.name}”的钱包流水数量不足。请补充 ${Math.max(8-merged.length,4)} 笔不重复记录，至少包含收入和支出两类。每行严格使用“WALLET｜收入或支出｜金额｜流水名称｜时间｜具体说明”。角色国籍/货币：${walletCurrency.name}（${walletCurrency.code}），所有金额都用该货币书写，例如 ${walletCurrency.symbol}39.90。内容符合角色设定。\n角色设定：${String(owner.details||owner.signature||owner.identity||'暂无').slice(0,3000)}\n已有流水，不得重复：\n${existing}`} ]})});
         if(!response.ok)continue;
         const data=await response.json();const added=parseTaListContent('wallet',apiResponseText(data)).wallet||[];
         merged=[...merged,...added].filter((item,index,list)=>list.findIndex(other=>`${other.type}|${other.amount}|${other.title}|${other.time}`===`${item.type}|${item.amount}|${item.title}|${item.time}`)===index);
       }catch{}
     }
     const fallback=[
-      {type:'income',amount:'¥1200.00',title:'账户余额转入',time:'本月',text:'用于近期生活开销'},
-      {type:'income',amount:'¥300.00',title:'临时收入',time:'本周',text:'符合角色日常的小额收入'},
-      {type:'expense',amount:'¥36.00',title:'日常餐饮',time:'今天',text:'一笔普通餐饮消费'},
-      {type:'expense',amount:'¥18.00',title:'交通出行',time:'昨天',text:'近期交通费用'},
-      {type:'expense',amount:'¥52.00',title:'生活用品',time:'本周',text:'补充日常用品'},
-      {type:'expense',amount:'¥28.00',title:'饮品零食',time:'本周',text:'随手购买的饮品和零食'},
-      {type:'expense',amount:'¥66.00',title:'外卖订单',time:'本周',text:'一次日常外卖消费'},
-      {type:'expense',amount:'¥45.00',title:'休闲娱乐',time:'近期',text:'符合角色生活的休闲开销'}
+      {type:'income',amount:`${walletCurrency.symbol}1200.00`,title:'账户余额转入',time:'本月',text:'用于近期生活开销'},
+      {type:'income',amount:`${walletCurrency.symbol}300.00`,title:'临时收入',time:'本周',text:'符合角色日常的小额收入'},
+      {type:'expense',amount:`${walletCurrency.symbol}36.00`,title:'日常餐饮',time:'今天',text:'一笔普通餐饮消费'},
+      {type:'expense',amount:`${walletCurrency.symbol}18.00`,title:'交通出行',time:'昨天',text:'近期交通费用'},
+      {type:'expense',amount:`${walletCurrency.symbol}52.00`,title:'生活用品',time:'本周',text:'补充日常用品'},
+      {type:'expense',amount:`${walletCurrency.symbol}28.00`,title:'饮品零食',time:'本周',text:'随手购买的饮品和零食'},
+      {type:'expense',amount:`${walletCurrency.symbol}66.00`,title:'外卖订单',time:'本周',text:'一次日常外卖消费'},
+      {type:'expense',amount:`${walletCurrency.symbol}45.00`,title:'休闲娱乐',time:'近期',text:'符合角色生活的休闲开销'}
     ];
     for(const item of fallback){if(merged.length>=8&&merged.some(row=>row.type==='income')&&merged.some(row=>row.type==='expense'))break;if(!merged.some(row=>row.title===item.title))merged.push(item);}
     return merged;
@@ -875,7 +962,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
       calendar:calendarNeedsCompletion ? `现有日程没有覆盖完整一整天，本次刷新必须先补齐，不能只做状态更新。保留原有项目；补充缺少时段，尤其是睡觉：当天凌晨 00:00 至起床，以及当晚入睡至次日早上（例如 22:30—次日07:00），分别作为独立行程。跨日行程的结束时间只写次日 HH:MM，不要写“次日”二字。已有当晚睡觉只到 23:59 的，请用相同开始时间更新它的结束时间，不要新增重叠项目。新增项目严格使用“CALENDAR_UPDATE｜开始时间｜结束时间｜PLANNED、DONE或CHANGED｜事件标题｜具体做什么”。每条简介写完整句子，以句号结束。绝对不能输出 NO_CHANGE。现有日程如下：\n${calendarContext}` : existingCalendar.length ? `这是当天第 ${Number(existingCalendarDay?.refreshCount || 1) + 1} 次刷新，现有日程已经覆盖完整一整天，绝对禁止重写整份日程。根据当前时间、角色近期聊天和世界书判断原计划的实际进展，只输出确实需要修改的项目。每个变更严格使用“CALENDAR_UPDATE｜原开始时间｜原结束时间｜DONE或CHANGED｜更新后的事件标题｜实际发生或改变后的具体事情”。简介必须是完整句子。若完全无需改变，只输出 NO_CHANGE。原日程如下：\n${calendarContext}` : '这是今天第一次生成，只允许建立这一份完整全天计划。不要返回 JSON。每行严格使用“CALENDAR｜开始时间｜结束时间｜PLANNED或DONE｜行程标题｜具体做什么”。开始和结束都必须使用 HH:MM。生成包含睡觉的全天行程：00:00 至起床是一段睡觉，当晚入睡至次日早上是另一段睡觉（例如 22:30—次日07:00，结束时间字段只写 07:00）。中间按时间顺序安排符合人设的三餐、活动和必要休息，不得重叠。每条简介必须写完整句子并以句号结束。当前时间之前用 DONE，未来用 PLANNED。',
       music:`不要返回 JSON。每行严格使用“MUSIC｜真实歌手｜真实歌曲名｜听过次数｜听这首歌时的具体心情”。每次刷新仍要生成 6—10 首新的最近播放记录，不能只返回已有歌曲或只处理封面；尽量选择与已有歌曲不同、但符合角色身份、性格与近况的真实歌曲。歌曲和歌手必须真实存在且对应正确，听过次数写成“12次”这种格式。已有歌曲仅供避重复参考：${musicContext}`,
       shopping:'不要返回 JSON。每行严格使用“SHOPPING｜普通购物、花市或外卖｜价格｜商品完整名称｜订单状态｜角色买它的具体用途”。一次生成 5—8 件不同记录，价格写成“¥39.90”。“具体用途”必须是至少 20 个汉字的完整自然句，说明角色为什么买、准备给谁使用或在什么场景使用；不能只写几个词，不能在逗号、连接词或半个词处结束，不能换行拆开一条记录。是否出现花市、外卖以及各自数量，必须由角色的成年人身份、人设、生活习惯和近况自行决定；不适合就完全不要出现。花市仅限明确成年的角色，只写合法非露骨的成人情趣用品；不得涉及未成年人。普通商品要像真实商城订单，外卖要像真实餐饮订单。',
-      wallet:'不要返回 JSON。每行严格使用“WALLET｜收入或支出｜金额｜流水名称｜时间｜具体说明”。必须生成 10—16 条彼此独立的近期钱包流水，不能只写一笔总账；至少包含 2 笔合理收入和 6 笔不同支出，每笔都要有独立金额、名称和时间。金额写成“¥39.90”；收入来源和消费内容必须符合角色职业、经济状况、普通购物、花市与外卖记录，收支要合理。'
+      wallet:`不要返回 JSON。每行严格使用“WALLET｜收入或支出｜金额｜流水名称｜时间｜具体说明”。必须生成 10—16 条彼此独立的近期钱包流水，不能只写一笔总账；至少包含 2 笔合理收入和 6 笔不同支出，每笔都要有独立金额、名称和时间。角色使用${taRoleCurrency(owner).name}（${taRoleCurrency(owner).code}），金额必须写成“${taRoleCurrency(owner).symbol}39.90”这样的格式；收入来源和消费内容必须符合角色职业、经济状况、普通购物、花市与外卖记录，收支要合理。`
     };
     const outputRule = key === 'doubao' ? `不要返回 JSON。第一行必须是“TITLE｜内容概括”。标题字数可根据内容需要适当增加，使用一句简洁的主题短语，必须让人一眼看出角色和豆包具体聊了什么人、什么事或什么需求，不能只写“日常问题解答、聊天话题、情绪疏导”等空泛分类，也不能照抄角色整句原话；禁止以“咨询、询问、查找、寻找、推荐、关于”开头。例如聊周杰伦的歌写“TITLE｜适合深夜听的周杰伦经典歌单”，聊考试复习写“TITLE｜下周考试的复习时间安排”，聊和朋友吵架写“TITLE｜和朋友吵架后的和好办法”。之后每条消息单独一行，只能使用“CHARACTER｜消息”或“DOUBAO｜消息”格式，不要编号、解释、代码块和其他文字。CHARACTER 只能是角色“${owner.nickname || owner.name}”本人，DOUBAO 是豆包；现实用户绝不能作为发言者出现。必须连续生成 4—6 个完整来回，共 8—12 条消息；严格由 CHARACTER 开始并交替回复，后一轮自然承接前一轮。角色消息保持口语化和相对简短；豆包每次回复写 2—4 句，内容比角色消息更长、更具体，但不要写成大段论文。绝对不能少于 4 轮。豆包的每次回复都必须保持温和、聪明、克制、有陪伴感：先理解角色真正的问题，再给清晰且实际的回应；不端着，不使用夸张网络套话。` : `${lineRules[key]}每条记录单独一行，只能使用指定格式，不要编号、解释、Markdown、代码块或其他文字。`;
     const prompt = `只生成角色手机里的${labels[key]}，不要生成其他内容。${outputRule}内容要符合角色设定和世界书，不要提及 AI、系统或提示词。${key === 'calendar' ? `当前准确日期和时间：${nowLabel}。日程所属日期：${todayKey}。` : ''}\n${key === 'music' ? `已有歌曲（仅用于避免重复，刷新仍必须追加新的歌曲）：${musicContext}\n` : ''}手机主人/豆包聊天发言者：${owner.nickname || owner.name}\n角色设定：${String(owner.details || owner.signature || '暂无').slice(0,3000)}\n绑定用户设定（只用于理解角色经历，不能代替角色发言）：${String(profile?.persona || profile?.nickname || '暂无').slice(0,1200)}\n局部世界书：${bookText}\n角色与用户最近 3 天的聊天背景（只能影响角色想聊什么，不能让用户进入豆包对话）：${recentMessagesByDays(current.messages, 3).map(item => item.text || item.content || '').join('；') || '暂无'}`;
@@ -998,8 +1085,11 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
     return `<section class="ta-order-list"><header><small>RECENT ORDERS</small><h2>最近订单</h2><p>点击商品可以查看角色买来做什么。</p></header>${rows.map((item, index) => { const price = String(item.price || '价格未知'); return `<article><div class="ta-order-shop"><b>${esc(item.type || '普通购物')}</b><span>${esc(item.status || '已签收')}</span></div><button type="button" data-ta-detail="shopping" data-ta-detail-index="${index}"><i>${icon('shop')}</i><span><b>${esc(item.title || item.name || '未命名商品')}</b><small>${esc(item.status || '查看订单详情')}</small></span><strong>${esc(/^[¥￥]/.test(price) || !/^\d/.test(price) ? price : `¥${price}`)}</strong><em>›</em></button></article>`; }).join('')}</section>`;
   }
   function roleWallet(owner) {
-    const rows=walletRows(owner);const signedAmount=item=>{const raw=String(item.amount||item.price||'0').replace(/[^\d.-]/g,'');const amount=Number(raw)||0;return item.type==='income'?amount:-amount;};const balance=rows.reduce((sum,item)=>sum+signedAmount(item),0);const income=rows.filter(item=>item.type==='income').reduce((sum,item)=>sum+Math.abs(signedAmount(item)),0);const expense=rows.filter(item=>item.type!=='income').reduce((sum,item)=>sum+Math.abs(signedAmount(item)),0);
-    return `<section class="ta-wallet-page"><div class="ta-wallet-balance" data-card-number="${walletCardNumber(owner.id)}"><small>当前流水结余</small><strong>¥ ${balance.toFixed(2)}</strong><div><span>收入 ¥ ${income.toFixed(2)}</span><span>支出 ¥ ${expense.toFixed(2)}</span></div></div><header><small>RECENT ACTIVITY</small><h2>最近收支</h2></header><div class="ta-wallet-list">${rows.length?rows.map(item=>`<article class="is-${item.type==='income'?'income':'expense'}"><i>${item.type==='income'?'＋':'−'}</i><span><b>${esc(item.title||'钱包流水')}</b><small>${esc(item.time||item.text||'近期')}</small></span><strong>${item.type==='income'?'+':'−'}¥ ${Math.abs(signedAmount(item)).toFixed(2)}</strong></article>`).join(''):'<p class="ta-role-empty">角色的钱包还没有收支记录，点击右上角刷新生成。</p>'}</div></section>`;
+    const rows=walletRows(owner); const currency=taRoleCurrency(owner);
+    const signedAmount=item=>{const amount=taDisplayAmount(item,currency);return item.type==='income'?amount:-amount;};
+    const balance=rows.reduce((sum,item)=>sum+signedAmount(item),0); const income=rows.filter(item=>item.type==='income').reduce((sum,item)=>sum+Math.abs(signedAmount(item)),0); const expense=rows.filter(item=>item.type!=='income').reduce((sum,item)=>sum+Math.abs(signedAmount(item)),0);
+    const balanceCny=taCnyEquivalent(balance,currency); const incomeCny=taCnyEquivalent(income,currency); const expenseCny=taCnyEquivalent(expense,currency);
+    return `<section class="ta-wallet-page"><div class="ta-wallet-balance" data-card-number="${walletCardNumber(owner.id)}"><small>当前流水结余 · ${esc(currency.name)}</small><strong>${esc(taFormatMoney(balance,currency))}</strong>${balanceCny?`<small class="ta-wallet-cny">${esc(balanceCny)} 人民币</small>`:''}<div><span>收入 ${esc(taFormatMoney(income,currency))}${incomeCny?`<small class="ta-wallet-cny">${esc(incomeCny)}</small>`:''}</span><span>支出 ${esc(taFormatMoney(expense,currency))}${expenseCny?`<small class="ta-wallet-cny">${esc(expenseCny)}</small>`:''}</span></div></div><header><small>RECENT ACTIVITY · ${esc(currency.code)}</small><h2>最近收支</h2></header><div class="ta-wallet-list">${rows.length?rows.map(item=>{const amount=Math.abs(signedAmount(item));const cny=taCnyEquivalent(amount,currency);return `<article class="is-${item.type==='income'?'income':'expense'}"><i>${item.type==='income'?'＋':'−'}</i><span><b>${esc(item.title||'钱包流水')}</b><small>${esc(item.time||item.text||'近期')}</small></span><strong>${item.type==='income'?'+':'−'}${esc(taFormatMoney(amount,currency))}${cny?`<small class="ta-wallet-cny">${esc(cny)}</small>`:''}</strong></article>`;}).join(''):'<p class="ta-role-empty">角色的钱包还没有收支记录，点击右上角刷新生成。</p>'}</div></section>`;
   }
   function roleDetailSheet(owner) {
     if (!activeDetail) return '';
