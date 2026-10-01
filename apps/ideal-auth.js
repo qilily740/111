@@ -47,6 +47,12 @@
     window.IdealMachineAuthToken = token;
   }
 
+  function publishAuthState() {
+    window.dispatchEvent(new CustomEvent('ideal-machine-auth-changed', {
+      detail: { authenticated: Boolean(user), user: user ? { ...user } : null }
+    }));
+  }
+
   function ensureRoot() {
     let root = document.getElementById('idealAuthRoot');
     if (!root) {
@@ -287,7 +293,7 @@
     }
     if (button.dataset.action === 'logout') await run(async () => {
       try { await api('/api/auth/sign-out', { method: 'POST' }); } catch {}
-      setToken(''); user = null; message('已退出登录。', 'info'); render();
+      setToken(''); user = null; publishAuthState(); message('已退出登录。', 'info'); render();
     });
     if (button.dataset.action === 'send-code') await run(async () => {
       const email = String(formValues().email || '').trim().toLowerCase();
@@ -317,6 +323,7 @@
         if (!issuedToken) throw Object.assign(new Error('missing token'), { code: 'AUTH_SERVICE_UNAVAILABLE' });
         setToken(issuedToken);
         user = payload?.user || null;
+        publishAuthState();
       } else {
         if (!registrationTicket || !emailVerificationTicket) throw Object.assign(new Error('registration incomplete'), { code: 'EMAIL_VERIFICATION_TICKET_INVALID' });
         const { response } = await api('/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ registrationTicket, emailVerificationTicket, email: verifiedEmail, username: values.username, password: values.password, passwordConfirmation: values.passwordConfirmation }) });
@@ -325,6 +332,7 @@
         setToken(issuedToken);
         const status = await api('/auth/session');
         user = status.payload.user;
+        publishAuthState();
       }
       message('登录成功。', 'success');
       render();
@@ -342,6 +350,7 @@
     } finally {
       restoringSession = false;
       render();
+      publishAuthState();
     }
   }
 
@@ -355,6 +364,7 @@
       if (error.status === 401 || error.status === 403) {
         setToken('');
         user = null;
+        publishAuthState();
         render();
       }
     });
@@ -388,11 +398,12 @@
     getToken: () => token,
     getUser: () => user,
     isAuthenticated: () => Boolean(user),
-    logout: async () => { try { if (token) await api('/api/auth/sign-out', { method:'POST' }); } catch {} setToken(''); user = null; render(); },
+    logout: async () => { try { if (token) await api('/api/auth/sign-out', { method:'POST' }); } catch {} setToken(''); user = null; publishAuthState(); render(); },
     refresh: restoreSession,
     handleAuthorizationFailure(code) {
       setToken('');
       user = null;
+      publishAuthState();
       render();
       const messageText = code === 'DISCORD_ACCESS_REVOKED' || code.startsWith('DISCORD_')
         ? 'Discord 服务器身份组资格已失效，请恢复资格后重新登录。'

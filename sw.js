@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20260930-reexport-lock-2';
+const CACHE_NAME = 'ideal-machine-shell-v20261001-account-auth-state-1';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());

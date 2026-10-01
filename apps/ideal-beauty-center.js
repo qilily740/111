@@ -104,6 +104,16 @@
     if (status) status.textContent = label;
   }
 
+  function syncAssetInfoHeight() {
+    const preview = root.querySelector('.ideal-beauty-asset-preview');
+    const info = root.querySelector('.ideal-beauty-asset-info');
+    if (!preview || !info) return;
+    const height = Math.round(preview.getBoundingClientRect().height);
+    if (height > 0) {
+      info.style.height = `${height}px`;
+      info.style.maxHeight = `${height}px`;
+    }
+  }
   function toggleIcon() {
     return view === 'beauty'
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.2 20c.5-3.4 2.8-5.2 6.8-5.2s6.3 1.8 6.8 5.2"/></svg>'
@@ -141,7 +151,7 @@
     const item = selectedAsset();
     if (!item) { screen = 'categories'; return renderCategory(); }
     const imported = isImportedAsset(item);
-    const source = item.source === 'imported-code' ? '导入的美化码（可编辑，不可二次分享）' : item.source === 'json' ? '导入的 JSON（可编辑，不可二次分享）' : item.source === 'generated' ? '线上美化码' : '本地美化';
+    const source = item.source === 'imported-code' ? '导入美化码' : item.source === 'json' ? '导入 JSON' : item.source === 'generated' ? '线上美化码' : '本地美化';
     const category = categoryName(categoryForAsset(item));
     const target = targetName(item);
     const targetMarkup = target && target !== category && target !== item.name ? `<p>${esc(target)}</p>` : '';
@@ -171,6 +181,7 @@
       if (view === 'beauty') renderTabs();
       $('[data-close-center]').textContent = screen === 'asset' ? '‹' : '×';
       if (view === 'account') renderAccount(); else if (screen === 'asset') renderAsset(); else renderCategory();
+      if (view === 'beauty' && screen === 'asset') requestAnimationFrame(syncAssetInfoHeight);
     } catch (error) {
       console.error('[IdealMachineBeauty] render failed', error);
       $('[data-content]').textContent = `美化暂时无法显示：${String(error?.message || '未知错误')}`;
@@ -414,5 +425,10 @@
     event.preventDefault(); event.stopImmediatePropagation(); api.show('beauty');
   }, true);
   window.addEventListener('ideal-machine-beauty-open', event => open(event.detail?.view || 'beauty'));
+  window.addEventListener('ideal-machine-auth-changed', event => {
+    if (view === 'account' && root.classList.contains('is-open')) render();
+    if (event.detail?.authenticated) refreshRemoteLibrary();
+  });
+  window.addEventListener('resize', () => { if (view === 'beauty' && screen === 'asset') requestAnimationFrame(syncAssetInfoHeight); });
   window.IdealMachineOpenBeautyCenter = open;
 })();

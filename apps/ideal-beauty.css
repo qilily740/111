@@ -143,6 +143,12 @@
 .ideal-beauty-account-page .ideal-beauty-inline{justify-content:flex-start;gap:18px}
 .ideal-beauty-account-page .ideal-beauty-inline span{flex:0 0 auto;text-align:left}
 
+/* 手机详情页：右侧信息列不超过左侧竖版效果图的高度。 */
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-info{min-height:0;overflow:hidden}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title{flex:0 0 auto;min-height:0;overflow:hidden}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta{min-height:0;flex:1 1 auto;overflow:hidden}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline{min-height:0}
+.ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 /* 详情信息使用标题行 + 具体内容行；按钮紧跟内容区，而不是贴页面底部。 */
 .ideal-beauty-page.is-asset-view .ideal-beauty-asset-detail{height:max-content;min-height:0;align-content:start}
 .ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta{margin-top:clamp(12px,2vh,20px)}
