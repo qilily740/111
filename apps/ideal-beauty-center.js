@@ -431,4 +431,5 @@
   });
   window.addEventListener('resize', () => { if (view === 'beauty' && screen === 'asset') requestAnimationFrame(syncAssetInfoHeight); });
   window.IdealMachineOpenBeautyCenter = open;
+  window.IdealMachineCloseBeautyCenter = close;
 })();

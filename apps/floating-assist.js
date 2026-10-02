@@ -421,14 +421,18 @@
       ['.music-app','[data-music-close]'], ['.doubao-app','[data-doubao-close]'], ['.shopping-app','[data-shop-close]'],
       ['.ifspace-app','[data-if-close]'], ['.couple-app','[data-couple-close]'], ['.worldbook-app','[data-world-close]'],
       ['.settings-app','[data-settings-close]'], ['.beauty-app','[data-beauty-close]'], ['.debate-app','[data-debate-close]'],
-      ['.fanfic-app','[data-fanfic-close]'], ['.magazine-app','[data-magazine-close]']
+      ['.fanfic-app','[data-fanfic-close]'], ['.magazine-app','[data-magazine-close]'],
+      ['.ideal-book-app','[data-book-close]'], ['.ideal-beauty-center','[data-close-center]']
     ];
     appClosers.forEach(([appSelector, closeSelector]) => {
       const openApp = document.querySelector(`${appSelector}.is-open`);
       if (!openApp) return;
       const closeButton = openApp.querySelector(closeSelector);
-      if (closeButton) closeButton.click();
-      else { openApp.classList.remove('is-open'); openApp.setAttribute('aria-hidden', 'true'); }
+      if (appSelector === '.ideal-beauty-center' && typeof window.IdealMachineCloseBeautyCenter === 'function') window.IdealMachineCloseBeautyCenter();
+      else if (closeButton) closeButton.click();
+      // 应用自己的关闭键有时只会从详情退回列表，不足以切换顶层 App。
+      // 快捷跳转必须离开当前整个 App，避免目标应用被留在下一层。
+      openApp.classList.remove('is-open'); openApp.setAttribute('aria-hidden', 'true');
     });
     document.querySelector('.folder-app-shell.is-open [data-folder-app-close]')?.click();
     document.querySelector('.desktop-folder-layer.is-open [data-folder-close]')?.click();
