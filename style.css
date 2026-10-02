@@ -13653,6 +13653,19 @@ body.ideal-keyboard-open .chat-app.is-open.is-chatting {
   left:0;
   height:var(--ideal-keyboard-viewport-height, 100dvh);
 }
+/* 键盘打开时，普通输入行与引用状态使用相同的 8px 底部间距。
+   覆盖历史上的 96px 输入区和 -20px 上移，避免输入框悬在键盘上方。 */
+body.ideal-keyboard-open .chat-app.is-open.is-chatting .chat-conversation > .chat-compose-wrap.has-input-focus:not(.has-chat-quote) {
+  flex-basis:62px !important;
+  height:62px !important;
+  padding:10px 14px 8px !important;
+}
+body.ideal-keyboard-open .chat-app.is-open.is-chatting .chat-conversation > .chat-compose-wrap.has-input-focus:not(.has-chat-quote) > .chat-compose {
+  flex:0 0 44px !important;
+  height:44px !important;
+  min-height:44px !important;
+  transform:none !important;
+}
 body.ideal-keyboard-open .beauty-sheet { min-height:0; }
 body.ideal-keyboard-open .beauty-content {
   min-height:0;
