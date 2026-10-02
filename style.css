@@ -1835,7 +1835,9 @@ body > .desktop-scroll-wrap {
 .chat-css-editor { padding: 0 !important; overflow: hidden; }.chat-css-editor-head { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 15px 16px; border: 0; background: transparent; color: #333; font: inherit; text-align: left; cursor: pointer; }.chat-css-editor-head span { display: grid; gap: 4px; }.chat-css-editor-head b { font-size: 14px; font-weight: 600; }.chat-css-editor-head small { color: #999; font-size: 10px; }.chat-css-editor-head i { color: #999; font-size: 18px; font-style: normal; transition: transform .2s ease; }.chat-css-editor.is-open .chat-css-editor-head i { transform: rotate(180deg); }.chat-css-editor-body { display: none; padding: 0 16px 16px; }.chat-css-editor.is-open .chat-css-editor-body { display: block; }.chat-css-hint { max-height: 112px; overflow-y: auto; overscroll-behavior: contain; margin-bottom: 9px; padding: 7px 8px; border: 1px solid rgba(0,0,0,.08); border-radius: 8px; background: rgba(0,0,0,.025); color: #999; font-size: 10px; line-height: 1.7; scrollbar-gutter: stable; }.chat-css-hint-title { display: block; margin: 3px 0 1px; color: #555; font-size: 10px; font-weight: 650; }.chat-css-hint-title:first-child { margin-top: 0; }.chat-css-hint-line { display: block; }.chat-css-hint code { color: #777; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }.chat-css-editor textarea { display: block; width: 100%; min-height: 190px; padding: 11px; border: 1px solid rgba(0,0,0,.11); border-radius: 11px; outline: 0; background: #fafaf8; color: #222; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }.chat-css-status { display: block; min-height: 15px; margin-top: 6px; color: #8a7777; font-size: 10px; line-height: 1.5; }.chat-css-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 10px; }.chat-css-actions button { min-height: 32px; padding: 0 11px; border: 1px solid rgba(0,0,0,.11); border-radius: 9px; background: #f1f1ef; color: #555; font: inherit; font-size: 11px; cursor: pointer; }.chat-css-actions button.is-primary { background: #222; color: #fff; }.chat-css-actions input { display: none; }
 .chat-css-editor .chat-css-hint-title:has(+ .chat-css-hint-line + .chat-css-hint-note), .chat-css-editor .chat-css-hint-title:has(+ .chat-css-hint-line + .chat-css-hint-note) + .chat-css-hint-line { display:none; }
 .chat-avatar-picker { cursor: default; }.chat-avatar-picker > div { display: grid; gap: 7px; }.chat-file-button { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-height: 32px; padding: 0 12px; border: 1px solid rgba(0,0,0,.11); border-radius: 9px; background: rgba(255,255,255,.58); color: #555; font-size: 11px; cursor: pointer; }.chat-file-button input { display: none; }.chat-avatar-url { width: min(100%, 270px); height: 32px; padding: 0 10px; border: 1px solid rgba(0,0,0,.11); border-radius: 9px; outline: 0; background: rgba(255,255,255,.65); color: #222; font: inherit; font-size: 11px; }
-.chat-avatar-actions { display: flex !important; flex-wrap: wrap; gap: 7px; }
+.chat-avatar-actions { display: flex !important; flex-wrap: nowrap; gap: clamp(4px, 1.4vw, 7px); width: 100%; min-width: 0; }
+.chat-avatar-actions > .chat-file-button,
+.chat-avatar-actions > button { flex: 1 1 0; min-width: 0; padding-right: clamp(5px, 1.6vw, 12px); padding-left: clamp(5px, 1.6vw, 12px); white-space: nowrap; font-size: clamp(9px, 2.5vw, 11px); }
 .chat-contact-actions { flex-wrap: wrap; justify-content: flex-end; }.chat-contact-actions button:last-child { color: #8a3a3a; }
 .chat-send, .chat-reply { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 50%; }.chat-send .chat-action-icon, .chat-reply .chat-action-icon { width: 18px; height: 18px; }
 @media (max-width: 600px) { .chat-send { display: grid; }.chat-reply { padding: 0; }.chat-person { padding-left: 15px; padding-right: 15px; }.chat-tools { grid-template-columns: repeat(4, 1fr); }.chat-bubble { font-size: 12px; } }
@@ -3944,7 +3946,6 @@ body > .desktop-scroll-wrap {
 .music-player .music-lyrics p.is-active .music-lyric-highlight { width:var(--lyric-progress,0%); }
 .music-player .music-lyrics p:not(.is-active) .music-lyric-highlight { width:0 !important; }
 .music-player .music-lyrics p[data-music-lyric-line].is-active { display:block; font-size:13px; transform:none; }
-.music-player .music-turntable:not(.is-playing) ~ .music-lyrics p[data-music-lyric-line] { display:none !important; }
 .music-player .music-lyrics p.is-placeholder { display:block; width:100%; padding:4px 8px; box-sizing:border-box; line-height:26px; }
 .music-full-lyrics-page { position:absolute; inset:0; display:grid; grid-template-rows:auto minmax(0,1fr); width:auto; height:auto; overflow:hidden; }
 .music-full-lyrics-main { min-height:0; height:auto; overflow:hidden; }
@@ -3956,7 +3957,8 @@ body > .desktop-scroll-wrap {
 .music-player .music-together-person { min-width:var(--music-together-person-width,54px); }
 .music-player .music-together-person i { width:var(--music-together-avatar-size,52px); height:var(--music-together-avatar-size,52px); }
 .music-player .music-together>.music-together-people { gap:var(--music-together-gap,18px); min-height:calc(var(--music-together-avatar-size,52px) + 6px); }
-.music-app .music-main:has(> .music-player) { overflow-y:hidden; overscroll-behavior-y:none; touch-action:pan-x; }
+.music-app .music-main.is-player-page { overflow-x:hidden !important; overflow-y:hidden !important; overscroll-behavior:none !important; touch-action:pan-x !important; }
+.music-app .music-main.is-player-page > .music-player { touch-action:pan-x !important; }
 .music-player .music-progress input { touch-action:pan-x; }
 .music-player.is-compact .music-turntable { width:min(68vw,250px); }
 @media (max-width:720px) {
@@ -8378,8 +8380,9 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   padding:0 38px;
   text-overflow:ellipsis;
   white-space:nowrap;
-  transition:font-size .16s ease;
+  transition:none;
 }
+.music-player .music-player-meta h2[data-music-title]:not(.is-fitted) { visibility:hidden; }
 .music-player {
   min-width:0;
   max-width:100%;
