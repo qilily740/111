@@ -26,14 +26,18 @@
   let pendingSelection = '';
   let pendingSelectionContext = null;
   let selectionPosition = null;
+  let preservingSelectionToolbar = false;
+  let selectionToolbarTimer = 0;
   let noteEditorOpen = false;
   let annotationPanelOpen = false;
   let annotationTab = 'bookmarks';
   let annotationScope = 'user';
+  let expandedAnnotationChapters = new Set();
   let annotationJump = null;
   let annotationEditor = null;
   let annotationRepair = null;
   let annotationQuery = '';
+  let annotationView = null;
   let deletedAnnotation = null;
   let deleteUndoTimer = null;
   let linkedChatAnnotation = null;
@@ -178,7 +182,7 @@
     const selectionOpen = pendingSelection.trim().length > 0;
     const selectionStyle = selectionPosition ? `style="left:${selectionPosition.left}px;top:${selectionPosition.top}px;bottom:auto"` : '';
     const dockStyle = readerDockOpen ? '' : `style="left:${dockPosition.left}%;top:${dockPosition.top}%;right:auto;bottom:auto"`;
-    return `<section class="ideal-book-reader ${night ? 'is-night' : ''}" data-book-reader><header class="ideal-book-reader-bar"><button type="button" data-book-to-shelf aria-label="返回书架">${icon('back')}</button><div class="ideal-book-reader-title"><small>${esc(bookTitle(book))}</small><strong>${esc(chapter.title || bookTitle(book))}</strong></div><button type="button" data-book-reader-bookmark aria-label="在当前位置添加书签">${icon('bookmark')}</button></header><main class="ideal-book-reading-scroll" data-book-scroll><article class="ideal-book-reading-text" style="font-size:${size}px;font-family:${esc(readerFontStyle(book))}">${chapterBody(book)}</article><div class="ideal-book-reading-chapter-nav"><button type="button" data-book-prev ${currentChapter <= 0 ? 'disabled' : ''}>上一章</button><span>${currentChapter + 1} / ${chapters.length}</span><button type="button" data-book-next ${currentChapter >= chapters.length - 1 ? 'disabled' : ''}>下一章</button></div></main><div class="ideal-book-reading-dock ${readerDockOpen ? 'is-open' : ''}" ${dockStyle}>${readerDockOpen ? `<nav class="ideal-book-reading-dock-bar" aria-label="阅读工具"><button type="button" data-book-font aria-label="文字设置">${icon('font')}<span>文字</span></button><button type="button" data-book-toc aria-label="章节目录">${icon('chapters')}<span>目录</span></button><button type="button" data-book-theme aria-label="切换阅读主题">${icon('night')}<span>主题</span></button><button type="button" data-book-annotations aria-label="查看标注">${icon('annotations')}<span>标注</span></button></nav>` : `<button class="ideal-book-reading-dock-toggle" type="button" data-book-reader-dock-toggle aria-label="展开阅读 Dock">⌃</button>`}</div>${fontPanelOpen ? readerFontPanel(book,size) : ''}<button class="ideal-book-role-chat-fab" type="button" data-book-role-chat aria-label="和${esc(role ? roleLabel(role) : '角色')}聊一聊" style="left:${position.left}%;top:${position.top}%">${role ? roleAvatar(role) : '<span>聊</span>'}<i aria-hidden="true">♥</i></button>${tocOpen ? chapterSheet(book,chapters) : ''}${coReadOpen ? coReadPanel(book,position) : ''}<div class="ideal-book-selection" data-book-selection ${selectionOpen ? '' : 'hidden'} ${selectionStyle}><button type="button" data-book-save-quote>摘录</button><button type="button" data-book-add-note>标注</button><button type="button" data-book-selection-summary>摘要</button>${summaryStatus ? `<small>${esc(summaryStatus)}</small>` : ''}</div>${annotationPanelOpen ? annotationPanel(book) : ''}${noteEditorOpen ? noteEditor() : ''}${annotationRepair ? repairPanel(book) : ''}${deletedAnnotation?.bookId === book.id ? '<div class="ideal-book-undo" role="status"><span>标注已删除</span><button type="button" data-book-annotation-undo>撤销</button></div>' : ''}</section>`;
+    return `<section class="ideal-book-reader ${night ? 'is-night' : ''}" data-book-reader><header class="ideal-book-reader-bar"><button type="button" data-book-to-shelf aria-label="返回书架">${icon('back')}</button><div class="ideal-book-reader-title"><small>${esc(bookTitle(book))}</small><strong>${esc(chapter.title || bookTitle(book))}</strong></div><button type="button" data-book-reader-bookmark aria-label="在当前位置添加书签">${icon('bookmark')}</button></header><main class="ideal-book-reading-scroll" data-book-scroll><article class="ideal-book-reading-text" style="font-size:${size}px;font-family:${esc(readerFontStyle(book))}">${chapterBody(book)}</article><div class="ideal-book-reading-chapter-nav"><button type="button" data-book-prev ${currentChapter <= 0 ? 'disabled' : ''}>上一章</button><span>${currentChapter + 1} / ${chapters.length}</span><button type="button" data-book-next ${currentChapter >= chapters.length - 1 ? 'disabled' : ''}>下一章</button></div></main><div class="ideal-book-reading-dock ${readerDockOpen ? 'is-open' : ''}" ${dockStyle}>${readerDockOpen ? `<nav class="ideal-book-reading-dock-bar" aria-label="阅读工具"><button type="button" data-book-font aria-label="文字设置">${icon('font')}<span>文字</span></button><button type="button" data-book-toc aria-label="章节目录">${icon('chapters')}<span>目录</span></button><button type="button" data-book-theme aria-label="切换阅读主题">${icon('night')}<span>主题</span></button><button type="button" data-book-annotations aria-label="查看标注">${icon('annotations')}<span>标注</span></button></nav>` : `<button class="ideal-book-reading-dock-toggle" type="button" data-book-reader-dock-toggle aria-label="展开阅读 Dock">⌃</button>`}</div>${fontPanelOpen ? readerFontPanel(book,size) : ''}<button class="ideal-book-role-chat-fab" type="button" data-book-role-chat aria-label="和${esc(role ? roleLabel(role) : '角色')}聊一聊" style="left:${position.left}%;top:${position.top}%">${role ? roleAvatar(role) : '<span>聊</span>'}<i aria-hidden="true">♥</i></button>${tocOpen ? chapterSheet(book,chapters) : ''}${coReadOpen ? coReadPanel(book,position) : ''}<div class="ideal-book-selection" data-book-selection ${selectionOpen ? '' : 'hidden'} ${selectionStyle}><button type="button" data-book-save-quote>摘录</button><button type="button" data-book-add-note>标注</button></div>${annotationPanelOpen ? annotationPanel(book) : ''}${noteEditorOpen ? noteEditor() : ''}${annotationView ? annotationViewPanel(book) : ''}${annotationRepair ? repairPanel(book) : ''}${deletedAnnotation?.bookId === book.id ? '<div class="ideal-book-undo" role="status"><span>标注已删除</span><button type="button" data-book-annotation-undo>撤销</button></div>' : ''}</section>`;
   }
   function chapterSheet(book, chapters) {
     return `<div class="ideal-book-sheet-shade" data-book-toc-close><section class="ideal-book-toc-sheet" role="dialog" aria-label="目录"><header><span>TABLE OF CONTENTS</span><button type="button" data-book-toc-close aria-label="关闭目录">${icon('close')}</button></header><h2>${esc(bookTitle(book))}</h2><div>${chapters.map((chapter,index) => `<button type="button" data-book-chapter="${index}" class="${index === currentChapter ? 'is-current' : ''}"><span>${String(index + 1).padStart(2,'0')}</span><b>${esc(chapter.title || `第 ${index + 1} 章`)}</b>${icon('chevron')}</button>`).join('')}</div></section></div>`;
@@ -362,7 +366,7 @@
   }
   function startBook(id) {
     stopClock(); const book = findBook(id); if (!book) return;
-    currentBookId = id; pendingSelection = ''; pendingSelectionContext = null; selectionPosition = null; annotationPanelOpen = false; annotationScope = 'user'; annotationTab = 'all'; annotationQuery = ''; noteEditorOpen = false; annotationEditor = null; annotationRepair = null; annotationJump = null; linkedChatAnnotation = null; chaptersFor(book); currentChapter = Math.max(0, Math.min(chaptersFor(book).length - 1, Number(book.chapter || 0)));
+    currentBookId = id; pendingSelection = ''; pendingSelectionContext = null; selectionPosition = null; annotationPanelOpen = false; annotationScope = 'user'; annotationTab = 'bookmarks'; annotationQuery = ''; expandedAnnotationChapters = new Set(); noteEditorOpen = false; annotationEditor = null; annotationView = null; annotationRepair = null; annotationJump = null; linkedChatAnnotation = null; chaptersFor(book); currentChapter = Math.max(0, Math.min(chaptersFor(book).length - 1, Number(book.chapter || 0)));
     book.lastOpened = Date.now(); bookAutomationTriggered = false; writeBooks(readBooks().map(item => item.id === id ? book : item));
     view = 'reader'; coReadOpen = false; tocOpen = false; readerDockOpen = false; fontPanelOpen = false; elapsedBase = Number(book.seconds || 0); elapsedSessionSeconds = 0; openedAt = Date.now(); lastReaderActivityAt = openedAt;
     render({readerScrollTop:Number(book.scrollTop || 0)});
@@ -472,10 +476,13 @@
   function saveBookmark() {
     const book = findBook(currentBookId); if (!book) return;
     const context = pendingSelectionContext || selectionContext() || visibleParagraphContext();
-    const existing = readAnnotations(book).bookmarks.find(entry => entry.chapterIndex === context.chapterIndex && entry.paragraphIndex === context.paragraphIndex);
-    const addAnother = existing ? window.confirm('这里已有书签。确定再添加一个吗？取消则编辑已有书签。') : true;
-    annotationEditor = existing && !addAnother ? { mode:'edit', type:'bookmarks', id:existing.id } : { mode:'create', type:'bookmarks', context, title:'' };
-    noteEditorOpen = true; pendingSelection = ''; pendingSelectionContext = null; selectionPosition = null; render();
+    const normalized = { ...context, quote:String(context.quote || context.text || ''), text:String(context.quote || context.text || ''), createdAt:Date.now() };
+    const store = readAnnotations(book);
+    store.bookmarks.unshift({ id:uid(), source:'user', ...normalized, title:'', note:'' });
+    writeBook(book);
+    pendingSelection = ''; pendingSelectionContext = null; selectionPosition = null; summaryStatus = '';
+    window.getSelection?.()?.removeAllRanges?.();
+    render();
   }
   function saveQuote(text = pendingSelection) {
     saveAnnotation('excerpt', text);
@@ -483,21 +490,6 @@
   function annotationPreview(value, limit = 220) {
     const text = normalizedAnnotationText(value);
     return text.length > limit ? `${text.slice(0, limit)}…` : text;
-  }
-  async function summarizeSelection() {
-    const book = findBook(currentBookId); const context = pendingSelectionContext || selectionContext();
-    const source = String(context?.text || pendingSelection || '').trim();
-    if (!book || !source) return;
-    summaryStatus = '正在生成摘要…'; render();
-    try {
-      const chapter = chaptersFor(book)[Number(context.chapterIndex ?? currentChapter)] || {};
-      const text = await requestBookCompletion('你是阅读摘要助手。只根据用户选中的原文，输出一句简洁、准确的中文摘要，不要补写原文没有的信息，不要使用“摘要：”前缀。', `书名：《${bookTitle(book)}》\n章节：${chapter.title || context.chapterTitle || ''}\n选中的原文：\n${source.slice(0,4000)}`,.15);
-      const latest = findBook(book.id); if (!latest) return;
-      const store = readAnnotations(latest); const item = { id:uid(), source:'user', ...context, quote:source, text:source, note:`摘要：${text}`, title:'摘要', kind:'summary', createdAt:Date.now() };
-      if (!store.notes.some(entry => entry.kind === 'summary' && entry.quote === item.quote && entry.chapterIndex === item.chapterIndex && entry.paragraphIndex === item.paragraphIndex)) store.notes.unshift(item);
-      writeBook(latest); summaryStatus = '摘要已保存';
-    } catch (error) { summaryStatus = `摘要失败：${error.message}`; }
-    render();
   }
   function generatedAnnotationContext(book) {
     const chapter = chaptersFor(book)[currentChapter] || {}; const paragraphs = chapterParagraphTexts(chapter); const paragraphIndex = Math.max(0, Math.min(paragraphs.length - 1, Number(app.querySelector('[data-book-paragraph-index]')?.dataset.bookParagraphIndex || 0))); const quote = paragraphs[paragraphIndex] || '';
@@ -549,17 +541,32 @@
     return null;
   }
   function annotationPanel(book) {
-    const role = currentRole(book); const store = readAnnotations(book,annotationScope,role); const types = [{key:'all',label:'全部'}, {key:'bookmarks',label:'书签'}, {key:'excerpts',label:'摘录'}, {key:'notes',label:'批注'}];
-    const all = ['bookmarks','excerpts','notes'].flatMap(type => store[type].map(item => ({...item,type})));
-    const entries = all.filter(item => annotationTab === 'all' || item.type === annotationTab).sort((a,b) => Number(a.chapterIndex) - Number(b.chapterIndex) || Number(a.paragraphIndex) - Number(b.paragraphIndex) || Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    const role = currentRole(book); const store = readAnnotations(book,annotationScope,role); const types = [{key:'bookmarks',label:'书签'}, {key:'excerpts',label:'摘录'}, {key:'notes',label:'批注'}];
+    const entries = store[annotationTab].map(item => ({...item,type:annotationTab})).sort((a,b) => Number(a.chapterIndex) - Number(b.chapterIndex) || Number(a.paragraphIndex) - Number(b.paragraphIndex) || Number(b.createdAt || 0) - Number(a.createdAt || 0));
     const roleLabelText = role ? `角色：${roleLabel(role)}` : '角色记录';
-    let lastChapter = null;
-    const entryMarkup = entries.map(item => {
-      const group = item.chapterIndex !== lastChapter ? `<h3 class="ideal-book-annotation-group">${esc(item.chapterTitle || `第 ${Number(item.chapterIndex || 0) + 1} 章`)}</h3>` : '';
-      lastChapter = item.chapterIndex;
-      return group + `<article class="ideal-book-annotation-item"><button type="button" class="ideal-book-annotation-open" data-book-annotation-id="${esc(item.id)}" data-book-annotation-type="${item.type}"><small>${esc(item.chapterTitle || `第 ${Number(item.chapterIndex || 0) + 1} 章`)} · 第 ${Number(item.paragraphIndex || 0) + 1} 段${item.kind === 'summary' ? ' · 摘要' : ''}</small>${item.title ? `<strong>${esc(item.title)}</strong>` : ''}${item.quote ? `<span class="ideal-book-annotation-quote">${esc(annotationPreview(item.quote))}</span>` : ''}${item.note ? `<span class="ideal-book-annotation-note">${esc(annotationPreview(item.note,180))}</span>` : ''}</button><div class="ideal-book-annotation-actions">${annotationScope === 'user' ? `<button type="button" data-book-annotation-edit="${esc(item.id)}" data-book-annotation-type="${item.type}">编辑</button>` : ''}<button type="button" data-book-annotation-delete="${esc(item.id)}" data-book-annotation-type="${item.type}">删除</button>${item.type === 'excerpts' ? `<button type="button" data-book-annotation-chat="${esc(item.id)}" data-book-annotation-type="${item.type}">和角色聊这句</button>` : ''}</div></article>`;
+    const itemMarkup = item => {
+      const chapterName = item.chapterTitle || `第 ${Number(item.chapterIndex || 0) + 1} 章`;
+      if (item.type === 'bookmarks') {
+        const createdAt = Number(item.createdAt) ? new Date(Number(item.createdAt)).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '时间未知';
+        return `<article class="ideal-book-annotation-item is-bookmark"><div class="ideal-book-bookmark-row"><button type="button" class="ideal-book-annotation-open" data-book-annotation-id="${esc(item.id)}" data-book-annotation-type="${item.type}"><small>${esc(chapterName)} · ${esc(createdAt)}</small></button><div class="ideal-book-annotation-actions"><button type="button" data-book-annotation-delete="${esc(item.id)}" data-book-annotation-type="${item.type}">删除</button></div></div></article>`;
+      }
+      const details = `<small>${esc(chapterName)} · 第 ${Number(item.paragraphIndex || 0) + 1} 段${item.kind === 'summary' ? ' · 标注' : ''}</small>${item.title && !(item.kind === 'summary' && item.title === '摘要') ? `<strong>${esc(item.title)}</strong>` : ''}${item.quote ? `<span class="ideal-book-annotation-quote">${esc(annotationPreview(item.quote))}</span>` : ''}${item.note ? `<span class="ideal-book-annotation-note">${esc(annotationPreview(item.note,180))}</span>` : ''}`;
+      return `<article class="ideal-book-annotation-item"><button type="button" class="ideal-book-annotation-open" data-book-annotation-id="${esc(item.id)}" data-book-annotation-type="${item.type}">${details}</button><div class="ideal-book-annotation-actions">${annotationScope === 'user' ? `<button type="button" data-book-annotation-edit="${esc(item.id)}" data-book-annotation-type="${item.type}">编辑</button>` : ''}<button type="button" data-book-annotation-delete="${esc(item.id)}" data-book-annotation-type="${item.type}">删除</button>${item.type === 'excerpts' ? `<button type="button" data-book-annotation-chat="${esc(item.id)}" data-book-annotation-type="${item.type}">和角色聊这句</button>` : ''}<button type="button" data-book-annotation-view="${esc(item.id)}" data-book-annotation-type="${item.type}">查看</button></div></article>`;
+    };
+    const chapterGroups = [];
+    entries.forEach(item => {
+      const index = Number(item.chapterIndex || 0); let group = chapterGroups.at(-1);
+      if (!group || group.index !== index) { group = { index, title:item.chapterTitle || `第 ${index + 1} 章`, items:[] }; chapterGroups.push(group); }
+      group.items.push(item);
+    });
+    const collapsible = annotationTab === 'excerpts' || annotationTab === 'notes';
+    const entryMarkup = chapterGroups.map(group => {
+      const rows = group.items.map(itemMarkup).join('');
+      if (!collapsible) return `<h3 class="ideal-book-annotation-group">${esc(group.title)}</h3>${rows}`;
+      const key = `${annotationScope}:${annotationTab}:${group.index}`; const expanded = expandedAnnotationChapters.has(key);
+      return `<section class="ideal-book-annotation-chapter ${expanded ? 'is-expanded' : ''}" data-book-annotation-chapter-group="${key}"><button type="button" class="ideal-book-annotation-chapter-toggle" data-book-annotation-chapter="${key}" aria-expanded="${expanded}"><span>${esc(group.title)}</span><small>${group.items.length} 条</small><i aria-hidden="true">⌄</i></button><div class="ideal-book-annotation-chapter-body" ${expanded ? '' : 'hidden'}>${rows}</div></section>`;
     }).join('');
-    return `<div class="ideal-book-annotations-shade" data-book-annotations-close><section class="ideal-book-annotations-panel" role="dialog" aria-modal="true" aria-label="标注"><header><div><span>READING NOTES</span><h2>标注</h2></div><button type="button" data-book-annotations-close aria-label="关闭标注">×</button></header><nav class="ideal-book-annotations-sources"><button type="button" data-book-annotation-scope="user" class="${annotationScope === 'user' ? 'is-active' : ''}">我的标注</button><button type="button" data-book-annotation-scope="role" class="${annotationScope === 'role' ? 'is-active' : ''}" ${role ? '' : 'disabled'}>${esc(roleLabelText)}</button></nav><nav class="ideal-book-annotations-tabs">${types.map(type => `<button type="button" data-book-annotation-tab="${type.key}" class="${annotationTab === type.key ? 'is-active' : ''}">${type.label}<small>${type.key === 'all' ? all.length : store[type.key].length}</small></button>`).join('')}</nav><label class="ideal-book-annotation-find"><span>查找章节或标注</span><input type="search" data-book-annotation-search placeholder="输入章节名、书签名或原句" value="${esc(annotationQuery)}" autocomplete="off"></label><main>${entries.length ? entryMarkup : '<p class="ideal-book-annotations-empty">这里还没有内容。</p>'}<p class="ideal-book-annotations-empty" data-book-annotation-no-results hidden>没有匹配的标注。</p></main></section></div>`;
+    return `<div class="ideal-book-annotations-shade" data-book-annotations-close><section class="ideal-book-annotations-panel" role="dialog" aria-modal="true" aria-label="标注"><header><div><span>READING NOTES</span><h2>标注</h2></div><button type="button" data-book-annotations-close aria-label="关闭标注">×</button></header><nav class="ideal-book-annotations-sources"><button type="button" data-book-annotation-scope="user" class="${annotationScope === 'user' ? 'is-active' : ''}">我的标注</button><button type="button" data-book-annotation-scope="role" class="${annotationScope === 'role' ? 'is-active' : ''}" ${role ? '' : 'disabled'}>${esc(roleLabelText)}</button></nav><nav class="ideal-book-annotations-tabs">${types.map(type => `<button type="button" data-book-annotation-tab="${type.key}" class="${annotationTab === type.key ? 'is-active' : ''}">${type.label}<small>${store[type.key].length}</small></button>`).join('')}</nav><label class="ideal-book-annotation-find"><span>查找章节或标注</span><input type="search" data-book-annotation-search placeholder="输入章节名、书签名或原句" value="${esc(annotationQuery)}" autocomplete="off"></label><main>${entries.length ? entryMarkup : '<p class="ideal-book-annotations-empty">这里还没有内容。</p>'}<p class="ideal-book-annotations-empty" data-book-annotation-no-results hidden>没有匹配的标注。</p></main></section></div>`;
   }
   function filterAnnotationList() {
     const list = app.querySelector('.ideal-book-annotations-panel > main'); if (!list) return;
@@ -571,13 +578,31 @@
       while (row && !row.classList.contains('ideal-book-annotation-group')) { if (row.classList.contains('ideal-book-annotation-item') && !row.hidden) hasVisible = true; row = row.nextElementSibling; }
       group.hidden = !hasVisible;
     });
-    const noResults = list.querySelector('[data-book-annotation-no-results]'); if (noResults) noResults.hidden = !list.querySelector('.ideal-book-annotation-item') || visible > 0;
+    [...list.querySelectorAll('[data-book-annotation-chapter-group]')].forEach(group => {
+      const hasVisible = [...group.querySelectorAll('.ideal-book-annotation-item')].some(item => !item.hidden);
+      const key = group.dataset.bookAnnotationChapterGroup;
+      const expanded = query ? hasVisible : expandedAnnotationChapters.has(key);
+      group.hidden = !hasVisible;
+      group.classList.toggle('is-expanded',expanded);
+      const toggle = group.querySelector('[data-book-annotation-chapter]');
+      const body = group.querySelector('.ideal-book-annotation-chapter-body');
+      toggle?.setAttribute('aria-expanded',String(expanded));
+      if (body) body.hidden = !expanded;
+    });
+    const noResults = list.querySelector('[data-book-annotation-no-results]'); if (noResults) noResults.hidden = !query || visible > 0;
   }
   function noteEditor() {
     const editor = annotationEditor; if (!editor) return '';
     const item = editor.mode === 'edit' ? annotationEntry(findBook(currentBookId),editor.id,'user',editor.type)?.item : editor.context;
     const title = editor.type === 'bookmarks' ? '书签名称' : editor.type === 'excerpts' ? '摘录笔记' : '批注';
     return `<div class="ideal-book-note-shade" data-book-note-close><section class="ideal-book-note-sheet" data-book-note-sheet role="dialog" aria-modal="true" aria-label="${title}"><header><strong>${editor.mode === 'edit' ? '编辑' : '添加'}${title}</strong><button type="button" data-book-note-close aria-label="关闭">×</button></header>${item?.quote ? `<p class="ideal-book-note-quote">${esc(item.quote)}</p>` : ''}${editor.type === 'bookmarks' ? `<input data-book-annotation-title type="text" maxlength="80" placeholder="可选，例如：伏笔出现" value="${esc(item?.title || '')}">` : `<textarea data-book-note-input placeholder="${editor.type === 'excerpts' ? '写下为什么收藏这句…' : '写下你的笔记…'}" maxlength="2000">${esc(item?.note || '')}</textarea>`}<footer><button type="button" data-book-note-close>取消</button><button type="button" data-book-note-save>保存</button></footer></section></div>`;
+  }
+  function annotationViewPanel(book) {
+    const found = annotationView && annotationEntry(book,annotationView.id,annotationScope,annotationView.type);
+    if (!found) return '';
+    const item = found.item; const chapter = item.chapterTitle || `第 ${Number(item.chapterIndex || 0) + 1} 章`;
+    const title = item.type === 'excerpts' ? '摘录' : '标注';
+    return `<div class="ideal-book-note-shade" data-book-annotation-view-close><section class="ideal-book-note-sheet ideal-book-annotation-detail" role="dialog" aria-modal="true" aria-label="查看${title}"><header><strong>查看${title}</strong><button type="button" data-book-annotation-view-close aria-label="关闭">×</button></header><small>${esc(chapter)} · 第 ${Number(item.paragraphIndex || 0) + 1} 段</small>${item.quote ? `<p class="ideal-book-note-quote">${esc(item.quote)}</p>` : ''}${item.note ? `<p class="ideal-book-annotation-detail-note">${esc(item.note)}</p>` : ''}</section></div>`;
   }
   function repairPanel(book) {
     const repair = annotationRepair; if (!repair) return '';
@@ -855,6 +880,7 @@
     if (event.target.closest('[data-book-close]')) { stopClock(); rolePickerOpen = false; goalEditorOpen = false; readerDockOpen = false; fontPanelOpen = false; shelfSelectMode = false; selectedBookIds.clear(); app.classList.remove('is-open'); return; }
     if ((pendingSelection || summaryStatus) && !event.target.closest('.ideal-book-reading-text,[data-book-selection],.ideal-book-note-sheet')) { pendingSelection = ''; pendingSelectionContext = null; selectionPosition = null; summaryStatus = ''; const selectionButton = app.querySelector('[data-book-selection]'); if (selectionButton) selectionButton.hidden = true; }
     if (event.target.matches('.ideal-book-note-shade[data-book-note-close]') || event.target.closest('button[data-book-note-close]')) { noteEditorOpen = false; annotationEditor = null; pendingSelectionContext = null; render(); return; }
+    if (event.target.matches('.ideal-book-note-shade[data-book-annotation-view-close]') || event.target.closest('button[data-book-annotation-view-close]')) { annotationView = null; render(); return; }
     if (event.target.closest('[data-book-note-save]')) { saveAnnotationEditor(); return; }
     if (event.target.matches('.ideal-book-note-shade[data-book-repair-close]') || event.target.closest('button[data-book-repair-close]')) { annotationRepair = null; render(); return; }
     const repairTarget = event.target.closest('[data-book-repair-target]'); if (repairTarget) { const book = findBook(currentBookId); const repair = annotationRepair; const found = repair && annotationEntry(book,repair.id,repair.scope,repair.type); if (!book || !found) return; const [chapterIndex,paragraphIndex] = repairTarget.dataset.bookRepairTarget.split(':').map(Number); const text = chapterParagraphTexts(chaptersFor(book)[chapterIndex])[paragraphIndex]; if (!text) return; found.item.chapterIndex = chapterIndex; found.item.paragraphIndex = paragraphIndex; found.item.chapterTitle = chaptersFor(book)[chapterIndex].title || ''; found.item.anchorText = text; found.item.updatedAt = Date.now(); writeBook(book); goToAnnotation(book,found.item,{chapterIndex,paragraphIndex}); return; }
@@ -886,17 +912,18 @@
     if (event.target.closest('[data-book-role-chat]')) { if (suppressRoleAvatarClick) { suppressRoleAvatarClick = false; return; } const opening = !coReadOpen; closeReaderPanels(opening ? 'chat' : ''); coReadOpen = opening; render(); const messages = app.querySelector('[data-book-chat-messages]'); if (messages && coReadOpen) messages.scrollTop = messages.scrollHeight; return; }
     if (event.target.closest('[data-book-summarize]')) { void summarizeChat(); return; }
     if (event.target.closest('[data-book-annotations-close]') && (!event.target.closest('.ideal-book-annotations-panel') || event.target.closest('button[data-book-annotations-close]'))) { annotationPanelOpen = false; render(); return; }
-    if (event.target.closest('[data-book-annotations]')) { const opening = !annotationPanelOpen; closeReaderPanels(opening ? 'annotations' : ''); annotationPanelOpen = opening; render(); return; }
-    const annotationScopeButton = event.target.closest('[data-book-annotation-scope]'); if (annotationScopeButton) { if (annotationScopeButton.disabled) return; annotationScope = annotationScopeButton.dataset.bookAnnotationScope === 'role' ? 'role' : 'user'; render({annotationScrollTop:0}); return; }
-    const annotationTabButton = event.target.closest('[data-book-annotation-tab]'); if (annotationTabButton) { annotationTab = annotationTabButton.dataset.bookAnnotationTab || 'all'; render({annotationScrollTop:0}); return; }
+    if (event.target.closest('[data-book-annotations]')) { const opening = !annotationPanelOpen; closeReaderPanels(opening ? 'annotations' : ''); annotationPanelOpen = opening; if (opening) { expandedAnnotationChapters = new Set(); annotationQuery = ''; } render(); return; }
+    const annotationScopeButton = event.target.closest('[data-book-annotation-scope]'); if (annotationScopeButton) { if (annotationScopeButton.disabled) return; annotationScope = annotationScopeButton.dataset.bookAnnotationScope === 'role' ? 'role' : 'user'; expandedAnnotationChapters = new Set(); annotationQuery = ''; render({annotationScrollTop:0}); return; }
+    const annotationTabButton = event.target.closest('[data-book-annotation-tab]'); if (annotationTabButton) { annotationTab = annotationTabButton.dataset.bookAnnotationTab || 'bookmarks'; expandedAnnotationChapters = new Set(); annotationQuery = ''; render({annotationScrollTop:0}); return; }
+    const annotationChapterToggle = event.target.closest('[data-book-annotation-chapter]'); if (annotationChapterToggle) { const key = annotationChapterToggle.dataset.bookAnnotationChapter; const group = annotationChapterToggle.closest('[data-book-annotation-chapter-group]'); const body = group?.querySelector('.ideal-book-annotation-chapter-body'); const expanded = !expandedAnnotationChapters.has(key); if (expanded) expandedAnnotationChapters.add(key); else expandedAnnotationChapters.delete(key); group?.classList.toggle('is-expanded',expanded); annotationChapterToggle.setAttribute('aria-expanded',String(expanded)); if (body) body.hidden = !expanded; return; }
     const annotationEdit = event.target.closest('[data-book-annotation-edit]'); if (annotationEdit) { annotationEditor = { mode:'edit', type:annotationEdit.dataset.bookAnnotationType, id:annotationEdit.dataset.bookAnnotationEdit }; noteEditorOpen = true; render(); return; }
+    const annotationViewButton = event.target.closest('[data-book-annotation-view]'); if (annotationViewButton) { annotationView = { id:annotationViewButton.dataset.bookAnnotationView, type:annotationViewButton.dataset.bookAnnotationType }; render(); return; }
     const annotationDelete = event.target.closest('[data-book-annotation-delete]'); if (annotationDelete) { deleteAnnotation(annotationDelete.dataset.bookAnnotationDelete,annotationDelete.dataset.bookAnnotationType); return; }
     const annotationChat = event.target.closest('[data-book-annotation-chat]'); if (annotationChat) { const book = findBook(currentBookId); const found = annotationEntry(book,annotationChat.dataset.bookAnnotationChat,annotationScope,'excerpts'); if (!found) return; linkedChatAnnotation = { id:found.item.id, quote:found.item.quote, chapterTitle:found.item.chapterTitle || '' }; annotationPanelOpen = false; coReadOpen = true; render(); const messages = app.querySelector('[data-book-chat-messages]'); if (messages) messages.scrollTop = messages.scrollHeight; return; }
     const annotationItem = event.target.closest('[data-book-annotation-id]'); if (annotationItem) { const book = findBook(currentBookId); const found = annotationEntry(book,annotationItem.dataset.bookAnnotationId,annotationScope,annotationItem.dataset.bookAnnotationType); if (!found) return; const target = findAnnotationTarget(book,found.item); if (!target) { annotationRepair = { id:found.item.id, type:found.type, scope:annotationScope }; render(); return; } goToAnnotation(book,found.item,target); return; }
     const chatSource = event.target.closest('[data-book-chat-source]'); if (chatSource) { const book = findBook(currentBookId); const found = annotationEntry(book,chatSource.dataset.bookChatSource,'user','excerpts') || annotationEntry(book,chatSource.dataset.bookChatSource,'role','excerpts'); if (!found) { window.alert('这条摘录已被删除。'); return; } const target = findAnnotationTarget(book,found.item); if (!target) { annotationRepair = {id:found.item.id,type:found.type,scope:found.item.source === 'role' ? 'role' : 'user'}; render(); return; } coReadOpen = false; goToAnnotation(book,found.item,target); return; }
     if (event.target.closest('[data-book-reader-bookmark]')) { closeReaderPanels(); saveBookmark(); return; }
     if (event.target.closest('[data-book-add-note]')) { pendingSelectionContext = selectionContext() || pendingSelectionContext; annotationEditor = { mode:'create', type:'notes', context:annotationContext(pendingSelection) }; noteEditorOpen = true; closeReaderPanels('note'); render(); return; }
-    if (event.target.closest('[data-book-selection-summary]')) { void summarizeSelection(); return; }
     if (event.target.closest('[data-book-save-quote]')) { saveQuote(); return; }
     if (event.target.closest('[data-book-together]')) { closeReaderPanels('chat'); coReadOpen = true; render(); const messages = app.querySelector('[data-book-chat-messages]'); if (messages) messages.scrollTop = messages.scrollHeight; return; }
     if (event.target.closest('[data-book-chat-close]')) { coReadOpen = false; linkedChatAnnotation = null; render(); return; }
@@ -929,6 +956,11 @@
     if (event.target.matches('[data-book-role]')) { const book = findBook(currentBookId); if (book) { book.coReadRoleId = event.target.value; writeBooks(readBooks().map(item => item.id === book.id ? book : item)); } }
   });
   app.addEventListener('pointerdown', event => {
+    if (event.target.closest('[data-book-selection]')) {
+      preservingSelectionToolbar = true;
+      window.clearTimeout(selectionToolbarTimer);
+      selectionToolbarTimer = window.setTimeout(() => { preservingSelectionToolbar = false; },700);
+    }
     const dockToggle = event.target.closest('[data-book-reader-dock-toggle]');
     if (dockToggle && event.button === 0) {
       const dock = dockToggle.closest('.ideal-book-reading-dock'); const rect = dock?.getBoundingClientRect();
@@ -1012,6 +1044,8 @@
         const range = window.getSelection()?.rangeCount ? window.getSelection().getRangeAt(0) : null; const rect = range?.getBoundingClientRect?.(); const reader = app.querySelector('[data-book-reader]'); const bounds = reader?.getBoundingClientRect?.();
         if (rect && bounds) { const below = rect.bottom - bounds.top + 10; selectionPosition = { left:Math.max(78,Math.min(bounds.width - 78,rect.left - bounds.left + rect.width / 2)), top:below + 48 < bounds.height - 80 ? below : Math.max(12,rect.top - bounds.top - 54) }; }
       } catch {}
+    } else if (toolbar && !preservingSelectionToolbar) {
+      pendingSelection = ''; pendingSelectionContext = null; selectionPosition = null; toolbar.hidden = true;
     }
   });
   window.addEventListener('pagehide', stopClock);

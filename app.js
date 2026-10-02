@@ -865,6 +865,7 @@
     let viewportSyncTimer = 0;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || !!window.navigator.standalone;
+    const hasFocusedEditable = () => Boolean(document.activeElement?.matches?.('textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]), [contenteditable]:not([contenteditable="false"])'));
     const sync = () => {
       const visualHeight = Math.round(window.visualViewport?.height || window.innerHeight);
       const visualTop = Math.round(window.visualViewport?.offsetTop || 0);
@@ -893,6 +894,10 @@
         // while shrinking visualViewport for the on-screen keyboard.
         keyboardOpen = visualHeight > 150 && visualHeight < layoutHeight - 120;
       }
+      // A shrinking visual viewport can linger during the keyboard's dismiss
+      // animation after blur. Keep the app at keyboard height only while an
+      // editable still owns focus, otherwise the desktop can flash through it.
+      keyboardOpen = keyboardOpen && hasFocusedEditable();
       // 仅键盘打开时覆盖内容高度；关闭后恢复 CSS 全屏高度和实时安全区。
       if (keyboardOpen) {
         root.style.setProperty('--ideal-keyboard-viewport-top', `${visualTop}px`);
@@ -920,6 +925,10 @@
       window.setTimeout(scheduleSync, 250);
     });
     window.visualViewport?.addEventListener('resize', scheduleSync);
+    document.addEventListener('focusout', event => {
+      if (!event.target?.matches?.('#chatInput')) return;
+      window.setTimeout(() => { if (!hasFocusedEditable()) sync(); }, 0);
+    }, true);
     sync();
     if (isIOS && isStandalone()) [120, 500, 1500, 3000].forEach(delay => window.setTimeout(sync, delay));
   }

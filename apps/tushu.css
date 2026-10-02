@@ -94,6 +94,8 @@
 .ideal-book-reader-title strong { overflow:hidden; font-family:Georgia,"Songti SC",serif; font-size:14px; font-weight:620; text-overflow:ellipsis; white-space:nowrap; }
 .ideal-book-reading-scroll { flex:1; overflow:auto; padding:clamp(28px,8vh,70px) 24px 30px; scroll-behavior:smooth; }
 .ideal-book-reading-text { max-width:650px; min-height:70vh; margin:0 auto; color:#383838; font-family:Georgia,"Songti SC","Noto Serif CJK SC",serif; line-height:2.05; letter-spacing:.015em; user-select:text; -webkit-user-select:text; }
+.ideal-book-app .ideal-book-reading-text,
+.ideal-book-app .ideal-book-reading-text * { user-select:text !important; -webkit-user-select:text !important; -webkit-touch-callout:default !important; }
 .ideal-book-reader.is-night .ideal-book-reading-text { color:#d3d3d3; }
 .ideal-book-reading-text p { margin:0 0 1.45em; text-indent:2em; white-space:normal; overflow-wrap:anywhere; }
 .ideal-book-reading-text .ideal-book-no-text { color:#999999; text-align:center; text-indent:0; }
@@ -185,7 +187,7 @@
 .ideal-book-annotations-sources button:disabled { opacity:.45; }
 .ideal-book-annotation-item { display:flex; flex-direction:column; gap:7px; width:100%; margin-top:8px; padding:12px; border:1px solid #e4e4e4; border-radius:15px; background:#fff; color:#222; text-align:left; }
 .ideal-book-annotation-item small { color:#999; font-size:10px; }
-.ideal-book-annotation-quote,.ideal-book-annotation-note { white-space:pre-wrap; word-break:break-word; }
+.ideal-book-annotation-quote,.ideal-book-annotation-note { display:-webkit-box; overflow:hidden; white-space:normal; word-break:break-word; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 .ideal-book-annotation-quote { font-size:13px; line-height:1.55; }
 .ideal-book-annotation-note { color:#777; font-size:12px; line-height:1.45; }
 .ideal-book-annotations-empty { padding:28px 0; color:#999; font-size:12px; text-align:center; }
@@ -194,12 +196,25 @@
 .ideal-book-annotation-find input { width:100%; min-height:38px; padding:8px 12px; border:1px solid #ddd; border-radius:12px; outline:0; background:#fff; color:#222; font-size:12px; }
 .ideal-book-annotation-find input:focus { border-color:#777; }
 .ideal-book-annotation-group { position:sticky; top:0; z-index:1; margin:18px 3px 6px; padding:6px 3px; background:rgba(250,250,250,.96); color:#555; font-size:11px; font-weight:700; }
+.ideal-book-annotation-chapter { margin:8px 0; }
+.ideal-book-annotation-chapter[hidden] { display:none !important; }
+.ideal-book-annotation-chapter-toggle { display:flex; align-items:center; gap:8px; width:100%; min-height:42px; padding:7px 8px; border:0; border-bottom:1px solid rgba(0,0,0,.08); background:transparent; color:#444; text-align:left; }
+.ideal-book-annotation-chapter-toggle > span { flex:1; font-size:12px; font-weight:700; }
+.ideal-book-annotation-chapter-toggle > small { color:#999; font-size:10px; }
+.ideal-book-annotation-chapter-toggle > i { color:#888; font-size:15px; font-style:normal; transition:transform .16s ease; }
+.ideal-book-annotation-chapter.is-expanded .ideal-book-annotation-chapter-toggle > i { transform:rotate(180deg); }
+.ideal-book-annotation-chapter-body { padding:0 0 4px; }
+.ideal-book-annotation-chapter-body[hidden] { display:none !important; }
 .ideal-book-annotation-group[hidden],.ideal-book-annotation-item[hidden],.ideal-book-annotations-empty[hidden] { display:none !important; }
 .ideal-book-annotation-item { padding:0; overflow:hidden; }
 .ideal-book-annotation-open { display:flex; flex-direction:column; gap:7px; width:100%; padding:12px; border:0; background:transparent; color:inherit; text-align:left; }
 .ideal-book-annotation-open strong { font-size:13px; }
 .ideal-book-annotation-actions { display:flex; flex-wrap:wrap; gap:6px; padding:0 10px 10px; }
 .ideal-book-annotation-actions button { padding:6px 10px; border:1px solid #ddd; border-radius:9px; background:#f5f5f5; color:#555; font-size:10px; }
+.ideal-book-annotation-actions button[data-book-annotation-view] { border-color:#222; background:#222; color:#fff; }
+.ideal-book-bookmark-row { display:flex; align-items:center; width:100%; min-width:0; }
+.ideal-book-bookmark-row .ideal-book-annotation-open { flex:1 1 auto; width:auto; min-width:0; }
+.ideal-book-bookmark-row .ideal-book-annotation-actions { flex:0 0 auto; padding:0 10px 0 0; }
 .ideal-book-note-sheet input[data-book-annotation-title] { display:block; width:100%; min-height:42px; padding:10px 12px; border:1px solid #dedee2; border-radius:12px; outline:0; background:#fff; color:#222; font:inherit; font-size:13px; }
 .ideal-book-repair-sheet > p:not(.ideal-book-note-quote) { margin:0 0 12px; color:#777; font-size:12px; line-height:1.5; }
 .ideal-book-repair-list { display:grid; gap:8px; max-height:38vh; overflow:auto; }
@@ -211,8 +226,14 @@
 .ideal-book-chat-messages article button[data-book-chat-source] { margin-top:5px; padding:3px 0; border:0; background:transparent; color:#777; font-size:10px; text-decoration:underline; }
 .ideal-book-reader.is-night .ideal-book-annotation-find input,.ideal-book-reader.is-night .ideal-book-annotation-actions button,.ideal-book-reader.is-night .ideal-book-note-sheet input[data-book-annotation-title],.ideal-book-reader.is-night .ideal-book-repair-list button { border-color:#555; background:#303030; color:#eee; }
 .ideal-book-reader.is-night .ideal-book-annotation-group { background:rgba(39,39,39,.97); color:#ddd; }
+.ideal-book-reader.is-night .ideal-book-annotation-chapter-toggle { border-bottom-color:rgba(255,255,255,.12); color:#eee; }
+.ideal-book-reader.is-night .ideal-book-annotation-actions button[data-book-annotation-view] { border-color:#111; background:#111; color:#fff; }
+.ideal-book-reader.is-night .ideal-book-annotation-detail-note { color:#ccc; }
 .ideal-book-note-sheet > header strong { font-size:18px; }
 .ideal-book-note-quote { max-height:130px; margin:0 0 12px; overflow:auto; padding:11px 12px; border-radius:13px; background:#f1f1f3; color:#666; font-size:12px; line-height:1.5; white-space:pre-wrap; }
+.ideal-book-annotation-detail > small { display:block; margin:0 0 10px; color:#999; font-size:10px; }
+.ideal-book-annotation-detail .ideal-book-note-quote { max-height:min(46vh,360px); margin-bottom:10px; }
+.ideal-book-annotation-detail-note { max-height:min(32vh,240px); overflow:auto; color:#555; font-size:13px; line-height:1.65; white-space:pre-wrap; word-break:break-word; }
 .ideal-book-note-sheet textarea { display:block; width:100%; min-height:120px; resize:vertical; padding:12px; border:1px solid #dedee2; border-radius:14px; outline:0; background:#fff; color:#222; font:inherit; font-size:13px; }
 .ideal-book-note-sheet footer { display:flex; gap:9px; margin-top:12px; }
 .ideal-book-note-sheet footer button { flex:1; min-height:40px; border:1px solid #dedee2; border-radius:12px; background:#fff; color:#333; font-size:12px; font-weight:650; }
