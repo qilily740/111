@@ -19,6 +19,8 @@
   let fontPanelOpen = false;
   let elapsedBase = 0;
   let openedAt = 0;
+  let elapsedSessionSeconds = 0;
+  let lastReaderActivityAt = 0;
   let elapsedTimer = null;
   let bookAutomationTriggered = false;
   let pendingSelection = '';
@@ -176,7 +178,7 @@
     const selectionOpen = pendingSelection.trim().length > 0;
     const selectionStyle = selectionPosition ? `style="left:${selectionPosition.left}px;top:${selectionPosition.top}px;bottom:auto"` : '';
     const dockStyle = readerDockOpen ? '' : `style="left:${dockPosition.left}%;top:${dockPosition.top}%;right:auto;bottom:auto"`;
-    return `<section class="ideal-book-reader ${night ? 'is-night' : ''}" data-book-reader><header class="ideal-book-reader-bar"><button type="button" data-book-to-shelf aria-label="返回书架">${icon('back')}</button><div class="ideal-book-reader-title"><small>${esc(bookTitle(book))}</small><strong>${esc(chapter.title || bookTitle(book))}</strong></div></header><main class="ideal-book-reading-scroll" data-book-scroll><article class="ideal-book-reading-text" style="font-size:${size}px;font-family:${esc(readerFontStyle(book))}">${chapterBody(book)}</article><div class="ideal-book-reading-chapter-nav"><button type="button" data-book-prev ${currentChapter <= 0 ? 'disabled' : ''}>上一章</button><span>${currentChapter + 1} / ${chapters.length}</span><button type="button" data-book-next ${currentChapter >= chapters.length - 1 ? 'disabled' : ''}>下一章</button></div></main><div class="ideal-book-reading-dock ${readerDockOpen ? 'is-open' : ''}" ${dockStyle}>${readerDockOpen ? `<nav class="ideal-book-reading-dock-bar" aria-label="阅读工具"><button type="button" data-book-font aria-label="文字设置">${icon('font')}<span>文字</span></button><button type="button" data-book-toc aria-label="章节目录">${icon('chapters')}<span>目录</span></button><button type="button" data-book-theme aria-label="切换阅读主题">${icon('night')}<span>主题</span></button><button type="button" data-book-annotations aria-label="查看标注">${icon('annotations')}<span>标注</span></button></nav>` : `<button class="ideal-book-reading-dock-toggle" type="button" data-book-reader-dock-toggle aria-label="展开阅读 Dock">⌃</button>`}</div>${fontPanelOpen ? readerFontPanel(book,size) : ''}<button class="ideal-book-role-chat-fab" type="button" data-book-role-chat aria-label="和${esc(role ? roleLabel(role) : '角色')}聊一聊" style="left:${position.left}%;top:${position.top}%">${role ? roleAvatar(role) : '<span>聊</span>'}<i aria-hidden="true">♥</i></button>${tocOpen ? chapterSheet(book,chapters) : ''}${coReadOpen ? coReadPanel(book,position) : ''}<div class="ideal-book-selection" data-book-selection ${selectionOpen ? '' : 'hidden'} ${selectionStyle}><button type="button" data-book-save-quote>摘录</button><button type="button" data-book-add-note>添加批注</button><button type="button" data-book-selection-bookmark>书签</button>${summaryStatus ? `<small>${esc(summaryStatus)}</small>` : ''}</div>${annotationPanelOpen ? annotationPanel(book) : ''}${noteEditorOpen ? noteEditor() : ''}${annotationRepair ? repairPanel(book) : ''}${deletedAnnotation?.bookId === book.id ? '<div class="ideal-book-undo" role="status"><span>标注已删除</span><button type="button" data-book-annotation-undo>撤销</button></div>' : ''}</section>`;
+    return `<section class="ideal-book-reader ${night ? 'is-night' : ''}" data-book-reader><header class="ideal-book-reader-bar"><button type="button" data-book-to-shelf aria-label="返回书架">${icon('back')}</button><div class="ideal-book-reader-title"><small>${esc(bookTitle(book))}</small><strong>${esc(chapter.title || bookTitle(book))}</strong></div><button type="button" data-book-reader-bookmark aria-label="在当前位置添加书签">${icon('bookmark')}</button></header><main class="ideal-book-reading-scroll" data-book-scroll><article class="ideal-book-reading-text" style="font-size:${size}px;font-family:${esc(readerFontStyle(book))}">${chapterBody(book)}</article><div class="ideal-book-reading-chapter-nav"><button type="button" data-book-prev ${currentChapter <= 0 ? 'disabled' : ''}>上一章</button><span>${currentChapter + 1} / ${chapters.length}</span><button type="button" data-book-next ${currentChapter >= chapters.length - 1 ? 'disabled' : ''}>下一章</button></div></main><div class="ideal-book-reading-dock ${readerDockOpen ? 'is-open' : ''}" ${dockStyle}>${readerDockOpen ? `<nav class="ideal-book-reading-dock-bar" aria-label="阅读工具"><button type="button" data-book-font aria-label="文字设置">${icon('font')}<span>文字</span></button><button type="button" data-book-toc aria-label="章节目录">${icon('chapters')}<span>目录</span></button><button type="button" data-book-theme aria-label="切换阅读主题">${icon('night')}<span>主题</span></button><button type="button" data-book-annotations aria-label="查看标注">${icon('annotations')}<span>标注</span></button></nav>` : `<button class="ideal-book-reading-dock-toggle" type="button" data-book-reader-dock-toggle aria-label="展开阅读 Dock">⌃</button>`}</div>${fontPanelOpen ? readerFontPanel(book,size) : ''}<button class="ideal-book-role-chat-fab" type="button" data-book-role-chat aria-label="和${esc(role ? roleLabel(role) : '角色')}聊一聊" style="left:${position.left}%;top:${position.top}%">${role ? roleAvatar(role) : '<span>聊</span>'}<i aria-hidden="true">♥</i></button>${tocOpen ? chapterSheet(book,chapters) : ''}${coReadOpen ? coReadPanel(book,position) : ''}<div class="ideal-book-selection" data-book-selection ${selectionOpen ? '' : 'hidden'} ${selectionStyle}><button type="button" data-book-save-quote>摘录</button><button type="button" data-book-add-note>标注</button><button type="button" data-book-selection-summary>摘要</button>${summaryStatus ? `<small>${esc(summaryStatus)}</small>` : ''}</div>${annotationPanelOpen ? annotationPanel(book) : ''}${noteEditorOpen ? noteEditor() : ''}${annotationRepair ? repairPanel(book) : ''}${deletedAnnotation?.bookId === book.id ? '<div class="ideal-book-undo" role="status"><span>标注已删除</span><button type="button" data-book-annotation-undo>撤销</button></div>' : ''}</section>`;
   }
   function chapterSheet(book, chapters) {
     return `<div class="ideal-book-sheet-shade" data-book-toc-close><section class="ideal-book-toc-sheet" role="dialog" aria-label="目录"><header><span>TABLE OF CONTENTS</span><button type="button" data-book-toc-close aria-label="关闭目录">${icon('close')}</button></header><h2>${esc(bookTitle(book))}</h2><div>${chapters.map((chapter,index) => `<button type="button" data-book-chapter="${index}" class="${index === currentChapter ? 'is-current' : ''}"><span>${String(index + 1).padStart(2,'0')}</span><b>${esc(chapter.title || `第 ${index + 1} 章`)}</b>${icon('chevron')}</button>`).join('')}</div></section></div>`;
@@ -362,9 +364,9 @@
     stopClock(); const book = findBook(id); if (!book) return;
     currentBookId = id; pendingSelection = ''; pendingSelectionContext = null; selectionPosition = null; annotationPanelOpen = false; annotationScope = 'user'; annotationTab = 'all'; annotationQuery = ''; noteEditorOpen = false; annotationEditor = null; annotationRepair = null; annotationJump = null; linkedChatAnnotation = null; chaptersFor(book); currentChapter = Math.max(0, Math.min(chaptersFor(book).length - 1, Number(book.chapter || 0)));
     book.lastOpened = Date.now(); bookAutomationTriggered = false; writeBooks(readBooks().map(item => item.id === id ? book : item));
-    view = 'reader'; coReadOpen = false; tocOpen = false; readerDockOpen = false; fontPanelOpen = false; elapsedBase = Number(book.seconds || 0); openedAt = Date.now();
+    view = 'reader'; coReadOpen = false; tocOpen = false; readerDockOpen = false; fontPanelOpen = false; elapsedBase = Number(book.seconds || 0); elapsedSessionSeconds = 0; openedAt = Date.now(); lastReaderActivityAt = openedAt;
     render({readerScrollTop:Number(book.scrollTop || 0)});
-    elapsedTimer = setInterval(() => { const current = findBook(currentBookId); if (!current || view !== 'reader') return; const seconds = elapsedBase + Math.floor((Date.now() - openedAt) / 1000); app.querySelector('[data-book-reader]')?.style.setProperty('--im-reading-seconds', seconds); if (seconds >= 30 && !bookAutomationTriggered) void runBookAutomation(current); }, 5000);
+    elapsedTimer = setInterval(() => { const current = findBook(currentBookId); if (!current || view !== 'reader') return; const now = Date.now(), readerIsActive = app.classList.contains('is-open') && document.visibilityState === 'visible' && now - lastReaderActivityAt < 90000; if (readerIsActive) elapsedSessionSeconds += 1; const seconds = elapsedBase + elapsedSessionSeconds; app.querySelector('[data-book-reader]')?.style.setProperty('--im-reading-seconds', seconds); if (elapsedSessionSeconds >= 30 && !bookAutomationTriggered) void runBookAutomation(current); }, 1000);
     requestAnimationFrame(() => { const scroll = app.querySelector('[data-book-scroll]'); if (scroll) { scroll.scrollTop = Number(book.scrollTop || 0); restoreReaderAnchor(scroll,book.readAnchor); } });
   }
   function stopClock() {
@@ -372,8 +374,8 @@
     if (!currentBookId || !openedAt) return;
     if (view === 'reader') updateProgress();
     const books = readBooks(); const book = books.find(item => item.id === currentBookId);
-    if (book) { const elapsed = Math.floor((Date.now() - openedAt) / 1000); book.seconds = elapsedBase + elapsed; const scroll = app.querySelector('[data-book-scroll]'); if (scroll) book.scrollTop = scroll.scrollTop; writeBooks(books); const logs = readDayLogs(); const key = todayKey(); logs[key] = Math.max(0,Number(logs[key] || 0)) + elapsed; localStorage.setItem(dayLogKey,JSON.stringify(logs)); const settings = readBookSettings(); if (elapsed >= 30 && settings.autoSummary && settings.autoSummaryTrigger === 'session') void proactiveBookSummary(book,'auto-summary'); }
-    openedAt = 0;
+    if (book) { const elapsed = elapsedSessionSeconds; book.seconds = elapsedBase + elapsed; const scroll = app.querySelector('[data-book-scroll]'); if (scroll) book.scrollTop = scroll.scrollTop; writeBooks(books); const logs = readDayLogs(); const key = todayKey(); logs[key] = Math.max(0,Number(logs[key] || 0)) + elapsed; localStorage.setItem(dayLogKey,JSON.stringify(logs)); const settings = readBookSettings(); if (elapsed >= 30 && settings.autoSummary && settings.autoSummaryTrigger === 'session') void proactiveBookSummary(book,'auto-summary'); }
+    openedAt = 0; elapsedSessionSeconds = 0; lastReaderActivityAt = 0;
   }
   function updateProgress() {
     const book = findBook(currentBookId); const scroll = app.querySelector('[data-book-scroll]'); if (!book || !scroll) return;
@@ -478,6 +480,25 @@
   function saveQuote(text = pendingSelection) {
     saveAnnotation('excerpt', text);
   }
+  function annotationPreview(value, limit = 220) {
+    const text = normalizedAnnotationText(value);
+    return text.length > limit ? `${text.slice(0, limit)}…` : text;
+  }
+  async function summarizeSelection() {
+    const book = findBook(currentBookId); const context = pendingSelectionContext || selectionContext();
+    const source = String(context?.text || pendingSelection || '').trim();
+    if (!book || !source) return;
+    summaryStatus = '正在生成摘要…'; render();
+    try {
+      const chapter = chaptersFor(book)[Number(context.chapterIndex ?? currentChapter)] || {};
+      const text = await requestBookCompletion('你是阅读摘要助手。只根据用户选中的原文，输出一句简洁、准确的中文摘要，不要补写原文没有的信息，不要使用“摘要：”前缀。', `书名：《${bookTitle(book)}》\n章节：${chapter.title || context.chapterTitle || ''}\n选中的原文：\n${source.slice(0,4000)}`,.15);
+      const latest = findBook(book.id); if (!latest) return;
+      const store = readAnnotations(latest); const item = { id:uid(), source:'user', ...context, quote:source, text:source, note:`摘要：${text}`, title:'摘要', kind:'summary', createdAt:Date.now() };
+      if (!store.notes.some(entry => entry.kind === 'summary' && entry.quote === item.quote && entry.chapterIndex === item.chapterIndex && entry.paragraphIndex === item.paragraphIndex)) store.notes.unshift(item);
+      writeBook(latest); summaryStatus = '摘要已保存';
+    } catch (error) { summaryStatus = `摘要失败：${error.message}`; }
+    render();
+  }
   function generatedAnnotationContext(book) {
     const chapter = chaptersFor(book)[currentChapter] || {}; const paragraphs = chapterParagraphTexts(chapter); const paragraphIndex = Math.max(0, Math.min(paragraphs.length - 1, Number(app.querySelector('[data-book-paragraph-index]')?.dataset.bookParagraphIndex || 0))); const quote = paragraphs[paragraphIndex] || '';
     return { chapterIndex:currentChapter, chapterTitle:chapter.title || '', paragraphIndex, quote, text:quote, startOffset:0, endOffset:0, createdAt:Date.now() };
@@ -536,7 +557,7 @@
     const entryMarkup = entries.map(item => {
       const group = item.chapterIndex !== lastChapter ? `<h3 class="ideal-book-annotation-group">${esc(item.chapterTitle || `第 ${Number(item.chapterIndex || 0) + 1} 章`)}</h3>` : '';
       lastChapter = item.chapterIndex;
-      return group + `<article class="ideal-book-annotation-item"><button type="button" class="ideal-book-annotation-open" data-book-annotation-id="${esc(item.id)}" data-book-annotation-type="${item.type}"><small>${esc(item.chapterTitle || `第 ${Number(item.chapterIndex || 0) + 1} 章`)} · 第 ${Number(item.paragraphIndex || 0) + 1} 段</small>${item.title ? `<strong>${esc(item.title)}</strong>` : ''}${item.quote ? `<span class="ideal-book-annotation-quote">${esc(item.quote)}</span>` : ''}${item.note ? `<span class="ideal-book-annotation-note">我的笔记：${esc(item.note)}</span>` : ''}</button><div class="ideal-book-annotation-actions">${annotationScope === 'user' ? `<button type="button" data-book-annotation-edit="${esc(item.id)}" data-book-annotation-type="${item.type}">编辑</button>` : ''}<button type="button" data-book-annotation-delete="${esc(item.id)}" data-book-annotation-type="${item.type}">删除</button>${item.type === 'excerpts' ? `<button type="button" data-book-annotation-chat="${esc(item.id)}" data-book-annotation-type="${item.type}">和角色聊这句</button>` : ''}</div></article>`;
+      return group + `<article class="ideal-book-annotation-item"><button type="button" class="ideal-book-annotation-open" data-book-annotation-id="${esc(item.id)}" data-book-annotation-type="${item.type}"><small>${esc(item.chapterTitle || `第 ${Number(item.chapterIndex || 0) + 1} 章`)} · 第 ${Number(item.paragraphIndex || 0) + 1} 段${item.kind === 'summary' ? ' · 摘要' : ''}</small>${item.title ? `<strong>${esc(item.title)}</strong>` : ''}${item.quote ? `<span class="ideal-book-annotation-quote">${esc(annotationPreview(item.quote))}</span>` : ''}${item.note ? `<span class="ideal-book-annotation-note">${esc(annotationPreview(item.note,180))}</span>` : ''}</button><div class="ideal-book-annotation-actions">${annotationScope === 'user' ? `<button type="button" data-book-annotation-edit="${esc(item.id)}" data-book-annotation-type="${item.type}">编辑</button>` : ''}<button type="button" data-book-annotation-delete="${esc(item.id)}" data-book-annotation-type="${item.type}">删除</button>${item.type === 'excerpts' ? `<button type="button" data-book-annotation-chat="${esc(item.id)}" data-book-annotation-type="${item.type}">和角色聊这句</button>` : ''}</div></article>`;
     }).join('');
     return `<div class="ideal-book-annotations-shade" data-book-annotations-close><section class="ideal-book-annotations-panel" role="dialog" aria-modal="true" aria-label="标注"><header><div><span>READING NOTES</span><h2>标注</h2></div><button type="button" data-book-annotations-close aria-label="关闭标注">×</button></header><nav class="ideal-book-annotations-sources"><button type="button" data-book-annotation-scope="user" class="${annotationScope === 'user' ? 'is-active' : ''}">我的标注</button><button type="button" data-book-annotation-scope="role" class="${annotationScope === 'role' ? 'is-active' : ''}" ${role ? '' : 'disabled'}>${esc(roleLabelText)}</button></nav><nav class="ideal-book-annotations-tabs">${types.map(type => `<button type="button" data-book-annotation-tab="${type.key}" class="${annotationTab === type.key ? 'is-active' : ''}">${type.label}<small>${type.key === 'all' ? all.length : store[type.key].length}</small></button>`).join('')}</nav><label class="ideal-book-annotation-find"><span>查找章节或标注</span><input type="search" data-book-annotation-search placeholder="输入章节名、书签名或原句" value="${esc(annotationQuery)}" autocomplete="off"></label><main>${entries.length ? entryMarkup : '<p class="ideal-book-annotations-empty">这里还没有内容。</p>'}<p class="ideal-book-annotations-empty" data-book-annotation-no-results hidden>没有匹配的标注。</p></main></section></div>`;
   }
@@ -699,9 +720,13 @@
     finally { chatSummaryJobs.delete(book.id); if (!automatic) summaryReplying = false; render(); }
   }
   const chanceHit = value => Math.random() * 100 < Math.max(0,Math.min(100,Number(value) || 0));
+  function roleHasBookmark(book, role) {
+    return readAnnotations(book,'role',role).bookmarks.length > 0;
+  }
   async function proactiveRoleAnnotation(book, role) {
     const settings = readBookSettings(); const enabled = [['note',settings.proactiveAnnotationNote],['excerpt',settings.proactiveAnnotationExcerpt],['bookmark',settings.proactiveAnnotationBookmark]].filter(item => item[1]).map(item => item[0]); if (!enabled.length) return;
-    const type = enabled[Math.floor(Math.random() * enabled.length)]; const context = generatedAnnotationContext(book); if (!context.quote) return;
+    const allowed = roleHasBookmark(book,role) ? enabled.filter(type => type !== 'bookmark') : enabled; if (!allowed.length) return;
+    const type = allowed[Math.floor(Math.random() * allowed.length)]; const context = generatedAnnotationContext(book); if (!context.quote) return;
     if (type === 'note') {
       const note = await requestBookCompletion(`你正在和用户一起读《${bookTitle(book)}》。你扮演角色“${roleLabel(role)}”。请针对给出的原文写一条简短批注，只输出批注正文，不要改写或重复原文，不要编造剧情。`, `章节：${context.chapterTitle}\n原文：${context.quote}`,.45);
       saveRoleAnnotation(book,role,'note',context,{ note });
@@ -764,7 +789,7 @@
     const book = findBook(currentBookId); const role = currentRole(book); if (!book || !text.trim()) return;
     const messages = roleChatMessages(book, role); messages.push({ role:'user', text:text.trim(), annotationId:sourceAnnotation?.id || '', annotationQuote:sourceAnnotation?.quote || '', annotationChapterTitle:sourceAnnotation?.chapterTitle || '', createdAt:Date.now() }); linkedChatAnnotation = null; saveRoleChatMessages(book, role, messages); writeBooks(readBooks().map(item => item.id === book.id ? book : item)); render();
     const messagesEl = app.querySelector('[data-book-chat-messages]'); if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
-    await requestCoReadReply(book,role);
+    // 发送只提交用户消息；角色回复由下方“回复”按钮单独触发。
   }
   async function rerollCoRead() {
     if (coReadReplying) return;
@@ -825,7 +850,7 @@
   }
 
   document.addEventListener('click', event => {
-    if (event.target.closest('[data-app-key="bookapp"]')) { view = 'home'; currentBookId = ''; app.classList.add('is-open'); render(); return; }
+    if (event.target.closest('[data-app-key="bookapp"]')) { stopClock(); view = 'home'; currentBookId = ''; app.classList.add('is-open'); render(); return; }
     if (!app.classList.contains('is-open')) return;
     if (event.target.closest('[data-book-close]')) { stopClock(); rolePickerOpen = false; goalEditorOpen = false; readerDockOpen = false; fontPanelOpen = false; shelfSelectMode = false; selectedBookIds.clear(); app.classList.remove('is-open'); return; }
     if ((pendingSelection || summaryStatus) && !event.target.closest('.ideal-book-reading-text,[data-book-selection],.ideal-book-note-sheet')) { pendingSelection = ''; pendingSelectionContext = null; selectionPosition = null; summaryStatus = ''; const selectionButton = app.querySelector('[data-book-selection]'); if (selectionButton) selectionButton.hidden = true; }
@@ -869,8 +894,9 @@
     const annotationChat = event.target.closest('[data-book-annotation-chat]'); if (annotationChat) { const book = findBook(currentBookId); const found = annotationEntry(book,annotationChat.dataset.bookAnnotationChat,annotationScope,'excerpts'); if (!found) return; linkedChatAnnotation = { id:found.item.id, quote:found.item.quote, chapterTitle:found.item.chapterTitle || '' }; annotationPanelOpen = false; coReadOpen = true; render(); const messages = app.querySelector('[data-book-chat-messages]'); if (messages) messages.scrollTop = messages.scrollHeight; return; }
     const annotationItem = event.target.closest('[data-book-annotation-id]'); if (annotationItem) { const book = findBook(currentBookId); const found = annotationEntry(book,annotationItem.dataset.bookAnnotationId,annotationScope,annotationItem.dataset.bookAnnotationType); if (!found) return; const target = findAnnotationTarget(book,found.item); if (!target) { annotationRepair = { id:found.item.id, type:found.type, scope:annotationScope }; render(); return; } goToAnnotation(book,found.item,target); return; }
     const chatSource = event.target.closest('[data-book-chat-source]'); if (chatSource) { const book = findBook(currentBookId); const found = annotationEntry(book,chatSource.dataset.bookChatSource,'user','excerpts') || annotationEntry(book,chatSource.dataset.bookChatSource,'role','excerpts'); if (!found) { window.alert('这条摘录已被删除。'); return; } const target = findAnnotationTarget(book,found.item); if (!target) { annotationRepair = {id:found.item.id,type:found.type,scope:found.item.source === 'role' ? 'role' : 'user'}; render(); return; } coReadOpen = false; goToAnnotation(book,found.item,target); return; }
-    if (event.target.closest('[data-book-selection-bookmark]')) { closeReaderPanels(); saveBookmark(); return; }
+    if (event.target.closest('[data-book-reader-bookmark]')) { closeReaderPanels(); saveBookmark(); return; }
     if (event.target.closest('[data-book-add-note]')) { pendingSelectionContext = selectionContext() || pendingSelectionContext; annotationEditor = { mode:'create', type:'notes', context:annotationContext(pendingSelection) }; noteEditorOpen = true; closeReaderPanels('note'); render(); return; }
+    if (event.target.closest('[data-book-selection-summary]')) { void summarizeSelection(); return; }
     if (event.target.closest('[data-book-save-quote]')) { saveQuote(); return; }
     if (event.target.closest('[data-book-together]')) { closeReaderPanels('chat'); coReadOpen = true; render(); const messages = app.querySelector('[data-book-chat-messages]'); if (messages) messages.scrollTop = messages.scrollHeight; return; }
     if (event.target.closest('[data-book-chat-close]')) { coReadOpen = false; linkedChatAnnotation = null; render(); return; }
@@ -879,7 +905,9 @@
     if (event.target.closest('[data-book-reader-dock-toggle]')) { if (suppressReaderDockToggleClick) { suppressReaderDockToggleClick = false; return; } closeReaderPanels(); readerDockOpen = true; render(); return; }
     if (readerDockOpen && view === 'reader' && !event.target.closest('.ideal-book-reading-dock,.ideal-book-chat-panel,.ideal-book-toc-sheet,.ideal-book-font-panel,.ideal-book-role-chat-fab,.ideal-book-selection,.ideal-book-annotations-panel,.ideal-book-note-sheet')) { readerDockOpen = false; tocOpen = false; fontPanelOpen = false; render(); return; }
   });
-  app.addEventListener('scroll', event => { if (event.target.matches('[data-book-scroll]')) updateProgress(); }, true);
+  function markReadingActivity(event) { if (view !== 'reader' || !app.classList.contains('is-open') || document.visibilityState !== 'visible') return; const scroll = app.querySelector('[data-book-scroll]'), target = event.target; if (scroll && (target === scroll || scroll.contains(target))) lastReaderActivityAt = Date.now(); }
+  for (const eventName of ['pointerdown','touchstart','wheel','keydown']) app.addEventListener(eventName,markReadingActivity,true);
+  app.addEventListener('scroll', event => { if (event.target.matches('[data-book-scroll]')) { lastReaderActivityAt = Date.now(); updateProgress(); } }, true);
   app.addEventListener('input', event => {
     if (event.target.matches('[data-book-annotation-search]')) { annotationQuery = event.target.value; filterAnnotationList(); return; }
     if (event.target.matches('[data-book-goal-input]')) { event.target.classList.remove('is-invalid'); const error = app.querySelector('[data-book-goal-error]'); if (error) error.textContent = '达到目标后，周一到周日会显示完成标记。'; return; }
@@ -969,6 +997,11 @@
   app.addEventListener('submit', event => {
     if (!event.target.matches('[data-book-chat-form]')) return;
     event.preventDefault(); const input = app.querySelector('[data-book-chat-input]'); const text = input?.value || ''; if (input) input.value = ''; sendCoRead(text,linkedChatAnnotation);
+  });
+  app.addEventListener('keydown', event => {
+    if (!event.target.matches('[data-book-chat-input]') || event.key !== 'Enter' || event.isComposing) return;
+    event.preventDefault();
+    event.target.form?.requestSubmit?.();
   });
   document.addEventListener('selectionchange', () => {
     if (!app.classList.contains('is-open') || view !== 'reader') return;

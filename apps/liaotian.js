@@ -294,7 +294,7 @@
       return raw;
     }
   }
-  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtTranslation = ''; let thoughtKey = ''; let thoughtRequestId = 0; let thoughtAvatarClickTimer = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let chatCssExportBlocked = false; let chatPageBeautyOpen = false; let chatPageBeautyTab = 'chat'; let chatPageBeautyDraft = null; let chatPageBeautyExportBlocked = false; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let momentCoverEditorOpen = false; let momentCoverDraftSource = ''; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineRequestLocked = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0; let chatGroupLongPressTimer = 0; let suppressChatGroupEntryClick = false;
+  let state = read(); let activeTab = 'chat'; let activeContact = state.contacts[0]?.id || null; let menuOpen = false; let imageChoiceOpen = false; let imageDescriptionOpen = false; let transferOpen = false; let userHomeProfileId = null; let walletModalType = ''; let emojiOpen = false; let emojiEditorOpen = false; let emojiEditMode = false; let selectedEmojiIds = new Set(); let activeEmojiGroup = state.emojis.groups[0]?.id || ''; let profilePickerOpen = false; let settingsProfilePickerOpen = false; let profileEditorOpen = false; let profileEditId = null; let profileAvatar = ''; let profileDraft = null; let thoughtOpen = false; let thoughtLoading = false; let thoughtText = ''; let thoughtTranslation = ''; let thoughtKey = ''; let thoughtRequestId = 0; let thoughtAvatarClickTimer = 0; let replying = false; let backgroundReplyContactId = ''; let backgroundDeliveryView = null; let editorMode = ''; let editorContactId = null; let editorAvatar = ''; let editorDraft = null; let editorWorldbookDraft = null; let contactSaving = false; let chatSettingsOpen = false; let chatCssExportBlocked = false; let chatPageBeautyOpen = false; let chatPageBeautyTab = 'chat'; let chatPageBeautyDraft = null; let chatPageBeautyExportBlocked = false; let momentFilter = 'all'; let momentBusy = false; let momentGenerationDepth = 0; let profileEditorPurpose = ''; let momentComposerOpen = false; let momentImageData = ''; let momentVisibility = []; let momentVisibilityMode = 'all'; let momentCoverEditorOpen = false; let momentCoverDraftSource = ''; let contactGroupComposerOpen = false; let roleMomentComposerOpen = false; let roleMomentTarget = 'random'; let roleMomentVisibility = 'all'; let roleMomentMode = 'random'; let roleMomentTargets = []; let roleMomentCount = 1; let roleMomentWithImage = false; let offlineSessionId = ''; let offlineBusy = false; let offlineRequestLocked = false; let offlineFinishing = false; let offlineExitRequested = false; let chatQuote = null; let chatDraftSaveTimer = 0; let chatGroupLongPressTimer = 0; let suppressChatGroupEntryClick = false;
   let activeContactGroupId = '';
   let chatLaunchScrollTop = 0;
   let chatMainScrollTop = 0;
@@ -2342,9 +2342,11 @@ ${rerollRule}
     musicState.profileId = chat.profileId;
     musicState.current ||= {};
     musicState.rooms ||= {};
+    musicState.queueContexts ||= {};
     const song = { id: verified.id, title: verified.title, artist: verified.artist, album: verified.album, cover: verified.cover, playUrl: verified.playUrl || '', source: 'netease', musicVerified: true };
     musicState.current[chat.profileId] = song;
     musicState.rooms[chat.profileId] = { song, roleId: activeContact, startedAt: Date.now() };
+    musicState.queueContexts[chat.profileId] = { type: 'chat', key: String(song.id), items: [{ id: song.id, title: song.title, artist: song.artist, album: song.album, cover: song.cover, source: 'netease' }] };
     localStorage.setItem('ideal-machine-music', JSON.stringify(musicState));
     const openSharedSong = window.IdealMachineApps?.yinyue?.openSharedSong;
     if (typeof openSharedSong === 'function' && openSharedSong(song)) return;
@@ -2441,6 +2443,8 @@ ${rerollRule}
   function handleTool(tool) { if (tool === 'reroll') { menuOpen = false; emojiOpen = false; syncChatPanelDOM(); rerollCurrentChatRound().catch(error => window.alert(`重新生成失败：${error.message}`)); return; } if (tool === 'offline') { menuOpen = false; emojiOpen = false; openOfflineMode(); return; } if (tool === 'image-file') { imageChoiceOpen = true; imageDescriptionOpen = false; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderImageChoice(); return; } if (tool === 'transfer') { transferOpen = true; menuOpen = false; emojiOpen = false; syncChatPanelDOM(); renderTransfer(); return; } if (tool === 'music') { menuOpen = false; emojiOpen = false; syncChatPanelDOM(); openMusicShareSheet(); return; } menuOpen = false; const labels = { voice: ['语音内容', 'voice'], video: ['通话主题', 'video'], location: ['位置名称', 'location'] }; const data = labels[tool]; if (!data) return render(); const value = window.prompt(data[0]); if (value?.trim()) addMessage(value.trim(), 'user', data[1]); }
   document.addEventListener('click', event => {
     if (event.target.closest('[data-chat-music-share-close]')) { closeMusicShareSheet(); return; }
+    const addToPlaylist = event.target.closest('[data-chat-music-add]');
+    if (addToPlaylist && app.classList.contains('is-open')) { const message = currentChat()?.messages.find(item => item.id === addToPlaylist.dataset.chatMusicAdd); if (message) { event.preventDefault(); event.stopImmediatePropagation(); window.IdealMachineMusicAddToPlaylist?.({ id: message.musicId || '', title: message.musicTitle || message.text || '', artist: message.musicArtist || '', album: message.musicAlbum || '', cover: message.musicCover || '', source: message.musicSource || 'netease', playUrl: message.musicPlayUrl || '', profileId: message.profileId || currentChat()?.profileId || '' }); } return; }
     const listen = event.target.closest('[data-chat-music-listen]');
     if (listen && app.classList.contains('is-open')) { const message = currentChat()?.messages.find(item => item.id === listen.dataset.chatMusicListen); if (message) listenToSharedMusic(message); return; }
     const pick = event.target.closest('[data-chat-music-pick]');
@@ -4585,7 +4589,7 @@ ${rerollRule}
         return resultArtist === artistKey || resultArtist.includes(artistKey) || artistKey.includes(resultArtist);
       });
       // 优先歌名与歌手都匹配；部分接口会把歌手合并/省略，至少保留歌名完全匹配的真实曲目。
-      const verified = exact || titleMatches[0] || matches[0];
+      const verified = exact || ((!artistKey || artist === '未知歌手') ? titleMatches[0] : null);
       if (!verified) return null;
       // 分享时只做这一次真实曲目搜索与校验；播放地址等用户真正点击播放时再取。
       return { ...verified, playUrl:'', source:'netease', verifiedRealSong:true, playable:false };
@@ -9527,6 +9531,23 @@ ${recentConversation}
       sections.push({ id:'offline', name:'线下', getCss:readOfflineBeautyCSS, setCss:saveOfflineBeautyCSS, resetCss:() => saveOfflineBeautyCSS(''), runtimeApply:applyOfflineBeautyCSS });
       return sections;
     }
+  };
+  const messageHtmlBeforeMusicPlaylistAction = messageHtml;
+  messageHtml = function(message) {
+    const html = messageHtmlBeforeMusicPlaylistAction(message);
+    if (message?.type !== 'music' || message.recalled || html.includes('data-chat-music-add')) return html;
+    const template = document.createElement('template');
+    template.innerHTML = html.trim();
+    const card = template.content.querySelector('.chat-music-message');
+    if (!card) return html;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'chat-music-add-playlist';
+    button.dataset.chatMusicAdd = message.id;
+    button.setAttribute('aria-label', '加入理想机歌单');
+    button.textContent = '＋';
+    card.appendChild(button);
+    return template.innerHTML;
   };
   startActiveMessageAutomation();
 })();
