@@ -201,8 +201,9 @@
 .ideal-book-annotation-chapter-toggle { display:flex; align-items:center; gap:8px; width:100%; min-height:42px; padding:7px 8px; border:0; border-bottom:1px solid rgba(0,0,0,.08); background:transparent; color:#444; text-align:left; }
 .ideal-book-annotation-chapter-toggle > span { flex:1; font-size:12px; font-weight:700; }
 .ideal-book-annotation-chapter-toggle > small { color:#999; font-size:10px; }
-.ideal-book-annotation-chapter-toggle > i { color:#888; font-size:15px; font-style:normal; transition:transform .16s ease; }
-.ideal-book-annotation-chapter.is-expanded .ideal-book-annotation-chapter-toggle > i { transform:rotate(180deg); }
+.ideal-book-annotation-chapter-toggle > i { display:grid; flex:0 0 18px; width:18px; height:18px; place-items:center; color:#888; font-style:normal; }
+.ideal-book-annotation-chapter-toggle > i::before { width:7px; height:7px; border-right:1.75px solid currentColor; border-bottom:1.75px solid currentColor; content:""; transform:translateY(-1.5px) rotate(45deg); transition:transform .16s ease; }
+.ideal-book-annotation-chapter.is-expanded .ideal-book-annotation-chapter-toggle > i::before { transform:translateY(1.5px) rotate(225deg); }
 .ideal-book-annotation-chapter-body { padding:0 0 4px; }
 .ideal-book-annotation-chapter-body[hidden] { display:none !important; }
 .ideal-book-annotation-group[hidden],.ideal-book-annotation-item[hidden],.ideal-book-annotations-empty[hidden] { display:none !important; }
