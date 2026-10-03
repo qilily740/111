@@ -863,17 +863,19 @@
   function installIdealViewportSizing() {
     const root = document.documentElement;
     let viewportSyncTimer = 0;
+    let viewportSyncFrame = 0;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || !!window.navigator.standalone;
     const hasFocusedEditable = () => Boolean(document.activeElement?.matches?.('textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]), [contenteditable]:not([contenteditable="false"])'));
     const sync = () => {
-      const visualHeight = Math.round(window.visualViewport?.height || window.innerHeight);
-      const visualTop = Math.round(window.visualViewport?.offsetTop || 0);
+      const visualHeight = Math.ceil(window.visualViewport?.height || window.innerHeight);
+      const visualTop = Math.floor(window.visualViewport?.offsetTop || 0);
       const standaloneIOS = isIOS && isStandalone();
       const layoutHeight = Math.round(window.innerHeight || visualHeight);
+      const layoutWidth = Math.round(window.innerWidth || document.documentElement.clientWidth);
+      const focusedEditable = hasFocusedEditable();
       let keyboardOpen = false;
       if (standaloneIOS) {
-        const layoutWidth = Math.round(window.innerWidth || document.documentElement.clientWidth);
         // iOS 主屏幕应用可能把状态栏高度从 vh/dvh/innerHeight 中扣掉。
         // 仅窗口宽度匹配整块屏幕时校准，避免把 iPad 分屏撑成全屏。
         const screenWidth = Number(window.screen?.width) || 0;
@@ -885,25 +887,29 @@
         if (idealStableStandaloneWidth && Math.abs(layoutWidth - idealStableStandaloneWidth) > 40) idealStableStandaloneHeight = 0;
         idealStableStandaloneWidth = layoutWidth;
         if (!idealStableStandaloneHeight || layoutHeight > idealStableStandaloneHeight) idealStableStandaloneHeight = layoutHeight;
-        keyboardOpen = visualHeight > 150 && visualHeight < idealStableStandaloneHeight - 100;
+        keyboardOpen = visualHeight > 150 && visualHeight < idealStableStandaloneHeight - 2;
       } else {
         root.style.removeProperty('--ideal-fullscreen-height');
-        idealStableStandaloneHeight = 0;
-        idealStableStandaloneWidth = 0;
-        // Safari and other mobile browsers keep innerHeight at the layout viewport
-        // while shrinking visualViewport for the on-screen keyboard.
-        keyboardOpen = visualHeight > 150 && visualHeight < layoutHeight - 120;
+        // 部分浏览器会让 innerHeight 和 visualViewport 一起缩小，因此保留
+        // 聚焦前的稳定高度，不能只拿当前两者比较。
+        if (idealStableStandaloneWidth && Math.abs(layoutWidth - idealStableStandaloneWidth) > 40) idealStableStandaloneHeight = 0;
+        idealStableStandaloneWidth = layoutWidth;
+        if (!idealStableStandaloneHeight || layoutHeight > idealStableStandaloneHeight) {
+          idealStableStandaloneHeight = layoutHeight;
+        }
+        const baselineHeight = Math.max(layoutHeight, idealStableStandaloneHeight || 0);
+        keyboardOpen = visualHeight > 150 && visualHeight < baselineHeight - 2;
       }
       // A shrinking visual viewport can linger during the keyboard's dismiss
       // animation after blur. Keep the app at keyboard height only while an
       // editable still owns focus, otherwise the desktop can flash through it.
-      keyboardOpen = keyboardOpen && hasFocusedEditable();
+      keyboardOpen = keyboardOpen && focusedEditable;
       // 仅键盘打开时覆盖内容高度；关闭后恢复 CSS 全屏高度和实时安全区。
       if (keyboardOpen) {
         root.style.setProperty('--ideal-keyboard-viewport-top', `${visualTop}px`);
         root.style.setProperty('--ideal-keyboard-viewport-height', `${visualHeight}px`);
-        if (standaloneIOS) root.style.setProperty('--ideal-app-height', `${visualHeight + visualTop}px`);
-        else root.style.removeProperty('--ideal-app-height');
+        // 所有移动浏览器都使用实时可视高度，避免键盘动画期间露出桌面底图。
+        root.style.setProperty('--ideal-app-height', `${visualHeight + visualTop}px`);
         root.style.setProperty('--ideal-safe-bottom', '0px');
       } else {
         root.style.removeProperty('--ideal-keyboard-viewport-top');
@@ -914,8 +920,15 @@
       document.body.classList.toggle('ideal-keyboard-open', keyboardOpen);
     };
     const scheduleSync = () => {
+      if (!viewportSyncFrame) {
+        viewportSyncFrame = window.requestAnimationFrame(() => {
+          viewportSyncFrame = 0;
+          sync();
+        });
+      }
       window.clearTimeout(viewportSyncTimer);
-      viewportSyncTimer = window.setTimeout(() => { viewportSyncTimer = 0; sync(); }, 140);
+      // 键盘动画结束后再校准一次，处理最后一帧没有触发 resize 的浏览器。
+      viewportSyncTimer = window.setTimeout(() => { viewportSyncTimer = 0; sync(); }, 80);
     };
     window.addEventListener('resize', scheduleSync);
     window.addEventListener('orientationchange', () => {
@@ -925,9 +938,14 @@
       window.setTimeout(scheduleSync, 250);
     });
     window.visualViewport?.addEventListener('resize', scheduleSync);
+    window.visualViewport?.addEventListener('scroll', scheduleSync);
+    document.addEventListener('focusin', event => {
+      if (event.target?.matches?.('textarea, input, [contenteditable]:not([contenteditable="false"])')) scheduleSync();
+    }, true);
     document.addEventListener('focusout', event => {
-      if (!event.target?.matches?.('#chatInput')) return;
-      window.setTimeout(() => { if (!hasFocusedEditable()) sync(); }, 0);
+      if (!event.target?.matches?.('textarea, input, [contenteditable]:not([contenteditable="false"])')) return;
+      window.setTimeout(scheduleSync, 0);
+      window.setTimeout(scheduleSync, 160);
     }, true);
     sync();
     if (isIOS && isStandalone()) [120, 500, 1500, 3000].forEach(delay => window.setTimeout(sync, delay));
