@@ -2463,11 +2463,12 @@ ${rerollRule}
   function readOfflineWritingStyles() { try { const list = JSON.parse(localStorage.getItem(offlineWritingStyleKey) || '[]'); return Array.isArray(list) ? list.filter(item => item?.id && item?.name && item?.prompt) : []; } catch { return []; } }
   const offlineReplyPresetsKey = 'ideal-machine-offline-reply-presets';
   function readOfflineReplyPresets() { try { const list = JSON.parse(localStorage.getItem(offlineReplyPresetsKey) || '[]'); return Array.isArray(list) ? list.filter(item => item?.id && item?.name && item?.prompt) : []; } catch { return []; } }
-  function offlineReplyPresetOptions(selected) { return `<option value="default" ${selected === 'default' ? 'selected' : ''}>内置默认提示词</option>${readOfflineReplyPresets().map(item => `<option value="${esc(item.id)}" ${selected === item.id ? 'selected' : ''}>${esc(item.name)} · 自建</option>`).join('')}${selected && selected !== 'default' && !readOfflineReplyPresets().some(item => item.id === selected) ? '<option value="session" selected>本次自定义</option>' : ''}`; }
+  function offlineReplyPresetOptions(selected) { return `<option value="default" ${selected === 'default' ? 'selected' : ''}>系统默认（隐藏）</option>${readOfflineReplyPresets().map(item => `<option value="${esc(item.id)}" ${selected === item.id ? 'selected' : ''}>${esc(item.name)} · 自建</option>`).join('')}${selected && selected !== 'default' && !readOfflineReplyPresets().some(item => item.id === selected) ? '<option value="session" selected>本次自定义</option>' : ''}`; }
   function offlineReplyPresetVariableGuide() { return `<div class="offline-preset-variable-guide"><b>变量说明</b><span><code>{{char_name}}</code> 当前角色名</span><span><code>{{user_name}}</code> 用户称呼</span><span><code>{{reply_length}}</code> 本次目标字数</span><span><code>{{user_person}}</code> 用户叙述人称</span><span><code>{{char_person}}</code> 角色叙述人称</span><span><code>{{world_background}}</code> 世界书分析背景</span><span><code>{{writing_style}}</code> 当前文风</span><span><code>{{scene}}</code> 地点、原因和角色状态</span><span><code>{{user_message}}</code> 用户本轮输入</span><span><code>{{online_chat}}</code> 线下开始前的线上聊天</span><span><code>{{offline_history}}</code> 已发生的线下内容</span></div>`; }
   function offlineWritingStyleOptions(selected) { return `${Object.entries(offlineWritingStyles).map(([id, item]) => `<option value="${id}" ${selected === id ? 'selected' : ''}>${item.name}</option>`).join('')}${readOfflineWritingStyles().map(item => `<option value="${esc(item.id)}" ${selected === item.id ? 'selected' : ''}>${esc(item.name)} · 自定义</option>`).join('')}`; }
   function offlineWritingStyle(session) { const id = session.writingStyleId || 'natural'; const custom = readOfflineWritingStyles().find(item => item.id === id); const preset = custom || offlineWritingStyles[id] || offlineWritingStyles.natural; const prompt = session.writingStylePrompt || preset.prompt; return { id: preset.id || id, name: preset.name, prompt: custom ? prompt : `${prompt}${offlineStyleExecutionFramework}` }; }
   function offlineReplyPreset(session, values = {}) { const raw = session.replyPreset || offlineDefaultReplyPreset; const replacements = { char_name:'角色', user_name:'用户', reply_length:'500', user_person:'我', char_person:'我', world_background:'暂无世界书分析结果。', writing_style:'自然细腻', scene:'暂无', user_message:'暂无', online_chat:'暂无', offline_history:'暂无', ...values }; return raw.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (match, key) => Object.prototype.hasOwnProperty.call(replacements, key.toLowerCase()) ? replacements[key.toLowerCase()] : match); }
+  function syncOfflinePresetField(panel) { const input = panel?.querySelector('[data-offline-preset]'); const select = panel?.querySelector('[data-offline-preset-select]'); if (!input || !select) return; const field = input.closest('.chat-offline-v2-preset'); const selectedId = select.value || 'default'; const item = readOfflineReplyPresets().find(preset => preset.id === selectedId); if (selectedId === 'default') { input.value = ''; if (field) field.hidden = true; return; } if (item) input.value = item.prompt; if (selectedId === 'session' && !input.value) input.value = offlineDefaultReplyPreset; if (field) field.hidden = false; }
   function ensureOfflineReplyPreset(session) { if (!session.replyPreset || session.replyPreset === offlineLegacyReplyPreset) session.replyPreset = offlineDefaultReplyPreset; return session.replyPreset; }
   function offlineWorldMaterial(contact) {
     let data = {};
@@ -3144,7 +3145,11 @@ ${rerollRule}
     panel.querySelector('[data-offline-length]').value = String(session.replyLength || 500);
     panel.querySelector('[data-offline-user-person]').value = session.userPerson || '我';
     panel.querySelector('[data-offline-character-person]').value = session.characterPerson || '我';
-    panel.querySelector('[data-offline-preset]').value = session.replyPreset || '保持自然、细腻、有现场感的表达，结合角色性格回应，不要机械复述。';
+    const presetSelect = panel.querySelector('[data-offline-preset-select]');
+    if (presetSelect) presetSelect.value = session.replyPresetId || 'default';
+    const presetInput = panel.querySelector('[data-offline-preset]');
+    if (presetInput) presetInput.value = presetSelect?.value === 'default' ? '' : (session.replyPreset || '');
+    syncOfflinePresetField(panel);
     const style = offlineWritingStyle(session);
     const styleSelect = panel.querySelector('[data-offline-style]');
     const styleDetail = panel.querySelector('[data-offline-style-detail]');
@@ -3216,7 +3221,7 @@ ${rerollRule}
     const rowStyle = 'box-sizing:border-box;display:grid!important;align-items:stretch!important;gap:9px;width:100%!important;min-width:0!important;padding-left:0!important;padding-right:0!important';
     const fieldStyle = 'box-sizing:border-box;display:block!important;width:calc(100% - 8px)!important;min-width:calc(100% - 8px)!important;max-width:calc(100% - 8px)!important;margin-left:4px!important;margin-right:4px!important';
     const titleStyle = 'box-sizing:border-box;display:grid!important;width:100%!important;padding-left:13px!important;padding-right:13px!important';
-    return `<aside class="chat-offline-settings-panel chat-offline-v2-settings" data-offline-settings-panel hidden><header><div><span>MEETING PREFERENCES</span><h2>现场设置</h2></div><button type="button" data-offline-settings aria-label="关闭现场设置">×</button></header><p>这里的文风、字数、人称和回复提示词只影响本次线下见面。</p><section><label style="${rowStyle}"><span style="${titleStyle}"><b>角色回复字数</b><small>每次回复按设定字数上下浮动 100 字</small></span><input data-offline-length style="${fieldStyle}" type="number" min="50" max="3000" step="50" inputmode="numeric" value="${esc(String(session.replyLength || 500))}"></label><label style="${rowStyle}"><span style="${titleStyle}"><b>用户叙述人称</b><small>识别用户动作时使用</small></span><select data-offline-user-person style="${fieldStyle}">${personOptions(session.userPerson || '我')}</select></label><label style="${rowStyle}"><span style="${titleStyle}"><b>角色叙述人称</b><small>角色描述自己时使用</small></span><select data-offline-character-person style="${fieldStyle}">${personOptions(session.characterPerson || '我')}</select></label></section><label class="chat-offline-v2-preset" style="${rowStyle}"><span style="${titleStyle}"><b>角色回复提示词</b><small>默认显示完整模板；支持 {{char_name}} 等变量，发送前自动替换</small></span><textarea data-offline-preset style="${fieldStyle}" placeholder="填写角色回复规则……">${esc(preset)}</textarea></label><label class="chat-offline-v2-preset" style="${rowStyle}"><span style="${titleStyle}"><b>现场文风</b><small>沿用 if 时空文风，也可以自己增加</small></span><select data-offline-style style="${fieldStyle}">${offlineWritingStyleOptions(style.id)}</select><textarea data-offline-style-detail style="${fieldStyle}" maxlength="5000" placeholder="描述语言、节奏、对白和描写重点……">${esc(style.prompt)}</textarea><button type="button" class="chat-offline-style-new" data-offline-style-new>＋ 新建文风</button></label><section class="chat-offline-style-editor" data-offline-style-editor hidden><label>文风名称<input data-offline-style-name maxlength="24" placeholder="例如：冷冽电影感"></label><label>具体写作要求<textarea data-offline-style-prompt maxlength="5000" placeholder="描述用词、节奏、氛围、对白和叙事偏好……"></textarea></label><button type="button" data-offline-style-save>保存并使用</button></section><div class="chat-offline-v2-settings-note"><i></i><span>生成前会先读取世界书分析出的世界背景；没有分析结果时，再根据角色设定推断背景。之后才读取人设、字数、人称、文风和现场记录。</span></div><footer class="chat-offline-v2-settings-actions"><button type="button" data-offline-settings>取消</button><button type="button" data-offline-settings-save>保存设置</button></footer></aside>`;
+    return `<aside class="chat-offline-settings-panel chat-offline-v2-settings" data-offline-settings-panel hidden><header><div><span>MEETING PREFERENCES</span><h2>现场设置</h2></div><button type="button" data-offline-settings aria-label="关闭现场设置">×</button></header><p>这里的文风、字数、人称和回复提示词只影响本次线下见面。</p><section><label style="${rowStyle}"><span style="${titleStyle}"><b>角色回复字数</b><small>每次回复按设定字数上下浮动 100 字</small></span><input data-offline-length style="${fieldStyle}" type="number" min="50" max="3000" step="50" inputmode="numeric" value="${esc(String(session.replyLength || 500))}"></label><label style="${rowStyle}"><span style="${titleStyle}"><b>用户叙述人称</b><small>识别用户动作时使用</small></span><select data-offline-user-person style="${fieldStyle}">${personOptions(session.userPerson || '我')}</select></label><label style="${rowStyle}"><span style="${titleStyle}"><b>角色叙述人称</b><small>角色描述自己时使用</small></span><select data-offline-character-person style="${fieldStyle}">${personOptions(session.characterPerson || '我')}</select></label></section><label class="chat-offline-v2-preset" style="${rowStyle}"><span style="${titleStyle}"><b>角色回复提示词</b><small>系统默认规则不会展示；你可以新增并使用自己的提示词</small></span><textarea data-offline-preset style="${fieldStyle}" placeholder="填写角色回复规则……">${esc(preset)}</textarea></label><label class="chat-offline-v2-preset" style="${rowStyle}"><span style="${titleStyle}"><b>现场文风</b><small>沿用 if 时空文风，也可以自己增加</small></span><select data-offline-style style="${fieldStyle}">${offlineWritingStyleOptions(style.id)}</select><textarea data-offline-style-detail style="${fieldStyle}" maxlength="5000" placeholder="描述语言、节奏、对白和描写重点……">${esc(style.prompt)}</textarea><button type="button" class="chat-offline-style-new" data-offline-style-new>＋ 新建文风</button></label><section class="chat-offline-style-editor" data-offline-style-editor hidden><label>文风名称<input data-offline-style-name maxlength="24" placeholder="例如：冷冽电影感"></label><label>具体写作要求<textarea data-offline-style-prompt maxlength="5000" placeholder="描述用词、节奏、氛围、对白和叙事偏好……"></textarea></label><button type="button" data-offline-style-save>保存并使用</button></section><div class="chat-offline-v2-settings-note"><i></i><span>生成前会先读取世界书分析出的世界背景；没有分析结果时，再根据角色设定推断背景。之后才读取人设、字数、人称、文风和现场记录。</span></div><footer class="chat-offline-v2-settings-actions"><button type="button" data-offline-settings>取消</button><button type="button" data-offline-settings-save>保存设置</button></footer></aside>`;
   }
   const offlineSettingsPanelMarkup = offlineSettingsPanel;
   offlineSettingsPanel = session => offlineSettingsPanelMarkup(session).replace('上下浮动 100 字', '上下浮动 20%');
@@ -7460,6 +7465,7 @@ ${recentConversation}
       if (presetField) presetField.before(controls);
       else presetInput.before(controls);
     }
+    syncOfflinePresetField(document.querySelector('[data-chat-offline-modal] [data-offline-settings-panel]'));
   };
   document.addEventListener('pointerdown', event => {
     const article = event.target.closest?.('[data-chat-offline-modal] .offline-meeting-v2 [data-offline-message-index]');
@@ -7536,7 +7542,8 @@ ${recentConversation}
     const panel = event.target.closest('[data-offline-settings-panel]');
     const item = readOfflineReplyPresets().find(preset => preset.id === event.target.value);
     const input = panel?.querySelector('[data-offline-preset]');
-    if (input) input.value = item?.prompt || offlineDefaultReplyPreset;
+    if (input) input.value = item?.prompt || (event.target.value === 'session' ? input.value : '');
+    syncOfflinePresetField(panel);
   });
   function openOfflinePresetEditor(panel, item = null) {
     const editor = panel?.querySelector('[data-offline-preset-editor]');
@@ -7546,7 +7553,7 @@ ${recentConversation}
     if (!editor || !name || !prompt) return;
     editor.dataset.editId = item?.id || '';
     name.value = item?.name || '';
-    prompt.value = input?.value.trim() || item?.prompt || offlineDefaultReplyPreset;
+    prompt.value = item ? (input?.value.trim() || item.prompt) : '';
     editor.hidden = false;
     name.focus();
   }
@@ -8500,7 +8507,9 @@ ${recentConversation}
         if (parsed.parts.indexOf(part) < parsed.parts.length - 1) await waitForVideoCallMessage();
       }
       if (parsed.hangup && videoCallSession === session && session.status === 'connected') {
-        await finishVideoCall('character');
+        // 让用户有时间读完角色最后一条字幕，再由角色结束通话。
+        await new Promise(resolve => window.setTimeout(resolve, 4000));
+        if (videoCallSession === session && session.status === 'connected') await finishVideoCall('character');
         return;
       }
     } catch (error) {
