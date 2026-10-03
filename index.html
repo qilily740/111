@@ -150,17 +150,75 @@
       (async () => {
         try { await window.IdealMachineStorageReady; } catch {}
         const scripts = [...document.querySelectorAll('script[data-ideal-script]')];
-        for (const source of scripts) {
-          await new Promise(resolve => {
+        const beautySources = ['apps/ideal-beauty-registry.js?v=20260930-reexport-lock-2', 'apps/ideal-beauty-center.js?v=20261001-asset-info-height-2'];
+        const sourceHref = source => new URL(source, location.href).href;
+        const sourceByFile = new Map(scripts.map(source => [source.src.split('?')[0].split('/').pop(), source.src]));
+        const loadPromises = new Map();
+        const loadedSources = new Set();
+        const loadScript = source => {
+          const href = sourceHref(source);
+          if (loadPromises.has(href)) return loadPromises.get(href);
+          const promise = new Promise(resolve => {
             const script = document.createElement('script');
-            script.src = source.src;
-            script.onload = script.onerror = resolve;
+            script.src = href;
+            script.onload = () => { loadedSources.add(href); resolve(true); };
+            script.onerror = () => resolve(false);
             document.body.appendChild(script);
           });
-        }
-        for (const source of ['apps/ideal-beauty-registry.js?v=20260930-reexport-lock-2', 'apps/ideal-beauty-center.js?v=20261001-asset-info-height-2']) {
-          await new Promise(resolve => { const script = document.createElement('script'); script.src = source; script.onload = script.onerror = resolve; document.body.appendChild(script); });
-        }
+          loadPromises.set(href, promise);
+          return promise;
+        };
+        const file = name => sourceByFile.get(name) || '';
+        const appLoadPlans = {
+          shezhi: [file('shezhi.js')],
+          meihua: [file('meihua.js')],
+          shijieshu: [file('shijieshu.js')],
+          qinglvkongjian: [file('qinglvkongjian.js')],
+          liaotian: [file('memory-engine.js'), file('ta-groups.js'), file('liaotian.js')],
+          ta: [file('ta-groups.js'), file('ta.js')],
+          luntan: [file('luntan.js')],
+          bookapp: [file('tushu.js')],
+          xiangce: [file('xiangce.js')],
+          rili: [file('rili.js')],
+          jiyiku: [file('jiyiku.js')],
+          yinyue: [file('yinyue.js')],
+          doubao: [file('doubao.js')],
+          gouwu: [file('gouwu.js')],
+          ifshikong: [file('ifshikong.js')],
+          'creative-folder': [file('creative-folder.js')],
+          debate: [file('bianlun.js')],
+          fanfic: [file('tongrenwen.js')],
+          magazine: [file('zazhishe.js')],
+          ideal: beautySources
+        };
+        const pendingLaunches = new Map();
+        const validPlan = plan => plan.filter(Boolean);
+        const isReady = key => validPlan(appLoadPlans[key] || []).every(source => loadedSources.has(sourceHref(source)));
+        const replayPendingLaunch = async key => {
+          const plan = validPlan(appLoadPlans[key] || []);
+          if (!plan.length || isReady(key)) return;
+          for (const source of plan) await loadScript(source);
+          if (!isReady(key)) return;
+          const launcher = pendingLaunches.get(key);
+          pendingLaunches.delete(key);
+          if (launcher?.isConnected) launcher.click();
+        };
+        // Desktop layout becomes visible before every large App script finishes.
+        // Queue an early tap and replay it as soon as that App's own listener exists.
+        document.addEventListener('click', event => {
+          const launcher = event.target.closest?.('.app-item[data-app-key], .dock-item[data-app-key], .folder-app-item[data-app-key]');
+          const key = launcher?.dataset.appKey;
+          const plan = validPlan(appLoadPlans[key] || []);
+          if (!launcher || !plan.length || isReady(key)) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (!pendingLaunches.has(key)) {
+            pendingLaunches.set(key, launcher);
+            replayPendingLaunch(key);
+          }
+        }, true);
+        for (const source of scripts) await loadScript(source.src);
+        for (const source of beautySources) await loadScript(source);
       })();
     </script>
 </body>
