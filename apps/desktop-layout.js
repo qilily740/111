@@ -32,32 +32,34 @@
     { id:'widget-search', key:'search', name:'搜索条', description:'桌面搜索入口', selector:'.search-wrap', size:'wide', columns:4, rows:1, defaultHidden:true },
     { id:'widget-photos', key:'photos', name:'三联照片', description:'三张竖版照片', selector:'.photo-group', size:'photos', columns:4, rows:2, defaultHidden:true },
   ];
-  const defaultLayoutVersion = 7;
+  const defaultLayoutVersion = 11;
+  const defaultFolders = [
+    { id:'folder-entertainment', name:'娱乐', apps:['app-yinyue','app-gouwu'] }
+  ];
   const defaultPages = [
-    ['widget-profile','widget-polaroid-mini','app-liaotian','app-ta','app-luntan','app-ideal','app-xiangce','app-jiaocheng','app-rili'],
-    ['widget-mood','app-yinyue','app-doubao','app-gouwu','app-ifshikong','widget-relationship-mini','widget-time-photo'],
-    ['widget-chat','widget-image','app-jiyiku','app-creative-folder','widget-now']
+    ['widget-profile','widget-polaroid-mini','app-liaotian','app-ta','app-ideal','app-jiaocheng'],
+    ['widget-mood','folder-entertainment','app-xiangce','app-luntan','app-rili','widget-relationship-mini','widget-time-photo'],
+    ['widget-chat','widget-image','app-jiyiku','app-bookapp','app-doubao','app-creative-folder','widget-now']
   ];
   const defaultPositions = {
     'widget-profile':{ page:0, column:1, row:2 },
     'widget-polaroid-mini':{ page:0, column:1, row:4 },
     'app-liaotian':{ page:0, column:3, row:4 },
     'app-ta':{ page:0, column:4, row:4 },
-    'app-luntan':{ page:0, column:3, row:5 },
-    'app-ideal':{ page:0, column:2, row:6 },
-    'app-rili':{ page:0, column:4, row:5 },
-    'app-xiangce':{ page:0, column:3, row:6 },
-    'app-jiaocheng':{ page:0, column:4, row:6 },
+    'app-luntan':{ page:1, column:2, row:4 },
+    'app-ideal':{ page:0, column:3, row:5 },
+    'app-xiangce':{ page:1, column:2, row:3 },
+    'app-jiaocheng':{ page:0, column:4, row:5 },
     'widget-mood':{ page:1, column:1, row:1 },
-    'app-yinyue':{ page:1, column:1, row:3 },
-    'app-doubao':{ page:1, column:2, row:3 },
-    'app-gouwu':{ page:1, column:1, row:4 },
-    'app-ifshikong':{ page:1, column:2, row:4 },
+    'folder-entertainment':{ page:1, column:1, row:3 },
+    'app-doubao':{ page:2, column:3, row:4 },
+    'app-rili':{ page:1, column:1, row:4 },
     'widget-relationship-mini':{ page:1, column:3, row:3 },
     'widget-time-photo':{ page:1, column:1, row:5 },
     'widget-chat':{ page:2, column:1, row:1 },
     'widget-image':{ page:2, column:1, row:3 },
     'app-jiyiku':{ page:2, column:3, row:3 },
+    'app-bookapp':{ page:2, column:4, row:3 },
     'app-creative-folder':{ page:2, column:4, row:4 },
     'widget-now':{ page:2, column:1, row:5 }
   };
@@ -70,6 +72,7 @@
     if (shouldRestoreCurrentDefault) {
       state.pages = defaultPages.map(items => [...items]);
       state.positions = Object.fromEntries(Object.entries(defaultPositions).map(([id, position]) => [id, { ...position }]));
+      state.folders = defaultFolders.map(folder => ({ ...folder, apps:[...folder.apps] }));
       const shown = new Set(defaultPages.flat());
       state.hiddenWidgets = [...new Set([...(state.hiddenWidgets || []), 'widget-todo', 'widget-photos', 'widget-search'])].filter(id => !shown.has(id));
       state.pageOneTopSlots = true;
@@ -95,15 +98,53 @@
     }
     if (!(state.pages || []).flat().includes('app-xiangce')) {
       state.pages ||= [];
-      state.pages[0] ||= [];
-      state.pages[0].push('app-xiangce');
+      state.pages[1] ||= [];
+      state.pages[1].push('app-xiangce');
       state.positions ||= {};
       state.positions['app-xiangce'] = { ...defaultPositions['app-xiangce'] };
+    }
+    // 将图书从旧版第一页迁移到第三页，并放在记忆库右侧。
+    if (state.layoutVersion < 8) {
+      state.pages = (state.pages || []).map(list => list.filter(id => id !== 'app-bookapp'));
+      while (state.pages.length < defaultPages.length) state.pages.push([]);
+      state.pages[2].push('app-bookapp');
+      state.positions ||= {};
+      state.positions['app-bookapp'] = { ...defaultPositions['app-bookapp'] };
+    }
+    // 更新现有默认布局：if 时空进入创作文件夹，论坛替代其位置；
+    // 豆包移到第三页记忆库下方，相册替代豆包原位置；
+    // 音乐与购物合并为娱乐文件夹，日历、Ideal、教程按新的默认位置排列。
+    if (state.layoutVersion < defaultLayoutVersion) {
+      const entertainmentApps = new Set(['app-yinyue','app-gouwu']);
+      state.pages = (state.pages || []).map(list => list.filter(id => !['app-ifshikong','app-luntan','app-doubao','app-xiangce','app-yinyue','app-gouwu','app-rili','app-ideal','app-jiaocheng','folder-entertainment'].includes(id)));
+      while (state.pages.length < defaultPages.length) state.pages.push([]);
+      state.pages[1].push('app-luntan');
+      state.pages[1].push('app-xiangce');
+      state.pages[2].push('app-doubao');
+      state.pages[0].push('app-ideal');
+      state.pages[0].push('app-jiaocheng');
+      state.pages[1].push('folder-entertainment');
+      state.pages[1].push('app-rili');
+      state.folders = (Array.isArray(state.folders) ? state.folders : [])
+        .filter(folder => String(folder?.id || '') !== 'folder-entertainment')
+        .map(folder => ({ ...folder, apps:(Array.isArray(folder.apps) ? folder.apps : []).filter(id => !entertainmentApps.has(id)) }))
+        .filter(folder => folder.apps.length >= 2);
+      state.folders.push({ ...defaultFolders[0], apps:[...defaultFolders[0].apps] });
+      state.positions ||= {};
+      state.positions['app-luntan'] = { ...defaultPositions['app-luntan'] };
+      state.positions['app-xiangce'] = { ...defaultPositions['app-xiangce'] };
+      state.positions['app-doubao'] = { ...defaultPositions['app-doubao'] };
+      state.positions['app-ideal'] = { ...defaultPositions['app-ideal'] };
+      state.positions['app-jiaocheng'] = { ...defaultPositions['app-jiaocheng'] };
+      state.positions['folder-entertainment'] = { ...defaultPositions['folder-entertainment'] };
+      state.positions['app-rili'] = { ...defaultPositions['app-rili'] };
+      delete state.positions['app-ifshikong'];
+      saveCreativeApps([...readCreativeApps(), 'app-ifshikong']);
     }
     state.layoutVersion = defaultLayoutVersion;
   }
   // 新增的两个入口只放到桌面第一页；已有自定义布局也补入相册左右相邻位置。
-  const newDesktopAppPositions = { 'app-ideal':{ page:0, column:2, row:6 }, 'app-jiaocheng':{ page:0, column:4, row:6 } };
+  const newDesktopAppPositions = { 'app-ideal':{ page:0, column:3, row:5 }, 'app-jiaocheng':{ page:0, column:4, row:5 } };
   state.pages ||= [];
   state.pages[0] ||= [];
   state.positions ||= {};
