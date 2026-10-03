@@ -244,6 +244,28 @@
     return Object.fromEntries(new FormData(ensureRoot().querySelector('form')).entries());
   }
 
+  function registrationResultMayBeAmbiguous(error) {
+    return !Number.isFinite(error?.status)
+      || error.status >= 500
+      || ['discord_check_failed', 'DISCORD_CHECK_FAILED', 'AUTH_SERVICE_UNAVAILABLE'].includes(error?.code);
+  }
+
+  async function loginWithCredentials(username, password) {
+    const { response, payload } = await api('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const issuedToken = response.headers.get('set-auth-token');
+    if (!issuedToken) throw Object.assign(new Error('missing token'), { code: 'AUTH_SERVICE_UNAVAILABLE' });
+    setToken(issuedToken);
+    let authenticatedUser = payload?.user || null;
+    if (!authenticatedUser) authenticatedUser = (await api('/auth/session')).payload.user || null;
+    if (!authenticatedUser) throw Object.assign(new Error('missing authenticated user'), { code: 'AUTH_SERVICE_UNAVAILABLE' });
+    user = authenticatedUser;
+    publishAuthState();
+  }
+
   async function run(action) {
     if (busy) return;
     busy = true;
@@ -326,13 +348,36 @@
         publishAuthState();
       } else {
         if (!registrationTicket || !emailVerificationTicket) throw Object.assign(new Error('registration incomplete'), { code: 'EMAIL_VERIFICATION_TICKET_INVALID' });
-        const { response } = await api('/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ registrationTicket, emailVerificationTicket, email: verifiedEmail, username: values.username, password: values.password, passwordConfirmation: values.passwordConfirmation }) });
-        const issuedToken = response.headers.get('set-auth-token');
-        if (!issuedToken) throw Object.assign(new Error('missing token'), { code: 'AUTH_SERVICE_UNAVAILABLE' });
-        setToken(issuedToken);
-        const status = await api('/auth/session');
-        user = status.payload.user;
-        publishAuthState();
+        let registrationAccepted = false;
+        try {
+          const { response } = await api('/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ registrationTicket, emailVerificationTicket, email: verifiedEmail, username: values.username, password: values.password, passwordConfirmation: values.passwordConfirmation }) });
+          registrationAccepted = true;
+          const issuedToken = response.headers.get('set-auth-token');
+          if (!issuedToken) throw Object.assign(new Error('missing token'), { code: 'AUTH_SERVICE_UNAVAILABLE' });
+          setToken(issuedToken);
+          const status = await api('/auth/session');
+          user = status.payload.user || null;
+          if (!user) throw Object.assign(new Error('missing authenticated user'), { code: 'AUTH_SERVICE_UNAVAILABLE' });
+          publishAuthState();
+        } catch (registrationError) {
+          if (!registrationAccepted && !registrationResultMayBeAmbiguous(registrationError)) throw registrationError;
+
+          // The server may have created the account even if Discord verification,
+          // the response header, or the follow-up session request failed. Reconcile
+          // with the submitted credentials before telling the user registration failed.
+          let recovered = false;
+          for (let attempt = 0; attempt < 3 && !recovered; attempt += 1) {
+            if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 600));
+            try {
+              await loginWithCredentials(values.username, values.password);
+              recovered = true;
+            } catch {
+              setToken('');
+              user = null;
+            }
+          }
+          if (!recovered) throw registrationError;
+        }
       }
       message('登录成功。', 'success');
       render();

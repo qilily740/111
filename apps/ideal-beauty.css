@@ -115,12 +115,8 @@
   .ideal-beauty-page.is-asset-view .ideal-beauty-actions{gap:7px;padding-top:4px}
   .ideal-beauty-page.is-asset-view .ideal-beauty-actions .ideal-beauty-action{min-height:36px;padding:7px 10px;font-size:clamp(10px,2.1vw,12px)}
 }
-
-/* 详情信息收紧；美化码允许完整换行，底部四个操作等宽铺满。 */
-.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title{padding:0}
 .ideal-beauty-page.is-asset-view .ideal-beauty-asset-title .ideal-beauty-asset-category{margin-top:0;line-height:1.2}
 .ideal-beauty-page.is-asset-view .ideal-beauty-asset-title h2{margin:3px 0 2px;line-height:1.15;white-space:normal}
-.ideal-beauty-page.is-asset-view .ideal-beauty-asset-title p{line-height:1.25}
 .ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:12px;padding:6px 0;line-height:1.3}
 .ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline span{white-space:normal;overflow-wrap:anywhere;text-align:right;line-height:1.3}
 .ideal-beauty-page.is-asset-view .ideal-beauty-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(7px,1.6vw,14px);align-items:stretch}

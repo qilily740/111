@@ -5,8 +5,9 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const root = path.dirname(fileURLToPath(import.meta.url));
-const localBinary = path.join(root, '.tools', 'cloudflared');
+const serverRoot = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(serverRoot, '..');
+const localBinary = path.join(projectRoot, '.tools', 'cloudflared');
 const pageUrl = process.env.IDEAL_PUBLIC_PAGE_URL || 'https://qilily740.github.io/111/';
 
 async function executable() {
@@ -33,8 +34,8 @@ let authServer = null;
 if (await authServiceIsRunning()) {
   console.log('检测到 3211 登录服务已运行，将直接复用。');
 } else {
-  authServer = spawn(process.execPath, [path.join(root, 'music-auth-server.mjs')], {
-    cwd: root,
+  authServer = spawn(process.execPath, [path.join(serverRoot, 'music-auth-server.mjs')], {
+    cwd: projectRoot,
     env: process.env,
     stdio: ['inherit', 'pipe', 'pipe']
   });
@@ -43,7 +44,7 @@ if (await authServiceIsRunning()) {
 }
 
 const tunnel = spawn(await executable(), ['tunnel', '--no-autoupdate', '--protocol', 'http2', '--url', 'http://127.0.0.1:3211'], {
-  cwd: root,
+  cwd: projectRoot,
   env: process.env,
   stdio: ['inherit', 'pipe', 'pipe']
 });

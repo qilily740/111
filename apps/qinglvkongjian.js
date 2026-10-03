@@ -427,56 +427,7 @@
     gengniang:{ extra:[['船上的分工','王十八负责接近金家，舟人则能控制行船与停靠。两人的机会并不相同。'],['事后举止','庚娘暂时顺从，保留了接近仇人的机会；这一举动不能反推她参与了谋害。']], contradiction:{ prompt:'哪两条线索最能反驳“王十八独自作案”？', pairs:[[0,3],[1,4],[2,5]], answer:1, explain:'江心孤舟使舟人的配合成为关键；船上的分工说明王十八负责诱引、舟人掌控行船。' }, order:{ prompt:'把陷阱形成的经过排对：', options:['王十八邀约 → 同舟离岸 → 舟人配合杀机 → 庚娘隐忍伺机','同舟离岸 → 庚娘隐忍 → 王十八邀约 → 舟人配合','舟人配合 → 庚娘隐忍 → 王十八邀约'], answer:0, hint:'先有主动邀约，再有离岸后的控制。' } },
     paintedskin:{ extra:[['窥见真容','王生窥见狰狞之物描画人皮，并把画好的皮披回身上。'],['表象与实证','女子的自述只能说明她希望王生相信什么；亲眼所见的画皮才是决定性证据。']], contradiction:{ prompt:'哪两条线索最直接推翻“她只是逃难女子”的说法？', pairs:[[0,2],[1,3],[4,5]], answer:2, explain:'亲眼窥见画皮，再与女子的自述对照，才能辨明表象与真身。' }, order:{ prompt:'把王生发现真相的经过排对：', options:['收留女子 → 道士警告 → 窥探书斋 → 看见画皮','道士警告 → 看见画皮 → 收留女子','窥探书斋 → 收留女子 → 道士警告'], answer:0, hint:'王生先收留对方，后来才起疑窥探。' } }
   };
-  function mysteryClues(caseFile) { return [...caseFile.clues, ...legacyMysteryPuzzles[caseFile.id].extra]; }
-  function mysteryProgress(id) { const progress = state.mysteryCases?.[id]; return progress && typeof progress === 'object' ? progress : { viewed:[], solved:false, attempts:0 }; }
-  function mysteryMarkup(role) {
-    const person = esc(roleName(role));
-    const caseFile = mysteryCaseList().find(item => item.id === mysteryCaseId);
-    const header = `<header class="couple-mystery-header"><button data-mystery-back type="button" ${caseFile ? '' : 'hidden'} aria-label="返回案件列表">‹</button><div><small>ARCHIVE OF SECRETS</small><b>古籍悬案</b></div><button class="couple-game-api-button" data-couple-game-api type="button" aria-label="游戏 API 设置">API</button><button data-mystery-close type="button" aria-label="关闭游戏">×</button></header>`;
-    if (!caseFile) return `<section class="couple-mystery" role="dialog" aria-modal="true" aria-label="古籍悬案">${header}<main class="couple-mystery-main"><div class="couple-mystery-section-title"><b>待查案卷</b><small>${mysteryCases.filter(item => mysteryProgress(item.id).solved).length} / ${mysteryCases.length} 已破 · 左右滑动</small></div><div class="couple-mystery-case-list">${mysteryCases.map(item => { const progress = mysteryProgress(item.id); return `<button class="couple-mystery-case-card" data-mystery-case="${item.id}" type="button"><span class="couple-mystery-scroll-art" aria-hidden="true"><img src="assets/ui/game-covers/ancient-case-scroll-v1.webp" onerror="this.onerror=null;this.src='assets/ui/game-covers/ancient-case-scroll-v1.png'" alt="古代卷轴" draggable="false"><span class="couple-mystery-scroll-writing"><small>案 ${item.number} · ${esc(item.tag)}</small><b>${esc(item.title)}</b><i>${esc(item.source)}</i><em>${progress.solved ? '已破案 ✓' : progress.investigated?.length ? '继续查案' : '展开案卷'} →</em></span></span><span class="couple-mystery-closed-label"><small>案 ${item.number}</small><b>${esc(item.title)}</b><em>${progress.solved ? '已破案 ✓' : progress.investigated?.length ? '继续查案' : '点击展开'}</em></span></button>`; }).join('')}</div></main></section>`;
-    const progress = mysteryProgress(caseFile.id);
-    const clues = mysteryClues(caseFile);
-    const viewed = Array.isArray(progress.viewed) ? progress.viewed : [];
-    const selectedClue = clues.find((_, index) => String(index) === mysteryClueId);
-    const puzzle = legacyMysteryPuzzles[caseFile.id];
-    const ready = viewed.length >= clues.length;
-    const discussion = Array.isArray(progress.discussion) ? progress.discussion.slice(-5) : [];
-    const optionButtons = (items, action, selected, disabled = false) => `<div class="couple-mystery-options">${items.map((item,index) => `<button data-mystery-${action}="${index}" class="${selected === index ? 'is-selected' : ''}" type="button" ${disabled ? 'disabled' : ''}>${esc(item)}</button>`).join('')}</div>`;
-    const intro = !progress.introRead ? `<div class="couple-mystery-preface"><small>案 ${caseFile.number} · 前情提要</small><h2>${esc(caseFile.title)}</h2><p>${esc(caseFile.intro)}</p><button data-mystery-begin type="button">开始调查 →</button></div>` : '';
-    const clueSection = progress.introRead ? `<div class="couple-mystery-section-title"><b>调查取证</b><small>已阅 ${viewed.length}/${clues.length}</small></div><div class="couple-mystery-clues">${clues.map(([name], index) => `<button data-mystery-clue="${index}" class="${viewed.includes(index) ? 'is-viewed' : ''} ${mysteryClueId === String(index) ? 'is-selected' : ''}" type="button"><i>0${index + 1}</i><b>${esc(name)}</b><span>${viewed.includes(index) ? '已阅' : '未阅'}</span></button>`).join('')}</div>${selectedClue ? `<div class="couple-mystery-clue-detail"><small>线索 ${Number(mysteryClueId) + 1}</small><h3>${esc(selectedClue[0])}</h3><p>${esc(selectedClue[1])}</p></div>` : ''}` : '';
-    const discuss = progress.introRead ? `<div class="couple-mystery-discuss"><div class="couple-mystery-section-title"><b>与 ${person} 讨论</b><small>只讨论已读线索</small></div>${discussion.map(item => `<p class="couple-mystery-dialogue ${item.who === 'user' ? 'is-user' : ''}"><b>${item.who === 'user' ? '你' : person}</b>${esc(item.text)}</p>`).join('')}<div class="couple-mystery-compose"><input data-mystery-input type="text" maxlength="160" placeholder="说说你的怀疑或问 TA 一句…" value="${esc(mysteryDraft)}"><button data-mystery-talk type="button" ${mysteryBusy ? 'disabled' : ''}>${mysteryBusy ? '思考中…' : '发送'}</button></div>${mysteryFeedback && mysteryFeedback.startsWith('讨论') ? `<p class="couple-mystery-feedback">${esc(mysteryFeedback)}</p>` : ''}</div>` : '';
-    const contradiction = ready ? `<div class="couple-mystery-section-title"><b>第一步 · 指出矛盾</b><small>${progress.contradictionDone ? '已完成 ✓' : '选出关键证据'}</small></div><div class="couple-mystery-question"><h3>${esc(puzzle.contradiction.prompt)}</h3>${progress.contradictionDone ? `<p>${esc(puzzle.contradiction.explain)}</p>` : optionButtons(puzzle.contradiction.pairs.map(pair => pair.map(i => clues[i][0]).join(' ＋ ')), 'contradiction', mysteryChoice)}</div>` : '';
-    const order = progress.contradictionDone ? `<div class="couple-mystery-section-title"><b>第二步 · 还原经过</b><small>${progress.orderDone ? '已完成 ✓' : '按先后排序'}</small></div><div class="couple-mystery-question"><h3>${esc(puzzle.order.prompt)}</h3>${progress.orderDone ? '<p>事件顺序已确认。</p>' : optionButtons(puzzle.order.options, 'order', mysteryChoice)}</div>` : '';
-    const finalQuestion = progress.orderDone ? `<div class="couple-mystery-section-title"><b>第三步 · 提交真相</b><small>${progress.solved ? '已破案 ✓' : '最后判断'}</small></div><div class="couple-mystery-question"><h3>${esc(caseFile.question)}</h3>${progress.solved ? `<div class="couple-mystery-truth"><b>真相大白</b><p>${esc(caseFile.truth)}</p><a href="${esc(caseFile.url)}" target="_blank" rel="noopener noreferrer">阅读原典：${esc(caseFile.source)} ↗</a></div>` : `${optionButtons(caseFile.options, 'answer', mysteryChoice)}<button class="couple-mystery-submit" data-mystery-submit type="button" ${mysteryChoice >= 0 ? '' : 'disabled'}>提交最终推理</button>`}</div>` : '';
-    return `<section class="couple-mystery" role="dialog" aria-modal="true" aria-label="${esc(caseFile.title)}">${header}<main class="couple-mystery-main">${intro}${clueSection}${discuss}${contradiction}${order}${finalQuestion}${mysteryFeedback && !mysteryFeedback.startsWith('讨论') ? `<p class="couple-mystery-feedback" role="status">${esc(mysteryFeedback)}</p>` : ''}<p class="couple-mystery-source">据 ${esc(caseFile.source)} 改编；线索为游戏化整理。</p></main></section>`;
-  }
-  async function mysteryTalk() {
-    const caseFile = mysteryCases.find(item => item.id === mysteryCaseId);
-    const input = app.querySelector('[data-mystery-input]');
-    const message = String(input?.value || '').trim().slice(0, 160);
-    if (!caseFile || !message || mysteryBusy) return;
-    const roleId = store.contactId;
-    const requestId = ++mysteryRequest;
-    const progress = mysteryProgress(caseFile.id);
-    progress.discussion = Array.isArray(progress.discussion) ? progress.discussion : [];
-    progress.discussion.push({ who:'user', text:message });
-    progress.discussion = progress.discussion.slice(-12);
-    state.mysteryCases[caseFile.id] = progress;
-    mysteryDraft = ''; mysteryBusy = true; mysteryFeedback = ''; save(); render();
-    const clues = mysteryClues(caseFile);
-    const seen = (progress.viewed || []).filter(i => Number.isInteger(i) && clues[i]).map(i => `${clues[i][0]}：${clues[i][1]}`).join('\n');
-    try {
-      const reply = await requestCoupleAI(`你正与用户一起玩古籍悬案。案件：${caseFile.title}。前情：${caseFile.intro}\n玩家已读线索：\n${seen || '暂无'}\n已完成的阶段：${progress.contradictionDone ? '指出矛盾；' : ''}${progress.orderDone ? '还原经过；' : ''}${progress.solved ? '已破案' : '尚未破案'}。只依据前情与已读线索，以角色自身的语气回应玩家，1—3句。可以提出一个具体疑点或反问。禁止透露未读线索、标准答案、真凶和后续剧情；不确定时明确说只是猜测。`, `玩家说：${message}`, .65);
-      if (requestId !== mysteryRequest || !mysteryOpen || store.contactId !== roleId || mysteryCaseId !== caseFile.id) return;
-      const latest = mysteryProgress(caseFile.id);
-      latest.discussion ||= [];
-      latest.discussion.push({ who:'role', text:reply.slice(0, 280) });
-      latest.discussion = latest.discussion.slice(-12);
-      state.mysteryCases[caseFile.id] = latest; save();
-    } catch (error) {
-      if (requestId === mysteryRequest && store.contactId === roleId) mysteryFeedback = `讨论暂时失败：${error.message}`;
-    } finally { if (requestId === mysteryRequest) { mysteryBusy = false; render(); } }
-  }
+
   const stockDesserts = [
     { id:'rose-millefeuille', name:'玫瑰覆盆子千层', image:'assets/ui/game-items/stock-sort/stock-sort-item-01-rose-millefeuille.webp' },
     { id:'lychee-vanilla', name:'荔枝香草冰淇淋杯', image:'assets/ui/game-items/stock-sort/stock-sort-item-02-lychee-vanilla.webp' },

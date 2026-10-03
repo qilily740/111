@@ -5,7 +5,7 @@
 只有需要临时把本机旧版登录服务暴露给外网时，才运行：
 
 ```bash
-node start-public-music-auth.mjs
+node server/start-public-music-auth.mjs
 ```
 
 终端会输出一个“请在手机或其他网络打开”的 GitHub Pages 链接。该链接把本次临时 HTTPS 登录入口保存到浏览器，然后照常点击音乐 App 的“二维码登录”。

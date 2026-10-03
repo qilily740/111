@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const PORT = Number(process.env.IDEAL_NETEASE_RELAY_PORT || 3210);
 const ORIGIN = 'https://music.163.com';
-const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const headers = {
   Accept: 'application/json',
   'Content-Type': 'application/x-www-form-urlencoded',

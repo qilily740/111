@@ -3660,7 +3660,7 @@ body > .desktop-scroll-wrap {
 @media not all { .game-app { background:#202020; color:#eee; }.game-header { border-color:rgba(255,255,255,.12); background:rgba(32,32,32,.86); }.game-header button { background:rgba(255,255,255,.1); color:#ddd; }.game-hero,.game-board,.game-card,.game-interaction { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }.game-card { color:#eee; }.game-card i,.game-score button,.game-primary,.dice-result { background:#eee; color:#111; }.g2048 { background:#444; }.g2048 .tile,.gmatch button,.gpuzzle button,.gmemory button,.gmines button,.ggomoku button { background:rgba(255,255,255,.12); color:#eee; }.g2048 .t2 { background:#eee; color:#111; }.g2048 .t8,.g2048 .t16,.gmemory button.is-open,.gmines button.is-mine,.ggomoku button { background:#eee; color:#111; }.gsudoku input { border-color:#555; background:#333; color:#eee; }.gsudoku input:disabled { background:#555; }.gtetris { background:#444; }.gtetris button { background:#333; }.gtetris button.is-filled { background:#eee; }.game-options button,.date-plan select { border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.1); color:#eee; }.date-plan select { background:#333; }.joint-puzzle i { background:#444; }.joint-puzzle i.is-done { background:#eee; color:#111; }.game-result { color:#ddd; } }
 .gmatch button.is-selected { outline:2px solid #222; outline-offset:2px; }.gtetris button.is-active { background:#222; }.tetris-controls { display:flex; justify-content:center; gap:8px; margin-top:12px; }.tetris-controls button { width:42px; height:34px; border:0; border-radius:10px; background:#eee; color:#333; font:inherit; font-size:17px; cursor:pointer; }.tetris-controls button:last-child { background:#222; color:#fff; }
 @media not all { .gmatch button.is-selected { outline-color:#fff; }.gtetris button.is-active { background:#eee; }.tetris-controls button { background:rgba(255,255,255,.12); color:#eee; }.tetris-controls button:last-child { background:#eee; color:#111; } }
-.doubao-app { position:fixed; inset:0; z-index:30; display:none; background:#f5f5f7; color:#222; }.doubao-app.is-open { display:block; }.doubao-page { display:flex; flex-direction:column; height:100%; }.doubao-header { display:flex; align-items:flex-start; justify-content:space-between; padding:max(22px,env(safe-area-inset-top)) 22px 16px; border-bottom:1px solid rgba(0,0,0,.08); background:rgba(255,255,255,.86); -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px); }.doubao-header span,.doubao-welcome>span { color:#999; font-size:9px; font-weight:700; letter-spacing:.16em; }.doubao-header h1 { margin-top:6px; font-size:25px; letter-spacing:-.04em; }.doubao-header-actions { display:flex; align-items:center; gap:8px; }.doubao-header-actions button { border:0; cursor:pointer; }.doubao-header-actions button:first-child { min-height:30px; padding:0 10px; border-radius:9px; background:rgba(0,0,0,.06); color:#666; font:inherit; font-size:10px; }.doubao-header-actions button:last-child { width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,.07); color:#555; font-size:20px; }.doubao-main { flex:1; overflow-y:auto; padding:22px 20px 28px; }.doubao-welcome { max-width:520px; margin:0 auto 18px; padding:19px; border:1px solid rgba(0,0,0,.08); border-radius:20px; background:rgba(255,255,255,.72); }.doubao-welcome h2 { margin-top:7px; font-size:22px; }.doubao-welcome p { margin-top:7px; color:#999; font-size:11px; line-height:1.6; }.doubao-messages { display:grid; gap:10px; max-width:520px; margin:auto; }.doubao-message { max-width:82%; padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:16px; }.doubao-message span { display:block; margin-bottom:5px; color:#999; font-size:9px; letter-spacing:.08em; }.doubao-message p { font-size:12px; line-height:1.65; }.doubao-message.is-user { justify-self:end; border-color:#222; background:#222; color:#fff; }.doubao-message.is-user span { color:#bbb; }.doubao-message.is-assistant { justify-self:start; background:rgba(255,255,255,.78); }.doubao-loading { color:#999; }.doubao-composer { display:flex; align-items:flex-end; gap:8px; padding:10px 18px max(12px,env(safe-area-inset-bottom)); border-top:1px solid rgba(0,0,0,.08); background:rgba(255,255,255,.82); -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px); }.doubao-composer textarea { flex:1; min-height:42px; max-height:120px; padding:12px 13px; border:1px solid rgba(0,0,0,.1); border-radius:13px; outline:0; background:rgba(245,245,247,.85); color:#222; font:inherit; font-size:12px; resize:none; }.doubao-composer button { width:42px; height:42px; border:0; border-radius:13px; background:#222; color:#fff; font-size:22px; cursor:pointer; }
+.doubao-app { position:fixed; inset:0; z-index:30; display:none; background:#f5f5f7; color:#222; }.doubao-app.is-open { display:block; }.doubao-page { display:flex; flex-direction:column; height:100%; }.doubao-header { display:flex; align-items:flex-start; justify-content:space-between; padding:max(22px,env(safe-area-inset-top)) 22px 16px; border-bottom:1px solid rgba(0,0,0,.08); background:rgba(255,255,255,.86); -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px); }.doubao-header span,.doubao-welcome>span { color:#999; font-size:9px; font-weight:700; letter-spacing:.16em; }.doubao-header h1 { margin-top:6px; font-size:25px; letter-spacing:-.04em; }.doubao-header-actions { display:flex; align-items:center; gap:8px; }.doubao-header-actions button { border:0; cursor:pointer; }.doubao-header-actions button:first-child { min-height:30px; padding:0 10px; border-radius:9px; background:rgba(0,0,0,.06); color:#666; font:inherit; font-size:10px; }.doubao-header-actions button:last-child { width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,.07); color:#555; font-size:20px; }.doubao-main { flex:1; overflow-y:auto; padding:22px 20px 28px; }.doubao-welcome { max-width:520px; margin:0 auto 18px; padding:19px; border:1px solid rgba(0,0,0,.08); border-radius:20px; background:rgba(255,255,255,.72); }.doubao-welcome h2 { margin-top:7px; font-size:22px; }.doubao-welcome p { margin-top:7px; color:#999; font-size:11px; line-height:1.6; }.doubao-messages { display:grid; gap:10px; max-width:520px; margin:auto; }.doubao-message { max-width:82%; padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:16px; }.doubao-message span { display:block; margin-bottom:5px; color:#999; font-size:9px; letter-spacing:.08em; }.doubao-message p { font-size:12px; line-height:1.65; }.doubao-message.is-user { justify-self:end; border-color:#222; background:#222; color:#fff; }.doubao-message.is-user span { color:#bbb; }.doubao-message.is-assistant { justify-self:start; background:rgba(255,255,255,.78); }.doubao-composer { display:flex; align-items:flex-end; gap:8px; padding:10px 18px max(12px,env(safe-area-inset-bottom)); border-top:1px solid rgba(0,0,0,.08); background:rgba(255,255,255,.82); -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px); }.doubao-composer textarea { flex:1; min-height:42px; max-height:120px; padding:12px 13px; border:1px solid rgba(0,0,0,.1); border-radius:13px; outline:0; background:rgba(245,245,247,.85); color:#222; font:inherit; font-size:12px; resize:none; }.doubao-composer button { width:42px; height:42px; border:0; border-radius:13px; background:#222; color:#fff; font-size:22px; cursor:pointer; }
 @media not all { .doubao-app { background:#202020; color:#eee; }.doubao-header,.doubao-composer { border-color:rgba(255,255,255,.12); background:rgba(32,32,32,.86); }.doubao-header-actions button:first-child,.doubao-header-actions button:last-child { background:rgba(255,255,255,.1); color:#ddd; }.doubao-welcome,.doubao-message.is-assistant { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.07); }.doubao-message.is-user { border-color:#eee; background:#eee; color:#111; }.doubao-message.is-user span { color:#777; }.doubao-composer textarea { border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.08); color:#eee; }.doubao-composer button { background:#eee; color:#111; } }
 .doubao-app { background:linear-gradient(160deg,#fff7fb 0%,#f6f3ff 48%,#f1f7ff 100%); color:#282238; }
 .doubao-header { border-bottom-color:rgba(126,91,177,.1); background:rgba(255,255,255,.7); box-shadow:0 5px 22px rgba(107,78,151,.06); }
@@ -5152,7 +5152,7 @@ body > .desktop-scroll-wrap {
 .magazine-design-layout { display:grid; grid-template-columns:minmax(220px,.8fr) minmax(0,1fr); align-items:start; gap:16px; }.magazine-cover-stage { display:grid; place-items:center; padding:16px; border-radius:20px; background:#ddd6cb; }.magazine-cover { position:relative; width:min(100%,330px); aspect-ratio:3/4; overflow:hidden; border-radius:4px; background:var(--mag-cover,#d7c8bd); color:var(--mag-ink,#241f1c); box-shadow:0 14px 30px rgba(45,38,31,.2); }.magazine-cover-image { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }.magazine-cover-shade { position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.08),transparent 42%,rgba(0,0,0,.17)); mix-blend-mode:multiply; }.magazine-cover-copy { position:absolute; inset:0; display:grid; grid-template-columns:1fr auto; grid-template-rows:auto 1fr auto auto; gap:6px; padding:9% 8%; color:inherit; }.magazine-cover-copy span { font:700 8px Arial,sans-serif; letter-spacing:.22em; }.magazine-cover-copy small { font:italic 7px Georgia,serif; text-align:right; }.magazine-cover-copy h2 { grid-column:1/-1; align-self:end; font-family:"Songti SC","Noto Serif CJK SC",serif; font-size:clamp(25px,7vw,47px); line-height:1.05; letter-spacing:-.06em; text-shadow:0 1px 8px rgba(255,255,255,.2); }.magazine-cover-copy p { grid-column:1/-1; max-width:82%; font-size:8px; line-height:1.5; }.magazine-cover-settings { display:grid; gap:2px; margin:0; }.magazine-color-row { display:flex; align-items:center; flex-wrap:wrap; gap:7px; margin-top:13px; }.magazine-color-row b { margin-right:4px; color:#766e65; font-size:9px; }.magazine-color-row button { width:25px; height:25px; border:2px solid #fff; border-radius:50%; box-shadow:0 1px 5px rgba(0,0,0,.13); cursor:pointer; }.magazine-color-row button.is-active { outline:2px solid #a47555; outline-offset:2px; }.magazine-cover-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:14px; }.magazine-cover-actions label,.magazine-cover-actions button { display:grid; place-items:center; min-height:36px; margin:0; border:0; border-radius:10px; background:#e9e1d8; color:#6f5542; font:inherit; font-size:8px; cursor:pointer; }.magazine-cover-actions input { display:none; }.magazine-cover-actions button:last-child { grid-column:1/-1; background:transparent; color:#a0968d; }
 .magazine-reader { padding:20px 18px 60px; }.magazine-reader > .magazine-cover { width:min(92%,430px); margin:0 auto 24px; }.magazine-toc,.magazine-reading-page { margin-top:13px; padding:22px; border-radius:20px; background:rgba(255,255,255,.62); }.magazine-toc ol { margin-top:16px; list-style:none; }.magazine-toc li { display:grid; grid-template-columns:25px minmax(0,1fr) auto; gap:9px; padding:9px 0; border-top:1px solid rgba(60,49,39,.09); }.magazine-toc li span { color:#a17453; font:italic 9px Georgia,serif; }.magazine-toc li b { font-size:10px; }.magazine-toc li small { color:#9c9389; font-size:7px; }.magazine-reading-page header > span { color:#a17453; font-size:8px; font-weight:700; letter-spacing:.15em; }.magazine-reading-page h2 { margin-top:8px; font-family:"Songti SC","Noto Serif CJK SC",serif; font-size:24px; line-height:1.25; }.magazine-reading-page header p { margin-top:8px; color:#887f75; font-size:10px; line-height:1.55; }.magazine-reading-page > div { margin-top:18px; font-family:"Songti SC","Noto Serif CJK SC",serif; font-size:11px; line-height:2; }
 @media (max-width:600px) { .magazine-main { padding-right:14px; padding-left:14px; }.magazine-form-grid,.magazine-overview > div { grid-template-columns:1fr; gap:0; }.magazine-section-card { grid-template-columns:20px minmax(0,1fr); }.magazine-section-card aside { grid-column:2; grid-template-columns:repeat(3,1fr); align-items:center; }.magazine-interview-layout { grid-template-columns:1fr; }.magazine-interview-roles { display:flex; overflow-x:auto; }.magazine-interview-roles button { flex:0 0 112px; }.magazine-design-layout { grid-template-columns:1fr; }.magazine-cover-stage { padding:19px 36px; }.magazine-role-grid { grid-template-columns:1fr 1fr; } }
-@media not all { .magazine-app { background:#1e1d1b; color:#eeeae3; }.magazine-page { background:linear-gradient(155deg,#292722,#201f1c); }.magazine-header { border-color:rgba(255,255,255,.09); background:rgba(39,37,33,.9); }.magazine-header p,.magazine-panel-head p,.magazine-form-title p { color:#aaa39a; }.magazine-round-button { background:rgba(255,255,255,.09); color:#eee; }.magazine-tabs { border-color:rgba(255,255,255,.09); background:rgba(39,37,33,.92); }.magazine-form-card,.magazine-overview,.magazine-section-card,.magazine-article-editor,.magazine-cover-settings,.magazine-interview-room,.magazine-toc,.magazine-reading-page { border-color:rgba(255,255,255,.09); background:rgba(255,255,255,.07); }.magazine-form-card input,.magazine-form-card textarea,.magazine-form-card select,.magazine-overview input,.magazine-overview textarea,.magazine-overview select,.magazine-cover-settings input,.magazine-cover-settings textarea,.magazine-interview-form textarea,.magazine-article-editor textarea { border-color:rgba(255,255,255,.1); background:rgba(0,0,0,.18); color:#eee; }.magazine-role-choice,.magazine-section-card aside button,.magazine-cover-actions label,.magazine-cover-actions button,.magazine-participant-chips span,.magazine-interview-turn { background:rgba(255,255,255,.09); color:#e1d7ce; }.magazine-role-choice:has(input:checked),.magazine-interview-roles button.is-active { border-color:#b98965; background:rgba(176,126,89,.2); }.magazine-interview-roles button { background:rgba(255,255,255,.06); color:#eee; }.magazine-interview-room > header,.magazine-interview-form,.magazine-toc li,.magazine-participant-manager { border-color:rgba(255,255,255,.08); }.magazine-cover-stage { background:#34312c; }.magazine-empty,.magazine-empty-small { border-color:rgba(255,255,255,.13); } }
+@media not all { .magazine-app { background:#1e1d1b; color:#eeeae3; }.magazine-page { background:linear-gradient(155deg,#292722,#201f1c); }.magazine-header { border-color:rgba(255,255,255,.09); background:rgba(39,37,33,.9); }.magazine-header p,.magazine-panel-head p,.magazine-form-title p { color:#aaa39a; }.magazine-round-button { background:rgba(255,255,255,.09); color:#eee; }.magazine-tabs { border-color:rgba(255,255,255,.09); background:rgba(39,37,33,.92); }.magazine-form-card,.magazine-overview,.magazine-section-card,.magazine-article-editor,.magazine-cover-settings,.magazine-interview-room,.magazine-toc,.magazine-reading-page { border-color:rgba(255,255,255,.09); background:rgba(255,255,255,.07); }.magazine-form-card input,.magazine-form-card textarea,.magazine-form-card select,.magazine-overview input,.magazine-overview textarea,.magazine-overview select,.magazine-cover-settings input,.magazine-cover-settings textarea,.magazine-interview-form textarea,.magazine-article-editor textarea { border-color:rgba(255,255,255,.1); background:rgba(0,0,0,.18); color:#eee; }.magazine-role-choice,.magazine-section-card aside button,.magazine-cover-actions label,.magazine-cover-actions button,.magazine-participant-chips span,.magazine-interview-turn { background:rgba(255,255,255,.09); color:#e1d7ce; }.magazine-role-choice:has(input:checked),.magazine-interview-roles button.is-active { border-color:#b98965; background:rgba(176,126,89,.2); }.magazine-interview-room > header,.magazine-interview-form,.magazine-toc li,.magazine-participant-manager { border-color:rgba(255,255,255,.08); }.magazine-cover-stage { background:#34312c; }.magazine-empty,.magazine-empty-small { border-color:rgba(255,255,255,.13); } }
 
 /* 小组件库：现有组件使用桌面真实样式，库本身保持纯黑白界面。 */
 .desktop-widget-library { color:#111; }
@@ -6868,12 +6868,10 @@ html .ifspace-app .ifspace-detail .ifspace-world-card h2 { margin-top:24px; colo
   .magazine-interview-intro { background:linear-gradient(135deg,#171513,#30251f); }
   .magazine-interview-roles { border-color:rgba(255,255,255,.1); background:rgba(255,255,255,.04); }
   .magazine-interview-roles-label { border-color:rgba(255,255,255,.09); }
-  .magazine-interview-roles button.is-active { background:rgba(176,126,89,.2); }
   .magazine-interview-room { border-color:rgba(255,255,255,.1); background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04)); }
   .magazine-interview-room > header,.magazine-interview-form { border-color:rgba(255,255,255,.09); background:rgba(255,255,255,.04); }
   .magazine-interview-turn-body { border-color:rgba(255,255,255,.08); background:rgba(255,255,255,.09); }
   .magazine-interview-input { border-color:rgba(255,255,255,.1); background:rgba(0,0,0,.16); }
-  .magazine-interview-empty b { color:#e0c5ae; }
 }
 .magazine-background-job { display:flex; align-items:center; gap:10px; margin-bottom:14px; padding:11px 13px; border:1px solid rgba(159,111,78,.18); border-radius:14px; background:rgba(255,250,244,.68); color:#6d5544; }
 .magazine-background-job > i { display:grid; flex:0 0 25px; place-items:center; width:25px; height:25px; border-radius:50%; background:#ead7c8; color:#8c5e42; font-style:normal; font-size:12px; }
@@ -10720,52 +10718,23 @@ select,
 
 /* 群聊固定三列：左侧成员头像｜消息内容｜右侧用户头像。 */
 .chat-group-conversation .chat-message-line {
-  display:grid !important;
-  grid-template-columns:38px minmax(0,1fr) 38px;
   column-gap:8px;
-  align-items:start !important;
-  width:100%;
 }
-.chat-group-conversation .chat-message.is-character .chat-message-avatar { grid-column:1; }
-.chat-group-conversation .chat-message.is-character .chat-group-message-content { grid-column:2; }
-.chat-group-conversation .chat-message.is-character .chat-message-line > small { grid-column:3; justify-self:start; }
-.chat-group-conversation .chat-message.is-user .chat-message-avatar { grid-column:3; grid-row:1; }
-.chat-group-conversation .chat-message.is-user .chat-group-message-content { grid-column:2; grid-row:1; }
-.chat-group-conversation .chat-message.is-user .chat-message-line > small { grid-column:1; grid-row:1; justify-self:end; }
 .chat-group-conversation .chat-group-message-content {
-  display:grid;
-  width:100%;
-  min-width:0;
-  max-width:none;
   gap:4px;
 }
 .chat-group-conversation .chat-message.is-character .chat-group-message-content { justify-items:start; }
 .chat-group-conversation .chat-message.is-user .chat-group-message-content { justify-items:end; }
-.chat-group-conversation .chat-group-message-content > .chat-bubble {
-  width:max-content;
-  max-width:100%;
-}
 .chat-group-conversation .chat-message-line > small {
-  align-self:end;
   margin:0 0 4px;
   white-space:nowrap;
 }
 
 /* 群聊沿用单聊消息行：整条消息限宽，群聊只增加昵称层。 */
-.chat-group-conversation .chat-message {
-  display:flex !important;
-  width:82% !important;
-  max-width:82% !important;
-}
 .chat-group-conversation .chat-message.is-character { align-items:flex-start !important; margin-right:auto !important; }
 .chat-group-conversation .chat-message.is-user { align-items:flex-end !important; margin-left:auto !important; }
 .chat-group-conversation .chat-message-line {
-  display:flex !important;
-  grid-template-columns:none !important;
-  align-items:flex-start !important;
   gap:8px !important;
-  width:100% !important;
-  max-width:100% !important;
 }
 .chat-group-conversation .chat-message.is-user .chat-message-line { flex-direction:row-reverse !important; }
 .chat-group-conversation .chat-message .chat-message-avatar,
@@ -10775,27 +10744,11 @@ select,
   grid-row:auto !important;
 }
 .chat-group-conversation .chat-group-message-content {
-  display:flex !important;
   flex:1 1 0 !important;
-  flex-direction:column;
-  width:0 !important;
-  min-width:0 !important;
-  max-width:none !important;
   gap:4px;
-}
-.chat-group-conversation .chat-message.is-character .chat-group-message-content { align-items:flex-start; }
-.chat-group-conversation .chat-message.is-user .chat-group-message-content { align-items:flex-end; }
-.chat-group-conversation .chat-group-message-content > .chat-bubble {
-  box-sizing:border-box !important;
-  width:fit-content !important;
-  min-width:0 !important;
-  max-width:100% !important;
-  overflow-wrap:anywhere;
-  word-break:break-word;
 }
 .chat-group-conversation .chat-message-line > small {
   flex:0 0 auto !important;
-  align-self:flex-end !important;
   justify-self:auto !important;
   margin:0 0 4px !important;
 }
@@ -10822,26 +10775,10 @@ select,
   width:100% !important;
   max-width:100% !important;
 }
-.chat-group-conversation .chat-message.is-character .chat-message-avatar {
-  grid-column:1 !important;
-  grid-row:1 !important;
-}
-.chat-group-conversation .chat-message.is-character .chat-group-message-content {
-  grid-column:2 !important;
-  grid-row:1 !important;
-}
 .chat-group-conversation .chat-message.is-character .chat-message-line > small {
   grid-column:3 !important;
   grid-row:1 !important;
   justify-self:start !important;
-}
-.chat-group-conversation .chat-message.is-user .chat-message-avatar {
-  grid-column:3 !important;
-  grid-row:1 !important;
-}
-.chat-group-conversation .chat-message.is-user .chat-group-message-content {
-  grid-column:2 !important;
-  grid-row:1 !important;
 }
 .chat-group-conversation .chat-message.is-user .chat-message-line > small {
   grid-column:1 !important;
@@ -10849,15 +10786,8 @@ select,
   justify-self:end !important;
 }
 .chat-group-conversation .chat-group-message-content {
-  display:flex !important;
   flex:none !important;
-  flex-direction:column;
-  width:100% !important;
-  min-width:0 !important;
-  max-width:100% !important;
 }
-.chat-group-conversation .chat-message.is-character .chat-group-message-content { align-items:flex-start !important; }
-.chat-group-conversation .chat-message.is-user .chat-group-message-content { align-items:flex-end !important; }
 .chat-group-conversation .chat-group-message-content > .chat-bubble {
   display:block;
   box-sizing:border-box !important;
@@ -10876,30 +10806,13 @@ select,
 
 /* 群聊镜像布局：头像位固定，气泡自适应，时间戳保持在气泡外侧。 */
 .chat-group-conversation .chat-message-line {
-  display:grid !important;
-  grid-template-columns:38px minmax(0,1fr) 38px !important;
   column-gap:8px !important;
-  align-items:start !important;
-  width:100% !important;
-  max-width:100% !important;
-}
-.chat-group-conversation .chat-message.is-character .chat-message-avatar {
-  grid-column:1 !important;
-  grid-row:1 !important;
 }
 .chat-group-conversation .chat-message.is-character .chat-group-message-content {
-  grid-column:2 !important;
-  grid-row:1 !important;
-  align-items:flex-start !important;
-}
-.chat-group-conversation .chat-message.is-user .chat-message-avatar {
-  grid-column:3 !important;
   grid-row:1 !important;
 }
 .chat-group-conversation .chat-message.is-user .chat-group-message-content {
-  grid-column:2 !important;
   grid-row:1 !important;
-  align-items:flex-end !important;
 }
 .chat-group-conversation .chat-group-message-content {
   display:flex !important;
@@ -10942,7 +10855,6 @@ select,
   line-height:1;
   white-space:nowrap;
 }
-.chat-group-conversation .chat-message-line > small { display:none !important; }
 
 /* 群聊气泡宽度链路：父级占满双头像之间的轨道，气泡自身按内容收缩。 */
 .chat-group-conversation .chat-messages > .chat-message {
@@ -10958,15 +10870,9 @@ select,
 .chat-group-conversation .chat-message .chat-group-message-content {
   box-sizing:border-box;
   flex:none !important;
-  width:100% !important;
-  min-width:0 !important;
-  max-width:none !important;
 }
 .chat-group-conversation .chat-message .chat-group-bubble-row {
   box-sizing:border-box;
-  width:100% !important;
-  min-width:0 !important;
-  max-width:none !important;
 }
 .chat-group-conversation .chat-message .chat-group-bubble-row > .chat-bubble {
   box-sizing:border-box;
@@ -10990,8 +10896,8 @@ select,
   width:100% !important;
   max-width:100% !important;
 }
-.chat-group-conversation .chat-message.is-character .chat-message-avatar { grid-column:1 !important; grid-row:1 !important; }
-.chat-group-conversation .chat-message.is-user .chat-message-avatar { grid-column:3 !important; grid-row:1 !important; }
+.chat-group-conversation .chat-message.is-character .chat-message-avatar {  grid-row:1 !important; }
+.chat-group-conversation .chat-message.is-user .chat-message-avatar {  grid-row:1 !important; }
 .chat-group-conversation .chat-message .chat-group-message-content {
   grid-column:2 !important;
   grid-row:1 !important;
@@ -11078,20 +10984,10 @@ select,
   }
 }
 
-/* 聊天输入区整体上移一点，键盘弹出时继续沿用原有的自适应抬升。 */
-.chat-conversation > .chat-compose-wrap .chat-compose {
-  transform:translateY(-8px);
-}
-
-/* 底部输入区加高：上方留出呼吸空间，输入行整体再上移。 */
+/* 输入区内边距；最终高度和位移统一在下方微调规则中设置。 */
 .chat-conversation > .chat-compose-wrap {
-  flex-basis:112px !important;
-  height:112px !important;
   padding-top:20px !important;
   padding-bottom:8px !important;
-}
-.chat-conversation > .chat-compose-wrap .chat-compose {
-  transform:translateY(-14px);
 }
 
 /* 底部输入区毛玻璃层。 */
