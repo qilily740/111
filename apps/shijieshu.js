@@ -3,6 +3,7 @@
   const analysisStorageKey = 'ideal-machine-worldbook-analyses';
   const chatStorageKey = 'ideal-machine-chat';
   const taNpcStorageKey = 'ideal-machine-ta-npcs';
+  const sillyTavernUnlockKey = 'ideal-machine-worldbook-sillytavern-unlocked';
   const categories = { global: '全局世界书', local: '局部世界书', forum: '论坛世界书' };
   const data = (() => { try { const value = JSON.parse(localStorage.getItem(storageKey) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; } })();
   Object.keys(categories).forEach(key => {
@@ -23,15 +24,21 @@
   let analysisResult = null;
   let selectedAnalysisNpc = '';
   let apiHint = '';
+  let sillyTavernUnlocked = localStorage.getItem(sillyTavernUnlockKey) === '1';
 
   const app = document.createElement('div');
   app.className = 'worldbook-app';
-  app.innerHTML = `<div class="worldbook-page"><header class="worldbook-header"><div><div class="worldbook-kicker">KNOWLEDGE SYSTEM</div><h1>世界书</h1><p>将设定、关系与秩序，安静地收纳在一起。</p></div><button class="worldbook-close" data-world-close type="button">×</button></header><nav class="worldbook-tabs" aria-label="世界书分类">${Object.entries(categories).map(([key, label]) => `<button data-world-category="${key}" type="button">${label}</button>`).join('')}</nav><main class="worldbook-main"><section class="worldbook-books"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">LIBRARIES</span><h2 id="worldbookCategoryTitle"></h2></div><div class="worldbook-library-actions"><button class="worldbook-import-book" data-world-import-book type="button">导入</button><button class="worldbook-add-book" data-world-add-book type="button">＋ 新建</button></div></div><div class="worldbook-book-list" id="worldbookBookList"></div></section><section class="worldbook-entries"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">ENTRIES</span><h2 id="worldbookBookTitle">选择一本世界书</h2></div><div class="worldbook-entry-actions"><button class="worldbook-view-analysis" data-world-view-analysis type="button" hidden>查看世界</button><button class="worldbook-analyze" data-world-analyze type="button">AI 分析</button><div class="worldbook-entry-actions-stack"><button class="worldbook-add-entry" data-world-add-entry type="button">＋ 条目</button><button class="worldbook-scroll-top" data-world-scroll-top type="button">↑ 回顶</button></div></div><small class="worldbook-api-hint" id="worldbookApiHint"></small></div><div class="worldbook-entry-list" id="worldbookEntryList"></div><section class="worldbook-analysis" id="worldbookAnalysis" hidden></section></section></main></div><section class="worldbook-analysis-page" id="worldbookAnalysisPage" aria-hidden="true"></section><div class="world-editor" id="worldEditor" aria-hidden="true"><div class="world-editor-backdrop" data-world-editor-close></div><section class="world-editor-sheet"><div class="world-editor-head"><div><span class="worldbook-eyebrow">EDIT</span><h2 id="worldEditorTitle">编辑世界书</h2></div><button type="button" data-world-editor-close>×</button></div><div id="worldEditorForm"></div><div class="world-editor-actions"><button type="button" class="world-editor-cancel" data-world-editor-close>取消</button><button type="button" class="world-editor-save" data-world-editor-save>保存</button></div></section></div><input id="worldbookImportFile" type="file" accept=".json,.doc,.docx,.txt,application/json,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>`;
+  app.innerHTML = `<div class="worldbook-page"><header class="worldbook-header"><div><div class="worldbook-kicker">KNOWLEDGE SYSTEM</div><h1>世界书</h1><p>将设定、关系与秩序，安静地收纳在一起。</p></div><button class="worldbook-close" data-world-close type="button">×</button></header><nav class="worldbook-tabs" aria-label="世界书分类">${Object.entries(categories).map(([key, label]) => `<button data-world-category="${key}" type="button">${label}</button>`).join('')}</nav><main class="worldbook-main"><section class="worldbook-books"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">LIBRARIES</span><h2 id="worldbookCategoryTitle"></h2></div><div class="worldbook-library-actions"><button class="worldbook-import-book" data-world-import-book type="button">导入</button><button class="worldbook-add-book" data-world-add-book type="button">＋ 新建</button></div></div><div class="worldbook-book-list" id="worldbookBookList"></div></section><section class="worldbook-entries"><div class="worldbook-section-head"><div><span class="worldbook-eyebrow">ENTRIES</span><h2 id="worldbookBookTitle">选择一本世界书</h2></div><div class="worldbook-entry-actions"><button class="worldbook-view-analysis" data-world-view-analysis type="button" hidden>查看世界</button><button class="worldbook-analyze" data-world-analyze type="button">AI 分析</button><div class="worldbook-entry-actions-stack"><button class="worldbook-add-entry" data-world-add-entry type="button">＋ 条目</button><button class="worldbook-scroll-top" data-world-scroll-top type="button">↑ 回顶</button></div></div><small class="worldbook-api-hint" id="worldbookApiHint"></small></div><div class="worldbook-entry-list" id="worldbookEntryList"></div><section class="worldbook-analysis" id="worldbookAnalysis" hidden></section></section></main></div><section class="worldbook-analysis-page" id="worldbookAnalysisPage" aria-hidden="true"></section><div class="world-editor" id="worldEditor" aria-hidden="true"><div class="world-editor-backdrop" data-world-editor-close></div><section class="world-editor-sheet"><div class="world-editor-head"><div><span class="worldbook-eyebrow">EDIT</span><h2 id="worldEditorTitle">编辑世界书</h2></div><button type="button" data-world-editor-close>×</button></div><div id="worldEditorForm"></div><div class="world-editor-actions"><button type="button" class="world-editor-cancel" data-world-editor-close>取消</button><button type="button" class="world-editor-save" data-world-editor-save>保存</button></div></section></div><div class="world-import-choice" id="worldImportChoice" aria-hidden="true"><div class="world-import-choice-backdrop" data-world-import-choice-close></div><section class="world-import-choice-sheet" role="dialog" aria-modal="true" aria-labelledby="worldImportChoiceTitle"><div class="world-editor-head"><div><span class="worldbook-eyebrow">IMPORT</span><h2 id="worldImportChoiceTitle">导入世界书</h2></div><button type="button" data-world-import-choice-close>×</button></div><button class="world-import-choice-button" data-world-import-text type="button">导入 TXT / DOCX / DOC</button><button class="world-import-choice-button" data-world-import-sillytavern type="button">导入 SillyTavern 角色卡（JSON）</button><button class="world-import-choice-button" data-world-import-json type="button" hidden>导入 JSON 世界书</button><p class="world-import-choice-note" data-world-import-choice-note></p><button class="world-editor-cancel world-import-choice-cancel" data-world-import-choice-close type="button">取消</button></section></div><div class="world-import-choice world-entry-choice" id="worldEntryChoice" aria-hidden="true"><div class="world-import-choice-backdrop" data-world-entry-choice-close></div><section class="world-import-choice-sheet" role="dialog" aria-modal="true" aria-labelledby="worldEntryChoiceTitle"><div class="world-editor-head"><div><span class="worldbook-eyebrow">ENTRY</span><h2 id="worldEntryChoiceTitle">添加条目</h2></div><button type="button" data-world-entry-choice-close>×</button></div><button class="world-import-choice-button" data-world-entry-add type="button">添加</button><button class="world-import-choice-button" data-world-entry-import type="button">导入</button><p class="world-import-choice-note" data-world-entry-choice-note></p><button class="world-editor-cancel world-import-choice-cancel" data-world-entry-choice-close type="button">取消</button></section></div><input id="worldbookImportFile" type="file" accept=".doc,.docx,.txt,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" hidden><input id="worldbookSillyTavernFile" type="file" accept=".json,application/json" hidden><input id="worldbookJsonFile" type="file" accept=".json,application/json" hidden><input id="worldbookEntryImportFile" type="file" accept=".doc,.docx,.txt,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" hidden>`;
   document.body.appendChild(app);
+  app.querySelector('#worldImportChoice')?.remove();
+  app.querySelector('#worldbookSillyTavernFile')?.remove();
+  app.querySelector('#worldbookJsonFile')?.remove();
   const worldbookTabs = app.querySelector('.worldbook-tabs');
   const worldbookAddBook = app.querySelector('[data-world-add-book]');
   const worldbookImportBook = app.querySelector('[data-world-import-book]');
   const worldbookImportFile = app.querySelector('#worldbookImportFile');
+  const worldbookEntryImportFile = app.querySelector('#worldbookEntryImportFile');
+  if (worldbookEntryImportFile) worldbookEntryImportFile.multiple = true;
   const worldbookLibraryHead = app.querySelector('.worldbook-books > .worldbook-section-head');
   if (worldbookTabs && worldbookAddBook && worldbookLibraryHead) worldbookLibraryHead.querySelector('.worldbook-library-actions')?.append(worldbookImportBook, worldbookAddBook);
 
@@ -209,21 +216,15 @@
     const score = value => (String(value).match(/[\u4e00-\u9fff]/g) || []).length * 4 + (String(value).match(/[A-Za-z]{2,}/g) || []).join('').length;
     return [utf16, legacy, html, rtf].sort((first, second) => score(second) - score(first))[0].replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
   }
-  async function importWorldbookFile(file) {
-    if (!file) return;
-    const extension = String(file.name || '').toLowerCase().split('.').pop();
-    const name = importBaseName(file.name);
-    let importedBooks = [];
-    if (extension === 'json') {
-      const parsed = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
-      importedBooks = normalizeImportedBooks(parsed, name);
-    } else if (extension === 'docx') {
-      importedBooks = [textToImportedBook(await readDocxText(file), name)].filter(Boolean);
-    } else if (extension === 'doc') {
-      importedBooks = [textToImportedBook(readLegacyDocText(new Uint8Array(await file.arrayBuffer())), name)].filter(Boolean);
-    } else if (extension === 'txt') {
-      importedBooks = [textToImportedBook(await file.text(), name)].filter(Boolean);
-    } else throw new Error('仅支持 JSON、DOC、DOCX 和 TXT 文件。');
+  function updateImportChoices() {
+    const entryNote = app.querySelector('[data-world-entry-choice-note]');
+    if (entryNote) entryNote.textContent = sillyTavernUnlocked ? '支持 TXT、DOCX、DOC 和 JSON。' : '支持 TXT、DOCX 和 DOC；JSON 需先解锁。';
+    if (worldbookImportFile) worldbookImportFile.accept = sillyTavernUnlocked ? '.json,.doc,.docx,.txt,application/json,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document' : '.doc,.docx,.txt,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain';
+    if (worldbookEntryImportFile) worldbookEntryImportFile.accept = sillyTavernUnlocked ? '.json,.doc,.docx,.txt,application/json,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document' : '.doc,.docx,.txt,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain';
+  }
+  function openEntryChoice() { updateImportChoices(); app.querySelector('#worldEntryChoice')?.classList.add('is-open'); app.querySelector('#worldEntryChoice')?.setAttribute('aria-hidden', 'false'); }
+  function closeEntryChoice() { app.querySelector('#worldEntryChoice')?.classList.remove('is-open'); app.querySelector('#worldEntryChoice')?.setAttribute('aria-hidden', 'true'); }
+  function addImportedBooks(importedBooks, name) {
     importedBooks = importedBooks.filter(book => book?.entries?.length);
     if (!importedBooks.length) throw new Error('文件中没有识别到可导入的世界书条目。');
     syncStoredWorldbooks();
@@ -241,6 +242,74 @@
     window.dispatchEvent(new CustomEvent('ideal-worldbooks-updated'));
     render();
     window.alert(`已导入 ${created.length} 本世界书，共 ${created.reduce((sum, book) => sum + book.entries.length, 0)} 个条目。`);
+    return created;
+  }
+  async function importWorldbookFile(file) {
+    if (!file) return;
+    const extension = String(file.name || '').toLowerCase().split('.').pop();
+    const name = importBaseName(file.name);
+    let importedBooks = [];
+    if (extension === 'json') {
+      if (!sillyTavernUnlocked) throw new Error('请先导入 SillyTavern 角色卡以解锁 JSON 格式。');
+      const parsed = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
+      importedBooks = normalizeImportedBooks(parsed, name);
+    } else if (extension === 'docx') {
+      importedBooks = [textToImportedBook(await readDocxText(file), name)].filter(Boolean);
+    } else if (extension === 'doc') {
+      importedBooks = [textToImportedBook(readLegacyDocText(new Uint8Array(await file.arrayBuffer())), name)].filter(Boolean);
+    } else if (extension === 'txt') {
+      importedBooks = [textToImportedBook(await file.text(), name)].filter(Boolean);
+    } else throw new Error('仅支持 DOC、DOCX 和 TXT 文件；解锁后还支持 JSON。');
+    return addImportedBooks(importedBooks, name);
+  }
+  async function importEntryFile(file, options = {}) {
+    if (!file) return;
+    const book = activeBook();
+    if (!book) throw new Error('请先选择一本世界书。');
+    const extension = String(file.name || '').toLowerCase().split('.').pop();
+    const name = importBaseName(file.name);
+    let entries = [];
+    if (extension === 'json') {
+      if (!sillyTavernUnlocked) throw new Error('请先导入 SillyTavern 角色卡以解锁 JSON 条目导入。');
+      const parsed = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
+      entries = normalizeImportedBooks(parsed, name).flatMap(item => item.entries || []);
+    } else if (extension === 'docx') {
+      entries = textToImportedBook(await readDocxText(file), name)?.entries || [];
+    } else if (extension === 'doc') {
+      entries = textToImportedBook(readLegacyDocText(new Uint8Array(await file.arrayBuffer())), name)?.entries || [];
+    } else if (extension === 'txt') {
+      entries = textToImportedBook(await file.text(), name)?.entries || [];
+    } else throw new Error('仅支持 DOC、DOCX 和 TXT 文件；解锁后还支持 JSON。');
+    entries = entries.filter(entry => entry?.content);
+    if (!entries.length) throw new Error('文件中没有识别到可导入的条目。');
+    book.entries.push(...entries.map(entry => ({ ...entry, id:uid('entry'), name:String(entry.name || '世界书条目').trim(), content:String(entry.content || '').trim() })));
+    if (!options.silent) {
+      save();
+      window.dispatchEvent(new CustomEvent('ideal-worldbooks-updated'));
+      render();
+      window.alert(`已导入 ${entries.length} 个条目。`);
+    }
+    return entries.length;
+  }
+  async function importEntryFiles(files) {
+    const selectedFiles = Array.from(files || []).filter(Boolean);
+    if (!selectedFiles.length) return;
+    if (!activeBook()) throw new Error('请先选择一本世界书。');
+    let importedCount = 0;
+    const failedFiles = [];
+    for (const file of selectedFiles) {
+      try {
+        importedCount += await importEntryFile(file, { silent: true });
+      } catch (error) {
+        failedFiles.push({ file, error });
+      }
+    }
+    if (!importedCount) throw (failedFiles[0]?.error || new Error('文件中没有识别到可导入的条目。'));
+    save();
+    window.dispatchEvent(new CustomEvent('ideal-worldbooks-updated'));
+    render();
+    const failedMessage = failedFiles.length ? `\n${failedFiles.length} 个文件未导入。` : '';
+    window.alert(`已导入 ${importedCount} 个条目。${failedMessage}`);
   }
   function syncStoredWorldbooks() {
     try {
@@ -603,6 +672,18 @@ ${entries || '暂无启用条目'}`;
     try { await importWorldbookFile(file); }
     catch (error) { window.alert(`导入世界书失败：${error?.message || '文件无法读取'}`); }
   });
+  worldbookEntryImportFile?.addEventListener('change', async event => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length) return;
+    try { await importEntryFiles(files); }
+    catch (error) { window.alert(`导入世界书条目失败：${error?.message || '文件无法读取'}`); }
+  });
+  updateImportChoices();
+  window.addEventListener('ideal-worldbook-sillytavern-unlocked', () => {
+    sillyTavernUnlocked = true;
+    updateImportChoices();
+  });
 
   document.addEventListener('click', event => {
     if (event.target.closest('[data-app-key="shijieshu"]')) { syncStoredWorldbooks(); analysisOpen = false; selectedAnalysisNpc = ''; app.classList.add('is-open'); render(); return; }
@@ -612,7 +693,8 @@ ${entries || '暂无启用条目'}`;
     if (relationNpc) { showRelationshipDetail(relationNpc.dataset.worldRelationNpc); return; }
     if (event.target.closest('[data-world-analysis-back]')) { analysisOpen = false; selectedAnalysisNpc = ''; render(); return; }
     if (event.target.closest('[data-world-analysis-refresh]')) { analyzeBook(); return; }
-    if (event.target.closest('[data-world-close]')) { analysisOpen = false; app.classList.remove('is-open'); closeEditor(); return; }
+    if (event.target.closest('[data-world-close]')) { analysisOpen = false; app.classList.remove('is-open'); closeEditor(); closeEntryChoice(); return; }
+    if (event.target.closest('[data-world-entry-choice-close]')) { closeEntryChoice(); return; }
     const category = event.target.closest('[data-world-category]');
     if (category) { activeCategory = category.dataset.worldCategory; activeBookId = null; apiHint = ''; render(); return; }
     const bookButton = event.target.closest('[data-world-book]');
@@ -631,7 +713,7 @@ ${entries || '暂无启用条目'}`;
       return;
     }
     if (event.target.closest('[data-world-add-book]')) { activeBookId = null; openEditor('book'); return; }
-    if (event.target.closest('[data-world-import-book]')) { worldbookImportFile?.click(); return; }
+    if (event.target.closest('[data-world-import-book]')) { updateImportChoices(); worldbookImportFile?.click(); return; }
     if (event.target.closest('[data-world-scroll-top]')) {
       ['.worldbook-main', '.worldbook-books', '.worldbook-entries'].forEach(selector => {
         const target = app.querySelector(selector);
@@ -639,7 +721,9 @@ ${entries || '暂无启用条目'}`;
       });
       return;
     }
-    if (event.target.closest('[data-world-add-entry]')) { document.querySelector('#worldEditorForm').dataset.entryId = ''; openEditor('entry'); return; }
+    if (event.target.closest('[data-world-add-entry]')) { openEntryChoice(); return; }
+    if (event.target.closest('[data-world-entry-add]')) { closeEntryChoice(); document.querySelector('#worldEditorForm').dataset.entryId = ''; openEditor('entry'); return; }
+    if (event.target.closest('[data-world-entry-import]')) { closeEntryChoice(); updateImportChoices(); worldbookEntryImportFile?.click(); return; }
     if (event.target.closest('[data-world-view-analysis]')) { const cached = activeBookId ? readJSON(analysisStorageKey, {})[activeBookId] : null; if (cached) { analysisBookId = activeBookId; analysisResult = cached; analysisOpen = true; selectedAnalysisNpc = ''; render(); } return; }
     if (event.target.closest('[data-world-analyze]')) { analyzeBook(); return; }
     const toggleBook = event.target.closest('[data-world-toggle-book]');
