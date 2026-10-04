@@ -24,7 +24,9 @@
   let analysisResult = null;
   let selectedAnalysisNpc = '';
   let apiHint = '';
-  let sillyTavernUnlocked = localStorage.getItem(sillyTavernUnlockKey) === '1';
+  // JSON 世界书导入权限必须跟聊天 App 的酒馆角色卡激活状态保持一致。
+  // 本地标记只用于兼容旧版本，不作为权限来源，避免未解锁时被旧缓存放行。
+  let sillyTavernUnlocked = false;
 
   const app = document.createElement('div');
   app.className = 'worldbook-app';
@@ -222,6 +224,14 @@
     if (worldbookImportFile) worldbookImportFile.accept = sillyTavernUnlocked ? '.json,.doc,.docx,.txt,application/json,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document' : '.doc,.docx,.txt,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain';
     if (worldbookEntryImportFile) worldbookEntryImportFile.accept = sillyTavernUnlocked ? '.json,.doc,.docx,.txt,application/json,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document' : '.doc,.docx,.txt,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain';
   }
+  function syncSillyTavernUnlockState() {
+    const unlocked = Boolean(window.IdealMachineActivation?.isUnlocked?.());
+    sillyTavernUnlocked = unlocked;
+    // 激活状态是唯一权限来源；清理旧版本留下的孤立标记。
+    if (unlocked) localStorage.setItem(sillyTavernUnlockKey, '1');
+    else localStorage.removeItem(sillyTavernUnlockKey);
+    updateImportChoices();
+  }
   function openEntryChoice() { updateImportChoices(); app.querySelector('#worldEntryChoice')?.classList.add('is-open'); app.querySelector('#worldEntryChoice')?.setAttribute('aria-hidden', 'false'); }
   function closeEntryChoice() { app.querySelector('#worldEntryChoice')?.classList.remove('is-open'); app.querySelector('#worldEntryChoice')?.setAttribute('aria-hidden', 'true'); }
   function addImportedBooks(importedBooks, name) {
@@ -250,6 +260,7 @@
     const name = importBaseName(file.name);
     let importedBooks = [];
     if (extension === 'json') {
+      syncSillyTavernUnlockState();
       if (!sillyTavernUnlocked) throw new Error('请先导入 SillyTavern 角色卡以解锁 JSON 格式。');
       const parsed = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
       importedBooks = normalizeImportedBooks(parsed, name);
@@ -270,6 +281,7 @@
     const name = importBaseName(file.name);
     let entries = [];
     if (extension === 'json') {
+      syncSillyTavernUnlockState();
       if (!sillyTavernUnlocked) throw new Error('请先导入 SillyTavern 角色卡以解锁 JSON 条目导入。');
       const parsed = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
       entries = normalizeImportedBooks(parsed, name).flatMap(item => item.entries || []);
@@ -679,11 +691,10 @@ ${entries || '暂无启用条目'}`;
     try { await importEntryFiles(files); }
     catch (error) { window.alert(`导入世界书条目失败：${error?.message || '文件无法读取'}`); }
   });
-  updateImportChoices();
-  window.addEventListener('ideal-worldbook-sillytavern-unlocked', () => {
-    sillyTavernUnlocked = true;
-    updateImportChoices();
-  });
+  syncSillyTavernUnlockState();
+  window.addEventListener('ideal-machine-activation-ready', syncSillyTavernUnlockState);
+  window.addEventListener('ideal-machine-activation-changed', syncSillyTavernUnlockState);
+  window.addEventListener('ideal-worldbook-sillytavern-unlocked', syncSillyTavernUnlockState);
 
   document.addEventListener('click', event => {
     if (event.target.closest('[data-app-key="shijieshu"]')) { syncStoredWorldbooks(); analysisOpen = false; selectedAnalysisNpc = ''; app.classList.add('is-open'); render(); return; }
@@ -713,7 +724,7 @@ ${entries || '暂无启用条目'}`;
       return;
     }
     if (event.target.closest('[data-world-add-book]')) { activeBookId = null; openEditor('book'); return; }
-    if (event.target.closest('[data-world-import-book]')) { updateImportChoices(); worldbookImportFile?.click(); return; }
+    if (event.target.closest('[data-world-import-book]')) { syncSillyTavernUnlockState(); worldbookImportFile?.click(); return; }
     if (event.target.closest('[data-world-scroll-top]')) {
       ['.worldbook-main', '.worldbook-books', '.worldbook-entries'].forEach(selector => {
         const target = app.querySelector(selector);
@@ -723,7 +734,7 @@ ${entries || '暂无启用条目'}`;
     }
     if (event.target.closest('[data-world-add-entry]')) { openEntryChoice(); return; }
     if (event.target.closest('[data-world-entry-add]')) { closeEntryChoice(); document.querySelector('#worldEditorForm').dataset.entryId = ''; openEditor('entry'); return; }
-    if (event.target.closest('[data-world-entry-import]')) { closeEntryChoice(); updateImportChoices(); worldbookEntryImportFile?.click(); return; }
+    if (event.target.closest('[data-world-entry-import]')) { closeEntryChoice(); syncSillyTavernUnlockState(); worldbookEntryImportFile?.click(); return; }
     if (event.target.closest('[data-world-view-analysis]')) { const cached = activeBookId ? readJSON(analysisStorageKey, {})[activeBookId] : null; if (cached) { analysisBookId = activeBookId; analysisResult = cached; analysisOpen = true; selectedAnalysisNpc = ''; render(); } return; }
     if (event.target.closest('[data-world-analyze]')) { analyzeBook(); return; }
     const toggleBook = event.target.closest('[data-world-toggle-book]');

@@ -43,4 +43,5 @@
     if (event.target.closest('[data-activation-submit]')) verify();
   });
   window.IdealMachineActivation = { feature, deviceCode, isUnlocked, ensureUnlocked, open: render, getLicense: () => state.license || null };
+  window.dispatchEvent(new CustomEvent('ideal-machine-activation-ready', { detail: { unlocked: isUnlocked() } }));
 })();

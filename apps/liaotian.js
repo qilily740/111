@@ -1153,9 +1153,11 @@
     return id;
   }
   function unlockWorldbookJsonImport() {
-    if (localStorage.getItem(worldbookSillyTavernUnlockKey) === '1') return;
+    if (!window.IdealMachineActivation?.isUnlocked?.()) return false;
+    if (localStorage.getItem(worldbookSillyTavernUnlockKey) === '1') return true;
     localStorage.setItem(worldbookSillyTavernUnlockKey, '1');
     window.dispatchEvent(new CustomEvent('ideal-worldbook-sillytavern-unlocked'));
+    return true;
   }
   async function importSillyTavernCard() {
     if (!(await window.IdealMachineActivation?.ensureUnlocked?.())) return;
@@ -1461,6 +1463,8 @@ ${languageInstruction}
   document.addEventListener('click', event => { const button = event.target.closest?.('[data-chat-import-card]'); if (!button || event.target.closest?.('#chatCharacterCardFile') || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); document.querySelector('#chatCharacterCardFile')?.click(); }, true);
   document.addEventListener('click', event => { const button = event.target.closest?.('[data-chat-import-text]'); if (!button || event.target.closest?.('#chatCharacterTextFile') || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); document.querySelector('#chatCharacterTextFile')?.click(); }, true);
   document.addEventListener('click', async event => { const button = event.target.closest?.('[data-chat-card-unlock]'); if (!button || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); if (await window.IdealMachineActivation?.ensureUnlocked?.()) { unlockWorldbookJsonImport(); renderEditor(); } }, true);
+  window.addEventListener('ideal-machine-activation-ready', () => { if (window.IdealMachineActivation?.isUnlocked?.()) unlockWorldbookJsonImport(); });
+  window.addEventListener('ideal-machine-activation-changed', () => { if (window.IdealMachineActivation?.isUnlocked?.()) unlockWorldbookJsonImport(); if (editorMode) renderEditor(); });
   document.addEventListener('change', event => { const input = event.target.closest?.('#chatCharacterCardFile'); if (!input || !input.files?.[0] || !editorMode) return; event.preventDefault(); event.stopImmediatePropagation(); importSillyTavernCard(); }, true);
   document.addEventListener('change', event => { const input = event.target.closest?.('#chatCharacterTextFile'); if (!input || !input.files?.[0] || !editorMode) return; event.preventDefault(); event.stopImmediatePropagation(); importCharacterTextFile(); }, true);
   function parseSillyTavernCard(file) {
