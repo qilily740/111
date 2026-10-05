@@ -3774,8 +3774,15 @@ ${rerollRule}
     const chat = activeContact ? state.chats?.[activeContact] : null;
     const conversation = document.querySelector('.chat-conversation');
     const wallpaper = conversation ? String(chatSettingsFor(chat).wallpaper || '').trim() : '';
+    const currentVisibleWallpaper = () => {
+      const visibleConversation = document.querySelector('.chat-conversation');
+      if (!visibleConversation || !activeContact) return '';
+      return String(chatSettingsFor(state.chats?.[activeContact]).wallpaper || '').trim();
+    };
     const paint = imageSource => {
-      if (activeContact && String(chatSettingsFor(state.chats?.[activeContact]).wallpaper || '').trim() !== wallpaper) return;
+      // 角色选择不会在切换到联系人/朋友圈页时清空。只按仍然可见的
+      // 会话壁纸校验异步回调，避免旧聊天壁纸残留在整个 App 背景上。
+      if (currentVisibleWallpaper() !== wallpaper) return;
       chatWallpaperResolvedSource = wallpaper;
       chatWallpaperImageSource = String(imageSource || '');
       const visibleConversation = document.querySelector('.chat-conversation');
@@ -5301,6 +5308,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   const baseRenderWithChatContrast = render;
   render = function() {
     baseRenderWithChatContrast();
+    applyChatWallpaper();
     app.classList.toggle('is-message-editing', chatMessageEditMode);
     requestAnimationFrame(() => { updateChatDockContrast(); moveChatUnreadBadge(); });
   };
@@ -5431,7 +5439,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const value = String(text || '').trim();
     if (!value) return false;
     if (/(?:别|不要|不用|不想|禁止|别再).{0,8}(?:发|传|拍|晒|生成)?.{0,5}(?:图|照片|自拍|相片|一?张)/.test(value)) return false;
-    return /(?:发|传|拍|晒|生成|来|给我).{0,10}(?:图|照片|自拍|相片)|(?:图|照片|自拍|相片).{0,10}(?:发|传|拍|晒|生成|看看|看|给我)|(?:给我|让我|想|要|能不能|可不可以).{0,8}(?:看看|看).{0,10}(?:你|现在|那里|在干嘛|穿的|周围|图|照片|自拍|相片)|(?:发|传|拍|晒|来)(?:一)?张(?:你|自己|现在|给我|自拍|照片|图)/.test(value);
+    const specificRequest = /(?:发我|给我发|传我|给我传|拍给我|给我拍).{0,10}(?:(?:一|两)?张)?(?:图|照片|自拍|相片)|(?:发|传|拍|晒|生成|来|给我).{0,10}(?:图|照片|自拍|相片)|(?:图|照片|自拍|相片).{0,10}(?:发|传|拍|晒|生成|看看|看|给我)|(?:给我|让我|想|要|能不能|可不可以|可以).{0,8}(?:看看|看).{0,12}(?:你|现在|那里|在干嘛|穿的|周围|图|照片|自拍|相片)|(?:发|传|拍|晒|来)(?:一|两)?张(?:你|自己|现在|给我|自拍|照片|图)|(?:发|传|来)(?:张|个)(?:你的|你|自拍|照片|图片|图)/.test(value);
+    const mentionsImage = /图|照片|自拍|相片/.test(value);
+    const asksToShare = /发|传|拍|晒|生成|给我|想看|想要|要看|看看|发来|发下|给看看/.test(value);
+    return specificRequest || (mentionsImage && asksToShare);
   }
 
   function generatedConversationContext(chat, contact) {
@@ -5460,7 +5471,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       : `生成以下图片：${String(prompt || '').trim()}。采用自然的生活摄影质感，构图清晰自然。`;
     try {
       const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1 });
-      if (!result?.assetId) return false;
+      if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源');
       if (existingMessage) Object.assign(existingMessage, { text: result.assetId, generated: true, generatedPrompt: prompt, generatedImageLoading: false });
       else {
         const imageMessage = { id: uid('message'), text: result.assetId, role: 'character', type: 'image', generated: true, generatedPrompt: prompt, time: time() };
@@ -5662,7 +5673,13 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     finally { chatFetch = originalFetch; }
     if (requiredImage) {
       if (generatedImageMarkerCount > markerCountBeforeReply) await latestGeneratedImagePromise;
-      else await generateCharacterChatImage(latestUserMessage?.text || '根据当前聊天内容发送一张合适的图片', targetChat, contact);
+      else {
+        const request = String(latestUserMessage?.text || '').trim();
+        const fallbackPrompt = /自拍|自拍照|对镜|镜子/.test(request)
+          ? '角色本人自然的日常自拍，肩部以上取景，穿着完整得体的日常服装，表情自然，柔和自然光，生活照片质感，不含文字、水印或聊天界面。'
+          : `角色根据用户刚才的明确请求分享一张相关的日常照片：${request.replace(/^(?:请|麻烦|能不能|可不可以|可以)?\s*/, '').slice(0, 100)}。画面自然真实，不含文字、水印或聊天界面。`;
+        await generateCharacterChatImage(fallbackPrompt, targetChat, contact);
+      }
     }
     return result;
   };
@@ -5736,22 +5753,29 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const resolveAsset = window.IdealMachineGetImage || window.IdealMachineImageAPI?.resolveAsset;
     if (!resolveAsset) return;
     app.querySelectorAll('img[data-chat-image-asset], img[src^="idb:image:"]').forEach(image => {
-      if (image.dataset.generatedImageLoading) return;
+      if (image.dataset.generatedImageLoading === 'true') return;
       const assetId = image.dataset.chatImageAsset || image.getAttribute('src');
       image.dataset.generatedImageLoading = 'true';
       const messageId = image.closest('[data-chat-message-id]')?.dataset.chatMessageId;
       const message = currentChat()?.messages?.find(item => String(item?.id || '') === String(messageId || ''));
       if (message?.role !== 'user' && !message?.realImage && !message?.sticker) image.closest('.chat-bubble.image')?.classList.add('generated-image');
-      Promise.resolve(resolveAsset(assetId)).then(source => {
-        if (source && image.isConnected) image.src = source;
-        else if (image.isConnected) image.alt = '图片暂时无法显示';
-        delete image.dataset.chatImageAsset;
-        image.dataset.generatedImageLoading = 'false';
-      }).catch(() => {
-        if (image.isConnected) image.alt = '图片暂时无法显示';
-        delete image.dataset.chatImageAsset;
-        image.dataset.generatedImageLoading = 'false';
-      });
+      (async () => {
+        let source = '';
+        for (let attempt = 0; attempt < 3 && image.isConnected && !source; attempt += 1) {
+          if (attempt) await new Promise(resolve => setTimeout(resolve, 180 * attempt));
+          try { source = String(await resolveAsset(assetId) || '').trim(); } catch {}
+        }
+        if (!image.isConnected) return;
+        if (source) {
+          image.src = source;
+          delete image.dataset.chatImageAsset;
+        } else {
+          // 保留 IndexedDB key；之后重绘/重新进入聊天时可以再次尝试读取，
+          // 不要把一次暂时性读取失败变成永久丢失图片。
+          image.alt = '图片读取失败，稍后重试';
+        }
+        delete image.dataset.generatedImageLoading;
+      })();
     });
   }
 
