@@ -13657,13 +13657,22 @@ body:is(.ideal-keyboard-transition,.ideal-keyboard-open) {
   background-color:#f5f5f3 !important;
   background-image:none !important;
 }
+html:has(body:is(.ideal-keyboard-transition,.ideal-keyboard-open)) {
+  background-color:#f5f5f3 !important;
+  background-image:none !important;
+}
 body.ideal-keyboard-open .chat-app.is-open.is-chatting {
   top:0;
   right:0;
   bottom:auto;
   left:0;
   height:var(--ideal-app-height, var(--ideal-keyboard-viewport-height, 100dvh));
-  background:#f5f5f3;
+  background-color:#f5f5f3 !important;
+}
+body.ideal-keyboard-open .chat-app.is-open.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote {
+  background-color:#f5f5f3 !important;
+  -webkit-backdrop-filter:none !important;
+  backdrop-filter:none !important;
 }
 /* 键盘打开时，普通输入行与引用状态使用相同的 8px 底部间距。
    覆盖历史上的 96px 输入区和 -20px 上移，避免输入框悬在键盘上方。 */

@@ -5903,10 +5903,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       created.forEach(message => { message.unread = !viewingTargetChat; });
       if (created.length) save();
       if (viewingTargetChat) return result;
-      created.forEach(message => {
+      for (const message of created) {
         const preview = message?.type === 'image' ? (message.sticker ? `[表情包] ${message.stickerDescription || ''}`.trim() : '[图片]') : message?.type === 'voice' ? `[语音] ${message.text || ''}` : message?.type === 'location' ? `[位置] ${message.locationName || message.text || ''}` : message?.type === 'transfer' ? `[转账] ${message.note || ''}` : message?.text || String(text || '');
-        window.IdealMachineNotifications?.show?.({ contactId: targetContactId, name: targetContact.nickname || targetContact.name || '角色', avatar: targetContact.avatar || '', message: preview, messageId: message.id });
-      });
+        await window.IdealMachineNotifications?.show?.({ contactId: targetContactId, name: targetContact.nickname || targetContact.name || '角色', avatar: targetContact.avatar || '', message: preview, messageId: message.id });
+      }
     }
     return result;
   };
@@ -8068,7 +8068,7 @@ ${recentConversation}
       chat.messages.push(message);
       save();
       if (!viewingTargetChat) {
-        window.IdealMachineNotifications?.show?.({ contactId, name:contact?.nickname || contact?.name || '角色', avatar:contact?.avatar || '', message:message.text, messageId:message.id });
+        await window.IdealMachineNotifications?.show?.({ contactId, name:contact?.nickname || contact?.name || '角色', avatar:contact?.avatar || '', message:message.text, messageId:message.id });
       }
       if (activeContact === contactId && app.classList.contains('is-open')) render();
       await new Promise(resolve => setTimeout(resolve, 220));

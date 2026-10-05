@@ -152,7 +152,7 @@
     } catch { source = ''; }
     return source;
   }
-  const pushServiceWorkerVersion = '20261005-push-chain-2';
+  const pushServiceWorkerVersion = '20261005-push-chain-4';
   function pushApiBase() {
     const value = String(window.IdealMachineConfig?.pushApiBase || '').trim().replace(/\/$/, '');
     if (!value) return '';
@@ -168,20 +168,22 @@
     if (!api) throw new Error('推送服务地址未配置。');
     const request = window.IdealMachineFetch || window.fetch.bind(window);
     const stage = path === '/config' ? '读取推送服务配置' : path === '/subscribe' ? '上传设备订阅' : '发送云端通知';
-    let timer = null;
-    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${stage}超时，请检查手机网络后重试。`)), 30000); });
-    try { return await Promise.race([request(`${api}${path}`, { ...options, idealScope:'notifications' }), timeout]); }
-    finally { clearTimeout(timer); }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException(`${stage}超时`, 'TimeoutError')), 60000);
+    try {
+      return await request(`${api}${path}`, { ...options, signal:controller.signal, timeout:60000, idealScope:'notifications' });
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error(`${stage}超时（60 秒无响应）。请确认手机网络可访问推送服务后重试。`);
+      throw error;
+    } finally { clearTimeout(timer); }
   }
   async function pushServiceWorkerRegistration() {
     if (!('serviceWorker' in navigator)) throw new Error('当前浏览器不支持 Service Worker。');
     const localhost = /^(localhost|127\.0\.0\.1)$/i.test(location.hostname);
     if (location.protocol !== 'https:' && !(location.protocol === 'http:' && localhost)) throw new Error('当前 VS Code 预览地址不支持系统推送。请通过 HTTPS 网站或 http://localhost 打开理想机。');
-    let registration = await navigator.serviceWorker.getRegistration();
-    if (!registration) {
-      try { registration = await navigator.serviceWorker.register(`./sw.js?v=${pushServiceWorkerVersion}`, { updateViaCache:'none' }); }
-      catch (error) { throw new Error(`Service Worker 注册失败：${error.message}`); }
-    }
+    let registration;
+    try { registration = await navigator.serviceWorker.register(`./sw.js?v=${pushServiceWorkerVersion}`, { updateViaCache:'none' }); }
+    catch (error) { throw new Error(`Service Worker 注册失败：${error.message}`); }
     if (!registration) throw new Error('Service Worker 注册没有返回结果，请刷新页面后重试。');
     let readyTimer;
     try {
@@ -270,7 +272,19 @@
     notificationTimer = setTimeout(hideMessageNotification, 3000);
     return true;
   }
-  function showMessageNotification(payload = {}, force = false) { if (!force && !notificationsEnabled()) return false; const identity = notificationIdentity(payload); const pageVisible = document.visibilityState === 'visible' && !document.hidden; if (!pageVisible || force) { hideMessageNotification(); showSystemNotification(identity, force); return true; } return showInternalNotification(identity); }
+  let notificationDeliveryQueue = Promise.resolve();
+  function showMessageNotification(payload = {}, force = false) {
+    if (!force && !notificationsEnabled()) return Promise.resolve(false);
+    const deliver = async () => {
+      const identity = notificationIdentity(payload);
+      const pageVisible = document.visibilityState === 'visible' && !document.hidden;
+      if (!pageVisible || force) { hideMessageNotification(); return showSystemNotification(identity, force); }
+      return showInternalNotification(identity);
+    };
+    const pending = notificationDeliveryQueue.then(deliver, deliver);
+    notificationDeliveryQueue = pending.then(() => new Promise(resolve => setTimeout(resolve, 1200)), () => new Promise(resolve => setTimeout(resolve, 1200)));
+    return pending;
+  }
   notificationBanner.addEventListener('click', () => { const contactId = notificationTarget; hideMessageNotification(); if (contactId) window.dispatchEvent(new CustomEvent('ideal-machine-open-chat', { detail: { contactId } })); });
   window.IdealMachineNotifications = { show: showMessageNotification, showInternal: showInternalNotification, showSystem: showSystemNotification, requestPermission: requestSystemNotificationPermission, hide: hideMessageNotification, enabled: notificationsEnabled };
   window.IdealMachinePush = { subscribe: subscribeToSystemPush, clientId: pushClientId, apiBase: pushApiBase };
@@ -420,7 +434,7 @@
     if (select) { event.preventDefault(); event.stopImmediatePropagation(); switchProfile(select.dataset.settingsProfileSelect || ''); }
   });
   document.addEventListener('click', event => { if (!app.classList.contains('is-open')) return; const toggle = event.target.closest?.('[data-settings-vector-profile-toggle]'); if (toggle) { vectorProfileMenuOpen = !vectorProfileMenuOpen; const menu = document.querySelector('#settingsVectorProfileMenu'); if (menu) menu.hidden = !vectorProfileMenuOpen; return; } const remove = event.target.closest?.('[data-settings-vector-profile-delete]'); if (remove) { event.preventDefault(); event.stopImmediatePropagation(); deleteVectorProfile(remove.dataset.settingsVectorProfileDelete); return; } const select = event.target.closest?.('[data-settings-vector-profile-select]'); if (select) { event.preventDefault(); event.stopImmediatePropagation(); switchVectorProfile(select.dataset.settingsVectorProfileSelect); return; } if (event.target.closest('[data-settings-vector-new-profile]')) { vectorEditingProfileId = ''; vectorProfileMenuOpen = false; settings.vectorApi = { ...settings.vectorApi, endpoint:'', key:'', model:'', availableModels:[], activeProfileId:'' }; renderVectorSettings(); setVectorStatus('请输入新的向量 API 配置'); return; } if (event.target.closest('[data-settings-vector-fetch]')) { fetchVectorModels(); return; } if (event.target.closest('[data-settings-vector-test]')) { testVectorConnection(); return; } if (event.target.closest('[data-settings-vector-save]')) saveVectorSettings(true); });
-  document.addEventListener('click', event => { if (!app.classList.contains('is-open')) return; if (event.target.closest('[data-settings-notification-internal-test]')) { showInternalNotification({ name:'理想机', avatar:idealAppIcon(), message:'这是一条理想机内通知测试。' }); return; } if (!event.target.closest('[data-settings-notification-system-test]')) return; requestSystemNotificationPermission().then(async () => { const shown = await showSystemNotification({ name:'理想机', avatar:idealAppIcon(), message:'这是一条手机系统通知测试。', messageId:`test-${Date.now()}` }, true); if (!shown) window.alert('手机系统通知发送失败，请检查浏览器或手机系统是否允许通知。'); if (window.IdealMachineAuth?.isAuthenticated?.()) { setPushStatus('正在绑定当前账号…', 'busy'); subscribeToSystemPush().catch(error => { setPushStatus(error.message, 'error'); console.warn('[Ideal] 系统通知已测试，但云端订阅失败。', error); }); } else setPushStatus('系统通知测试通过；登录后才能启用云端推送', ''); }).catch(error => window.alert(error.message)); });
+  document.addEventListener('click', event => { if (!app.classList.contains('is-open')) return; if (event.target.closest('[data-settings-notification-internal-test]')) { showInternalNotification({ name:'理想机', avatar:idealAppIcon(), message:'这是一条理想机内通知测试。' }); return; } if (!event.target.closest('[data-settings-notification-system-test]')) return; requestSystemNotificationPermission().then(async () => { const shown = await showSystemNotification({ name:'理想机', avatar:idealAppIcon(), message:'这是一条手机系统通知测试。', messageId:`test-${Date.now()}` }, true); if (!shown) throw new Error('手机系统通知未能显示，请确认已将理想机添加到主屏幕并允许系统通知。'); if (window.IdealMachineAuth?.isAuthenticated?.()) { setPushStatus('本机通知已触发，正在同步云端订阅…', 'busy'); try { await subscribeToSystemPush(); } catch (error) { setPushStatus(`本机通知已触发；云端订阅失败：${error.message}`, 'error'); console.warn('[Ideal] 本机通知已测试，但云端订阅失败。', error); } } else setPushStatus('本机系统通知测试已触发；登录后才能启用云端推送', ''); }).catch(error => { setPushStatus(error.message, 'error'); window.alert(error.message); }); });
   document.addEventListener('change', event => { if (!app.classList.contains('is-open') || !event.target.matches('[data-settings-notification-toggle]')) return; const enabled = event.target.checked; settings.notifications = { ...(settings.notifications || {}), enabled }; saveSettings(); if (!enabled) { hideMessageNotification(); setPushStatus('已关闭', ''); return; } requestSystemNotificationPermission().then(() => { setPushStatus('正在绑定当前账号…', 'busy'); subscribeToSystemPush().catch(error => { setPushStatus(error.message, 'error'); console.warn('[Ideal] 系统通知可用，但云端推送订阅失败。', error); }); }).catch(error => { event.target.checked = false; settings.notifications = { ...(settings.notifications || {}), enabled:false }; saveSettings(); setPushStatus(error.message, 'error'); window.alert(error.message); }); });
   document.addEventListener('change', event => { if (!app.classList.contains('is-open') || !event.target.matches('[data-settings-keepalive-toggle]')) return; window.IdealMachineKeepAlive.setEnabled(event.target.checked); });
   document.addEventListener('change', event => { if (!app.classList.contains('is-open')) return; if (event.target.matches('[data-settings-model]')) { const model = event.target.dataset.settingsModel; const selected = new Set(settings.api.selected || []); event.target.checked ? selected.add(model) : selected.delete(model); settings.api.selected = [...selected]; renderModels(); } if (event.target.matches('[data-settings-assignment]')) { settings.api.assignments[event.target.dataset.settingsAssignment] = event.target.value; saveSettings(); } if (event.target.matches('#settingsImport') && event.target.files[0]) importData(event.target.files[0]); });
