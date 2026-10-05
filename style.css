@@ -13653,6 +13653,10 @@ body.ideal-keyboard-open > [data-chat-offline-modal].is-open {
    composer above iOS's visual keyboard viewport. Resize the app itself while
    the keyboard is open; the conversation flex layout then keeps its composer
    at the viewport bottom, including when a quote preview is present. */
+body:is(.ideal-keyboard-transition,.ideal-keyboard-open) {
+  background-color:#f5f5f3 !important;
+  background-image:none !important;
+}
 body.ideal-keyboard-open .chat-app.is-open.is-chatting {
   top:0;
   right:0;

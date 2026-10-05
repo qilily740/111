@@ -864,6 +864,7 @@
     const root = document.documentElement;
     let viewportSyncTimer = 0;
     let viewportSyncFrame = 0;
+    let chatKeyboardTransitionTimer = 0;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || !!window.navigator.standalone;
     const hasFocusedEditable = () => Boolean(document.activeElement?.matches?.('textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]), [contenteditable]:not([contenteditable="false"])'));
@@ -940,12 +941,24 @@
     window.visualViewport?.addEventListener('resize', scheduleSync);
     window.visualViewport?.addEventListener('scroll', scheduleSync);
     document.addEventListener('focusin', event => {
-      if (event.target?.matches?.('textarea, input, [contenteditable]:not([contenteditable="false"])')) scheduleSync();
+      if (!event.target?.matches?.('textarea, input, [contenteditable]:not([contenteditable="false"])')) return;
+      if (event.target.closest?.('.chat-app.is-open.is-chatting')) {
+        window.clearTimeout(chatKeyboardTransitionTimer);
+        document.body.classList.add('ideal-keyboard-transition');
+      }
+      scheduleSync();
     }, true);
     document.addEventListener('focusout', event => {
       if (!event.target?.matches?.('textarea, input, [contenteditable]:not([contenteditable="false"])')) return;
       window.setTimeout(scheduleSync, 0);
       window.setTimeout(scheduleSync, 160);
+      if (event.target.closest?.('.chat-app.is-chatting')) {
+        window.clearTimeout(chatKeyboardTransitionTimer);
+        chatKeyboardTransitionTimer = window.setTimeout(() => {
+          chatKeyboardTransitionTimer = 0;
+          if (!hasFocusedEditable()) document.body.classList.remove('ideal-keyboard-transition');
+        }, 500);
+      }
     }, true);
     sync();
     if (isIOS && isStandalone()) [120, 500, 1500, 3000].forEach(delay => window.setTimeout(sync, delay));
