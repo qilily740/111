@@ -479,7 +479,11 @@
         const current = Array.isArray(chat.thoughts) ? chat.thoughts : [];
         const merged = new Map(current.map(item => [String(item?.key || ''), item]));
         if (Array.isArray(cached?.thoughts)) cached.thoughts.forEach(item => { const key = String(item?.key || ''); const previous = merged.get(key); if (key && (!previous || Number(item.createdAt || 0) >= Number(previous.createdAt || 0))) merged.set(key, item); });
-        chat.thoughts = [...merged.values()];
+        chat.thoughts = [...merged.values()].map(item => ({
+          ...item,
+          text:cleanThoughtText(item?.text),
+          ...(item?.translation ? { translation:cleanThoughtText(item.translation) } : {})
+        })).filter(item => item.key && item.text);
         const messages = Array.isArray(chat.messages) ? chat.messages : [];
         const latestCharacter = messages.slice().reverse().find(message => message?.role !== 'user') || null;
         const latestCharacterKey = latestCharacter ? thoughtRoundKeyForMessage(chat, latestCharacter) : '';
@@ -492,8 +496,8 @@
         const latest = Number(chat.latestThoughtVersion || cached?.latestThoughtVersion || 0) >= 2
           ? (validStoredLatest || latestMessageRecord)
           : (legacyUnkeyedLatest ? null : (latestMessageRecord || (latestCharacterKey ? null : storedLatest) || (!latestCharacterKey ? chat.thoughts.slice().reverse().find(item => item?.text) : null)));
-        if (latest) {
-          chat.latestThought = { key:String(latest.key), text:cleanThoughtText(latest.text), ...(latest.translation ? { translation:cleanThoughtText(latest.translation) } : {}), createdAt:Number(latest.createdAt || 0) };
+        if (latest && cleanThoughtText(latest.text)) {
+          chat.latestThought = { key:String(latest.key), text:cleanThoughtText(latest.text), ...(latest.translation && cleanThoughtText(latest.translation) ? { translation:cleanThoughtText(latest.translation) } : {}), createdAt:Number(latest.createdAt || 0) };
           chat.latestThoughtKey = String(latest.key);
           chat.latestThoughtVersion = 2;
         } else if (latestCharacterKey) {
@@ -699,8 +703,17 @@
   }
   let chatViewRendering = false;
   let replyExecution = false;
+  let messageWriteContactId = '';
+  const chatUiActionContexts = [];
   const replyingContacts = new Set();
-  function currentContactId() { return backgroundReplyContactId || activeContact; }
+  function currentUiActionContactId() { return chatUiActionContexts[chatUiActionContexts.length - 1]?.contactId || ''; }
+  function withMessageWriteContact(contactId, callback) {
+    const previousContactId = messageWriteContactId;
+    messageWriteContactId = contactId || '';
+    try { return callback(); }
+    finally { messageWriteContactId = previousContactId; }
+  }
+  function currentContactId() { return messageWriteContactId || currentUiActionContactId() || backgroundReplyContactId || activeContact; }
   // `replying` is shared by the layered reply pipeline, while the user can
   // switch conversations during a background reply. UI state must therefore
   // be scoped to the conversation that owns the active request.
@@ -708,7 +721,18 @@
     if (taGroupContact(contactId)) return Boolean(contactId && replyingContacts.has(contactId));
     return Boolean(contactId && (replyingContacts.has(contactId) || (replying && (backgroundReplyContactId ? backgroundReplyContactId === contactId : contactId === activeContact))));
   }
-  function currentChat() { const contactId = chatViewRendering ? activeContact : (replyExecution ? currentContactId() : activeContact); if (!contactId) return null; state.chats[contactId] ||= { profileId: '', messages: [] }; return state.chats[contactId]; }
+  function currentChat() { const uiContactId = currentUiActionContactId(); const contactId = chatViewRendering ? activeContact : (messageWriteContactId || uiContactId || (replyExecution ? currentContactId() : activeContact)); if (!contactId) return null; state.chats[contactId] ||= { profileId: '', messages: [] }; return state.chats[contactId]; }
+  ['click', 'dblclick', 'change', 'input', 'submit', 'keydown', 'pointerup'].forEach(type => {
+    document.addEventListener(type, event => {
+      if (!app.classList.contains('is-open') || !activeContact || !app.contains(event.target)) return;
+      const context = { contactId:activeContact };
+      chatUiActionContexts.push(context);
+      queueMicrotask(() => {
+        const index = chatUiActionContexts.lastIndexOf(context);
+        if (index >= 0) chatUiActionContexts.splice(index, 1);
+      });
+    }, true);
+  });
   function chatUnreadCount(contactId) {
     const contact = state.contacts.find(item => item.id === contactId);
     const chat = state.chats?.[contactId];
@@ -1655,15 +1679,47 @@ ${languageInstruction}
     if (message.type === 'location') return `[位置] ${message.locationName || message.text || ''}`.trim();
     return String(message.text || '').replace(/\[\[[\s\S]*?\]\]/g, '').trim() || `[${message.type || '消息'}]`;
   }
-  function cleanThoughtText(value) { return String(value || '').replace(/^```[\s\S]*?\n|```$/g, '').replace(/^(?:心声|内心独白|角色心声)\s*[:：]\s*/i, '').replace(/\n{2,}/g, '\n').trim(); }
+  function cleanThoughtText(value) {
+    let text = String(value || '').replace(/^```[\s\S]*?\n|```$/g, '').replace(/^(?:心声|内心独白|角色心声)\s*[:：]\s*/i, '');
+    const nonThoughtContent = /\[\[\s*(?:MSG|IMAGE_PROMPT|STICKER|VOICE|VIDEO_CALL|VIDEO_HANGUP|TRANSFER(?:_ACCEPT|_RETURN)?|LOCATION|MUSIC|QUOTE|SHOPPING_PAID|TOGETHER)\b/i.exec(text);
+    if (nonThoughtContent) text = text.slice(0, nonThoughtContent.index);
+    return text.replace(/!\[[^\]]*\]\([^)]+\)/g, '').replace(/<img\b[^>]*>/ig, '').replace(/\[\[\s*\/?\s*THOUGHT\s*\]\]/ig, '').replace(/\n{2,}/g, '\n').trim();
+  }
+  function thoughtActionMarkers(value) {
+    return String(value || '').match(/\[\[(?:IMAGE_PROMPT\s*:[\s\S]*?|MUSIC\b[^\]]*|STICKER\s*:[^\]]*|VOICE\b[^\]]*|VIDEO_CALL\b[^\]]*|VIDEO_HANGUP\b[^\]]*|TRANSFER(?:_ACCEPT|_RETURN)?\b[^\]]*|LOCATION\b[^\]]*|SHOPPING_PAID\b[^\]]*|TOGETHER\b[^\]]*)\]\]/ig) || [];
+  }
   function extractCombinedThought(value) {
-    let source = String(value || '');
-    const match = source.match(/\[\[\s*THOUGHT\s*\]\]([\s\S]*?)(?:\[\[\s*\/\s*THOUGHT\s*\]\]|$)/i);
-    const thoughtParts = extractCharacterTranslation(match?.[1] || '');
+    const source = String(value || '');
+    const opening = /\[\[\s*THOUGHT\s*\]\]/i.exec(source);
+    if (!opening) return { reply:source.replace(/\[\[\s*\/\s*THOUGHT\s*\]\]/ig, '').trim(), thought:'', thoughtTranslation:'' };
+    const bodyStart = opening.index + opening[0].length;
+    const closingPattern = /\[\[\s*\/\s*THOUGHT\s*\]\]/ig;
+    closingPattern.lastIndex = bodyStart;
+    const closing = closingPattern.exec(source);
+    const prefix = source.slice(0, opening.index).trim();
+    if (!closing) {
+      // An unclosed thought block is malformed: never store its tail as a thought.
+      // Recover only explicitly marked chat/actions so image requests still work.
+      const malformedTail = source.slice(bodyStart);
+      const messageStart = /\[\[\s*MSG\s*\]\]/i.exec(malformedTail);
+      const recoveredMessages = messageStart ? malformedTail.slice(messageStart.index).replace(/\[\[\s*\/?\s*THOUGHT\s*\]\]/ig, '') : '';
+      const recoveredActions = messageStart ? [] : thoughtActionMarkers(malformedTail);
+      return { reply:[prefix, recoveredMessages, ...recoveredActions].filter(Boolean).join('\n').trim(), thought:'', thoughtTranslation:'' };
+    }
+    let thoughtSource = source.slice(bodyStart, closing.index);
+    let recoveredMessage = '';
+    const messageStart = /\[\[\s*MSG\s*\]\]/i.exec(thoughtSource);
+    if (messageStart) {
+      recoveredMessage = thoughtSource.slice(messageStart.index);
+      thoughtSource = thoughtSource.slice(0, messageStart.index);
+    }
+    const recoveredActions = thoughtActionMarkers(thoughtSource);
+    thoughtSource = thoughtSource.replace(/\[\[(?:IMAGE_PROMPT\s*:[\s\S]*?|MUSIC\b[^\]]*|STICKER\s*:[^\]]*|VOICE\b[^\]]*|VIDEO_CALL\b[^\]]*|VIDEO_HANGUP\b[^\]]*|TRANSFER(?:_ACCEPT|_RETURN)?\b[^\]]*|LOCATION\b[^\]]*|SHOPPING_PAID\b[^\]]*|TOGETHER\b[^\]]*)\]\]/ig, ' ');
+    const thoughtParts = extractCharacterTranslation(thoughtSource);
     const thought = cleanThoughtText(thoughtParts.text);
     const thoughtTranslation = cleanThoughtText(thoughtParts.translation);
-    if (match) source = source.replace(match[0], ' ').trim();
-    return { reply:source, thought, thoughtTranslation };
+    const suffix = source.slice(closing.index + closing[0].length).replace(/\[\[\s*\/?\s*THOUGHT\s*\]\]/ig, '').trim();
+    return { reply:[prefix, recoveredMessage, suffix, ...recoveredActions].filter(Boolean).join('\n').trim(), thought, thoughtTranslation };
   }
   async function saveCombinedThought(chat, value, translation = '', roundKey = '') {
     let text = cleanThoughtText(value);
@@ -2650,6 +2706,7 @@ ${rerollRule}
       if (message && message.role !== 'user' && chatSettingsFor(chat).thoughtEnabled !== false) {
         event.preventDefault();
         event.stopImmediatePropagation();
+        const thoughtContactId = activeContact;
         // 双击头像会先触发两次 click；延迟单击，等 dblclick 判断完成后再打开心声。
         if (event.detail > 1) {
           if (thoughtAvatarClickTimer) {
@@ -2661,8 +2718,8 @@ ${rerollRule}
         if (thoughtAvatarClickTimer) window.clearTimeout(thoughtAvatarClickTimer);
         thoughtAvatarClickTimer = window.setTimeout(() => {
           thoughtAvatarClickTimer = 0;
-          if (!app.classList.contains('is-open') || !avatar.isConnected) return;
-          const currentChatData = currentChat();
+          if (!app.classList.contains('is-open') || activeTab !== 'chat' || activeContact !== thoughtContactId || !avatar.isConnected) return;
+          const currentChatData = state.chats?.[thoughtContactId];
           if (!currentChatData || chatSettingsFor(currentChatData).thoughtEnabled === false) return;
           const currentMessage = (currentChatData.messages || []).find(item => String(item.id || '') === String(message.id || '')) || message;
           const currentThoughtKey = thoughtKeyForMessage(currentChatData, currentMessage);
@@ -5959,7 +6016,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     return chatSettingsFor(state.chats?.[contact.id]).internalNotificationEnabled !== false;
   };
   addMessage = async function(text, role = 'user', type = '', meta = {}) {
-    const targetContactId = role === 'character' && backgroundReplyContactId ? backgroundReplyContactId : activeContact;
+    const targetContactId = role === 'character' && backgroundReplyContactId ? backgroundReplyContactId : (messageWriteContactId || currentUiActionContactId() || activeContact);
     const targetContact = state.contacts.find(item => item.id === targetContactId);
     const targetChat = targetContactId ? state.chats[targetContactId] : null;
     const beforeLength = targetChat?.messages?.length || 0;
@@ -6790,21 +6847,12 @@ ${recentConversation}
   addMessage = async function(text, role = 'user', type = '', meta = {}) {
     const targetContactId = role === 'character' && backgroundReplyContactId ? backgroundReplyContactId : activeContact;
     if (!targetContactId || targetContactId === activeContact) return await addMessageBeforeBackgroundDelivery(text, role, type, meta);
-    const previousActiveContact = activeContact;
-    const previousRender = render;
     const previousDeliveryView = backgroundDeliveryView;
-    backgroundDeliveryView = { appOpen:app.classList.contains('is-open'), pageVisible:document.visibilityState === 'visible' && !document.hidden, activeTab, activeContact:previousActiveContact };
-    activeContact = targetContactId;
-    // Inner message handlers redraw after every split message. Suppress those
-    // redraws so the visible page never jumps to the background conversation.
-    render = function() {};
+    backgroundDeliveryView = { appOpen:app.classList.contains('is-open'), pageVisible:document.visibilityState === 'visible' && !document.hidden, activeTab, activeContact };
     try {
       return await addMessageBeforeBackgroundDelivery(text, role, type, meta);
     } finally {
-      render = previousRender;
-      activeContact = previousActiveContact;
       backgroundDeliveryView = previousDeliveryView;
-      if (app.classList.contains('is-open')) render();
     }
   };
 
@@ -6915,6 +6963,7 @@ ${recentConversation}
     event.stopImmediatePropagation();
     const input = event.target;
     const files = [...input.files];
+    const targetContactId = activeContact;
     input.value = '';
     try {
       let sentImage = false;
@@ -6922,7 +6971,7 @@ ${recentConversation}
         let source = window.IdealMachineReadImage ? await window.IdealMachineReadImage(file, 1280, .82) : await blobToDataUrl(file);
         if (!source) continue;
         if (window.IdealMachinePutImage) source = await window.IdealMachinePutImage(source);
-        await addMessage(source, 'user', 'image', { realImage: true, imageMimeType: file.type || 'image/jpeg', visionReadAt: 0 });
+        await withMessageWriteContact(targetContactId, () => addMessage(source, 'user', 'image', { realImage: true, imageMimeType: file.type || 'image/jpeg', visionReadAt: 0 }));
         sentImage = true;
       }
       if (!sentImage) throw new Error('图片读取失败');
@@ -8881,13 +8930,13 @@ ${recentConversation}
   addMessage = function(text, role = 'user', type = '', meta = {}) {
     // 异步角色回复必须沿用发起回复时锁定的联系人；用户等待期间即使
     // 切到群聊，也不能让当前页面抢走原单聊的消息。
-    const targetContactId = role === 'character' && backgroundReplyContactId ? backgroundReplyContactId : activeContact;
+    const targetContactId = role === 'character' && backgroundReplyContactId ? backgroundReplyContactId : (messageWriteContactId || currentUiActionContactId() || activeContact);
     const contact = taGroupContact(targetContactId);
-    if (!contact || !window.IdealMachineTaGroups?.appendMessage) return addMessageWithoutTaGroup(text, role, type, meta);
+    if (!contact || !window.IdealMachineTaGroups?.appendMessage) return withMessageWriteContact(targetContactId, () => addMessageWithoutTaGroup(text, role, type, meta));
     const chat = state.chats?.[targetContactId] || {};
     const profile = state.profiles.find(item => item.id === chat.profileId);
     const group = window.IdealMachineTaGroups.appendMessage(contact.taRoleId, contact.taGroupId, { ...meta, id:uid('message'), text, role, senderId:role === 'user' ? 'user' : (meta.senderId || contact.taRoleId), senderName:role === 'user' ? (profile?.nickname || profile?.realName || '我') : (meta.senderName || '角色'), senderAvatar:role === 'user' ? (profile?.avatar || '') : (meta.senderAvatar || ''), senderKind:role === 'user' ? 'user' : 'owner', type, time:time(), createdAt:Date.now() });
-    if (!group) return addMessageWithoutTaGroup(text, role, type, meta);
+    if (!group) return withMessageWriteContact(targetContactId, () => addMessageWithoutTaGroup(text, role, type, meta));
     state.chats[targetContactId] = { ...chat, messages:group.messages.map(message => ({ ...message, type:message.type || '' })) };
     save(); render();
     setTimeout(() => { const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = box.scrollHeight; }, 0);
@@ -9295,7 +9344,7 @@ ${recentConversation}
   // 回复结束后由 finally 的那次 render 一次性更新。
   const renderWithEmojiReplyGuard = render;
   render = function(...args) {
-    const keepEmojiPanel = emojiOpen && app.classList.contains('is-open') && activeTab === 'chat' && (replying || isContactReplying(activeContact));
+    const keepEmojiPanel = emojiOpen && app.classList.contains('is-open') && activeTab === 'chat' && isContactReplying(activeContact);
     if (keepEmojiPanel) return;
     return renderWithEmojiReplyGuard(...args);
   };
@@ -9369,9 +9418,15 @@ ${recentConversation}
   }
   const renderBeforeShoppingReceiptImages = render;
   render = function(...args) {
-    const result = renderBeforeShoppingReceiptImages(...args);
-    requestAnimationFrame(hydrateShoppingReceiptImages);
-    return result;
+    const previousChatViewRendering = chatViewRendering;
+    chatViewRendering = true;
+    try {
+      const result = renderBeforeShoppingReceiptImages(...args);
+      requestAnimationFrame(hydrateShoppingReceiptImages);
+      return result;
+    } finally {
+      chatViewRendering = previousChatViewRendering;
+    }
   };
   // 角色朋友圈自动活动：只在页面可运行时工作，不改变现有设置面板。
   // 生成使用独立请求和最小上下文，避免普通聊天再次读取朋友圈，也避免把朋友圈内容写回聊天记录。
