@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20261005-push-chain-4';
+const CACHE_NAME = 'ideal-machine-shell-v20261005-push-chain-5';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
@@ -17,15 +17,22 @@ self.addEventListener('activate', event => {
 self.addEventListener('push', event => {
   let payload = {};
   try { payload = event.data?.json?.() || {}; } catch { payload = { body: event.data?.text?.() || '' }; }
-  event.waitUntil(self.registration.showNotification(String(payload.title || 'Ideal'), {
-    body: String(payload.body || payload.message || '收到一条新消息'),
-    icon: payload.icon || './assets/icons/ideal-orbit-day.png',
-    badge: payload.badge || './assets/icons/ideal-orbit-day.png',
-    tag: String(payload.tag || `ideal-message-${Date.now()}-${Math.random().toString(36).slice(2)}`),
-    renotify: true,
-    timestamp: Number(payload.timestamp || Date.now()),
-    data: { ...(payload.data || {}), url: payload.url || payload.data?.url || './' }
-  }));
+  const messages = Array.isArray(payload.messages) && payload.messages.length
+    ? payload.messages
+    : [payload];
+  event.waitUntil((async () => {
+    for (const message of messages) {
+      await self.registration.showNotification(String(message.title || payload.title || 'Ideal'), {
+        body: String(message.body || message.message || payload.body || '收到一条新消息'),
+        icon: message.icon || payload.icon || './assets/icons/ideal-orbit-day.png',
+        badge: message.badge || payload.badge || './assets/icons/ideal-orbit-day.png',
+        tag: String(message.tag || payload.tag || `ideal-message-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+        renotify: true,
+        timestamp: Number(message.timestamp || payload.timestamp || Date.now()),
+        data: { ...(payload.data || {}), ...(message.data || {}), url: message.url || payload.url || payload.data?.url || './' }
+      });
+    }
+  })());
 });
 
 self.addEventListener('notificationclick', event => {

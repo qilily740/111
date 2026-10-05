@@ -152,7 +152,7 @@
     } catch { source = ''; }
     return source;
   }
-  const pushServiceWorkerVersion = '20261005-push-chain-4';
+  const pushServiceWorkerVersion = '20261005-push-chain-5';
   function pushApiBase() {
     const value = String(window.IdealMachineConfig?.pushApiBase || '').trim().replace(/\/$/, '');
     if (!value) return '';
@@ -221,7 +221,7 @@
     return true;
   }
   async function requestSystemNotificationPermission() { if (!('Notification' in window)) throw new Error('当前浏览器不支持系统通知。'); if (!window.isSecureContext && !/^(localhost|127\.0\.0\.1)$/i.test(location.hostname)) throw new Error('系统通知需要 HTTPS 或本机开发环境。'); const result = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission(); if (result !== 'granted') throw new Error('你没有允许 Ideal 发送系统通知。'); return result; }
-  async function showSystemNotification(payload = {}, force = false) {
+  async function showSystemNotification(payload = {}, force = false, skipCloud = false) {
     if (!force && !notificationsEnabled()) return false;
     if (!('Notification' in window) || Notification.permission !== 'granted') return false;
     const { contactId = '', message = '', messageId = '', groupId = '' } = payload;
@@ -229,7 +229,7 @@
     const title = identity.name || '新消息';
     const body = String(message || '收到一条新消息');
     const tag = `ideal-${groupId || contactId || 'chat'}-${messageId || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
-    if (!force && contactId && window.IdealMachineAuth?.isAuthenticated?.()) {
+    if (!skipCloud && !force && contactId && window.IdealMachineAuth?.isAuthenticated?.()) {
       try {
         const response = await pushRequest('/send', {
           method:'POST',
@@ -246,6 +246,47 @@
     const options = { body, icon:source, badge:source, tag, renotify:true, timestamp:Date.now(), data:{ contactId, messageId, groupId } };
     try { const registration = await pushServiceWorkerRegistration(); if (registration?.showNotification) { await registration.showNotification(title, options); return true; } } catch (error) { console.warn('[Ideal] Service Worker 通知失败。', error); }
     try { new Notification(title, options); return true; } catch (error) { console.warn('[Ideal] 浏览器通知失败。', error); return false; }
+  }
+  async function showSystemNotificationBatch(payload = {}) {
+    if (!notificationsEnabled()) return false;
+    const messages = (Array.isArray(payload.messages) ? payload.messages : []).map(item => ({
+      body:String(item?.message || item?.body || '').trim(),
+      messageId:String(item?.messageId || '')
+    })).filter(item => item.body);
+    if (!messages.length) return false;
+    const contactId = String(payload.contactId || '');
+    const identity = notificationIdentity({ ...payload, message:messages[0].body });
+    const pageVisible = document.visibilityState === 'visible' && !document.hidden;
+    if (pageVisible) {
+      for (const item of messages) await showMessageNotification({ ...identity, message:item.body, messageId:item.messageId, contactId });
+      return true;
+    }
+    if (contactId && window.IdealMachineAuth?.isAuthenticated?.()) {
+      try {
+        const icon = await resolveNotificationAvatar(identity.avatar) || idealAppIcon();
+        const response = await pushRequest('/send', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body:JSON.stringify({
+            title:identity.name || '新消息', contactId, icon, badge:icon,
+            url:`./?idealOpenChat=${encodeURIComponent(contactId)}`,
+            messages:messages.map(item => ({
+              body:item.body,
+              messageId:item.messageId,
+              tag:`ideal-${contactId}-${item.messageId || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
+            }))
+          })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (response.ok && Number(result.delivered) > 0) return true;
+        console.warn('[Ideal] 云端批量通知未送达。', result);
+      } catch (error) { console.warn('[Ideal] 云端批量通知发送失败，改用本机通知。', error); }
+    }
+    for (const item of messages) {
+      await showSystemNotification({ ...identity, message:item.body, messageId:item.messageId, contactId }, false, true);
+      await new Promise(resolve => setTimeout(resolve, 350));
+    }
+    return true;
   }
   function showInternalNotification(payload = {}) {
     const identity = notificationIdentity(payload);
@@ -286,7 +327,7 @@
     return pending;
   }
   notificationBanner.addEventListener('click', () => { const contactId = notificationTarget; hideMessageNotification(); if (contactId) window.dispatchEvent(new CustomEvent('ideal-machine-open-chat', { detail: { contactId } })); });
-  window.IdealMachineNotifications = { show: showMessageNotification, showInternal: showInternalNotification, showSystem: showSystemNotification, requestPermission: requestSystemNotificationPermission, hide: hideMessageNotification, enabled: notificationsEnabled };
+  window.IdealMachineNotifications = { show: showMessageNotification, showBatch:showSystemNotificationBatch, showInternal: showInternalNotification, showSystem: showSystemNotification, requestPermission: requestSystemNotificationPermission, hide: hideMessageNotification, enabled: notificationsEnabled };
   window.IdealMachinePush = { subscribe: subscribeToSystemPush, clientId: pushClientId, apiBase: pushApiBase };
   window.addEventListener('ideal-machine-auth-changed', () => {
     if (!window.IdealMachineAuth?.isAuthenticated?.() || !notificationsEnabled() || !('Notification' in window) || Notification.permission !== 'granted') return;

@@ -5903,10 +5903,11 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       created.forEach(message => { message.unread = !viewingTargetChat; });
       if (created.length) save();
       if (viewingTargetChat) return result;
-      for (const message of created) {
+      const notificationMessages = created.map(message => {
         const preview = message?.type === 'image' ? (message.sticker ? `[表情包] ${message.stickerDescription || ''}`.trim() : '[图片]') : message?.type === 'voice' ? `[语音] ${message.text || ''}` : message?.type === 'location' ? `[位置] ${message.locationName || message.text || ''}` : message?.type === 'transfer' ? `[转账] ${message.note || ''}` : message?.text || String(text || '');
-        await window.IdealMachineNotifications?.show?.({ contactId: targetContactId, name: targetContact.nickname || targetContact.name || '角色', avatar: targetContact.avatar || '', message: preview, messageId: message.id });
-      }
+        return { message:preview, messageId:message.id };
+      });
+      if (notificationMessages.length) await window.IdealMachineNotifications?.showBatch?.({ contactId:targetContactId, name:targetContact.nickname || targetContact.name || '角色', avatar:targetContact.avatar || '', messages:notificationMessages });
     }
     return result;
   };
@@ -8058,6 +8059,7 @@ ${recentConversation}
       chunkTranslations = compacted.map(item => item.translation);
     }
     const replyRoundKey = replyThoughtRoundKey(chat);
+    const notificationMessages = [];
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
       const chunk = chunks[chunkIndex];
       if (!state.chats?.[contactId] || !state.contacts.some(item => item.id === contactId)) break;
@@ -8068,11 +8070,12 @@ ${recentConversation}
       chat.messages.push(message);
       save();
       if (!viewingTargetChat) {
-        await window.IdealMachineNotifications?.show?.({ contactId, name:contact?.nickname || contact?.name || '角色', avatar:contact?.avatar || '', message:message.text, messageId:message.id });
+        notificationMessages.push({ message:message.text, messageId:message.id });
       }
       if (activeContact === contactId && app.classList.contains('is-open')) render();
       await new Promise(resolve => setTimeout(resolve, 220));
     }
+    if (notificationMessages.length) await window.IdealMachineNotifications?.showBatch?.({ contactId, name:contact?.nickname || contact?.name || '角色', avatar:contact?.avatar || '', messages:notificationMessages });
     if (combinedAnswer.thought) await saveCombinedThought(chat, combinedAnswer.thought, combinedAnswer.thoughtTranslation, replyRoundKey);
     else if (activeContact === contactId) await loadCurrentThought(true, replyRoundKey);
   }
