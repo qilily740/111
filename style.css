@@ -2419,6 +2419,11 @@ body > .desktop-scroll-wrap {
 .settings-image-model-control input { min-width:0; flex:1; }
 .settings-image-model-control button { min-width:76px; height:38px; padding:0 10px; border:1px solid rgba(0,0,0,.11); border-radius:10px; background:rgba(255,255,255,.58); color:#555; font:inherit; font-size:10px; cursor:pointer; }
 .settings-image-model-control button:disabled { opacity:.55; cursor:wait; }
+.settings-image-retain { margin-top:12px; padding:12px; border:1px solid rgba(0,0,0,.08); border-radius:12px; background:rgba(255,255,255,.32); }
+.settings-image-retained-list { display:grid; gap:5px; max-height:220px; margin-top:9px; overflow:auto; }
+.settings-image-retained-option { display:flex; align-items:center; gap:9px; min-height:32px; padding:5px 8px; border-radius:8px; background:rgba(255,255,255,.42); color:#444; font-size:11px; overflow-wrap:anywhere; cursor:pointer; }
+.settings-image-retained-option input { flex:0 0 auto; width:15px; height:15px; margin:0; accent-color:#222; }
+.settings-image-retained-option span { min-width:0; }
 .settings-image-prompts { display:grid; gap:10px; }
 .settings-image-prompts textarea { min-height:76px; padding:10px 11px; resize:vertical; line-height:1.55; }
 .settings-image-block { margin-top:17px; padding-top:16px; border-top:1px solid rgba(0,0,0,.08); }
@@ -2449,6 +2454,9 @@ body > .desktop-scroll-wrap {
 @media not all {
   .settings-image-grid input, .settings-image-grid select, .settings-image-prompts textarea, .settings-image-auto-card > div input { border-color:rgba(255,255,255,.14); background:rgba(0,0,0,.22); color:#eee; }
   .settings-image-model-control button { border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.08); color:#ddd; }
+  .settings-image-retain { border-color:rgba(255,255,255,.12); background:rgba(255,255,255,.05); }
+  .settings-image-retained-option { background:rgba(255,255,255,.06); color:#ddd; }
+  .settings-image-retained-option input { accent-color:#eee; }
   .settings-image-block { border-color:rgba(255,255,255,.12); }
   .settings-image-behavior-note { border-color:rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:#aaa; }
   .settings-image-auto-card { border-color:rgba(255,255,255,.12); background:rgba(255,255,255,.06); }

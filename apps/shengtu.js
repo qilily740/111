@@ -7,6 +7,7 @@
     key: '',
     model: '',
     availableModels: [],
+    selectedModels: [],
     profiles: [],
     activeProfileId: '',
     protocol: 'openai',
@@ -24,10 +25,16 @@
       const config = { ...defaults, ...(saved && typeof saved === 'object' ? saved : {}) };
       if (config.negativePrompt === previousBuiltInNegativePrompt) config.negativePrompt = '';
       config.availableModels = Array.isArray(config.availableModels) ? config.availableModels : [];
+      config.selectedModels = Array.isArray(config.selectedModels) ? config.selectedModels : (config.model ? [config.model] : []);
       config.profiles = Array.isArray(config.profiles) ? config.profiles : [];
+      config.profiles = config.profiles.map(profile => ({
+        ...profile,
+        availableModels: Array.isArray(profile.availableModels) ? profile.availableModels : [],
+        selectedModels: Array.isArray(profile.selectedModels) ? profile.selectedModels : (profile.model ? [profile.model] : [])
+      }));
       if (!config.profiles.length && config.endpoint) {
         const id = `image-profile-${Date.now()}`;
-        config.profiles = [{ id, name: config.endpoint, endpoint: config.endpoint, key: config.key, model: config.model, availableModels: config.availableModels, protocol: config.protocol, chatSize: config.chatSize, momentSize: config.momentSize, quality: config.quality, count: config.count, positivePrompt: config.positivePrompt, negativePrompt: config.negativePrompt }];
+        config.profiles = [{ id, name: config.endpoint, endpoint: config.endpoint, key: config.key, model: config.model, availableModels: config.availableModels, selectedModels: config.selectedModels, protocol: config.protocol, chatSize: config.chatSize, momentSize: config.momentSize, quality: config.quality, count: config.count, positivePrompt: config.positivePrompt, negativePrompt: config.negativePrompt }];
         config.activeProfileId = id;
       }
       config.activeProfileId = config.profiles.some(profile => profile.id === config.activeProfileId) ? config.activeProfileId : (config.profiles[0]?.id || '');
@@ -77,12 +84,39 @@
   function imageEndpoint(endpoint) {
     const clean = String(endpoint || '').trim().replace(/\/$/, '');
     if (!clean) return '';
+    if (/\/chat\/completions$/i.test(clean)) return clean.replace(/\/chat\/completions$/i, '/images/generations');
     return /\/images\/generations$/i.test(clean) ? clean : `${clean}/images/generations`;
   }
 
   function modelsEndpoint(endpoint) {
-    const clean = String(endpoint || '').trim().replace(/\/$/, '').replace(/\/images\/generations$/i, '');
-    return clean ? `${clean}/models` : '';
+    const clean = String(endpoint || '').trim().replace(/\/$/, '')
+      .replace(/\/(?:chat\/completions|images\/(?:generations|edits))$/i, '');
+    if (!clean) return '';
+    return /\/models$/i.test(clean) ? clean : `${clean}/models`;
+  }
+
+  async function imageModelsError(response) {
+    let detail = '';
+    try {
+      const text = await response.text();
+      if (text) {
+        try {
+          const payload = JSON.parse(text);
+          const error = payload?.error;
+          detail = typeof error === 'string' ? error : error?.message || payload?.message || payload?.detail || payload?.msg || '';
+        } catch {
+          detail = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+      }
+    } catch {}
+    detail = String(detail).replace(/Bearer\s+\S+/gi, 'Bearer [已隐藏]').replace(/(api[_ -]?key|token)\s*[:=]\s*\S+/gi, '$1=[已隐藏]').slice(0, 240);
+    if (response.status === 401) {
+      return `HTTP 401：生图服务拒绝了 API Key${detail ? `（${detail}）` : ''}。请确认填写的是该生图服务的有效 Key，且有读取模型列表权限。`;
+    }
+    if (response.status === 403) {
+      return `HTTP 403：生图 Key 无权读取模型列表${detail ? `（${detail}）` : ''}。请检查 Key 权限或服务商要求。`;
+    }
+    return `HTTP ${response.status}${detail ? `：${detail}` : ''}`;
   }
 
   function imageSize(value) {
@@ -132,6 +166,10 @@
     const count = Math.max(1, Math.min(4, Number(options.count || config.count) || 1));
     const body = { model: config.model, prompt, n: count, size };
     if (config.quality) body.quality = config.quality;
+    // Wanwan 的 OpenAI 兼容链路优先让服务直接返回 base64，减少依赖
+    // 图片 CDN 的跨域读取；只在服务明确不支持此字段时降级重试。
+    const canRequestBase64 = config.protocol !== 'extended';
+    if (canRequestBase64) body.response_format = 'b64_json';
     if (config.protocol === 'extended') {
       const dimensions = imageSize(size);
       Object.assign(body, dimensions, {
@@ -141,20 +179,42 @@
     }
     const headers = { 'Content-Type': 'application/json' };
     if (config.key) headers.Authorization = `Bearer ${config.key}`;
-    const response = await fetch(endpoint, { idealScope:purpose === 'chat' ? 'chat-image-generation' : 'image', idealPurpose:purpose === 'chat' ? '聊天 App－生成聊天图片' : '生图 App－生成图片', method:'POST', headers, body:JSON.stringify(body) });
-    if (!response.ok) {
-      let detail = '';
+    const requestOptions = { idealScope:purpose === 'chat' ? 'chat-image-generation' : 'image', idealPurpose:purpose === 'chat' ? '聊天 App－生成聊天图片' : '生图 App－生成图片', method:'POST', headers, body:'' };
+    let response;
+    let payload;
+    let retriedWithoutResponseFormat = false;
+    while (true) {
+      requestOptions.body = JSON.stringify(body);
       try {
-        const payload = await response.json();
-        detail = payload?.error?.message || payload?.message || '';
-      } catch {
-        try { detail = await response.text(); } catch {}
+        response = await fetch(endpoint, requestOptions);
+      } catch (error) {
+        if (error instanceof TypeError || error?.message === 'Failed to fetch') {
+          const localFileHint = location.protocol === 'file:'
+            ? ' 当前页面是 file:// 本地文件，请改用 HTTPS/localhost 地址打开。'
+            : '';
+          throw new Error(`生图请求没有收到接口响应，可能是跨域（CORS/OPTIONS）或网络连接失败。${localFileHint}请确认生图服务允许当前页面来源的 POST、Authorization 和 Content-Type。`, { cause:error });
+        }
+        throw error;
       }
-      throw new Error(detail ? `HTTP ${response.status}：${detail}` : `HTTP ${response.status}`);
+      let responseText = '';
+      try { responseText = await response.clone().text(); } catch {}
+      try { payload = responseText ? JSON.parse(responseText) : null; } catch { payload = null; }
+      const providerMessage = String(payload?.error?.message || payload?.error || payload?.message || payload?.detail || responseText || '');
+      const rejectsResponseFormat = canRequestBase64 && !retriedWithoutResponseFormat && !response.ok
+        && /response[_ -]?format|unsupported.{0,30}(?:parameter|field)|unknown.{0,20}(?:parameter|field)|不支持.{0,12}(?:参数|字段)/i.test(providerMessage);
+      if (rejectsResponseFormat) {
+        delete body.response_format;
+        retriedWithoutResponseFormat = true;
+        continue;
+      }
+      if (!response.ok) {
+        const detail = providerMessage.replace(/Bearer\s+\S+/gi, 'Bearer [已隐藏]').slice(0, 400);
+        throw new Error(detail ? `HTTP ${response.status}：${detail}` : `HTTP ${response.status}`);
+      }
+      break;
     }
-    const payload = await response.json();
     const sources = extractImages(payload);
-    if (!sources.length) throw new Error('接口没有返回可识别的图片');
+    if (!sources.length) throw new Error('接口已响应，但没有返回可识别的图片（支持 data[].b64_json、base64 或 url 格式）');
     const assets = await Promise.all(sources.map(storeImage));
     return { assetId: assets[0], assetIds: assets, prompt, revisedPrompt: payload?.data?.[0]?.revised_prompt || '' };
   }
@@ -198,6 +258,7 @@
         <label class="settings-image-model-field">生图模型<div class="settings-image-model-control"><input data-image-setting="model" data-image-model-input list="settingsImageModelOptions" type="text" placeholder="填写或拉取模型"><button data-image-model-fetch type="button">拉取模型</button></div><datalist id="settingsImageModelOptions"></datalist></label>
         <label>接口协议<select data-image-setting="protocol"><option value="openai">OpenAI 兼容</option><option value="extended">扩展参数兼容</option></select></label>
       </div>
+      <div class="settings-image-retain"><div class="settings-subhead"><b>保留模型</b><small data-image-retained-count>拉取模型后勾选</small></div><div class="settings-image-retained-list" data-image-retained-list><div class="settings-empty">尚未拉取模型</div></div></div>
       <div class="settings-image-block">
         <div class="settings-subhead"><b>聊天与朋友圈</b><small>分别使用适合场景的画幅</small></div>
         <div class="settings-image-grid">
@@ -230,7 +291,7 @@
   let imageEditingProfileId = null;
 
   function imageProfileValues(config) {
-    const keys = ['endpoint', 'key', 'model', 'availableModels', 'protocol', 'chatSize', 'momentSize', 'quality', 'count', 'positivePrompt', 'negativePrompt'];
+    const keys = ['endpoint', 'key', 'model', 'availableModels', 'selectedModels', 'protocol', 'chatSize', 'momentSize', 'quality', 'count', 'positivePrompt', 'negativePrompt'];
     return keys.reduce((result, key) => { result[key] = config[key]; return result; }, {});
   }
 
@@ -259,14 +320,26 @@
       if (field.type === 'checkbox') field.checked = Boolean(config[key]);
       else field.value = config[key] ?? '';
     });
-    renderModelOptions(config.availableModels);
+    renderModelOptions(config.availableModels, config.selectedModels);
+    renderRetainedImageModels(config.availableModels, config.selectedModels);
     setStatus(config.endpoint && config.model ? '已配置' : '未配置', config.endpoint && config.model ? 'ready' : '');
   }
 
-  function renderModelOptions(models) {
+  function renderModelOptions(models, selectedModels = []) {
     const list = document.querySelector('#settingsImageModelOptions');
     if (!list) return;
-    list.innerHTML = (Array.isArray(models) ? models : []).map(model => `<option value="${escapeHtml(model)}"></option>`).join('');
+    const retained = Array.isArray(selectedModels) ? selectedModels : (Array.isArray(models) ? models : []);
+    list.innerHTML = retained.map(model => `<option value="${escapeHtml(model)}"></option>`).join('');
+  }
+
+  function renderRetainedImageModels(models, selectedModels = []) {
+    const list = document.querySelector('[data-image-retained-list]');
+    const count = document.querySelector('[data-image-retained-count]');
+    if (!list) return;
+    const available = Array.isArray(models) ? models : [];
+    const retained = new Set(Array.isArray(selectedModels) ? selectedModels : []);
+    if (count) count.textContent = available.length ? `已保留 ${retained.size} / ${available.length} 个` : '拉取模型后勾选';
+    list.innerHTML = available.length ? available.map(model => `<label class="settings-image-retained-option"><input type="checkbox" data-image-retain-model="${escapeHtml(model)}" ${retained.has(model) ? 'checked' : ''}><span>${escapeHtml(model)}</span></label>`).join('') : '<div class="settings-empty">尚未拉取模型</div>';
   }
 
   function collectSettings() {
@@ -283,6 +356,8 @@
 
   function saveImageProfile(showStatus = true) {
     const config = collectSettings();
+    config.selectedModels = Array.isArray(config.selectedModels) ? config.selectedModels : [];
+    if (config.model && !config.selectedModels.includes(config.model)) config.selectedModels.push(config.model);
     if (!config.endpoint || !config.model) return setStatus('请填写生图接口地址和模型', 'error');
     const profiles = Array.isArray(config.profiles) ? [...config.profiles] : [];
     const id = config.activeProfileId || `image-profile-${Date.now()}`;
@@ -349,21 +424,28 @@
     setStatus('正在拉取模型', 'busy');
     try {
       const headers = {};
-      if (config.key) headers.Authorization = `Bearer ${config.key}`;
-      const response = await fetch(endpoint, { idealScope:'image', idealPurpose:'生图 App－下载生成结果', headers });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const usesGoogleApiKey = /generativelanguage\.googleapis\.com/i.test(endpoint);
+      if (config.key) headers[usesGoogleApiKey ? 'x-goog-api-key' : 'Authorization'] = usesGoogleApiKey ? config.key : `Bearer ${config.key}`;
+      const response = await fetch(endpoint, { idealScope:'image', idealPurpose:'生图 App－下载生成结果', idealUseDefaultKey:false, headers });
+      if (!response.ok) throw new Error(await imageModelsError(response));
       const payload = await response.json();
       const rows = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.models) ? payload.models : [];
-      const models = [...new Set(rows.map(item => typeof item === 'string' ? item : item?.id || item?.name).filter(Boolean))];
+      const models = [...new Set(rows.map(item => {
+        const model = typeof item === 'string' ? item : item?.id || item?.name;
+        return String(model || '').replace(/^models\//, '');
+      }).filter(Boolean))];
       if (!models.length) throw new Error('接口没有返回模型');
       const imagePattern = /image|dall|flux|sdxl|stable|recraft|seedream|imagen|qwen.*(?:image|img)|wan.*image/i;
       models.sort((a, b) => Number(imagePattern.test(b)) - Number(imagePattern.test(a)) || a.localeCompare(b));
       config.availableModels = models;
-      if (!config.model) config.model = models.find(model => imagePattern.test(model)) || models[0];
+      config.selectedModels = config.selectedModels.filter(model => models.includes(model));
+      if (!config.selectedModels.length) config.selectedModels = [models.find(model => imagePattern.test(model)) || models[0]];
+      if (!config.model || !config.selectedModels.includes(config.model)) config.model = config.selectedModels[0];
       const activeIndex = config.profiles.findIndex(profile => profile.id === config.activeProfileId);
       if (activeIndex >= 0) config.profiles[activeIndex] = { ...config.profiles[activeIndex], ...imageProfileValues(config) };
       saveConfig(config);
-      renderModelOptions(models);
+      renderModelOptions(models, config.selectedModels);
+      renderRetainedImageModels(models, config.selectedModels);
       const input = document.querySelector('[data-image-model-input]');
       if (input) input.value = config.model;
       setStatus(`已拉取 ${models.length} 个模型`, 'ready');
@@ -414,6 +496,8 @@
       if (current) { current.textContent = '新建生图配置'; current.title = ''; }
       const menu = document.querySelector('#settingsImageProfileMenu');
       if (menu) menu.hidden = true;
+      renderModelOptions([], []);
+      renderRetainedImageModels([], []);
       setStatus('请输入新的生图配置');
       return;
     }
@@ -424,6 +508,23 @@
     const saveButton = event.target.closest('[data-image-api-save]');
     if (!saveButton) return;
     saveImageProfile(true);
+  });
+
+  document.addEventListener('change', event => {
+    const checkbox = event.target.closest?.('[data-image-retain-model]');
+    if (!checkbox) return;
+    const config = collectSettings();
+    config.selectedModels = [...document.querySelectorAll('[data-image-retain-model]:checked')].map(item => item.dataset.imageRetainModel);
+    if (!config.selectedModels.includes(config.model)) config.model = config.selectedModels[0] || '';
+    const activeIndex = config.profiles.findIndex(profile => profile.id === config.activeProfileId);
+    if (activeIndex >= 0) config.profiles[activeIndex] = { ...config.profiles[activeIndex], ...imageProfileValues(config) };
+    saveConfig(config);
+    const input = document.querySelector('[data-image-model-input]');
+    if (input) input.value = config.model;
+    renderModelOptions(config.availableModels, config.selectedModels);
+    const count = document.querySelector('[data-image-retained-count]');
+    if (count) count.textContent = `已保留 ${config.selectedModels.length} / ${config.availableModels.length} 个`;
+    setStatus(`已保留 ${config.selectedModels.length} 个模型`, 'ready');
   });
 
   renderSettings();

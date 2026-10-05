@@ -182,7 +182,7 @@
     if (!configuredProxy || !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(location.origin)) return null;
     const source = machineRequestUrl(input);
     if (!source) return null;
-    if (!/^https?:$/i.test(source.protocol) || !/\/(?:models|chat\/completions|embeddings)$/i.test(source.pathname)) return null;
+    if (!/^https?:$/i.test(source.protocol) || !/\/(?:models|chat\/completions|embeddings|images\/(?:generations|edits))$/i.test(source.pathname)) return null;
     const proxy = new URL(configuredProxy, location.href);
     proxy.pathname = `${proxy.pathname.replace(/\/$/, '')}${source.pathname}`;
     const headers = new Headers(init.headers || {});

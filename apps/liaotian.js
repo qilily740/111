@@ -4053,6 +4053,14 @@ ${rerollRule}
   window.addEventListener('resize', positionChatTools, { passive:true });
   window.visualViewport?.addEventListener('resize', positionChatTools, { passive:true });
   function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const body = message.recalled ? '<span class="chat-recalled">' + (message.role === 'user' ? '你' : '角色') + '撤回了一条消息</span>' : message.type === 'voice' ? voiceMessageBody(message) : message.type === 'image' ? '<img src="' + esc(message.text) + '" alt="图片">' : message.type === 'image-desc' ? '<div class="chat-image-description"><strong>文字图片</strong><p>' + esc(message.text) + '</p></div>' : message.type === 'transfer' ? '<div class="chat-transfer-message"><strong>转账</strong><b>¥ ' + esc(message.amount || message.text) + '</b><p>' + esc(message.note || '无备注') + '</p><small>' + (message.status === 'accepted' ? (message.role === 'user' ? '已被接收' : '已接收') : message.status === 'returned' ? (message.role === 'user' ? '已被退回' : '已退回') : '待处理') + '</small></div>' : message.type === 'music' ? '<div class="chat-music-message" data-chat-music-listen="' + esc(message.id) + '" role="button" tabindex="0" title="点击一起听">' + (message.musicCover ? '<img src="' + esc(message.musicCover) + '" alt="">' : '<span class="chat-music-mark">♫</span>') + '<div><b>' + esc(message.musicTitle || message.text || '未知歌曲') + '</b><small>' + esc(message.musicArtist || '未知歌手') + (message.musicAlbum ? ' · ' + esc(message.musicAlbum) : '') + '</small></div></div>' : message.type === 'video' ? '▣ ' + esc(message.text) : message.type === 'location' ? '<div class="chat-location-message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.2"/></svg><div class="chat-location-copy"><b>' + esc(message.locationName || message.text || '定位') + '</b><p>' + esc(message.locationDetail || '具体地点未填写') + '</p></div><strong class="chat-location-distance">' + esc(message.distance || '未知') + '</strong></div>' : message.type === 'together' ? '▤ ' + esc(message.text) : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp || message.recalled ? '' : '<small>' + esc(message.time || '') + '</small>'; const typeClass = (message.type || '') + (message.status === 'accepted' ? ' is-settled is-accepted' : message.status === 'returned' ? ' is-settled is-returned' : '') + (message.sticker ? ' sticker' : ''); return '<div class="chat-message ' + (message.role === 'user' ? 'is-user' : 'is-character') + '" data-chat-message-id="' + esc(message.id) + '"><div class="chat-message-line">' + avatar + '<div class="chat-bubble ' + typeClass + '">' + body + '</div>' + stamp + '</div></div>'; }
+  const baseAssetAwareMessageHtml = messageHtml;
+  messageHtml = function(message) {
+    const html = baseAssetAwareMessageHtml(message);
+    if (message?.type !== 'image' || !/^idb:image:/i.test(String(message.text || ''))) return html;
+    // IndexedDB key is not a browser-loadable image URL. Keep it in data-* until
+    // hydrateGeneratedImages resolves the stored data URL, then assign img.src.
+    return html.replace(`src="${esc(message.text)}"`, `data-chat-image-asset="${esc(message.text)}"`);
+  };
   const baseCurrencyMessageHtml = messageHtml;
   messageHtml = function(message) {
     const html = baseCurrencyMessageHtml(message);
@@ -4920,7 +4928,13 @@ ${rerollRule}
     const replyRoundKey = replyThoughtRoundKey(chat);
     // 思考、正文和音乐选择已经在同一次聊天模型请求中完成；不要在尾部再
     // 自动发起一个“续写”请求，否则一次点击会被记录成多次聊天调用。
-    const raw = combined.reply;
+    const rawReply = String(combined.reply || '');
+    // IMAGE_PROMPT 必须在拆分气泡和清理控制标记前消费；这样无论消息走
+    // 哪一层 addMessage 包装，都不会把图片动作当成普通文字吞掉或显示出来。
+    const imagePromptMatch = rawReply.match(generatedImageMarker);
+    const raw = imagePromptMatch
+      ? rawReply.replace(generatedImageMarker, '').replace(/\[\[IMAGE_PROMPT\s*:[\s\S]*?\]\]/ig, '').trim()
+      : rawReply;
     if (isSingleChatSystemNotice(raw)) {
       baseCharacterAddMessage(cleanCharacterVisibleText(raw), 'character', '', { thoughtRoundKey: replyRoundKey });
       return;
@@ -5033,9 +5047,15 @@ ${rerollRule}
       if (item) { await appendCharacterMessage(emojiDisplaySource(item.url), 'image', { sticker: true, stickerDescription: item.text || '' }); sent += 1; }
     }
     if (!sent) {
-      const visibleFallback = cleanCharacterVisibleText(String(combined.reply || '').replace(/\[\[STICKER\s*:[^\]]+\]\]/ig, ''));
+      const visibleFallback = cleanCharacterVisibleText(String(raw || '').replace(/\[\[STICKER\s*:[^\]]+\]\]/ig, ''));
       if (visibleFallback && !/^[.。…\s]+$/u.test(visibleFallback)) await appendCharacterMessage(visibleFallback);
-      else throw new Error(visibleFallback ? 'API 只返回了省略号，请重试' : 'API 返回了空回复（可能只返回了内部控制标记）');
+      else if (!imagePromptMatch?.[1]?.trim()) throw new Error(visibleFallback ? 'API 只返回了省略号，请重试' : 'API 返回了空回复（可能只返回了内部控制标记）');
+    }
+    if (imagePromptMatch?.[1]?.trim()) {
+      generatedImageMarkerCount += 1;
+      const imageContact = state.contacts.find(item => item.id === activeContact);
+      latestGeneratedImagePromise = generateCharacterChatImage(imagePromptMatch[1].trim(), chat, imageContact);
+      await latestGeneratedImagePromise;
     }
     if (combined.thought) await saveCombinedThought(chat, combined.thought, combined.thoughtTranslation, replyRoundKey);
     else if (chat === state.chats?.[activeContact]) await loadCurrentThought(true, replyRoundKey);
@@ -5411,7 +5431,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const value = String(text || '').trim();
     if (!value) return false;
     if (/(?:别|不要|不用|不想|禁止|别再).{0,8}(?:发|传|拍|晒|生成)?.{0,5}(?:图|照片|自拍|相片|一?张)/.test(value)) return false;
-    return /(?:发|传|拍|晒|生成|来|给我).{0,10}(?:图|照片|自拍|相片)|(?:图|照片|自拍|相片).{0,10}(?:发|传|拍|晒|生成|看看|看)|(?:给我|让我|想)看看.{0,8}(?:你|现在|那里|在干嘛|穿的|周围)|(?:发|传|拍|晒|来)(?:一)?张(?:你|自己|现在|给我|自拍|照片|图)/.test(value);
+    return /(?:发|传|拍|晒|生成|来|给我).{0,10}(?:图|照片|自拍|相片)|(?:图|照片|自拍|相片).{0,10}(?:发|传|拍|晒|生成|看看|看|给我)|(?:给我|让我|想|要|能不能|可不可以).{0,8}(?:看看|看).{0,10}(?:你|现在|那里|在干嘛|穿的|周围|图|照片|自拍|相片)|(?:发|传|拍|晒|来)(?:一)?张(?:你|自己|现在|给我|自拍|照片|图)/.test(value);
   }
 
   function generatedConversationContext(chat, contact) {
@@ -5424,8 +5444,20 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   async function generateCharacterChatImage(prompt, targetChat, contact, existingMessage = null) {
     const api = window.IdealMachineImageAPI;
-    if (!api?.generate || !targetChat || !contact) return false;
-    const rolePrompt = `人物：${contact.nickname || contact.name || '角色'}。\n人物设定：${contact.details || contact.signature || '保持当前角色外观与身份一致'}。\n当前聊天场景：${generatedConversationContext(targetChat, contact)}。\n角色想发出的图片：${prompt}。\n画面必须符合人物设定和当前对话，不要画聊天界面、气泡、文字或水印。`;
+    if (!api?.generate || !targetChat || !contact) {
+      const error = new Error(!api?.generate ? '生图模块尚未加载，请刷新页面后重试。' : '无法识别当前聊天角色，请重新进入聊天后重试。');
+      console.warn('角色生图失败：', error);
+      window.alert(`角色发图失败：${error.message}`);
+      return false;
+    }
+    // 不把完整人设和最近聊天原文转交给图片服务：其中可能有与图片无关的
+    // 成人话题，造成普通自拍被审核误判。文字模型已在 IMAGE_PROMPT 中结合
+    // 人设与聊天，提炼出图片所需的视觉描述，因此这里只传该描述和构图约束。
+    const latestUserText = [...(targetChat.messages || [])].reverse().find(message => message.role === 'user')?.text || '';
+    const selfieRequest = /自拍|自拍照|对镜自拍|镜子自拍/.test(`${prompt}\n${latestUserText}`);
+    const rolePrompt = selfieRequest
+      ? `生成一张普通自然的角色自拍照。图片内容：${String(prompt || '').trim()}。角色穿着完整得体的日常服装，肩部以上取景，表情自然，柔和自然光，呈现日常分享的生活照片质感。`
+      : `生成以下图片：${String(prompt || '').trim()}。采用自然的生活摄影质感，构图清晰自然。`;
     try {
       const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1 });
       if (!result?.assetId) return false;
@@ -5446,6 +5478,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       return true;
     } catch (error) {
       console.warn('角色生图失败，已保留文字回复：', error);
+      window.alert(`角色发图失败：${error?.message || '生图接口请求失败'}`);
       return false;
     }
   }
@@ -5702,17 +5735,23 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   function hydrateGeneratedImages() {
     const resolveAsset = window.IdealMachineGetImage || window.IdealMachineImageAPI?.resolveAsset;
     if (!resolveAsset) return;
-    app.querySelectorAll('img[src^="idb:image:"]').forEach(image => {
+    app.querySelectorAll('img[data-chat-image-asset], img[src^="idb:image:"]').forEach(image => {
       if (image.dataset.generatedImageLoading) return;
-      const assetId = image.getAttribute('src');
+      const assetId = image.dataset.chatImageAsset || image.getAttribute('src');
       image.dataset.generatedImageLoading = 'true';
       const messageId = image.closest('[data-chat-message-id]')?.dataset.chatMessageId;
       const message = currentChat()?.messages?.find(item => String(item?.id || '') === String(messageId || ''));
       if (message?.role !== 'user' && !message?.realImage && !message?.sticker) image.closest('.chat-bubble.image')?.classList.add('generated-image');
       Promise.resolve(resolveAsset(assetId)).then(source => {
-        if (source) image.src = source;
+        if (source && image.isConnected) image.src = source;
+        else if (image.isConnected) image.alt = '图片暂时无法显示';
+        delete image.dataset.chatImageAsset;
         image.dataset.generatedImageLoading = 'false';
-      }).catch(() => { image.dataset.generatedImageLoading = 'false'; });
+      }).catch(() => {
+        if (image.isConnected) image.alt = '图片暂时无法显示';
+        delete image.dataset.chatImageAsset;
+        image.dataset.generatedImageLoading = 'false';
+      });
     });
   }
 
