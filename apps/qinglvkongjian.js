@@ -315,6 +315,19 @@
     });
     paperTexturePromise.then(texture => {
       if (!overlay.isConnected || overlay.classList.contains('is-closing')) return;
+      // The source texture is RGB with an opaque white page. Remove its paper-white fill
+      // for the crumpling mesh, keeping only the soft gray creases as translucent detail.
+      const animationTexture = document.createElement('canvas');
+      animationTexture.width = texture.width;
+      animationTexture.height = texture.height;
+      const textureContext = animationTexture.getContext('2d', { willReadFrequently:true });
+      textureContext.drawImage(texture, 0, 0);
+      const pixels = textureContext.getImageData(0, 0, texture.width, texture.height);
+      for (let index = 0; index < pixels.data.length; index += 4) {
+        const luminance = pixels.data[index] * .2126 + pixels.data[index + 1] * .7152 + pixels.data[index + 2] * .0722;
+        pixels.data[index + 3] = Math.max(0, Math.min(255, (248 - luminance) * 4));
+      }
+      textureContext.putImageData(pixels, 0, 0);
       const bounds = overlay.getBoundingClientRect();
       const rect = sheet.getBoundingClientRect();
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -350,7 +363,7 @@
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.closePath();
         ctx.clip(); ctx.globalAlpha = alpha;
         ctx.transform(m11, m12, m21, m22, a.x - m11 * a.sx - m21 * a.sy, a.y - m12 * a.sx - m22 * a.sy);
-        ctx.drawImage(texture, 0, 0);
+        ctx.drawImage(animationTexture, 0, 0);
         ctx.fillStyle = `rgba(25,28,32,${Math.min(.19, Math.abs(a.z - c.z) / 170) * fold})`;
         ctx.fillRect(0, 0, texture.width, texture.height);
         ctx.restore();

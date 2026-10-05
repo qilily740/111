@@ -152,11 +152,50 @@
     } catch { source = ''; }
     return source;
   }
-  function pushApiBase() { return String(window.IdealMachineConfig?.pushApiBase || '').replace(/\/$/, ''); }
+  const pushServiceWorkerVersion = '20261005-push-chain-1';
+  function pushApiBase() {
+    const value = String(window.IdealMachineConfig?.pushApiBase || '').trim().replace(/\/$/, '');
+    if (!value) return '';
+    try {
+      const url = new URL(value, location.href);
+      return /^https?:$/i.test(url.protocol) ? url.href.replace(/\/$/, '') : '';
+    } catch { return ''; }
+  }
   function pushClientId() { const key = 'ideal-machine-push-client-id'; let value = ''; try { value = localStorage.getItem(key) || ''; if (!value) { value = crypto.randomUUID?.() || `ideal-${Date.now()}-${Math.random().toString(36).slice(2)}`; localStorage.setItem(key, value); } } catch { value = `ideal-${Date.now()}-${Math.random().toString(36).slice(2)}`; } return value; }
   function urlBase64ToUint8Array(value) { const padding = '='.repeat((4 - String(value).length % 4) % 4); const base64 = String(value).replace(/-/g, '+').replace(/_/g, '/') + padding; const raw = atob(base64); return Uint8Array.from(raw, character => character.charCodeAt(0)); }
-  async function subscribeToSystemPush() { const api = pushApiBase(); if (!api || !('serviceWorker' in navigator) || !('PushManager' in window)) return false; const registration = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register('./sw.js?v=20260920-system-push-5', { updateViaCache:'none' }); await navigator.serviceWorker.ready; const configResponse = await fetch(`${api}/config`, { idealScope:'notifications', timeout:12000 }); if (!configResponse.ok) throw new Error(`推送服务配置失败：HTTP ${configResponse.status}`); const config = await configResponse.json(); if (!config.publicKey) throw new Error('推送服务没有返回公钥。'); let subscription = await registration.pushManager.getSubscription(); if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(config.publicKey) }); const uploadResponse = await fetch(`${api}/subscribe`, { method:'POST', idealScope:'notifications', timeout:12000, headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ subscription, clientId:pushClientId() }) }); if (!uploadResponse.ok) throw new Error(`推送订阅上传失败：HTTP ${uploadResponse.status}`); return true; }
-  async function requestSystemNotificationPermission() { if (!('Notification' in window)) throw new Error('当前浏览器不支持系统通知。'); if (!window.isSecureContext && !/^(localhost|127\.0\.0\.1)$/i.test(location.hostname)) throw new Error('系统通知需要 HTTPS 或本机开发环境。'); const result = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission(); if (result !== 'granted') throw new Error('你没有允许 Ideal 发送系统通知。'); try { await subscribeToSystemPush(); } catch (error) { console.warn('[Ideal] 系统推送订阅暂不可用，保留本机通知能力。', error); } return result; }
+  async function pushRequest(path, options = {}) {
+    const api = pushApiBase();
+    if (!api) throw new Error('推送服务地址未配置。');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException('推送服务请求超时', 'TimeoutError')), 12000);
+    const request = window.IdealMachineFetch || window.fetch.bind(window);
+    try { return await request(`${api}${path}`, { ...options, idealScope:'notifications', signal:controller.signal }); }
+    finally { clearTimeout(timer); }
+  }
+  async function pushServiceWorkerRegistration() {
+    if (!('serviceWorker' in navigator)) throw new Error('当前浏览器不支持 Service Worker。');
+    let registration = await navigator.serviceWorker.getRegistration();
+    if (!registration && /^https?:$/i.test(location.protocol)) registration = await navigator.serviceWorker.register(`./sw.js?v=${pushServiceWorkerVersion}`, { updateViaCache:'none' });
+    if (!registration) throw new Error('Service Worker 尚未准备好。');
+    await navigator.serviceWorker.ready;
+    return registration;
+  }
+  async function subscribeToSystemPush() {
+    const api = pushApiBase();
+    if (!api) throw new Error('推送服务地址未配置。');
+    if (!('PushManager' in window)) throw new Error('当前设备不支持后台系统推送。');
+    const registration = await pushServiceWorkerRegistration();
+    const configResponse = await pushRequest('/config');
+    if (!configResponse.ok) throw new Error(`推送服务配置失败：HTTP ${configResponse.status}`);
+    const config = await configResponse.json();
+    if (!config.publicKey) throw new Error('推送服务没有返回公钥。');
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(config.publicKey) });
+    const uploadResponse = await pushRequest('/subscribe', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ subscription, clientId:pushClientId() }) });
+    if (!uploadResponse.ok) throw new Error(`推送订阅上传失败：HTTP ${uploadResponse.status}`);
+    return true;
+  }
+  async function requestSystemNotificationPermission() { if (!('Notification' in window)) throw new Error('当前浏览器不支持系统通知。'); if (!window.isSecureContext && !/^(localhost|127\.0\.0\.1)$/i.test(location.hostname)) throw new Error('系统通知需要 HTTPS 或本机开发环境。'); const result = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission(); if (result !== 'granted') throw new Error('你没有允许 Ideal 发送系统通知。'); await subscribeToSystemPush(); return result; }
   async function showSystemNotification(payload = {}, force = false) {
     if (!force && !notificationsEnabled()) return false;
     if (!('Notification' in window) || Notification.permission !== 'granted') return false;
@@ -165,9 +204,22 @@
     const title = identity.name || '新消息';
     const body = String(message || '收到一条新消息');
     const tag = `ideal-${groupId || contactId || 'chat'}-${messageId || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+    if (!force && contactId && window.IdealMachineAuth?.isAuthenticated?.()) {
+      try {
+        const response = await pushRequest('/send', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body:JSON.stringify({ title, body, tag, contactId, messageId, url:`./?idealOpenChat=${encodeURIComponent(contactId)}` })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (response.ok && Number(result.delivered) > 0) return true;
+      } catch (error) {
+        console.warn('[Ideal] 云端角色通知发送失败，改用本机通知。', error);
+      }
+    }
     const source = await resolveNotificationAvatar(identity.avatar) || idealAppIcon();
     const options = { body, icon:source, badge:source, tag, renotify:true, timestamp:Date.now(), data:{ contactId, messageId, groupId } };
-    try { let registration = await navigator.serviceWorker?.getRegistration?.(); if (!registration && navigator.serviceWorker && /^https?:$/.test(location.protocol)) registration = await navigator.serviceWorker.register('./sw.js?v=20260920-system-push-5', { updateViaCache:'none' }); if (registration?.showNotification) { await registration.showNotification(title, options); return true; } } catch (error) { console.warn('[Ideal] Service Worker 通知失败。', error); }
+    try { const registration = await pushServiceWorkerRegistration(); if (registration?.showNotification) { await registration.showNotification(title, options); return true; } } catch (error) { console.warn('[Ideal] Service Worker 通知失败。', error); }
     try { new Notification(title, options); return true; } catch (error) { console.warn('[Ideal] 浏览器通知失败。', error); return false; }
   }
   function showInternalNotification(payload = {}) {
@@ -199,6 +251,10 @@
   notificationBanner.addEventListener('click', () => { const contactId = notificationTarget; hideMessageNotification(); if (contactId) window.dispatchEvent(new CustomEvent('ideal-machine-open-chat', { detail: { contactId } })); });
   window.IdealMachineNotifications = { show: showMessageNotification, showInternal: showInternalNotification, showSystem: showSystemNotification, requestPermission: requestSystemNotificationPermission, hide: hideMessageNotification, enabled: notificationsEnabled };
   window.IdealMachinePush = { subscribe: subscribeToSystemPush, clientId: pushClientId, apiBase: pushApiBase };
+  window.addEventListener('ideal-machine-auth-changed', () => {
+    if (!window.IdealMachineAuth?.isAuthenticated?.() || !notificationsEnabled() || !('Notification' in window) || Notification.permission !== 'granted') return;
+    subscribeToSystemPush().catch(error => console.warn('[Ideal] 登录后同步系统推送订阅失败。', error));
+  });
   const savedApiButton = app.querySelector('[data-settings-save-api]');
   savedApiButton.textContent = '保存 API 接入';
   app.querySelector('#settingsModelList').insertAdjacentHTML('afterend', '<button class="settings-save-api settings-save-api-only" data-settings-save-api type="button">保存 API 接入</button>');

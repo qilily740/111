@@ -6,7 +6,7 @@
   const apps = [['liaotian','聊天','chat','#8bb8f1'],['luntan','论坛','forum','#f1a66f'],['rili','日历','calendar','#ee9b9b'],['qinglvkongjian','情侣空间','couple','#dc91b7'],['yinyue','音乐','music','#9e9ae9'],['doubao','豆包','doubao','#8ec8c2'],['gouwu','购物','shop','#e5b27d'],['qianbao','钱包','wallet','#78a889']];
   const beautyApp = ['meihua','美化','beauty','#9ba9c8'];
   const desktopApps = [...apps, beautyApp];
-  let state = readState(); let activeApp = ''; let activeChatTarget = ''; let activeDetail = null; let activeCalendarDate = localDateKey(new Date()); let calendarAutoOpenKey = ''; let npcBusy = false; let refreshing = false; let taRefreshTimeout = 180000; let refreshPickerOpen = false; let appearanceOpen = false; let appearanceDraft = null; let appearanceSwapKey = ''; let reverseOpen = false; let reverseBusy = false; let reverseLive = null; let reverseForceCaught = false; let reverseRateOpen = false; let reverseViewer = null; let reverseAppearance = {wallpaper:'',icons:{},names:{}}; let reverseStep = 0; let selectedRefreshApps = new Set(); let doubaoHistoryOpen = false; let selectedDoubaoHistory = -1; let groupLongPressTimer = 0; let suppressGroupEntryClick = false; let taChatListScrollTop = 0; let taChatListScrollRoleId = '';
+  let state = readState(); let activeApp = ''; let activeChatTarget = ''; let activeTaChatTab = 'chats'; let activeDetail = null; let activeCalendarDate = localDateKey(new Date()); let calendarAutoOpenKey = ''; let npcBusy = false; let refreshing = false; let taRefreshTimeout = 180000; let refreshPickerOpen = false; let appearanceOpen = false; let appearanceDraft = null; let appearanceSwapKey = ''; let reverseOpen = false; let reverseBusy = false; let reverseLive = null; let reverseForceCaught = false; let reverseRateOpen = false; let reverseViewer = null; let reverseAppearance = {wallpaper:'',icons:{},names:{}}; let reverseStep = 0; let selectedRefreshApps = new Set(); let doubaoHistoryOpen = false; let selectedDoubaoHistory = -1; let groupLongPressTimer = 0; let suppressGroupEntryClick = false; let taChatListScrollByTab = {chats:0,contacts:0,moments:0}; let taChatSkipCaptureOnce = false; let taChatListScrollRoleId = '';
   function readState() { try { const value=JSON.parse(localStorage.getItem(storageKey) || '{}'); return { roleId:value.roleId || '', appearance:{ wallpaper:value.appearance?.wallpaper || '', icons:value.appearance?.icons && typeof value.appearance.icons === 'object' ? value.appearance.icons : {} } }; } catch { return { roleId:'', appearance:{ wallpaper:'', icons:{} } }; } }
   function saveState() { localStorage.setItem(storageKey, JSON.stringify(state)); }
   function captureTaChatListScroll() {
@@ -14,7 +14,7 @@
     const main = app.querySelector('.ta-role-app-main');
     const owner = role();
     if (!main || !owner) return;
-    taChatListScrollTop = main.scrollTop;
+    taChatListScrollByTab[activeTaChatTab] = main.scrollTop;
     taChatListScrollRoleId = owner.id;
   }
   function restoreTaChatListScroll() {
@@ -24,7 +24,7 @@
     if (!owner || !main || (taChatListScrollRoleId && taChatListScrollRoleId !== owner.id)) return;
     const apply = () => {
       const max = Math.max(0, main.scrollHeight - main.clientHeight);
-      main.scrollTop = Math.min(Math.max(0, taChatListScrollTop), max);
+      main.scrollTop = Math.min(Math.max(0, taChatListScrollByTab[activeTaChatTab] || 0), max);
     };
     apply();
     window.requestAnimationFrame?.(apply);
@@ -752,6 +752,29 @@
     if (!npcs.length) throw new Error('API 没有返回可识别的 NPC 聊天，请重新刷新');
     return { npcs, groups:[...groupsByName.values()] };
   }
+  function parseRoleNpcMomentRows(value, contacts) {
+    const contactByName = new Map((Array.isArray(contacts) ? contacts : []).map(item => [String(item?.name || '').trim(), item]));
+    const rows = new Map();
+    String(value || '').replace(/```(?:text)?|```/gi, '').split(/\r?\n/).forEach(line => {
+      const parts = protocolParts(line);
+      if (parts.length < 2) return;
+      const label = String(parts.shift() || '').toUpperCase();
+      if (/^(?:MOMENT|朋友圈动态)$/.test(label) && parts.length >= 3) {
+        const [name, postTime, ...body] = parts;
+        const contact = contactByName.get(String(name || '').trim());
+        const text = body.join('｜').trim().replace(/^['“”"]+|['“”"]+$/g, '');
+        if (contact && text) rows.set(contact.name, { contact, time:String(postTime || '').trim(), text, comments:[] });
+        return;
+      }
+      if (/^(?:MOMENT_COMMENT|朋友圈评论)$/.test(label) && parts.length >= 4) {
+        const [momentAuthor, commenter, relation, ...body] = parts;
+        const row = rows.get(String(momentAuthor || '').trim());
+        const text = body.join('｜').trim().replace(/^['“”"]+|['“”"]+$/g, '');
+        if (row && commenter && text) row.comments.push({ name:String(commenter).trim(), relation:String(relation || '').trim(), text });
+      }
+    });
+    return [...rows.values()];
+  }
   function parseGroupsOnly(value) {
     try {
       const parsed = parseApiJSON(value);
@@ -791,13 +814,17 @@
       : existingGroups.length < maxGroupCount
         ? `当前 NPC 数量不足以再组成更多包含至少 2 位 NPC 的群聊；本次不要凑数或虚构 NPC，只延续已有群聊。`
         : `当前已经有 ${maxGroupCount} 个群聊，本次禁止新增，只能延续已有群聊并生成新的聊天内容。`;
-    const prompt = `生成角色“${owner.nickname || owner.name}”手机聊天 App 中，角色与 NPC 联系人的聊天记录，以及角色所在的真实群聊。现实用户与角色的聊天由程序直接同步，禁止把现实用户写进 NPC 列表，也不要生成角色与现实用户的私聊。
-不要返回 JSON。每位 NPC 先输出一行联系人资料，再输出聊天；群聊先输出群资料，再输出群消息，严格使用下面五种格式（消息末尾可带译文字段）：
+    const prompt = `刷新角色“${owner.nickname || owner.name}”手机聊天 App 中，角色与 NPC 联系人的聊天记录、角色所在的真实群聊，以及这些 NPC 在聊天 App 朋友圈发布的新动态。现实用户与角色的聊天由程序直接同步，禁止把现实用户写进 NPC 列表，也不要生成角色与现实用户的私聊或用户朋友圈动态。
+不要返回 JSON。每位 NPC 先输出一行联系人资料，再输出聊天；群聊先输出群资料，再输出群消息；同时每位 NPC 生成一条自己的朋友圈动态和 1—3 条熟人评论。严格使用下面七种格式（消息末尾可带译文字段）：
 CONTACT｜NPC姓名｜NPC身份｜与角色的关系
 OWNER_MESSAGE｜NPC姓名｜时间｜原文｜TRANSLATION｜中文译文
 NPC_MESSAGE｜NPC姓名｜时间｜原文｜TRANSLATION｜中文译文
+MOMENT｜NPC姓名｜时间｜朋友圈动态正文
+MOMENT_COMMENT｜动态NPC姓名｜评论者姓名｜与动态NPC的关系｜评论正文
 GROUP｜群类别｜符合身份的群名称｜群聊当前话题｜成员姓名，用顿号分隔
 GROUP_MESSAGE｜群名称｜发送者姓名｜时间｜原文｜TRANSLATION｜中文译文
+每位 NPC 的 MOMENT 都必须用该 NPC 本人的身份和口吻，像真实朋友圈的生活记录，内容与其设定或刚发生的聊天自然相关；只生成本次刷新涉及的 NPC 动态，不要生成角色或用户的动态。动态控制在 1—3 句，不要带“朋友圈”标题、解释或格式外文字。
+每条 MOMENT 后紧接 1—3 条 MOMENT_COMMENT，评论者优先使用本次生成的其他 NPC。如果联系人只有一位，可随机生成一位符合其身份圈子的熟人（如同学、同事或朋友），只作为评论者、不加入联系人列表。评论需具体回应动态，不要重复套话，也不可评论自己发布的动态。
 每条记录单独一行；外文消息必须在末尾追加“｜TRANSLATION｜中文译文”，中文消息也保留“｜TRANSLATION｜”但译文留空。消息正文不要使用“｜”字符。不要编号、Markdown、代码块、解释或其他文字。${fixedContacts.length ? `下面列出的 ${fixedContacts.length} 位是世界书分析后锁定的固定联系人。必须逐一为他们生成聊天，姓名保持完全一致，禁止新增、删除、替换或改名。` : '根据角色设定、世界书及已有 NPC，选取 2—5 位确实与角色有关的 NPC。'}每位生成 4—10 条有来有回的自然聊天；OWNER_MESSAGE 永远代表手机主人“${owner.nickname || owner.name}”，NPC_MESSAGE 代表对应 NPC；双方严格交替，内容符合各自身份和关系，口语化、长短自然，不要写旁白、动作、系统说明或提示词。
 群聊要求：群类别只能从“家庭、朋友、工作、学校、兴趣、其他”中选择，同一角色下每个类别最多只能有 1 个群聊，不能重复类别。每个 GROUP 的成员列表都必须包含角色本人“${owner.nickname || owner.name}”以及至少 2 位 NPC，禁止生成只有 NPC 没有角色的群聊。${existingGroups.length ? `已有 ${existingGroups.length} 个群聊，必须保留这些群名、类别和成员关系，在原群里延续聊天或开启新话题，不得重置历史。已有群聊：${existingGroups.map(group => `${groupCategoryForUse(group)}｜${group.name}（${group.topic || '话题未知'}）`).join('；')}` : '这是首次生成群聊；每个群聊至少包含角色和 2 位 NPC，且类别不能重复。'}${groupCreationInstruction}每个 GROUP 必须先写类别，再写群名；新增群聊必须使用尚未出现的类别。群名必须像真实聊天软件里成员自己起的名称：短、随手、带有这个小圈子的具体记忆或共同语境。请从成员之间真实存在的关系、地点、项目代号、共同习惯、正在处理的具体事情或内部称呼中提取关键词，优先使用成员真的会输入的简称，不要凭空发明与人设无关的词。群名应让人一眼知道这是哪个关系圈，但不需要把所有成员身份写全；只有在身份本身就是大家日常使用的称呼时，才可以使用姓氏或组织简称。禁止使用固定模板、泛称和口号，禁止中点加副标题、完整句式身份、正式头衔、话题摘要、成员名单拼接，以及“临时小分队”“朋友群”“聊天群”“某某某的群聊”等名称。不要套用任何示例或预设词。群名控制在 2—10 个字。所有群聊合计最多 5 个。群消息必须像真实群聊：每条消息都要回应上一条或推进上一条提到的具体事情，至少形成 2—3 轮来回；不同成员要有明显不同的语气、立场和关系，不要让每个人各说各的，不要把 NPC 私聊原文复制进群里，不要出现系统提示、账号注销、消息无法送达、API、提示词或旁白。角色发言要和 NPC 发言一样自然，不能为了凑数量轮流播报。每个群至少生成 5 条有来有回的群消息。${existingGroups.length ? `不要删除或改名已有且自然的群聊；如果旧群名明显是“身份加话题”式机械名称，可以只修正群名，不能重置成员和历史：${existingGroups.map(group => group.name).join('、')}` : ''}
 角色设定：${String(owner.details || owner.signature || owner.identity || '暂无').slice(0,3500)}
@@ -806,7 +833,7 @@ GROUP_MESSAGE｜群名称｜发送者姓名｜时间｜原文｜TRANSLATION｜�
 ${fixedContacts.length ? '固定 NPC' : '已有 NPC'}：${existing.length ? existing.map(item => `${item.name}（${item.identity || item.reason || '关系未知'}）`).join('；') : '暂无'}`;
     refreshing = true; refreshPickerOpen = false; render();
     try {
-      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:options.timeout || 120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.76, max_tokens:6500, stream:false, messages:[{ role:'system', content:'你是角色手机聊天记录生成器。只按指定的 CONTACT、OWNER_MESSAGE、NPC_MESSAGE、GROUP、GROUP_MESSAGE 格式输出，不要返回 JSON、Markdown 或解释。' }, { role:'user', content:prompt }] }) });
+      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { timeout:options.timeout || 120000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.76, max_tokens:7500, stream:false, messages:[{ role:'system', content:'你是角色手机聊天与朋友圈内容生成器。只按指定的 CONTACT、OWNER_MESSAGE、NPC_MESSAGE、MOMENT、MOMENT_COMMENT、GROUP、GROUP_MESSAGE 格式输出，不要返回 JSON、Markdown 或解释。' }, { role:'user', content:prompt }] }) });
       if (response.status === 429) throw new Error('接口已接通，但当前触发了限流（429），请稍后再试。');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json(); let result = parseRoleChatContent(apiResponseText(data), existing);
@@ -866,6 +893,44 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
       const contacts = fixedContacts.length ? fixedContacts.map(item => generatedByName.has(item.name) ? { ...item, ...generatedByName.get(item.name), name:item.name, fixed:true, sourceBookId:item.sourceBookId } : item) : generated;
       const cache = read('ideal-machine-ta-npcs', {}); cache[owner.id] = contacts;
       localStorage.setItem('ideal-machine-ta-npcs', JSON.stringify(cache));
+      const momentRows = parseRoleNpcMomentRows(apiResponseText(data), contacts);
+      if (momentRows.length) {
+        const sharedChat = read(chatKey, {});
+        sharedChat.moments = Array.isArray(sharedChat.moments) ? sharedChat.moments : [];
+        momentRows.forEach(({ contact, time:postTime, text }) => {
+          const authorId = String(contact.id || `npc:${owner.id}:${contact.name}`);
+          const duplicate = sharedChat.moments.some(post => String(post.authorType || '') === 'npc' && String(post.npcSourceRoleId || '') === String(owner.id) && String(post.authorId || '') === authorId && String(post.text || '').trim() === text);
+          if (duplicate) return;
+          const sourceRow = momentRows.find(row => row.contact.name === contact.name);
+          const comments = (sourceRow?.comments || []).filter(comment => comment.name && comment.text && comment.name !== contact.name).slice(0, 3);
+          if (!comments.length) {
+            const otherNpc = contacts.find(item => item.name !== contact.name);
+            const fallbackNames = ['林予安','周知夏','许闻舟','陈嘉禾','江昀','沈月白'];
+            const fallbackRelations = ['朋友','同事','同学','熟人'];
+            const fallbackTexts = ['这张拍得真不错，下次也叫上我。','看起来很适合你，改天一起去。','看到这个我也想起我们上次聊的事了。','分享得不错，最近我也正好在关注这个。'];
+            const commenter = otherNpc?.name || fallbackNames[Math.floor(Math.random() * fallbackNames.length)];
+            comments.push({ name:commenter, relation:otherNpc?.reason || fallbackRelations[Math.floor(Math.random() * fallbackRelations.length)], text:fallbackTexts[Math.floor(Math.random() * fallbackTexts.length)] });
+          }
+          const actorById = new Map();
+          contacts.filter(item => item.name !== contact.name).forEach(item => {
+            const id = String(item.id || `npc:${owner.id}:${item.name}`);
+            actorById.set(id, { id, name:item.name, displayName:item.name });
+          });
+          const storedComments = comments.map(comment => {
+            const relatedNpc = contacts.find(item => item.name === comment.name);
+            const id = String(relatedNpc?.id || `npc:${owner.id}:moment-friend:${comment.name}`);
+            actorById.set(id, { id, name:comment.name, displayName:comment.name });
+            return { id:uid('ta-npc-comment'), author:comment.name, text:comment.text, authorType:'npc', authorId:id, npcSourceRoleId:owner.id, relationToAuthor:comment.relation || '', time:postTime || new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }) };
+          });
+          const actors = [...actorById.values()].sort(() => Math.random() - .5);
+          const likeCount = Math.min(actors.length, 1 + Math.floor(Math.random() * Math.min(5, actors.length)));
+          const likers = actors.slice(0, likeCount);
+          sharedChat.moments.unshift({ id:uid('ta-npc-moment'), author:contact.name, realName:contact.name, authorType:'npc', authorId, npcSourceRoleId:owner.id, avatar:contact.avatar || '', text, visibility:'all', time:postTime || new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }), createdAt:Date.now(), likes:likers.length, roleLikes:likers.length, roleLikeIds:likers.map(item => item.id), interactionActors:likers, comments:storedComments });
+        });
+        sharedChat.moments = sharedChat.moments.slice(0, 1000);
+        localStorage.setItem(chatKey, JSON.stringify(sharedChat));
+        window.dispatchEvent(new CustomEvent('ideal-machine-chat-updated'));
+      }
       const currentGroups = groupCache(owner);
       const effectiveNpcGroupCapacity = contacts.length >= 2 ? Math.floor(contacts.length / 2) : 0;
       const effectiveTargetGroupCount = Math.min(maxGroupCount, Math.max(currentGroups.length, effectiveNpcGroupCapacity));
@@ -1092,6 +1157,21 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
   }
   function roleDetailSheet(owner) {
     if (!activeDetail) return '';
+    if (activeDetail.type === 'moment') {
+      const post = roleChatMomentPosts(owner).find(item => String(item.id) === String(activeDetail.id));
+      if (!post) return '';
+      const countComments = rows => (Array.isArray(rows) ? rows : []).reduce((total, item) => total + 1 + countComments(item.replies), 0);
+      const renderComments = rows => (Array.isArray(rows) ? rows : []).map(comment => `<div class="chat-moment-comment"><b>${esc(comment.author || '评论者')}</b><span>${esc(comment.text || '')}${comment.time ? `<small>${esc(comment.time)}</small>` : ''}</span>${comment.replies?.length ? `<div class="chat-moment-comment-replies">${renderComments(comment.replies)}</div>` : ''}</div>`).join('');
+      const comments = Array.isArray(post.comments) ? post.comments : [];
+      const authorKind = post.authorType === 'npc' ? '相关 NPC' : post.authorType === 'user' ? '用户动态' : '角色动态';
+      return `<div class="ta-item-detail-layer ta-moment-detail-layer"><button type="button" class="ta-item-detail-backdrop" data-ta-detail-close aria-label="关闭详情"></button><section class="ta-item-detail-sheet ta-moment-detail-sheet" role="dialog" aria-modal="true" aria-label="朋友圈详情"><header><i>${avatar({ name:post.author || post.realName, avatar:post.avatar })}</i><div><small>${esc(post.realName || authorKind)} · ${esc(post.time || '')}</small><h2>${esc(post.author || post.realName || '角色')}</h2></div><button type="button" data-ta-detail-close aria-label="关闭">×</button></header><main><article class="chat-moment ta-chat-moment-detail"><p>${esc(post.text || '')}</p>${post.image ? `<img src="${esc(post.image)}" alt="朋友圈图片">` : ''}${post.location ? `<div class="chat-moment-location">⌖ ${esc(post.location)}</div>` : ''}<small class="chat-moment-visibility-label">◉ ${post.visibility === 'private' ? '仅自己可见' : post.visibility === 'groups' ? '分组可见' : '所有人可见'}</small><div class="chat-moment-footer"><span>♡ ${Number(post.likes || 0)}</span><span>◌ ${countComments(comments)}</span></div></article><section class="ta-moment-comments"><h3>评论${comments.length ? ` (${countComments(comments)})` : ''}</h3>${comments.length ? `<div class="chat-moment-comments">${renderComments(comments)}</div>` : '<p class="ta-forum-no-comments">还没有评论</p>'}</section></main></section></div>`;
+    }
+    if (activeDetail.type === 'forum') {
+      const post = roleForumPosts(owner).find(item => String(item.id) === String(activeDetail.id));
+      if (!post) return '';
+      const replies = Array.isArray(post.replies) ? post.replies : [];
+      return `<div class="ta-item-detail-layer ta-forum-detail-layer"><button type="button" class="ta-item-detail-backdrop" data-ta-detail-close aria-label="关闭详情"></button><section class="ta-item-detail-sheet ta-forum-detail-sheet" role="dialog" aria-modal="true" aria-label="论坛帖子详情"><header><i>${avatar(post)}</i><div><small>@${esc(post.handle || 'user')} · ${esc(post.time || '')}</small><h2>${esc(post.nickname || '论坛用户')}</h2></div><button type="button" data-ta-detail-close aria-label="关闭">×</button></header><main><p class="forum-post-text">${esc(post.text || post.content || '')}</p>${post.voiceStyle && post.ownerType !== 'user' ? `<small class="forum-post-style">发言方式：${esc(post.voiceStyle)}</small>` : ''}<div class="ta-forum-detail-counts"><span>评论 ${Number(post.comments ?? replies.length)}</span><span>转发 ${Number(post.reposts || 0)}</span><span>点赞 ${Number(post.likes || 0)}</span></div><section class="ta-forum-comments"><h3>评论 ${replies.length ? `(${replies.length})` : ''}</h3>${replies.length ? `<div class="forum-post-replies">${replies.map(reply => `<article class="${reply.replyTo ? 'is-nested' : ''}"><span class="forum-post-reply-avatar">${avatar(reply)}</span><p><b>${esc(reply.nickname || '角色')}</b>${reply.replyToName ? `<small>回复 @${esc(reply.replyToName)}</small>` : ''}<span>${esc(reply.text || '')}</span>${reply.time ? `<time>${esc(reply.time)}</time>` : ''}</p></article>`).join('')}</div>` : '<p class="ta-forum-no-comments">还没有评论</p>'}</section></main></section></div>`;
+    }
     const music = activeDetail.type === 'music';
     const item = (music ? musicRows(owner) : shoppingRows(owner))[activeDetail.index];
     if (!item) return '';
@@ -1102,11 +1182,107 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
     const musicCover = music ? (item.cover || item.coverUrl || item.albumCover || '') : '';
     return `<div class="ta-item-detail-layer"><button type="button" class="ta-item-detail-backdrop" data-ta-detail-close aria-label="关闭详情"></button><section class="ta-item-detail-sheet"><header><i>${music ? (musicCover ? `<img src="${esc(musicCover)}" alt="${esc(title)}专辑封面">` : builtinAppIcon('yinyue', icon('music'))) : icon('shop')}</i><div><small>${music ? 'LISTENING MOOD' : 'PURCHASE PURPOSE'}</small><h2>${esc(title)}</h2><span>${esc(subtitle)}</span></div><button type="button" data-ta-detail-close aria-label="关闭">×</button></header><main><small>${music ? '角色听这首歌时的心情' : '角色买来做什么'}</small><p>${esc(body)}</p></main></section></div>`;
   }
+  function roleForumPosts(owner) {
+    const feed = read('ideal-machine-forum', []);
+    if (!Array.isArray(feed)) return [];
+    const ownerName = String(owner?.nickname || owner?.name || '').trim();
+    const npcRows = npcCache(owner);
+    const npcIds = new Set(npcRows.map(item => String(item?.id || '')).filter(Boolean));
+    const npcNames = npcRows.map(item => String(item?.name || item?.nickname || '').trim()).filter(Boolean);
+    const forumProfile = read('ideal-machine-forum-profile', {});
+    const userName = String(forumProfile.nickname || '').trim();
+    return feed.filter(item => {
+      if (!item || typeof item !== 'object') return false;
+      const type = String(item.ownerType || '').toLowerCase();
+      if (type === 'user' || item.handle === 'user' || (userName && (item.owner === userName || item.nickname === userName))) return true;
+      if ((type === 'character' || type === 'role') && (String(item.ownerId || '') === String(owner?.id || '') || (!item.ownerId && (item.owner === ownerName || item.nickname === ownerName)))) return true;
+      if (type !== 'npc') return false;
+      if (npcIds.has(String(item.ownerId || ''))) return true;
+      const relation = `${item.actorProfile || ''} ${item.relationToRole || ''} ${item.relatedRoleId || ''}`;
+      return (item.relatedRoleId && String(item.relatedRoleId) === String(owner?.id || '')) || (ownerName && relation.includes(ownerName)) || npcNames.includes(String(item.nickname || ''));
+    });
+  }
+  function roleChatMomentPosts(owner) {
+    const chat = read(chatKey, {});
+    const moments = chat.moments;
+    if (!Array.isArray(moments)) return [];
+    const ownerId = String(owner?.id || '');
+    const ownerName = String(owner?.nickname || owner?.name || '').trim();
+    const npcs = npcCache(owner);
+    const npcIds = new Set(npcs.map(item => String(item?.id || '')).filter(Boolean));
+    const npcNames = new Set(npcs.map(item => String(item?.name || item?.nickname || '').trim()).filter(Boolean));
+    return moments.filter(post => {
+      if (!post || typeof post !== 'object') return false;
+      const type = String(post.authorType || '').toLowerCase();
+      if (type === 'user') return true;
+      if (post.visibility === 'private' || post.userOnly) return false;
+      if (type === 'character' || type === 'role') return String(post.authorId || '') === ownerId || (!post.authorId && [ownerName, String(owner?.name || '')].includes(String(post.realName || post.author || '')));
+      if (type !== 'npc') return false;
+      return String(post.npcSourceRoleId || '') === ownerId || npcIds.has(String(post.authorId || '')) || npcNames.has(String(post.realName || post.author || '').trim());
+    }).slice().sort((a, b) => Number(b.createdAt || b.timestamp || 0) - Number(a.createdAt || a.timestamp || 0));
+  }
+  function roleChatMomentCard(post) {
+    const countComments = rows => (Array.isArray(rows) ? rows : []).reduce((total, item) => total + 1 + countComments(item.replies), 0);
+    const comments = Array.isArray(post.comments) ? post.comments : [];
+    const author = post.author || post.realName || (post.authorType === 'npc' ? '相关 NPC' : post.authorType === 'user' ? '用户' : '角色');
+    const label = post.authorType === 'npc' ? '相关 NPC' : post.authorType === 'user' ? '用户' : '角色';
+    const renderComments = rows => (Array.isArray(rows) ? rows : []).map(comment => `<div class="chat-moment-comment"><b>${esc(comment.author || '评论者')}</b><span>${esc(comment.text || '')}</span>${comment.replies?.length ? `<div class="chat-moment-comment-replies">${renderComments(comment.replies)}</div>` : ''}</div>`).join('');
+    return `<article class="chat-moment ta-role-chat-moment" data-ta-moment-open="${esc(post.id || '')}" tabindex="0" role="button" aria-label="查看${esc(author)}的朋友圈详情"><div class="chat-moment-head"><div class="chat-avatar small-avatar">${avatar({ name:author, avatar:post.avatar })}</div><div><b>${esc(author)}</b><small>${esc(post.realName || label)} · ${esc(post.time || '')}</small></div><span class="chat-moment-owner">${label}</span></div><p>${esc(post.text || '')}</p>${post.image ? `<img src="${esc(post.image)}" alt="朋友圈图片">` : ''}${post.location ? `<div class="chat-moment-location">⌖ ${esc(post.location)}</div>` : ''}<small class="chat-moment-visibility-label">◉ ${post.visibility === 'groups' ? '分组可见' : '所有人可见'}</small><div class="chat-moment-footer"><span>♡ ${Number(post.likes || 0)}</span><span>◌ ${countComments(comments)}</span><span class="ta-moment-readmore">查看详情 ›</span></div>${comments.length ? `<div class="chat-moment-comments">${renderComments(comments)}</div>` : ''}</article>`;
+  }
+  function roleChatMomentsFeed(owner) {
+    const posts = roleChatMomentPosts(owner);
+    return `<section class="chat-moments-page ta-role-chat-moments"><div class="chat-moments-body"><div class="chat-moments"><div class="ta-chat-moments-heading"><b>${esc(owner.nickname || owner.name || '角色')} 的朋友圈</b></div>${posts.length ? posts.map(roleChatMomentCard).join('') : '<div class="chat-empty small"><div class="chat-empty-mark">◌</div><h2>这里还没有动态</h2><p>朋友圈动态会显示在这里。</p></div>'}</div></div></section>`;
+  }
+  function roleForumIcon(type) {
+    const paths = {
+      comment:'<path d="M9 11h30v19H20l-11 7v-7z"/><path d="M16 17h16M16 23h10"/>',
+      repost:'<path d="M12 17h25l-5-5M36 31H11l5 5"/>',
+      like:'<path d="M24 38S8 28 8 17a8 8 0 0 1 15-4 8 8 0 0 1 15 4c0 11-14 21-14 21z"/>'
+    };
+    return `<svg class="forum-post-icon" viewBox="0 0 48 48" aria-hidden="true">${paths[type] || ''}</svg>`;
+  }
+  function roleForumPostHtml(post) {
+    const replies = Array.isArray(post.replies) ? post.replies : [];
+    const replyHtml = replies.length ? `<div class="forum-post-replies">${replies.map(reply => `<article class="${reply.replyTo ? 'is-nested' : ''}"><span class="forum-post-reply-avatar">${avatar(reply)}</span><p><b>${esc(reply.nickname || '角色')}</b>${reply.replyToName ? `<small>回复 @${esc(reply.replyToName)}</small>` : ''}<span>${esc(reply.text || '')}</span></p></article>`).join('')}</div>` : '';
+    return `<article class="forum-post ta-forum-post" data-ta-forum-open="${esc(post.id || '')}" tabindex="0" role="button" aria-label="查看${esc(post.nickname || '论坛用户')}的帖子详情"><div class="forum-post-avatar">${avatar(post)}</div><div class="forum-post-body"><header><div><b>${esc(post.nickname || '论坛用户')}</b><span>@${esc(post.handle || 'user')}</span></div><time>${esc(post.time || '')}</time></header><p class="forum-post-text">${esc(post.text || post.content || '')}</p>${post.voiceStyle && post.ownerType !== 'user' ? `<small class="forum-post-style">发言方式：${esc(post.voiceStyle)}</small>` : ''}${replyHtml}<footer><span aria-label="评论 ${Number(post.comments ?? replies.length)} 条">${roleForumIcon('comment')}<span>${Number(post.comments ?? replies.length)}</span></span><span aria-label="转发 ${Number(post.reposts || 0)} 次">${roleForumIcon('repost')}<span>${Number(post.reposts || 0)}</span></span><span aria-label="点赞 ${Number(post.likes || 0)} 次">${roleForumIcon('like')}<span>${Number(post.likes || 0)}</span></span></footer></div></article>`;
+  }
+  function roleForumFeed(owner) {
+    const posts = roleForumPosts(owner);
+    return posts.length ? `<div class="forum-feed ta-role-forum-feed">${posts.map(roleForumPostHtml).join('')}</div>` : '<div class="forum-empty"><div>⌁</div><h2>暂时没有帖子</h2><p>论坛动态会显示在这里。</p></div>';
+  }
+  function roleChatDock() {
+    const tabs = [
+      ['chats','聊天','<path class="chat-tab-shape" d="M24 5C13.5 5 5 12.4 5 21.6c0 5.7 3.2 10.7 8.2 13.7L11.5 43l8.3-4.6c1.4.3 2.8.4 4.2.4 10.5 0 19-7.4 19-16.6S34.5 5 24 5Z"/>'],
+      ['contacts','联系人','<path class="chat-tab-shape" d="M20.5 5.2c-5.1 0-8.4 4.1-8.4 9.3 0 3.4 1.5 6.2 4.1 7.9l-1.8 5.1-9.1 5.4c-1.2.7-1.9 2-1.9 3.5v2.2h31.4v-2.2c0-1.5-.8-2.8-2-3.5l-9-5.4-1.8-5.1c2.5-1.7 4-4.5 4-7.9 0-5.2-3.2-9.3-8.3-9.3Z"/><path class="chat-tab-detail" d="M34 14h10M34 20h10M34 26h7"/>'],
+      ['moments','朋友圈','<circle class="chat-tab-shape chat-tab-compass-outline" cx="24" cy="24" r="19"/><circle class="chat-tab-compass-fill" cx="24" cy="24" r="19"/><path class="chat-tab-compass-needle" d="M15.5 32.5 21 21l11.5-5.5L27 27z"/>']
+    ];
+    return `<nav class="chat-tabs ta-chat-dock" aria-label="聊天导航">${tabs.map(([key,label,path]) => `<button class="chat-tab-${key === 'chats' ? 'chat' : key}${activeTaChatTab === key ? ' is-active' : ''}" type="button" data-ta-chat-tab="${key}" data-chat-tab="${key === 'chats' ? 'chat' : key}" title="${label}" aria-label="${label}" aria-current="${activeTaChatTab === key ? 'page' : 'false'}">${key === 'chats' ? '<span class="chat-tab-icon-wrap">' : ''}<svg class="chat-tab-icon${key === 'moments' ? ' chat-tab-compass' : ''}" viewBox="0 0 48 48" aria-hidden="true">${path}</svg>${key === 'chats' ? '</span>' : ''}<small>${label}</small></button>`).join('')}</nav>`;
+  }
+  function roleChatPage(owner) {
+    if (activeTaChatTab === 'moments') return roleChatMomentsFeed(owner);
+    const chat = read(chatKey, {});
+    const current = chat.chats?.[owner.id] || {};
+    const profile = (chat.profiles || []).find(item => item.id === current.profileId) || {};
+    const npcs = npcCache(owner);
+    const groups = groupCache(owner);
+    const entries = [];
+    if (activeTaChatTab === 'chats') {
+      groups.forEach(group => entries.push(`<button class="ta-chat-entry ta-group-entry" type="button" title="长按删除群聊" data-ta-group-entry="${esc(group.id)}" data-ta-role-chat="group:${esc(group.id)}"><i>${avatar({ name:group.name, avatar:group.avatar })}</i><span><b>${esc(group.name)}</b><small>${esc(group.messages?.at(-1)?.text || `${group.members?.length || 0} 位成员 · ${group.topic || '持续聊天'}`)}</small></span><em>${group.userJoined ? '已加入 · ›' : '›'}</em></button>`));
+      entries.push(`<button class="ta-chat-entry" type="button" data-ta-role-chat="user"><i>${avatar(profile)}</i><span><b>${esc(profile.nickname || profile.realName || '绑定用户')}</b><small>${esc(current.messages?.at(-1)?.text || current.messages?.at(-1)?.content || '暂无消息')}</small></span><em>›</em></button>`);
+      npcs.forEach((item, index) => { if (item.messages?.length) entries.push(`<button class="ta-chat-entry" type="button" data-ta-role-chat="npc:${index}"><i>${avatar(item)}</i><span><b>${esc(item.name || 'NPC')}</b><small>${esc(item.messages.at(-1)?.text || item.identity || item.reason || '暂无消息')}</small></span><em>›</em></button>`); });
+    } else {
+      entries.push(`<button class="ta-chat-entry" type="button" data-ta-role-chat="user"><i>${avatar(profile)}</i><span><b>${esc(profile.nickname || profile.realName || '绑定用户')}</b><small>${esc(profile.persona || '绑定用户')}</small></span><em>›</em></button>`);
+      npcs.forEach((item, index) => entries.push(`<button class="ta-chat-entry" type="button" data-ta-role-chat="npc:${index}"><i>${avatar(item)}</i><span><b>${esc(item.name || 'NPC')}</b><small>${esc(item.identity || item.reason || '角色相关联系人')}</small></span><em>›</em></button>`));
+    }
+    const heading = activeTaChatTab === 'chats' ? '最近聊天' : '联系人';
+    const empty = activeTaChatTab === 'chats' ? '还没有聊天记录。' : '暂无联系人。';
+    return `<div class="ta-role-intro"><i>${avatar(owner)}</i><div><b>${esc(owner.nickname || owner.name)}</b><small>角色手机主人</small></div></div><div class="ta-role-section-head"><b>${heading}</b>${activeTaChatTab === 'chats' ? `<button class="ta-chat-list-refresh ${refreshing ? 'is-refreshing' : ''}" type="button" data-ta-chat-refresh ${refreshing ? 'disabled' : ''}>${refreshing ? '刷新中…' : '刷新聊天'}</button>` : ''}</div><div class="ta-chat-entry-list">${entries.join('') || `<p class="ta-role-empty">${empty}</p>`}</div>`;
+  }
   function roleContent(key, owner) {
-    const chat = read(chatKey, {}); const name = owner.nickname || owner.name;
-    if (key === 'liaotian') { const current = chat.chats?.[owner.id] || {}; const profile = (chat.profiles || []).find(item => item.id === current.profileId); const npcs = npcCache(owner); const groups = groupCache(owner); const entries = []; groups.forEach(group => entries.push(`<button class="ta-chat-entry ta-group-entry" type="button" title="长按删除群聊" data-ta-group-entry="${esc(group.id)}" data-ta-role-chat="group:${esc(group.id)}"><i>${avatar({ name:group.name, avatar:group.avatar })}</i><span><b>${esc(group.name)}</b><small>${esc(group.messages?.at(-1)?.text || `${group.members?.length || 0} 位成员 · ${group.topic || '持续聊天'}`)}</small></span><em>${group.userJoined ? '已加入 · ›' : '›'}</em></button>`)); entries.push(`<button class="ta-chat-entry" type="button" data-ta-role-chat="user"><i>${avatar(profile)}</i><span><b>${esc(profile?.nickname || profile?.realName || '绑定用户')}</b><small>${esc(current.messages?.at(-1)?.text || current.messages?.at(-1)?.content || '暂无消息')}</small></span><em>›</em></button>`); npcs.forEach((item, index) => entries.push(`<button class="ta-chat-entry" type="button" data-ta-role-chat="npc:${index}"><i>${avatar(item)}</i><span><b>${esc(item.name || 'NPC')}</b><small>${esc(item.messages?.at(-1)?.text || item.identity || item.reason || '暂无消息')}</small></span><em>›</em></button>`)); return `<div class="ta-role-intro"><i>${avatar(owner)}</i><div><b>${esc(name)}</b><small>角色手机主人 · 聊天联系人</small></div></div><div class="ta-role-section-head"><b>群聊与联系人</b><button class="ta-chat-list-refresh ${refreshing ? 'is-refreshing' : ''}" type="button" data-ta-chat-refresh ${refreshing ? 'disabled' : ''}>${refreshing ? '刷新中…' : '刷新聊天'}</button></div><div class="ta-chat-entry-list">${entries.join('') || '<p class="ta-role-empty">刷新后会出现角色真实参与的群聊。</p>'}</div>`; }
+    const name = owner.nickname || owner.name;
+    if (key === 'liaotian') return roleChatPage(owner);
     const fresh = snapshot(owner);
-    if (key === 'luntan') { const posts = fresh.forum?.length ? fresh.forum : read('ideal-machine-forum', []).filter(item => item.ownerType === 'character' || item.owner === name || item.nickname === name); return textList(posts, '角色还没有发布论坛动态。'); }
+    if (key === 'luntan') return roleForumFeed(owner);
     if (key === 'rili') return roleCalendar(owner);
     if (key === 'qinglvkongjian') { const couple = read('ideal-machine-couple', {}); const space = couple.spaces?.[owner.id] || couple; const rows = fresh.couple?.length ? fresh.couple : [...(space.memories || []).map(item => ({...item, title:'回忆 · '+item.title})), ...(space.wishes || []).map(item => ({...item, title:'愿望 · '+item.text}))]; return `<div class="ta-role-intro"><i>${avatar(owner)}</i><div><b>${esc(name)} 的情侣空间</b><small>角色视角 · 共同记录</small></div></div>${textList(rows, '情侣空间里还没有共同记录。')}`; }
     if (key === 'yinyue') return roleMusic(owner);
@@ -1123,7 +1299,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
   const roleContentWithoutGroupManage = roleContent;
   roleContent = function(key, owner) {
     const html = roleContentWithoutGroupManage(key, owner);
-    if (key !== 'liaotian') return html;
+    if (key !== 'liaotian' || activeTaChatTab !== 'chats') return html;
     const listButton = `<button class="ta-chat-list-manage" type="button" data-ta-group-manage>管理聊天</button>`;
     const withoutLongPress = html
       .replace(/<button class="ta-chat-list-refresh[\s\S]*?<\/button>/, listButton)
@@ -1181,11 +1357,55 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
     if (activeApp === 'liaotian' && activeChatTarget) return roleConversation(owner, activeChatTarget);
     if (activeApp === 'doubao') return roleDoubao(owner, snapshot(owner));
     const pageRefreshKey = { rili:'calendar', yinyue:'music', gouwu:'shopping', qianbao:'wallet' }[activeApp];
-    const refreshButton = activeApp === 'liaotian'
+    const refreshButton = activeApp === 'liaotian' && activeTaChatTab !== 'moments'
       ? `<button class="ta-app-header-refresh ${refreshing ? 'is-refreshing' : ''}" type="button" data-ta-chat-refresh aria-label="刷新聊天" ${refreshing ? 'disabled' : ''}>↻</button>`
       : pageRefreshKey ? `<button class="ta-app-header-refresh ${refreshing ? 'is-refreshing' : ''}" type="button" data-ta-page-refresh="${pageRefreshKey}" aria-label="刷新${meta[1]}" ${refreshing ? 'disabled' : ''}>↻</button>` : '';
-    return `<section class="ta-role-app-page"><header class="ta-role-app-header"><button type="button" data-ta-home>‹</button><div><small>${esc(owner.nickname || owner.name)} 的手机</small><h1>${meta[1]}</h1></div>${refreshButton}</header><main class="ta-role-app-main">${roleContent(activeApp, owner)}</main>${roleDetailSheet(owner)}</section>`;
+    const chatDock = activeApp === 'liaotian' && !activeChatTarget ? roleChatDock() : '';
+    return `<section class="ta-role-app-page${activeApp === 'liaotian' ? ' is-ta-chat-app' : ''}"><header class="ta-role-app-header"><button type="button" data-ta-home>‹</button><div><small>${esc(owner.nickname || owner.name)} 的手机</small><h1>${meta[1]}</h1></div>${refreshButton}</header><main class="ta-role-app-main">${roleContent(activeApp, owner)}</main>${chatDock}${roleDetailSheet(owner)}</section>`;
   }
+  document.addEventListener('click', event => {
+    const tab = event.target.closest('[data-ta-chat-tab]');
+    if (!tab || !app.classList.contains('is-open') || activeApp !== 'liaotian' || activeChatTarget) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    captureTaChatListScroll();
+    taChatSkipCaptureOnce = true;
+    activeTaChatTab = tab.dataset.taChatTab;
+    activeDetail = null;
+    groupManageOpen = false;
+    selectedGroupIds.clear();
+    render();
+  }, true);
+  document.addEventListener('click', event => {
+    const post = event.target.closest('[data-ta-forum-open]');
+    if (!post || !app.classList.contains('is-open') || activeApp !== 'luntan') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    activeDetail = { type:'forum', id:post.dataset.taForumOpen };
+    render();
+  }, true);
+  document.addEventListener('keydown', event => {
+    const post = event.target.closest('[data-ta-forum-open]');
+    if (!post || !['Enter',' '].includes(event.key) || !app.classList.contains('is-open') || activeApp !== 'luntan') return;
+    event.preventDefault();
+    activeDetail = { type:'forum', id:post.dataset.taForumOpen };
+    render();
+  }, true);
+  document.addEventListener('click', event => {
+    const post = event.target.closest('[data-ta-moment-open]');
+    if (!post || !app.classList.contains('is-open') || activeApp !== 'liaotian' || activeTaChatTab !== 'moments') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    activeDetail = { type:'moment', id:post.dataset.taMomentOpen };
+    render();
+  }, true);
+  document.addEventListener('keydown', event => {
+    const post = event.target.closest('[data-ta-moment-open]');
+    if (!post || !['Enter',' '].includes(event.key) || !app.classList.contains('is-open') || activeApp !== 'liaotian' || activeTaChatTab !== 'moments') return;
+    event.preventDefault();
+    activeDetail = { type:'moment', id:post.dataset.taMomentOpen };
+    render();
+  }, true);
   function clearGroupLongPress() { if (groupLongPressTimer) { window.clearTimeout(groupLongPressTimer); groupLongPressTimer = 0; } }
   document.addEventListener('pointerdown', event => {
     const entry = event.target.closest('[data-ta-group-entry]');
@@ -1232,7 +1452,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
   function reversePage(owner) { const checks=reverseChecks(owner.id);const latest=checks[0];return `<section class="ta-reverse-page"><header><button type="button" data-ta-reverse-close>‹</button><div><small>SECRET CHECK</small><h1>TA 看我</h1></div></header><main><div class="ta-reverse-hero"><i>${avatar(owner)}</i><span><small>本次查岗角色</small><b>${esc(owner.nickname||owner.name)}</b><p>TA 会自己决定查看哪些 App，不会提前弹出授权提示。</p></span><button type="button" data-ta-reverse-run ${reverseBusy?'disabled':''}>${reverseBusy?'正在后台查看…':'让 TA 偷偷查手机'}</button></div>${latest?`<section class="ta-reverse-result"><header><small>${new Date(latest.createdAt).toLocaleString('zh-CN')}</small><h2>最近一次查岗</h2></header><div>${latest.findings.map((item,index)=>`<article><i>${index+1}</i><span><small>${esc(item.app)}</small><b>${esc(item.title)}</b><p>${esc(item.detail)}</p><em>${esc(item.reaction)}</em></span></article>`).join('')}</div><footer><small>查完后的反应</small><p>${esc(latest.summary)}</p>${latest.message?`<b>随后发给你：${esc(latest.message)}</b>`:''}</footer></section>`:'<p class="ta-role-empty">还没有查岗记录。开始后，角色会依据自己的人设查看用户手机并留下真实反应。</p>'}</main></section>`; }
   function refreshPicker() { const options = [['chat','聊天','同步用户消息并生成 NPC 对话','liaotian'],['calendar','日历','角色今天的行程安排','rili'],['music','音乐','角色最近听歌与收藏','yinyue'],['doubao','豆包','角色和豆包的聊天记录','doubao'],['shopping','购物','角色的普通购物、花市和外卖记录','gouwu'],['wallet','钱包','角色近期的收入与开销','qianbao']]; const allSelected = selectedRefreshApps.size === options.length; return `<div class="ta-refresh-sheet"><div class="ta-refresh-backdrop" data-ta-refresh-close></div><section><header><div><small>REFRESH ROLE PHONE</small><h2>刷新哪些 App？</h2></div><button type="button" data-ta-refresh-close>×</button></header><button class="ta-refresh-select-all" type="button" data-ta-refresh-all><i class="${allSelected ? 'is-checked' : ''}">${allSelected ? '✓' : ''}</i><span>全选</span></button><main>${options.map(([key,name,description,appKey]) => `<button class="${selectedRefreshApps.has(key) ? 'is-selected' : ''}" type="button" data-ta-refresh-app="${key}"><i class="ta-refresh-builtin-icon">${defaultIosIcon(appKey,name.slice(0,1))}</i><span><b>${name}</b><small>${description}</small></span><em>${selectedRefreshApps.has(key) ? '✓' : ''}</em></button>`).join('')}</main><button class="ta-refresh-submit" type="button" data-ta-refresh-submit ${selectedRefreshApps.size ? '' : 'disabled'}>刷新选中的 ${selectedRefreshApps.size || ''} 个 App</button></section></div>`; }
   function syncRefreshPicker() { const sheet = app.querySelector('.ta-refresh-sheet'); if (!sheet) return; const keys = ['chat','calendar','music','doubao','shopping','wallet']; const allSelected = selectedRefreshApps.size === keys.length; const allIcon = sheet.querySelector('[data-ta-refresh-all] i'); if (allIcon) { allIcon.classList.toggle('is-checked', allSelected); allIcon.textContent = allSelected ? '✓' : ''; } sheet.querySelectorAll('[data-ta-refresh-app]').forEach(button => { const selected = selectedRefreshApps.has(button.dataset.taRefreshApp); button.classList.toggle('is-selected', selected); const mark = button.querySelector('em'); if (mark) mark.textContent = selected ? '✓' : ''; }); const submit = sheet.querySelector('[data-ta-refresh-submit]'); if (submit) { submit.disabled = !selectedRefreshApps.size; submit.textContent = `刷新选中的 ${selectedRefreshApps.size || ''} 个 App`; } }
-  function render() { const shouldRestoreChatList = activeApp === 'liaotian' && !activeChatTarget; if (shouldRestoreChatList) captureTaChatListScroll(); const list = roles(); const owner = role(); if (owner && owner.id !== state.roleId) { state.roleId = owner.id; saveState(); } const wallpaper=appearanceValue()?.wallpaper; app.innerHTML = reverseOpen && owner ? reversePageV3(owner) : owner && activeApp ? roleApp(owner) : `<section class="ta-phone-page"><div class="ta-wallpaper" style="${wallpaper ? `background-image:url('${esc(wallpaper)}')` : ''}"></div><div class="ta-phone-head"><button type="button" data-ta-role-picker><i>${avatar(owner)}</i><span><b>${esc(owner?.nickname || owner?.name || 'Ta 的手机')}</b><small>${owner ? '角色手机' : '还没有角色'}</small></span><em>⌄</em></button><div class="ta-head-actions"><button type="button" data-ta-reverse-open aria-label="TA 看我">⇄</button><button type="button" data-ta-refresh ${refreshing ? 'disabled' : ''} aria-label="刷新角色手机">${refreshing ? '…' : '↻'}</button><button type="button" class="ta-close" data-ta-close>×</button></div></div><main class="ta-phone-main">${owner ? `<div class="ta-welcome"><span>TA'S PHONE</span><h1>${esc(owner.nickname || owner.name)} 的手机</h1></div><div class="ta-app-grid">${desktopApps.map(([key, name, iconName, color]) => `<button class="ta-app-icon" data-ta-role-app="${key}" type="button"><i style="--ta-icon-color:${color}">${desktopIcon(key,iconName)}</i><span>${name}</span></button>`).join('')}</div>` : `<div class="ta-no-role"><i>⌁</i><h2>还没有角色手机</h2><p>先在聊天 App 中创建一个角色，再来查看 Ta 的手机。</p></div>`}</main></section>${app.classList.contains('is-role-picker') ? rolePicker(list) : ''}${refreshPickerOpen ? refreshPicker() : ''}${appearanceOpen ? appearanceSheet() : ''}`; decorateTaChatDateDividers(); scheduleReverseBrowseMotion(); if (shouldRestoreChatList) restoreTaChatListScroll(); }
+  function render() { const shouldRestoreChatList = activeApp === 'liaotian' && !activeChatTarget; if (shouldRestoreChatList) { if (taChatSkipCaptureOnce) taChatSkipCaptureOnce = false; else captureTaChatListScroll(); } const list = roles(); const owner = role(); if (owner && owner.id !== state.roleId) { state.roleId = owner.id; saveState(); } const wallpaper=appearanceValue()?.wallpaper; app.innerHTML = reverseOpen && owner ? reversePageV3(owner) : owner && activeApp ? roleApp(owner) : `<section class="ta-phone-page"><div class="ta-wallpaper" style="${wallpaper ? `background-image:url('${esc(wallpaper)}')` : ''}"></div><div class="ta-phone-head"><button type="button" data-ta-role-picker><i>${avatar(owner)}</i><span><b>${esc(owner?.nickname || owner?.name || 'Ta 的手机')}</b><small>${owner ? '角色手机' : '还没有角色'}</small></span><em>⌄</em></button><div class="ta-head-actions"><button type="button" data-ta-reverse-open aria-label="TA 看我">⇄</button><button type="button" data-ta-refresh ${refreshing ? 'disabled' : ''} aria-label="刷新角色手机">${refreshing ? '…' : '↻'}</button><button type="button" class="ta-close" data-ta-close>×</button></div></div><main class="ta-phone-main">${owner ? `<div class="ta-welcome"><span>TA'S PHONE</span><h1>${esc(owner.nickname || owner.name)} 的手机</h1></div><div class="ta-app-grid">${desktopApps.map(([key, name, iconName, color]) => `<button class="ta-app-icon" data-ta-role-app="${key}" type="button"><i style="--ta-icon-color:${color}">${desktopIcon(key,iconName)}</i><span>${name}</span></button>`).join('')}</div>` : `<div class="ta-no-role"><i>⌁</i><h2>还没有角色手机</h2><p>先在聊天 App 中创建一个角色，再来查看 Ta 的手机。</p></div>`}</main></section>${app.classList.contains('is-role-picker') ? rolePicker(list) : ''}${refreshPickerOpen ? refreshPicker() : ''}${appearanceOpen ? appearanceSheet() : ''}`; decorateTaChatDateDividers(); scheduleReverseBrowseMotion(); if (shouldRestoreChatList) restoreTaChatListScroll(); }
   document.addEventListener('click', event => {
     if (!app.classList.contains('is-open') || activeApp !== 'doubao') return;
     const owner = role();
@@ -1288,7 +1508,7 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
     const files=[...(event.target.files||[])];if(!files.length)return;const max=emptyIconTargets().length;if(!max)return window.alert('所有 App 都已有自定义图标，可先恢复默认或交换图标。');const values=[];for(const file of files.slice(0,max)){const value=window.IdealMachineReadImage?await window.IdealMachineReadImage(file,360,.84):await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>resolve('');reader.readAsDataURL(file);});if(value)values.push(value);}event.target.closest('.ta-icon-source-sheet')?.remove();applyIconBatch(values);
   });
   document.addEventListener('input', event => { if(!app.classList.contains('is-open')||!event.target.matches('[data-ta-reverse-rate-range]'))return;const output=app.querySelector('[data-ta-reverse-rate-output]');if(output)output.textContent=`${event.target.value}%`;const text=app.querySelector('.ta-reverse-rate-sheet>section>p');const owner=role();if(text&&owner)text.textContent=`仅作用于 ${owner.nickname||owner.name}。成功率为 ${event.target.value}%，被发现概率为 ${100-Number(event.target.value)}%。`; });
-  document.addEventListener('click', event => { if (event.target.closest('[data-app-key="ta"]')) { state = readState(); activeApp = ''; activeChatTarget = ''; activeDetail = null; activeCalendarDate = localDateKey(new Date()); calendarAutoOpenKey = ''; refreshPickerOpen = false; appearanceOpen = false; reverseOpen = false; selectedRefreshApps.clear(); doubaoHistoryOpen = false; selectedDoubaoHistory = -1; render(); app.classList.add('is-open'); return; } if (!app.classList.contains('is-open')) return; if (event.target.closest('[data-ta-appearance-close]')) { appearanceOpen = false; render(); return; } const albumPick=event.target.closest('[data-ta-album-pick]'); if(albumPick){const target=albumPick.dataset.taAlbumPick;if(!window.IdealMachineAlbum?.pick)return window.alert('相册 App 还没有准备好。');window.IdealMachineAlbum.pick(url=>setAppearanceImage(target,url));return;} const urlPick=event.target.closest('[data-ta-url-pick]');if(urlPick){const value=window.prompt('输入图片链接（https://…）');if(value&&!/^https?:\/\//i.test(value.trim()))return window.alert('请输入有效的 http(s) 图片链接。');if(value)setAppearanceImage(urlPick.dataset.taUrlPick,value);return;} if (event.target.closest('[data-ta-wallpaper-reset]')) { state.appearance.wallpaper = ''; saveState(); render(); return; } const iconReset=event.target.closest('[data-ta-icon-reset]'); if (iconReset) { delete state.appearance.icons[iconReset.dataset.taIconReset]; saveState(); render(); return; } if (event.target.closest('[data-ta-detail-close]')) { activeDetail = null; render(); return; } const detail = event.target.closest('[data-ta-detail]'); if (detail) { activeDetail = { type:detail.dataset.taDetail, index:Number(detail.dataset.taDetailIndex) }; render(); return; } if (event.target.closest('[data-ta-refresh-close]')) { refreshPickerOpen = false; selectedRefreshApps.clear(); render(); return; } if (event.target.closest('[data-ta-refresh-all]')) { const keys = ['chat','calendar','music','doubao','shopping','wallet']; if (selectedRefreshApps.size === keys.length) selectedRefreshApps.clear(); else keys.forEach(key => selectedRefreshApps.add(key)); syncRefreshPicker(); return; } const refreshChoice = event.target.closest('[data-ta-refresh-app]'); if (refreshChoice) { const key = refreshChoice.dataset.taRefreshApp; selectedRefreshApps.has(key) ? selectedRefreshApps.delete(key) : selectedRefreshApps.add(key); syncRefreshPicker(); return; } if (event.target.closest('[data-ta-refresh-submit]')) { const owner = role(); const keys = [...selectedRefreshApps]; if (owner && keys.length) refreshSelectedApps(owner, keys); return; } if (event.target.closest('[data-ta-close]')) { captureTaChatListScroll(); calendarAutoOpenKey = ''; app.classList.remove('is-open'); app.classList.remove('is-role-picker'); appearanceOpen = false; reverseOpen = false; activeDetail = null; return; } if (event.target.closest('[data-ta-role-picker]')) { app.classList.add('is-role-picker'); render(); return; } if (event.target.closest('[data-ta-role-close]')) { app.classList.remove('is-role-picker'); render(); return; } const selected = event.target.closest('[data-ta-role]'); if (selected) { state.roleId = selected.dataset.taRole; activeDetail = null; activeCalendarDate = localDateKey(new Date()); calendarAutoOpenKey = ''; saveState(); app.classList.remove('is-role-picker'); render(); return; } if (event.target.closest('[data-ta-refresh]')) { if (!role()) return; selectedRefreshApps.clear(); refreshPickerOpen = true; render(); return; } const calendarNav = event.target.closest('[data-ta-calendar-nav]'); if (calendarNav) { activeCalendarDate = shiftDateKey(activeCalendarDate, Number(calendarNav.dataset.taCalendarNav)); render(); return; } const pageRefresh = event.target.closest('[data-ta-page-refresh]'); if (pageRefresh) { const owner = role(); if (owner) { if (pageRefresh.dataset.taPageRefresh === 'calendar' && activeCalendarDate !== localDateKey(new Date())) { window.alert('只能刷新今天的日程；上一天和下一天用于查看已经保存的记录。'); return; } activeDetail = null; refreshSelectedApp(owner, pageRefresh.dataset.taPageRefresh); } return; } if (event.target.closest('[data-ta-chat-refresh]')) { const owner = role(); if (owner) refreshRoleChats(owner); return; } if (event.target.closest('[data-ta-chat-list]')) { activeChatTarget = ''; render(); return; } if (event.target.closest('[data-ta-home]')) { captureTaChatListScroll(); activeApp = ''; activeChatTarget = ''; activeDetail = null; calendarAutoOpenKey = ''; render(); return; } if (event.target.closest('[data-ta-analyze-npc]')) { const owner = role(); if (owner) analyzeNpcs(owner); return; } const chatEntry = event.target.closest('[data-ta-role-chat]'); if (chatEntry) { if (suppressGroupEntryClick && chatEntry.matches('[data-ta-group-entry]')) { suppressGroupEntryClick = false; return; } captureTaChatListScroll(); activeChatTarget = chatEntry.dataset.taRoleChat; render(); return; } const launch = event.target.closest('[data-ta-role-app]'); if (launch) { if(launch.dataset.taRoleApp==='meihua'){appearanceOpen=true;render();return;} captureTaChatListScroll(); activeApp = launch.dataset.taRoleApp; activeDetail = null; if (activeApp === 'rili') { activeCalendarDate = localDateKey(new Date()); window.setTimeout(() => autoRefreshRoleCalendar(role()), 0); } else calendarAutoOpenKey = ''; return render(); } });
+  document.addEventListener('click', event => { if (event.target.closest('[data-app-key="ta"]')) { state = readState(); activeApp = ''; activeChatTarget = ''; activeDetail = null; activeCalendarDate = localDateKey(new Date()); calendarAutoOpenKey = ''; refreshPickerOpen = false; appearanceOpen = false; reverseOpen = false; selectedRefreshApps.clear(); doubaoHistoryOpen = false; selectedDoubaoHistory = -1; render(); app.classList.add('is-open'); return; } if (!app.classList.contains('is-open')) return; if (event.target.closest('[data-ta-appearance-close]')) { appearanceOpen = false; render(); return; } const albumPick=event.target.closest('[data-ta-album-pick]'); if(albumPick){const target=albumPick.dataset.taAlbumPick;if(!window.IdealMachineAlbum?.pick)return window.alert('相册 App 还没有准备好。');window.IdealMachineAlbum.pick(url=>setAppearanceImage(target,url));return;} const urlPick=event.target.closest('[data-ta-url-pick]');if(urlPick){const value=window.prompt('输入图片链接（https://…）');if(value&&!/^https?:\/\//i.test(value.trim()))return window.alert('请输入有效的 http(s) 图片链接。');if(value)setAppearanceImage(urlPick.dataset.taUrlPick,value);return;} if (event.target.closest('[data-ta-wallpaper-reset]')) { state.appearance.wallpaper = ''; saveState(); render(); return; } const iconReset=event.target.closest('[data-ta-icon-reset]'); if (iconReset) { delete state.appearance.icons[iconReset.dataset.taIconReset]; saveState(); render(); return; } if (event.target.closest('[data-ta-detail-close]')) { activeDetail = null; render(); return; } const detail = event.target.closest('[data-ta-detail]'); if (detail) { activeDetail = { type:detail.dataset.taDetail, index:Number(detail.dataset.taDetailIndex) }; render(); return; } if (event.target.closest('[data-ta-refresh-close]')) { refreshPickerOpen = false; selectedRefreshApps.clear(); render(); return; } if (event.target.closest('[data-ta-refresh-all]')) { const keys = ['chat','calendar','music','doubao','shopping','wallet']; if (selectedRefreshApps.size === keys.length) selectedRefreshApps.clear(); else keys.forEach(key => selectedRefreshApps.add(key)); syncRefreshPicker(); return; } const refreshChoice = event.target.closest('[data-ta-refresh-app]'); if (refreshChoice) { const key = refreshChoice.dataset.taRefreshApp; selectedRefreshApps.has(key) ? selectedRefreshApps.delete(key) : selectedRefreshApps.add(key); syncRefreshPicker(); return; } if (event.target.closest('[data-ta-refresh-submit]')) { const owner = role(); const keys = [...selectedRefreshApps]; if (owner && keys.length) refreshSelectedApps(owner, keys); return; } if (event.target.closest('[data-ta-close]')) { captureTaChatListScroll(); calendarAutoOpenKey = ''; app.classList.remove('is-open'); app.classList.remove('is-role-picker'); appearanceOpen = false; reverseOpen = false; activeDetail = null; return; } if (event.target.closest('[data-ta-role-picker]')) { app.classList.add('is-role-picker'); render(); return; } if (event.target.closest('[data-ta-role-close]')) { app.classList.remove('is-role-picker'); render(); return; } const selected = event.target.closest('[data-ta-role]'); if (selected) { state.roleId = selected.dataset.taRole; activeDetail = null; activeCalendarDate = localDateKey(new Date()); calendarAutoOpenKey = ''; saveState(); app.classList.remove('is-role-picker'); render(); return; } if (event.target.closest('[data-ta-refresh]')) { if (!role()) return; selectedRefreshApps.clear(); refreshPickerOpen = true; render(); return; } const calendarNav = event.target.closest('[data-ta-calendar-nav]'); if (calendarNav) { activeCalendarDate = shiftDateKey(activeCalendarDate, Number(calendarNav.dataset.taCalendarNav)); render(); return; } const pageRefresh = event.target.closest('[data-ta-page-refresh]'); if (pageRefresh) { const owner = role(); if (owner) { if (pageRefresh.dataset.taPageRefresh === 'calendar' && activeCalendarDate !== localDateKey(new Date())) { window.alert('只能刷新今天的日程；上一天和下一天用于查看已经保存的记录。'); return; } activeDetail = null; refreshSelectedApp(owner, pageRefresh.dataset.taPageRefresh); } return; } if (event.target.closest('[data-ta-chat-refresh]')) { const owner = role(); if (owner) refreshRoleChats(owner); return; } if (event.target.closest('[data-ta-chat-list]')) { taChatSkipCaptureOnce = true; activeChatTarget = ''; render(); return; } if (event.target.closest('[data-ta-home]')) { captureTaChatListScroll(); activeApp = ''; activeChatTarget = ''; activeDetail = null; calendarAutoOpenKey = ''; render(); return; } if (event.target.closest('[data-ta-analyze-npc]')) { const owner = role(); if (owner) analyzeNpcs(owner); return; } const chatEntry = event.target.closest('[data-ta-role-chat]'); if (chatEntry) { if (suppressGroupEntryClick && chatEntry.matches('[data-ta-group-entry]')) { suppressGroupEntryClick = false; return; } captureTaChatListScroll(); activeChatTarget = chatEntry.dataset.taRoleChat; render(); return; } const launch = event.target.closest('[data-ta-role-app]'); if (launch) { if(launch.dataset.taRoleApp==='meihua'){appearanceOpen=true;render();return;} captureTaChatListScroll(); activeApp = launch.dataset.taRoleApp; activeDetail = null; if (activeApp === 'rili') { activeCalendarDate = localDateKey(new Date()); window.setTimeout(() => autoRefreshRoleCalendar(role()), 0); } else calendarAutoOpenKey = ''; return render(); } });
   document.addEventListener('change', event => { if (!app.classList.contains('is-open')||!event.target.matches('[data-ta-image-file]')) return; const file=event.target.files?.[0]; if(!file)return;const target=event.target.dataset.taImageFile;const wallpaper=target==='wallpaper';const reader=window.IdealMachineReadImage ? window.IdealMachineReadImage(file, wallpaper ? 1600 : 360, wallpaper ? .76 : .84) : new Promise(resolve=>{const source=new FileReader();source.onload=()=>resolve(source.result);source.onerror=()=>resolve('');source.readAsDataURL(file);});reader.then(value=>setAppearanceImage(target,value)); });
   function reverseDataLines(value, limit=8) { const rows=[];const visit=(item,prefix='')=>{if(rows.length>=limit||item==null)return;if(typeof item==='string'||typeof item==='number'){const text=String(item).trim();if(text)rows.push(`${prefix}${text}`);return;}if(Array.isArray(item)){item.slice(-limit).forEach(entry=>visit(entry,prefix));return;}if(typeof item==='object'){const title=item.name||item.title||item.productName||item.with||item.text||item.note||'';const detail=item.price||item.amount||item.status||item.category||item.time||'';if(title)rows.push(`${prefix}${title}${detail?` · ${detail}`:''}`);else Object.entries(item).slice(0,limit).forEach(([key,entry])=>visit(entry,`${key}：`));}};visit(value);return rows.slice(0,limit); }
   function reverseWait(ms) { return new Promise(resolve=>window.setTimeout(resolve,ms)); }

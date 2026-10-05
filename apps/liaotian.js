@@ -1,5 +1,6 @@
 (() => {
   const key = 'ideal-machine-chat';
+  const worldbookSillyTavernUnlockKey = 'ideal-machine-worldbook-sillytavern-unlocked';
   const initial = { contacts: [], profiles: [], chats: {}, moments: [], contactGroups: [], emojis: { groups: [{ id: 'emoji-default', name: '默认', items: [] }] }, pageBeauty: { chat: '', contacts: '', moments: '', me: '', dock: '' } };
   const chatPageBeautyKeys = Object.freeze(['chat', 'contacts', 'moments', 'me', 'dock']);
   const chatPageBeautyLabels = Object.freeze({ chat: '聊天', contacts: '联系人', moments: '朋友圈', me: '我', dock: '公用 Dock' });
@@ -1151,12 +1152,20 @@
     window.dispatchEvent(new CustomEvent('ideal-worldbooks-updated'));
     return id;
   }
+  function unlockWorldbookJsonImport() {
+    if (!window.IdealMachineActivation?.isUnlocked?.()) return false;
+    if (localStorage.getItem(worldbookSillyTavernUnlockKey) === '1') return true;
+    localStorage.setItem(worldbookSillyTavernUnlockKey, '1');
+    window.dispatchEvent(new CustomEvent('ideal-worldbook-sillytavern-unlocked'));
+    return true;
+  }
   async function importSillyTavernCard() {
     if (!(await window.IdealMachineActivation?.ensureUnlocked?.())) return;
     const file = document.querySelector('#chatCharacterCardFile')?.files?.[0];
     if (!file) return;
     try {
       const imported = await parseSillyTavernCard(file);
+      unlockWorldbookJsonImport();
       editorDraft = imported;
       editorAvatar = imported.avatar || editorAvatar;
       editorWorldbookDraft = queueImportedWorldbook(imported.book);
@@ -1453,7 +1462,9 @@ ${languageInstruction}
 
   document.addEventListener('click', event => { const button = event.target.closest?.('[data-chat-import-card]'); if (!button || event.target.closest?.('#chatCharacterCardFile') || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); document.querySelector('#chatCharacterCardFile')?.click(); }, true);
   document.addEventListener('click', event => { const button = event.target.closest?.('[data-chat-import-text]'); if (!button || event.target.closest?.('#chatCharacterTextFile') || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); document.querySelector('#chatCharacterTextFile')?.click(); }, true);
-  document.addEventListener('click', async event => { const button = event.target.closest?.('[data-chat-card-unlock]'); if (!button || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); if (await window.IdealMachineActivation?.ensureUnlocked?.()) renderEditor(); }, true);
+  document.addEventListener('click', async event => { const button = event.target.closest?.('[data-chat-card-unlock]'); if (!button || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); if (await window.IdealMachineActivation?.ensureUnlocked?.()) { unlockWorldbookJsonImport(); renderEditor(); } }, true);
+  window.addEventListener('ideal-machine-activation-ready', () => { if (window.IdealMachineActivation?.isUnlocked?.()) unlockWorldbookJsonImport(); });
+  window.addEventListener('ideal-machine-activation-changed', () => { if (window.IdealMachineActivation?.isUnlocked?.()) unlockWorldbookJsonImport(); if (editorMode) renderEditor(); });
   document.addEventListener('change', event => { const input = event.target.closest?.('#chatCharacterCardFile'); if (!input || !input.files?.[0] || !editorMode) return; event.preventDefault(); event.stopImmediatePropagation(); importSillyTavernCard(); }, true);
   document.addEventListener('change', event => { const input = event.target.closest?.('#chatCharacterTextFile'); if (!input || !input.files?.[0] || !editorMode) return; event.preventDefault(); event.stopImmediatePropagation(); importCharacterTextFile(); }, true);
   function parseSillyTavernCard(file) {
@@ -1563,6 +1574,7 @@ ${languageInstruction}
     const editor = document.querySelector('#chatEditor'); if (!editor) return;
     editor.classList.toggle('is-open', Boolean(editorMode)); editor.setAttribute('aria-hidden', String(!editorMode)); if (!editorMode) { editor.innerHTML = ''; return; }
     const contact = state.contacts.find(item => item.id === editorContactId) || {}; const source = { ...contact, ...(editorDraft || {}) }; const unlocked = Boolean(window.IdealMachineActivation?.isUnlocked?.());
+    if (unlocked) unlockWorldbookJsonImport();
     const worldbook = editorWorldbookDraft ? `<p class="chat-card-import-note">保存后自动创建并绑定：${esc(editorWorldbookDraft.name)}（${editorWorldbookDraft.entries.length} 个条目）</p>` : '';
     const importedWorldbookOption = editorWorldbookDraft ? `<option value="__imported_worldbook__" selected>已导入并绑定：${esc(editorWorldbookDraft.name)}</option>` : '';
     const cardAction = unlocked ? `<label class="chat-file-button" data-chat-import-card>选择角色卡<input id="chatCharacterCardFile" type="file" accept="image/png,.png,application/json,.json"></label>` : `<span class="chat-card-lock" aria-label="导入功能已锁定">🔒</span><button class="chat-card-unlock" type="button" data-chat-card-unlock>解锁导入</button>`;
@@ -7854,7 +7866,9 @@ ${recentConversation}
   }
   function momentActorName(id) {
     const contact = state.contacts.find(item => item.id === id); if (contact) return contact.nickname || contact.name || '';
-    return momentNpcActors().find(item => item.id === id)?.displayName || '';
+    const npc = momentNpcActors().find(item => item.id === id)?.displayName;
+    if (npc) return npc;
+    return (state.moments || []).flatMap(post => Array.isArray(post.interactionActors) ? post.interactionActors : []).find(actor => String(actor?.id || '') === String(id || ''))?.displayName || '';
   }
   function momentCommentThreadEntries(post) {
     const entries = [];
