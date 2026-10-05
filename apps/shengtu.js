@@ -124,23 +124,40 @@
     return match ? { width: Number(match[1]), height: Number(match[2]) } : {};
   }
 
-  function normalizeImage(value) {
+  function normalizeImage(value, baseUrl = '') {
     const raw = String(value || '').trim();
     if (!raw) return '';
-    if (/^(data:image\/|https?:\/\/|blob:)/i.test(raw)) return raw;
+    if (/^(data:|https?:\/\/|blob:)/i.test(raw)) return raw;
+    if (/^\/\//.test(raw)) return `${location.protocol}${raw}`;
+    // 一些 OpenAI 兼容服务返回相对图片地址。将其解析到服务端点，
+    // 不要误当成 base64 包装成 data URL（浏览器会因此无法显示）。
+    if (/^(?:\.{0,2}\/|\/)|^[\w.-]+\/[\w./?=&%-]+\.(?:png|jpe?g|webp|gif)(?:[?#].*)?$/i.test(raw)) {
+      try { return new URL(raw, baseUrl || location.href).href; } catch {}
+    }
     return `data:image/png;base64,${raw.replace(/^data:image\/[^;]+;base64,/i, '')}`;
   }
 
-  function extractImages(payload) {
+  function extractImages(payload, baseUrl = '') {
     const pools = [];
-    if (Array.isArray(payload?.data)) pools.push(...payload.data);
-    if (Array.isArray(payload?.images)) pools.push(...payload.images);
-    if (Array.isArray(payload?.output)) pools.push(...payload.output);
+    for (const group of [payload?.data, payload?.images, payload?.output, payload?.result]) {
+      if (Array.isArray(group)) pools.push(...group);
+      else if (group && typeof group === 'object') pools.push(group);
+    }
     if (payload?.image) pools.push(payload.image);
+    if (payload?.image_url) pools.push({ image_url: payload.image_url });
+    (Array.isArray(payload?.candidates) ? payload.candidates : []).forEach(candidate => {
+      (Array.isArray(candidate?.content?.parts) ? candidate.content.parts : []).forEach(part => {
+        if (part?.inline_data || part?.inlineData || part?.image_url) pools.push(part);
+      });
+    });
     const values = pools.map(item => {
       if (typeof item === 'string') return item;
-      return item?.b64_json || item?.base64 || item?.b64 || item?.url || item?.image || item?.data || '';
-    }).map(normalizeImage).filter(Boolean);
+      const imageUrl = item?.image_url;
+      const inlineData = item?.inline_data || item?.inlineData;
+      return item?.b64_json || item?.base64 || item?.b64 || item?.url ||
+        (typeof imageUrl === 'string' ? imageUrl : imageUrl?.url) || item?.image || item?.data ||
+        inlineData?.data || '';
+    }).map(value => normalizeImage(value, baseUrl)).filter(Boolean);
     return [...new Set(values)];
   }
 
@@ -149,6 +166,9 @@
   }
 
   async function storeImage(value) {
+    // 远端 URL 直接作为消息资源使用，避免额外包一层 IndexedDB key 后，
+    // 还要经历本地解引用才可显示；base64 则继续放入 IndexedDB，避免撑爆 localStorage。
+    if (/^https?:\/\//i.test(String(value || ''))) return String(value);
     return window.IdealMachinePutImage ? window.IdealMachinePutImage(value) : value;
   }
 
@@ -213,7 +233,7 @@
       }
       break;
     }
-    const sources = extractImages(payload);
+    const sources = extractImages(payload, endpoint);
     if (!sources.length) throw new Error('接口已响应，但没有返回可识别的图片（支持 data[].b64_json、base64 或 url 格式）');
     const assets = await Promise.all(sources.map(storeImage));
     return { assetId: assets[0], assetIds: assets, prompt, revisedPrompt: payload?.data?.[0]?.revised_prompt || '' };
