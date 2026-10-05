@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ideal-machine-shell-v20261005-push-chain-1';
+const CACHE_NAME = 'ideal-machine-shell-v20261005-push-chain-2';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());

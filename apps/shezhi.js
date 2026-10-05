@@ -152,7 +152,7 @@
     } catch { source = ''; }
     return source;
   }
-  const pushServiceWorkerVersion = '20261005-push-chain-1';
+  const pushServiceWorkerVersion = '20261005-push-chain-2';
   function pushApiBase() {
     const value = String(window.IdealMachineConfig?.pushApiBase || '').trim().replace(/\/$/, '');
     if (!value) return '';
@@ -166,10 +166,10 @@
   async function pushRequest(path, options = {}) {
     const api = pushApiBase();
     if (!api) throw new Error('推送服务地址未配置。');
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(new DOMException('推送服务请求超时', 'TimeoutError')), 12000);
     const request = window.IdealMachineFetch || window.fetch.bind(window);
-    try { return await request(`${api}${path}`, { ...options, idealScope:'notifications', signal:controller.signal }); }
+    let timer = null;
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('推送服务请求超时，请稍后重试。')), 12000); });
+    try { return await Promise.race([request(`${api}${path}`, { ...options, idealScope:'notifications' }), timeout]); }
     finally { clearTimeout(timer); }
   }
   async function pushServiceWorkerRegistration() {
