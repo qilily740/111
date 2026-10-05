@@ -9704,7 +9704,16 @@ ${recentConversation}
     const section = document.querySelector('#chatSettings .chat-display-settings');
     if (!chatSettingsOpen || !chat || !contact || contact.isGroup || !section || section.querySelector('[data-chat-setting-toggle="internalNotificationEnabled"]')) return;
     const enabled = chatSettingsFor(chat).internalNotificationEnabled;
-    section.insertAdjacentHTML('beforeend', `<label class="chat-setting-toggle"><span><b>理想机内消息弹窗</b><small>关闭后此角色不显示顶部通知，即使全局通知开启；不影响手机系统通知</small></span><input type="checkbox" data-chat-setting-toggle="internalNotificationEnabled" ${enabled ? 'checked' : ''}></label>`);
+    section.insertAdjacentHTML('beforeend', `<label class="chat-setting-toggle"><span>理想机内消息弹窗<small>关闭后此角色不显示顶部通知，即使全局通知开启；不影响手机系统通知</small></span><input type="checkbox" data-chat-setting-toggle="internalNotificationEnabled" ${enabled ? 'checked' : ''}></label>`);
   };
+  document.addEventListener('change', event => {
+    const toggle = event.target.closest?.('#chatSettings [data-chat-setting-toggle="internalNotificationEnabled"]');
+    if (!toggle) return;
+    event.stopImmediatePropagation();
+    const chat = currentChat();
+    if (!chat) return;
+    chatSettingsFor(chat).internalNotificationEnabled = toggle.checked;
+    save();
+  }, true);
   startActiveMessageAutomation();
 })();
