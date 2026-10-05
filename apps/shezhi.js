@@ -290,6 +290,7 @@
   }
   function showInternalNotification(payload = {}) {
     const identity = notificationIdentity(payload);
+    if (identity.contactId && window.IdealMachineChatView?.shouldShowInternalNotification?.(identity.contactId) === false) return false;
     notificationTarget = identity.contactId || '';
     const avatarRequest = ++notificationAvatarRequest;
     const avatarNode = notificationBanner.querySelector('.ideal-message-notification-avatar');
