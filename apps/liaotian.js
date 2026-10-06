@@ -244,9 +244,16 @@
   function idealChatBilingualLanguageLabel(code) {
     return IDEAL_CHAT_BILINGUAL_LANGUAGES.find(item => item[0] === code)?.[1] || code;
   }
+  function idealChatBilingualNeedsExplicitLabels(chat) {
+    const settings = idealChatBilingualFor(chat);
+    return settings.enabled && [settings.sourceLang, settings.targetLang].some(code => code === 'yue' || code.startsWith('zh-'));
+  }
   function idealChatBilingualInstruction(chat) {
     const settings = idealChatBilingualFor(chat);
     if (!settings.enabled) return '';
+    if (idealChatBilingualNeedsExplicitLabels(chat)) {
+      return `\n\n【理想机双语模式｜最高优先级】\n本聊天已启用双语模式。角色优先使用${idealChatBilingualLanguageLabel(settings.sourceLang)}表达；每条可见消息和心声都必须严格写成“原文：${idealChatBilingualLanguageLabel(settings.sourceLang)}内容「译文：${idealChatBilingualLanguageLabel(settings.targetLang)}内容」”。“原文：”和“译文：”标签必须保留，系统会据此区分粤语与中文等共用汉字的语言；不要省略标签，不要把译文另起一条，不要把标签之外的说明输出给用户。即使原文与译文都使用汉字，也必须输出完整的原文和译文。每条消息分别配对，不要把多条消息合并。`;
+    }
     return `\n\n【理想机双语模式｜最高优先级】\n本聊天已启用双语模式。角色优先使用${idealChatBilingualLanguageLabel(settings.sourceLang)}表达；需要翻译时，把同一条消息写成“${idealChatBilingualLanguageLabel(settings.sourceLang)}原文「${idealChatBilingualLanguageLabel(settings.targetLang)}译文」”。原文与译文必须属于同一条消息，不能合并多条消息，不能输出语言说明、标题或额外解释。若本条本来就是自然的${idealChatBilingualLanguageLabel(settings.targetLang)}，可以只输出原文。心声也遵循同样格式。`;
   }
   function idealChatBilingualVisible(value) {
@@ -260,22 +267,27 @@
   function idealChatBilingualParse(value) {
     let source = String(value || '').trim();
     if (source.startsWith('[') && source.endsWith(']') && !source.startsWith('[[')) source = source.slice(1, -1).trim();
+    const labeled = source.match(/^(?:[^「」\n]{1,12})?原文[：:]?\s*([\s\S]*?)「(?:[^「」\n]{1,12})?译文[：:]?\s*([^「」]+)」\s*$/);
+    if (labeled) return { text:labeled[1].trim(), translation:labeled[2].trim(), explicitPair:true };
     const match = source.match(/^([\s\S]*?)「([^「」]+)」\s*$/);
     if (!match || !idealChatBilingualHasForeign(match[1])) return { text: source, translation: '' };
-    return { text: match[1].trim(), translation: match[2].trim() };
+    return { text: match[1].trim(), translation: match[2].trim(), explicitPair:false };
   }
   function idealChatBilingualReplyCompliant(value, chat) {
     const settings = idealChatBilingualFor(chat);
     if (!settings.enabled) return true;
-    const source = String(value || '').replace(/\[\[\s*THOUGHT\s*\]\][\s\S]*?(?:\[\[\s*\/\s*THOUGHT\s*\]\]|$)/ig, '');
+    const source = String(value || '').replace(/\[\[\s*THOUGHT\s*\]\]|\[\[\s*\/\s*THOUGHT\s*\]\]/ig, ' ');
     return source.split(/\[\[MSG\]\]/i).map(item => item.trim()).filter(Boolean).every(item => {
       if (/^\[\[(?:STICKER|VOICE|VIDEO_CALL|TRANSFER|LOCATION|PAT)\b/i.test(item)) return true;
-      const parsed = idealChatBilingualParse(item);
+      const visibleItem = item.replace(/\[\[[\s\S]*?\]\]/g, '').trim();
+      const parsed = idealChatBilingualParse(visibleItem);
+      if (idealChatBilingualNeedsExplicitLabels(chat)) return parsed.explicitPair === true;
       return !idealChatBilingualHasForeign(parsed.text) || Boolean(parsed.translation);
     });
   }
   function idealChatBilingualCorrectionPrompt(chat) {
     const settings = idealChatBilingualFor(chat);
+    if (idealChatBilingualNeedsExplicitLabels(chat)) return `上一条回复没有遵守理想机双语格式。请保持原意、语气、消息数量和所有控制标记不变，只修正每条可见消息及心声的格式：严格写成“原文：${idealChatBilingualLanguageLabel(settings.sourceLang)}内容「译文：${idealChatBilingualLanguageLabel(settings.targetLang)}内容」”。必须保留“原文：”和“译文：”标签；两段都要有实际内容，不得因两种语言都使用汉字而省略译文。只输出完整回复，不要解释。`;
     return `上一条回复没有遵守理想机双语格式。请保持原意、语气、消息数量和控制标记不变，只修正语言格式：非${idealChatBilingualLanguageLabel(settings.targetLang)}消息必须在同一条原文末尾追加「${idealChatBilingualLanguageLabel(settings.targetLang)}译文」；${idealChatBilingualLanguageLabel(settings.targetLang)}消息可保持原文。只输出完整回复，不要解释。`;
   }
   async function idealChatBilingualCorrectReply(raw, chat, config, model, systemText, history, scope = 'chat') {
@@ -347,6 +359,18 @@
   }, true);
   document.addEventListener('contextmenu', event => { if (event.target.closest?.('.chat-app')) event.preventDefault(); }, true);
   document.addEventListener('click', event => { const saveButton = event.target.closest?.('[data-chat-role-moment-save]'); if (!saveButton) return; const checkbox = document.querySelector('#chatRoleMomentComposer [data-chat-role-moment-image]'); const config = window.IdealMachineImageAPI?.getConfig?.() || {}; if (checkbox?.checked && !(config.endpoint && config.model)) { event.preventDefault(); event.stopImmediatePropagation(); window.alert('请先在设置中配置生图 API，再生成带图动态。'); } }, true);
+  document.addEventListener('click', event => {
+    const saveButton = event.target.closest?.('#chatRoleMomentComposer [data-chat-role-moment-save]');
+    if (!saveButton) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (roleMomentMode === 'select') roleMomentTargets = [...document.querySelectorAll('#chatRoleMomentComposer [data-chat-role-target]:checked')].map(input => input.dataset.chatRoleTarget);
+    const withImage = Boolean(document.querySelector('#chatRoleMomentComposer [data-chat-role-moment-image]')?.checked);
+    roleMomentWithImage = false;
+    roleMomentComposerOpen = false;
+    renderRoleMomentComposer();
+    void submitRoleMomentComposer(withImage);
+  }, true);
   document.addEventListener('click', event => { const button = event.target.closest?.('#chatRoleMomentComposer [data-chat-role-moment-image-toggle]'); if (!button) return; event.preventDefault(); event.stopImmediatePropagation(); roleMomentWithImage = !roleMomentWithImage; button.classList.toggle('is-selected', roleMomentWithImage); button.setAttribute('aria-pressed', String(roleMomentWithImage)); const checkbox = document.querySelector('#chatRoleMomentComposer [data-chat-role-moment-image]'); if (checkbox) checkbox.checked = roleMomentWithImage; }, true);
   document.addEventListener('click', event => { const saveButton = event.target.closest?.('[data-chat-reading-chat-settings-save]'); if (!saveButton) return; const modal = document.querySelector('[data-chat-reading]'); const book = readBooks().find(item => item.id === readingBookId); if (!modal || !book) return; event.preventDefault(); event.stopImmediatePropagation(); const size = Number(modal.querySelector('[data-reading-chat-font-size]')?.value || 11); const font = modal.querySelector('[data-reading-chat-font]')?.value === 'reading' && book.fontSource ? 'reading' : 'default'; book.readingChatTextColor = modal.querySelector('[data-reading-chat-text-color]')?.value || '#222222'; book.readingChatFontSize = Math.max(10, Math.min(24, Number.isFinite(size) ? size : 11)); book.readingChatFontChoice = font; book.readingChatBackground = readingImageSource(modal.querySelector('[data-chat-reading-background]')?.value || book.readingChatBackground || ''); if (/^https?:\/\//i.test(book.readingChatBackground)) window.IdealMachineAlbum?.archiveUrl?.(book.readingChatBackground, '阅读聊天背景'); saveBooks(readBooks().map(item => item.id === book.id ? book : item)); readingChatSettingsOpen = false; modal.querySelector('.chat-reading-chat-settings')?.remove(); renderReadingChat(modal); }, true);
   document.addEventListener('click', event => { if (event.target.closest?.('[data-chat-tool="offline"]')) offlineExitRequested = false; }, true);
@@ -1954,7 +1978,9 @@ ${languageInstruction}
     const thoughtBilingual = idealChatBilingualFor(chat);
     const thoughtLanguageRule = idealChatBilingualInstruction(chat) || '心声使用角色自然的主要语言，不要附加译文。';
     const thoughtTranslationRule = thoughtBilingual.enabled
-      ? `心声也必须遵守双语模式：原文使用${idealChatBilingualLanguageLabel(thoughtBilingual.sourceLang)}，需要翻译时在同一条心声末尾追加「${idealChatBilingualLanguageLabel(thoughtBilingual.targetLang)}译文」。`
+      ? idealChatBilingualNeedsExplicitLabels(chat)
+        ? `心声也必须严格写成“原文：${idealChatBilingualLanguageLabel(thoughtBilingual.sourceLang)}内容「译文：${idealChatBilingualLanguageLabel(thoughtBilingual.targetLang)}内容」”，必须保留两个标签并提供实际译文。`
+        : `心声也必须遵守双语模式：原文使用${idealChatBilingualLanguageLabel(thoughtBilingual.sourceLang)}，需要翻译时在同一条心声末尾追加「${idealChatBilingualLanguageLabel(thoughtBilingual.targetLang)}译文」。`
       : '不要附加译文。';
     const rerollRule = force && savedThought?.text
       ? `这是一次重roll。旧心声是：“${cleanThoughtText(savedThought.text).slice(0, 120)}”。新心声必须换一个符合当前情境的具体角度或措辞，不能原样复用旧心声。`
@@ -5520,6 +5546,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     }).join('\n');
   }
 
+  function isExplicitSelfieRequest(text) {
+    return /自拍|自拍照|对镜自拍|镜子自拍|镜面自拍|mirror\s*selfie/i.test(String(text || ''));
+  }
+
   async function generateCharacterChatImage(prompt, targetChat, contact, existingMessage = null) {
     const api = window.IdealMachineImageAPI;
     if (!api?.generate || !targetChat || !contact) {
@@ -5528,16 +5558,20 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       window.alert(`角色发图失败：${error.message}`);
       return false;
     }
-    // 不把完整人设和聊天记录交给图片服务；聊天模型已经结合角色资料
-    // 整理了视觉描述。去掉镜头控制标签后，仅补充一致的安全/成像约束，
-    // 不再把所有自拍都强制改成肩部近景，以免覆盖提示词里的具体构图。
-    const rolePrompt = prepareCharacterImagePrompt(prompt);
+    // 自拍请求走稳定的安全简短提示词：不把聊天历史或聊天模型展开的
+    // 亲密/身体描写带入图片 API，避免普通“发自拍”被扩写成触发 400 的内容。
+    // 这是正常的内容边界处理，不重试或绕过图片服务的审核。
+    const latestUserMessage = [...(targetChat.messages || [])].reverse().find(message => message.role === 'user');
+    const selfieRequested = isExplicitSelfieRequest(latestUserMessage?.text);
+    const rolePrompt = selfieRequested
+      ? 'A natural everyday selfie portrait of a fictional character, fully clothed in ordinary casual clothing, relaxed friendly expression, soft natural daylight, simple private indoor background, realistic personal snapshot, tasteful and non-suggestive, no readable text, watermark, logo, or app interface.'
+      : prepareCharacterImagePrompt(prompt);
     try {
       const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1 });
       if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源');
-      if (existingMessage) Object.assign(existingMessage, { text: result.assetId, generated: true, generatedPrompt: prompt, generatedImageLoading: false });
+      if (existingMessage) Object.assign(existingMessage, { text: result.assetId, generated: true, generatedPrompt: rolePrompt, generatedImageLoading: false });
       else {
-        const imageMessage = { id: uid('message'), text: result.assetId, role: 'character', type: 'image', generated: true, generatedPrompt: prompt, time: time() };
+        const imageMessage = { id: uid('message'), text: result.assetId, role: 'character', type: 'image', generated: true, generatedPrompt: rolePrompt, time: time() };
         const contactId = contact?.id || Object.keys(state.chats || {}).find(id => state.chats[id] === targetChat) || '';
         const viewingTargetChat = isViewingChat(contactId);
         if (!viewingTargetChat) imageMessage.unread = true;
@@ -5793,49 +5827,32 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     }
   }
 
-  async function safeMomentImagePrompt(post, contact) {
-    // 参考 Wanwan：先整理成具体的镜头化英文 prompt，再单独交给生图 API；
-    // 不把完整人设和聊天记录直接拼进图片请求，减少无关内容造成的审核误判。
-    const config = window.IdealMachineAPI?.getConfig?.();
-    const model = window.IdealMachineAPI?.getModel?.('chat');
-    if (!config?.endpoint || !config.key || !model) throw new Error('请先配置聊天 API，才能为朋友圈配图整理画面提示词。');
-    const request = window.IdealMachineFetch || fetch;
-    const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      timeout: 90000,
-      idealScope: 'chat-moments-image-prompt',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` },
-      body: JSON.stringify({
-        model,
-        temperature: .35,
-        max_tokens: 260,
-        stream: false,
-        messages: [
-          { role: 'system', content: 'Create clear, original image descriptions for everyday social posts. Respond with valid JSON only: {"canGenerate":true,"prompt":"..."} or {"canGenerate":false,"prompt":""}; choose false if the described scene is not safe to depict. Write the prompt in English (40-80 words) as a natural description beginning with a suitable shot type, for example "A close-up portrait", "A full-body candid shot", "A still life", or "A landscape view". Cover the visible subject and action, surroundings, framing, lighting, and mood. People must be fully clothed and shown non-sexually. Do not make up ages or sensitive physical traits, and exclude writing, watermarks, logos, and app interfaces.' },
-          { role: 'user', content: `Write an image prompt for this character's everyday social post. Make the specific event in the post visually recognizable and include only details that help depict it. Relevant, safe visual traits may be used, but leave unrelated intimate, sexual, violent, or sensitive backstory out.\nCharacter: ${String(contact?.nickname || contact?.name || 'character').slice(0, 80)}\nVisible appearance notes (use only if relevant to the scene): ${String(contact?.details || contact?.signature || '').slice(0, 1200)}\nPost to depict: ${String(post?.text || '').slice(0, 600)}` }
-        ]
-      })
-    });
-    if (!response.ok) throw new Error(`画面提示词整理失败：HTTP ${response.status}`);
-    const payload = await response.json();
-    const raw = String(payload.choices?.[0]?.message?.content || '').replace(/```(?:json)?|```/gi, '').trim();
-    let result;
-    try { result = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || raw); } catch { throw new Error('画面提示词整理结果格式无效。'); }
-    const prompt = String(result?.prompt || '').trim();
-    if (result?.canGenerate !== true || !prompt) throw new Error('这条动态无法整理成符合生图要求的安全画面，已保留文字动态。');
-    return prompt;
+  function safeMomentImagePrompt(post, contact) {
+    const text = String(post?.text || '').trim().slice(0, 600);
+    const appearance = String(contact?.signature || contact?.details || '').trim().slice(0, 600);
+    if (!text) throw new Error('朋友圈正文为空，无法根据动态生成配图。');
+    return [
+      '请直接为这条角色朋友圈生成一张具体、自然的生活场景图片。画面应呈现动态正文里实际发生的事情，保留其中的主体、动作和情境；不要把有具体事件的动态改成无关的人像或静物。采用可信的日常摄影观感，构图清楚，环境、光线和氛围贴合这条动态。',
+      `朋友圈正文：${text}`,
+      appearance ? `角色外观参考（只采用与画面相关、可见的特征）：${appearance}` : '',
+      '人物如出现须穿着完整、自然得体；不要加入情色描写、臆造年龄或敏感身体特征。画面中不要出现可读文字、水印、logo、聊天气泡或社交软件界面。'
+    ].filter(Boolean).join('\n');
   }
 
-  async function addGeneratedMomentImages(posts) {
+  async function addGeneratedMomentImages(posts, { showErrors = false } = {}) {
     const api = window.IdealMachineImageAPI;
-    if (!api?.generate) return;
+    if (!api?.generate) {
+      if (showErrors) window.alert('生图模块尚未加载，朋友圈文字已生成但配图没有提交。请刷新页面后重试。');
+      return false;
+    }
+    const failures = [];
     for (const post of posts) {
       const contact = state.contacts.find(item => item.id === post.authorId);
       if (!contact || post.image) continue;
       try {
         const prompt = await safeMomentImagePrompt(post, contact);
         const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
-        if (!result?.assetId) continue;
+        if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源。');
         post.image = result.assetId;
         post.generatedImage = true;
         post.generatedPrompt = prompt;
@@ -5844,7 +5861,23 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         render();
       } catch (error) {
         console.warn('朋友圈配图失败，已保留文字动态：', error);
+        failures.push(`${contact?.nickname || contact?.name || '角色'}：${error?.message || '生图请求失败'}`);
       }
+    }
+    if (failures.length && showErrors) window.alert(`朋友圈配图未成功：\n${failures.join('\n')}`);
+    return failures.length === 0;
+  }
+
+  async function submitRoleMomentComposer(withImage) {
+    const before = new Set(state.moments.map(post => post.id));
+    try {
+      await generateRoleMoment(null);
+      const created = state.moments.filter(post => !before.has(post.id) && post.authorType === 'character');
+      if (withImage && created.length) await addGeneratedMomentImages(created, { showErrors: true });
+      else if (withImage) window.alert('角色动态没有成功生成，因此没有可配图的内容。');
+    } catch (error) {
+      console.error('生成角色朋友圈失败：', error);
+      window.alert(`生成角色朋友圈失败：${error?.message || '请求失败'}`);
     }
   }
 
