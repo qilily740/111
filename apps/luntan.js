@@ -69,6 +69,42 @@
     try { const payload = JSON.parse(detail); message = payload.error?.message || payload.message || detail; } catch {}
     return `HTTP ${response.status}${message ? `：${String(message).slice(0, 180)}` : ''}`;
   }
+  function parseForumInteractionResults(value) {
+    const raw = String(value || '').replace(/```json?|```/gi, '').trim();
+    if (!raw) throw new Error('API 返回内容为空');
+    if (raw.length > 30000) throw new Error('API 返回内容过长，无法安全解析');
+    let start = -1;
+    let inString = false;
+    let escaped = false;
+    let depth = 0;
+    for (let index = 0; index < raw.length; index += 1) {
+      const char = raw[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') { inString = true; continue; }
+      if (char === '[' || char === '{') {
+        if (start < 0) {
+          if (char !== '[' && char !== '{') continue;
+          start = index;
+        }
+        depth += 1;
+        if (depth > 24) throw new Error('API 返回的互动数据嵌套过深，请重试');
+      } else if (char === ']' || char === '}') {
+        if (start < 0) continue;
+        depth -= 1;
+        if (depth < 0) throw new Error('API 返回的互动数据格式无效');
+        if (depth === 0) {
+          const parsed = JSON.parse(raw.slice(start, index + 1));
+          return Array.isArray(parsed) ? parsed : [parsed];
+        }
+      }
+    }
+    throw new Error('API 没有返回完整的互动 JSON 数组');
+  }
   async function forumRequest(url, options, scope = 'forum') {
     const request = window.IdealMachineFetch || window.fetch.bind(window);
     let lastError;
@@ -364,14 +400,23 @@
     if (!actors.length) return window.alert('没有可互动的角色或 NPC，请先在论坛设置中选择角色或论坛世界书。');
     const { endpoint, url, headers, model } = forumApi();
     if (!endpoint || !model) return window.alert('论坛还没有可用模型：请在设置中拉取模型并至少保留一个模型。');
-    const rules = (worldbook?.entries?.filter(entry => entry.enabled !== false).map(entry => `【${entry.name}】\n${entry.content}`).join('\n\n') || '未选择论坛世界书。').slice(-6000);
-    const roster = (await Promise.all(actors.slice(0, 16).map(async actor => `类型：${actor.actorType}\nID：${actor.id}\n姓名：${actor.displayName}\n${actor.actorType === 'role' ? await boundRoleForumContext(actor, `回应论坛用户${getProfile().nickname}的动态`) : '【资料边界】这是 NPC；未提供的用户资料保持未知，不得推测。'}\n身份：${actor.identity || '暂无'}\n性格与说话方式：${String(actor.signature || actor.persona || actor.personality || '暂无').slice(0, 700)}\n动机与关系：${String(actor.motivation || actor.reason || actor.relationDescription || '暂无').slice(0, 500)}\n背景：${String(actor.description || actor.background || '暂无').slice(0, 500)}\n当前状态：${actor.status || actor.lifeStatus || '默认在世'}`))).join('\n\n').slice(0, 10000);
-    const existingReplies = Array.isArray(post.replies) ? post.replies : [];
-    const replyContext = existingReplies.length ? existingReplies.slice(-20).map(reply => `评论ID：${reply.id}\n评论者：${reply.nickname || '用户'}\n内容：${String(reply.text || '').slice(0, 400)}`).join('\n\n') : '暂无评论';
     const button = [...app.querySelectorAll('[data-forum-post]')].find(entry => entry.dataset.forumPost === post.id)?.querySelector('[data-forum-interact]');
     interactionBusy = true;
     button?.classList.add('is-loading');
+    let phase = '准备角色资料';
     try {
+      const rules = (worldbook?.entries?.filter(entry => entry.enabled !== false).map(entry => `【${entry.name}】\n${entry.content}`).join('\n\n') || '未选择论坛世界书。').slice(-6000);
+      const rosterLines = [];
+      for (const actor of actors.slice(0, 16)) {
+        const context = actor.actorType === 'role'
+          ? await boundRoleForumContext(actor, `回应论坛用户${getProfile().nickname}的动态`)
+          : '【资料边界】这是 NPC；未提供的用户资料保持未知，不得推测。';
+        rosterLines.push(`类型：${actor.actorType}\nID：${actor.id}\n姓名：${actor.displayName}\n${context}\n身份：${actor.identity || '暂无'}\n性格与说话方式：${String(actor.signature || actor.persona || actor.personality || '暂无').slice(0, 700)}\n动机与关系：${String(actor.motivation || actor.reason || actor.relationDescription || '暂无').slice(0, 500)}\n背景：${String(actor.description || actor.background || '暂无').slice(0, 500)}\n当前状态：${actor.status || actor.lifeStatus || '默认在世'}`);
+      }
+      const roster = rosterLines.join('\n\n').slice(0, 10000);
+      const existingReplies = Array.isArray(post.replies) ? post.replies : [];
+      const replyContext = existingReplies.length ? existingReplies.slice(-20).map(reply => `评论ID：${reply.id}\n评论者：${reply.nickname || '用户'}\n内容：${String(reply.text || '').slice(0, 400)}`).join('\n\n') : '暂无评论';
+      phase = '请求模型生成互动';
       const response = await forumRequest(url, {
         method: 'POST',
         headers,
@@ -381,10 +426,10 @@
         ] })
       }, 'forum-interaction');
       if (!response.ok) throw new Error(await forumError(response));
+      phase = '读取模型返回内容';
       const data = await response.json();
-      const raw = String(data.choices?.[0]?.message?.content || '').replace(/```json?|```/gi, '').trim();
-      let results = JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0] || raw);
-      if (!Array.isArray(results)) results = [results];
+      phase = '解析互动数据';
+      const results = parseForumInteractionResults(data.choices?.[0]?.message?.content || '');
       const list = getPosts();
       const target = list.find(item => item.id === post.id);
       if (!target) return;
@@ -411,10 +456,14 @@
         if (action === 'like' || action === 'both') { target.likes = Number(target.likes || 0) + 1; interactions += 1; if (action === 'like' && actor.actorType === 'role' && userText) syncForumMemory(actor, target, `like-${actor.id}`, userText, '', 'like'); }
       });
       if (!interactions) throw new Error('API 没有返回有效互动');
+      phase = '保存互动并刷新朋友圈';
       save(feedKey, list);
       render();
     } catch (error) {
-      window.alert(`生成互动失败：${error.message || '未知错误'}`);
+      const detail = error?.name === 'RangeError' && /call stack/i.test(String(error.message || ''))
+        ? '内部数据处理时发生递归过深'
+        : (error.message || '未知错误');
+      window.alert(`生成互动失败（${phase}）：${detail}`);
     } finally {
       interactionBusy = false;
       button?.classList.remove('is-loading');

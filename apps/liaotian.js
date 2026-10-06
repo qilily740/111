@@ -2113,6 +2113,24 @@ ${rerollRule}
   }
   function openContactEditor(contact) { if (contactSaving) return; editorMode = contact ? 'edit' : 'add'; editorContactId = contact?.id || null; editorAvatar = contact?.avatar || ''; editorDraft = null; editorWorldbookDraft = null; renderEditor(); }
   function closeContactEditor() { if (contactSaving) return; editorMode = ''; editorContactId = null; editorAvatar = ''; editorDraft = null; editorWorldbookDraft = null; renderEditor(); }
+  function syncContactNameToMoments(contact) {
+    if (!contact?.id) return;
+    const displayName = contact.nickname || contact.name || '角色';
+    const syncComments = comments => (Array.isArray(comments) ? comments : []).forEach(comment => {
+      if (String(comment.authorId || '') === String(contact.id)) comment.author = displayName;
+      syncComments(comment.replies);
+    });
+    (state.moments || []).forEach(post => {
+      if (post.authorType === 'character' && String(post.authorId || '') === String(contact.id)) {
+        post.author = displayName;
+        post.realName = contact.name || '';
+      }
+      syncComments(post.comments);
+      if (Array.isArray(post.interactionActors)) post.interactionActors.forEach(actor => {
+        if (String(actor?.id || '') === String(contact.id)) actor.displayName = displayName;
+      });
+    });
+  }
   async function saveContactEditor() {
     if (contactSaving || !editorMode) return;
     const editor = document.querySelector('#chatEditor');
@@ -2141,6 +2159,7 @@ ${rerollRule}
       // The contacts page uses groupIds while rendering. Normalize here too,
       // so a newly-created role can never break the immediate refresh.
       normalizeChatState(state);
+      if (targetContact) syncContactNameToMoments(targetContact);
       save();
       editorMode = ''; editorContactId = null; editorAvatar = ''; editorDraft = null; editorWorldbookDraft = null; if (mode === 'add') { activeTab = 'contacts'; activeContact = null; }
     } catch (error) { window.alert(`保存角色失败：${error.message}`); }
@@ -3860,9 +3879,87 @@ ${rerollRule}
     }
     save(); syncDeletedMemory(chat, [message]); chatMessageEditingId = ''; renderMessageEditor(); render();
   });
+  function contactImageAppearance(contact) { return [contact?.imageAppearance, contact?.faceDescription, contact?.appearanceDescription, contact?.appearance, contact?.details, contact?.signature].find(value => typeof value === 'string' && value.trim())?.trim().slice(0, 2400) || ''; }
+  function syncChatImageAppearance(chat, contact) {
+    if (!chat) return false;
+    chat.settings ||= {};
+    const settings = chat.settings;
+    const sourceAppearance = contactImageAppearance(contact);
+    if (!Object.prototype.hasOwnProperty.call(settings, 'imageCharacterDescription')) {
+      settings.imageCharacterDescription = sourceAppearance;
+      settings.imageCharacterDescriptionSource = 'contact';
+      return true;
+    }
+    if (settings.imageCharacterDescriptionSource === 'contact' && settings.imageCharacterDescription !== sourceAppearance) {
+      settings.imageCharacterDescription = sourceAppearance;
+      return true;
+    }
+    return false;
+  }
+  function getChatImageAppearance(chat, contact) {
+    if (!chat) return contactImageAppearance(contact);
+    const changed = syncChatImageAppearance(chat, contact);
+    if (changed) save();
+    return String(chat?.settings?.imageCharacterDescription || '').trim().slice(0, 2400);
+  }
+  function lockCharacterImageAppearance(prompt, appearance) {
+    const description = String(appearance || '').replace(/\s+/g, ' ').trim();
+    if (!description) return prompt;
+    const basePrompt = String(prompt || '').replace(/^Character identity constraint:[\s\S]*?\n\n/, '').trim();
+    return `Character identity constraint: whenever this character is visible, depict the same person and do not substitute a generic or different person. Preserve the described face, facial features, hairstyle, hair color, skin tone, and gender presentation. Highest-priority appearance description: ${description}\n\n${basePrompt}`;
+  }
   function chatSettingsFor(chat = currentChat()) { if (!chat) return { hideAvatar: false, hideTimestamp: false, realTimeAwareness: true, internalNotificationEnabled: true, userBubbleColor: '#222222', userBubbleTextColor: '#ffffff', userBubbleBorderColor: '#222222', characterBubbleColor: '#ffffff', characterBubbleTextColor: '#111111', characterBubbleBorderColor: '#dddddd', wallpaper: '', visionEnabled: false, visionModel: '', activeMessageEnabled: false, activeMessageIdleMinutes: 15, activeMessageCooldownMinutes: 30, activeMessageDailyLimit: 3 }; chat.settings ||= {}; chat.settings.hideAvatar = Boolean(chat.settings.hideAvatar); chat.settings.hideTimestamp = Boolean(chat.settings.hideTimestamp); chat.settings.realTimeAwareness = chat.settings.realTimeAwareness !== false; chat.settings.internalNotificationEnabled = chat.settings.internalNotificationEnabled !== false; chat.settings.userBubbleColor ||= '#222222'; chat.settings.userBubbleTextColor ||= '#ffffff'; chat.settings.userBubbleBorderColor ||= '#222222'; chat.settings.characterBubbleColor ||= '#ffffff'; chat.settings.characterBubbleTextColor ||= '#111111'; chat.settings.characterBubbleBorderColor ||= '#dddddd'; chat.settings.wallpaper ||= ''; chat.settings.visionEnabled = chat.settings.visionEnabled === true; chat.settings.visionModel = String(chat.settings.visionModel || ''); normalizeActiveMessageSettings(chat); return chat.settings; }
   function renderChat() { const contact = state.contacts.find(item => item.id === activeContact); if (!contact) return `<div class="chat-launch-list"><div class="chat-launch-head"><span>YOUR CONTACTS</span><p>选择一个角色进入聊天</p></div>${state.contacts.length ? state.contacts.map(item => `<button class="chat-launch-contact" data-chat-open="${item.id}" type="button">${avatarMarkup(item)}<span><b>${esc(item.nickname || item.name)}</b><small>${esc(item.name || item.identity || '等待开始聊天')}</small></span><i>›</i></button>`).join('') : '<div class="chat-empty"><div class="chat-empty-mark">✦</div><h2>还没有角色</h2><p>添加一个角色，绑定你的用户设定后开始聊天。</p><button data-chat-go="contacts" type="button">添加角色</button></div>'}</div>`; const chat = currentChat(); const profile = state.profiles.find(item => item.id === chat.profileId); const settings = chatSettingsFor(chat); const wallpaper = settings.wallpaper ? `background-image:url("${esc(settings.wallpaper)}")` : ''; return `<div class="chat-conversation" style="${wallpaper};--chat-user-bubble:${esc(settings.userBubbleColor)};--chat-user-text:${esc(settings.userBubbleTextColor)};--chat-character-bubble:${esc(settings.characterBubbleColor)};--chat-character-text:${esc(settings.characterBubbleTextColor)}"><div class="chat-person">${avatarMarkup(contact)}<div><b>${esc(contact.nickname || contact.name)}</b><small>${profile ? `使用设定：${esc(profile.nickname || profile.realName || profile.name)}` : '尚未绑定用户设定'}</small></div><button data-chat-bind type="button">${profile ? '更换设定' : '绑定设定'}</button></div>${profilePickerOpen ? profilePicker() : ''}${messageEditBar()}<div class="chat-messages" id="chatMessages">${chat.messages.length ? chat.messages.map(messageHtml).join('') : '<div class="chat-hint">你可以从一句问候开始。</div>'}</div><div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${replying ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div></div>`; }
   function renderChatSettings() { const panel = document.querySelector('#chatSettings'); if (!panel) return; panel.classList.toggle('is-open', chatSettingsOpen); panel.setAttribute('aria-hidden', String(!chatSettingsOpen)); if (!chatSettingsOpen) { panel.innerHTML = ''; return; } const contact = state.contacts.find(item => item.id === activeContact); const chat = currentChat(); const settings = chatSettingsFor(chat); const profile = state.profiles.find(item => item.id === chat?.profileId); const colorInput = (label, key, fallback, placeholder) => `<label>${label}<div class="chat-color-control"><input type="text" data-chat-color="${key}" value="${esc(settings[key])}" placeholder="${placeholder}"><input type="color" data-chat-color-picker="${key}" value="${/^#[0-9a-f]{6}$/i.test(settings[key]) ? settings[key] : fallback}"></div></label>`; panel.innerHTML = `<div class="chat-settings-page"><header><button data-chat-settings-close type="button">${actionIcon('back')}</button><h1>聊天设置</h1><span></span></header><main><section><span class="chat-kicker">CONVERSATION</span><h2>${esc(contact?.nickname || contact?.name || '')}</h2><p>管理这段关系的聊天显示与气泡样式。</p></section><button class="chat-settings-row" data-chat-bind type="button"><span>${profile ? '换绑用户设定' : '绑定用户设定'}</span><b>${esc(profile?.nickname || profile?.realName || '未绑定')}</b></button>${settingsProfilePickerOpen ? profilePicker() : ''}<section class="chat-display-settings"><label class="chat-setting-toggle"><span>隐藏头像<small>隐藏聊天内容旁的双方头像</small></span><input type="checkbox" data-chat-setting-toggle="hideAvatar" ${settings.hideAvatar ? 'checked' : ''}></label><label class="chat-setting-toggle"><span>隐藏时间戳<small>隐藏每条消息下方的发送时间</small></span><input type="checkbox" data-chat-setting-toggle="hideTimestamp" ${settings.hideTimestamp ? 'checked' : ''}></label></section><section class="chat-wallpaper-settings"><h3>聊天壁纸</h3><div class="chat-wallpaper-preview" style="${settings.wallpaper ? `background-image:url("${esc(settings.wallpaper)}")` : ''}"></div><input class="chat-wallpaper-url" data-chat-wallpaper-url type="url" value="${esc(settings.wallpaper?.startsWith('data:') ? '' : settings.wallpaper)}" placeholder="粘贴图片 URL"><div class="chat-wallpaper-actions"><label class="chat-file-button">选择本地图片<input type="file" accept="image/*" data-chat-wallpaper-file></label><button type="button" data-chat-wallpaper-reset>恢复默认</button></div></section><section class="chat-color-settings"><h3>气泡设置</h3><div class="chat-bubble-preview"><span>聊天预览</span><div class="chat-preview-row is-character"><div class="chat-preview-bubble" style="background:${esc(settings.characterBubbleColor)};color:${esc(settings.characterBubbleTextColor)}">${esc(contact?.nickname || '角色')}：你好</div></div><div class="chat-preview-row is-user"><div class="chat-preview-bubble" style="background:${esc(settings.userBubbleColor)};color:${esc(settings.userBubbleTextColor)}">${esc(profile?.nickname || profile?.realName || '我')}：收到</div></div></div>${colorInput('用户气泡', 'userBubbleColor', '#222222', '#222222 或 rgba(...)')}${colorInput('用户文字', 'userBubbleTextColor', '#ffffff', '#ffffff 或 rgba(...)')}${colorInput('角色气泡', 'characterBubbleColor', '#ffffff', '#ffffff 或 rgba(...)')}${colorInput('角色文字', 'characterBubbleTextColor', '#111111', '#111111 或 rgba(...)')}<small>可分别设置双方气泡与气泡内文字颜色，预览会同步更新。</small></section><button class="chat-settings-row danger" data-chat-block-contact type="button"><span>拉黑角色</span><b>拉黑</b></button><button class="chat-settings-row danger" data-chat-delete-contact type="button"><span>删除角色</span><b>删除</b></button><button class="chat-settings-row danger" data-chat-clear type="button"><span>清空聊天记录</span><b>清空</b></button></main></div>`; }
+  const renderChatSettingsBase = renderChatSettings;
+  renderChatSettings = function() {
+    renderChatSettingsBase();
+    const panel = document.querySelector('#chatSettings');
+    const main = panel?.querySelector('.chat-settings-page > main');
+    const chat = currentChat();
+    const contact = state.contacts.find(item => item.id === activeContact);
+    if (!chat || !main || !chatSettingsOpen) return;
+    const appearance = getChatImageAppearance(chat, contact);
+    const section = document.createElement('section');
+    section.className = 'chat-wallpaper-settings chat-image-appearance-settings';
+    section.innerHTML = `<h3>生图角色面部与形象</h3><p>角色设定会自动同步到这里；你编辑后将优先使用自定义内容。生图时会把这段描述作为角色身份依据。</p><textarea class="chat-wallpaper-url" data-chat-image-appearance rows="5" style="height:auto;min-height:120px;padding:10px;line-height:1.5;resize:vertical" placeholder="例如：年轻男性，窄长眼型，黑色短发，左眉尾有一道浅疤；保持与角色设定一致。">${esc(appearance)}</textarea><div class="chat-wallpaper-actions"><button type="button" data-chat-image-appearance-sync>从联系人设定重新同步</button></div>`;
+    const wallpaper = main.querySelector('.chat-wallpaper-settings');
+    if (wallpaper) main.insertBefore(section, wallpaper);
+    else main.appendChild(section);
+  };
+  let chatImageAppearanceSaveTimer = 0;
+  document.addEventListener('input', event => {
+    const field = event.target.closest('[data-chat-image-appearance]');
+    if (!field || !field.closest('#chatSettings')) return;
+    const chat = currentChat();
+    if (!chat) return;
+    chat.settings ||= {};
+    chat.settings.imageCharacterDescription = field.value.slice(0, 2400);
+    chat.settings.imageCharacterDescriptionSource = 'custom';
+    clearTimeout(chatImageAppearanceSaveTimer);
+    chatImageAppearanceSaveTimer = setTimeout(save, 250);
+  });
+  document.addEventListener('change', event => {
+    const field = event.target.closest('[data-chat-image-appearance]');
+    if (!field || !field.closest('#chatSettings')) return;
+    clearTimeout(chatImageAppearanceSaveTimer);
+    save();
+  });
+  document.addEventListener('click', event => {
+    const button = event.target.closest('[data-chat-image-appearance-sync]');
+    if (!button || !button.closest('#chatSettings')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const chat = currentChat();
+    const contact = state.contacts.find(item => item.id === activeContact);
+    if (!chat) return;
+    chat.settings ||= {};
+    chat.settings.imageCharacterDescription = contactImageAppearance(contact);
+    chat.settings.imageCharacterDescriptionSource = 'contact';
+    save();
+    const field = document.querySelector('#chatSettings [data-chat-image-appearance]');
+    if (field) field.value = chat.settings.imageCharacterDescription;
+  }, true);
   function updateChatWallpaperWithoutPageJump(value, chat = currentChat()) {
     if (!chat) return;
     chatSettingsFor(chat).wallpaper = String(value || '').trim();
@@ -5615,6 +5712,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         return false;
       }
     }
+    rolePrompt = lockCharacterImageAppearance(rolePrompt, getChatImageAppearance(targetChat, contact));
     try {
       const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1, ...(selfieRequested ? { referenceImage, requireReferenceImage:true } : {}) });
       if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源');
@@ -5878,7 +5976,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   function safeMomentImagePrompt(post, contact) {
     const text = String(post?.text || '').trim().slice(0, 600);
-    const appearance = String(contact?.signature || contact?.details || '').trim().slice(0, 600);
+    const appearance = getChatImageAppearance(state.chats[contact?.id], contact).slice(0, 1200);
     if (!text) throw new Error('朋友圈正文为空，无法根据动态生成配图。');
     return [
       '请直接为这条角色朋友圈生成一张具体、自然的生活场景图片。画面应呈现动态正文里实际发生的事情，保留其中的主体、动作和情境；不要把有具体事件的动态改成无关的人像或静物。采用可信的日常摄影观感，构图清楚，环境、光线和氛围贴合这条动态。',
@@ -8163,6 +8261,35 @@ ${recentConversation}
     visit(post?.comments);
     return entries;
   }
+  function momentCommentIsUser(comment) {
+    if (comment?.authorType === 'user' || ['moments-user', momentProfile().id].filter(Boolean).includes(String(comment?.authorId || ''))) return true;
+    if (comment?.authorType) return false;
+    const profile = momentProfile();
+    return [profile.nickname, profile.realName, '我', '用户'].filter(Boolean).includes(String(comment?.author || ''));
+  }
+  function setMomentInteractionButtonsBusy(postId, busy) {
+    app.querySelectorAll('[data-moment-interact]').forEach(button => {
+      const isTarget = String(button.dataset.momentInteract || '') === String(postId || '');
+      button.disabled = Boolean(busy);
+      button.classList.toggle('is-moment-busy', Boolean(busy && isTarget));
+      button.textContent = busy && isTarget ? '互动中…' : '✦ 互动';
+    });
+  }
+  function refreshMomentPostInPlace(postId) {
+    const post = state.moments.find(item => String(item.id) === String(postId));
+    const current = [...app.querySelectorAll('.chat-moment[data-moment-id]')].find(item => String(item.dataset.momentId) === String(postId));
+    if (!post || !current) return;
+    const scroller = current.closest('.chat-moments-body') || current.closest('#chatMain') || current.parentElement;
+    const scrollerTop = scroller?.getBoundingClientRect().top || 0;
+    const anchor = [...app.querySelectorAll('.chat-moment[data-moment-id]')].find(item => item !== current && item.getBoundingClientRect().bottom > scrollerTop);
+    const anchorTop = anchor?.getBoundingClientRect().top;
+    const holder = document.createElement('div');
+    holder.innerHTML = renderMomentPost(post).trim();
+    const replacement = holder.firstElementChild;
+    if (!replacement) return;
+    current.replaceWith(replacement);
+    if (anchor && anchorTop != null && scroller) scroller.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
+  }
   generateRoleInteraction = async function(post) {
     if (!post || post.visibility === 'private' || post.userOnly) return window.alert('仅用户可见的动态，其他角色和 NPC 看不见也不能互动。');
     if (momentPostAuthorIsDeceased(post)) return window.alert('已去世的角色不能参与朋友圈互动。');
@@ -8174,27 +8301,39 @@ ${recentConversation}
     if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API 模型。');
     const targetId = post.id;
     const originalText = String(post.text || '');
+    const isCharacterPost = post.authorType === 'character';
+    const postAuthorContact = isCharacterPost ? state.contacts.find(item => String(item.id) === String(post.authorId)) : null;
+    const postAuthorName = isCharacterPost
+      ? (postAuthorContact?.nickname || postAuthorContact?.name || post.author || '角色')
+      : (post.author || momentProfile().nickname || momentProfile().realName || '用户');
+    const postAuthorContext = isCharacterPost
+      ? `作者类型：角色本人\n作者角色ID：${postAuthorContact?.id || post.authorId}\n作者网名：${postAuthorContact?.nickname || post.author || postAuthorName}\n作者真实姓名：${postAuthorContact?.name || postAuthorName}\n作者身份与人设：${String(postAuthorContact?.details || postAuthorContact?.signature || postAuthorContact?.identity || '未提供').slice(0, 1600)}\n互动关系：本条动态由以上角色本人发布。所有角色/NPC互动都围绕这位发帖角色及动态内容展开；用户不是作者、互动对象或在场者，与本次角色间互动无关。禁止提及用户、对用户说话、假设用户发布/参与/看见了该动态。`
+      : `作者类型：用户本人\n作者显示名：${postAuthorName}\n角色/NPC可依据动态和现有评论自然回应这位用户。`;
     const visibility = post.visibility === 'groups' ? `指定分组可见：${(post.visibleGroups || []).map(id => state.contactGroups.find(group => group.id === id)?.name || id).join('、') || '未指定分组'}` : post.visibility === 'character' ? '仅角色可见' : '所有人可见';
     const existingComments = momentCommentThreadEntries(post);
-    const userReply = [...existingComments].reverse().find(entry => entry.comment.authorType === 'user' && entry.parentId);
-    const commentContext = ((existingComments.slice(-30).map(({ comment, parentId }) => `评论ID：${comment.id}\n${parentId ? `回复评论ID：${parentId}\n` : ''}评论者：${comment.author || '用户'}\n评论内容：${comment.text || ''}`).join('\n\n') || '暂无评论。') + (userReply ? `\n\n【必须优先回复】用户刚刚回复了角色评论，目标评论ID为 ${userReply.comment.id}。请让至少一位合适的角色或 NPC 使用 reply 或 both 直接回复这条用户评论，targetId 必须填写该 ID，不能只点赞或另起无关评论。` : '')) + `\n\n【本次批量互动要求】一次点击要产生多条互动：候选人数超过 1 人时，至少新增 1 条评论和 1 个点赞，优先安排 2—4 个不同角色或 NPC；某个角色或 NPC 可以同时评论和点赞。候选人数只有 1 人时，让其使用 both，同时完成评论和点赞。`;
+    const contextComments = isCharacterPost ? existingComments.filter(entry => !momentCommentIsUser(entry.comment)) : existingComments;
+    const userReply = isCharacterPost ? null : [...existingComments].reverse().find(entry => momentCommentIsUser(entry.comment) && entry.parentId);
+    const commentContext = ((contextComments.slice(-30).map(({ comment, parentId }) => `评论ID：${comment.id}\n${parentId ? `回复评论ID：${parentId}\n` : ''}评论者：${comment.author || '用户'}\n评论内容：${comment.text || ''}`).join('\n\n') || '暂无相关评论。') + (userReply ? `\n\n【必须优先回复】用户刚刚回复了角色评论，目标评论ID为 ${userReply.comment.id}。请让至少一位合适的角色或 NPC 使用 reply 或 both 直接回复这条用户评论，targetId 必须填写该 ID，不能只点赞或另起无关评论。` : '')) + `\n\n【本次批量互动要求】一次点击要产生多条互动：候选人数超过 1 人时，至少新增 1 条评论和 1 个点赞，优先安排 2—4 个不同角色或 NPC；某个角色或 NPC 可以同时评论和点赞。候选人数只有 1 人时，让其使用 both，同时完成评论和点赞。`;
     const roster = actors.slice(0, 24).map(actor => `${actor.actorType === 'npc' ? 'NPC' : '角色'}ID：${actor.id}\n姓名：${actor.displayName}\n身份：${actor.identity || '未填写'}\n人设：${String(actor.persona || '暂无').slice(0, 1400)}\n${actor.actorType === 'npc' ? `所属角色：${state.contacts.find(item => item.id === actor.sourceRoleId)?.nickname || state.contacts.find(item => item.id === actor.sourceRoleId)?.name || '未知'}` : ''}`).join('\n\n');
     const minimum = actors.length > 1 ? 2 : 1;
     const prompt = `请为这条朋友圈安排自然的角色/NPC互动。必须严格按以下顺序执行：
 第一步，先读取【可见范围】。仅自己可见时禁止返回任何互动；指定分组可见时，只能从已经筛选出的可见角色和 NPC 中选择；所有人可见或仅角色可见时，只能使用下方候选名单。
 第二步，再根据动态内容、评论、每个角色/NPC的人设、身份、关系和背景控制互动数量。一次互动至少安排 ${minimum} 个独立互动单位；如果候选名单只有 1 人，可以让该人物同时点赞并评论，但不能只返回一个孤立点赞。候选人数超过 1 人时，至少安排 2 个不同角色/NPC，其中至少 1 个应该在动态有具体内容时发表评论，其他人可以点赞或评论。不要让所有人使用相同语气，也不要为了凑数量强行让不合适的人互动。
-只返回合法 JSON 数组，不要 Markdown、解释或其他字段。每项格式：{"actorId":"候选名单中的真实ID","action":"reply|like|both","targetId":"post或现有评论ID","text":"评论正文；纯点赞时为空"}。回复动态时 targetId 填 post；回复评论时必须填写现有评论的真实评论ID。禁止回复自己已有的评论、禁止互动不可见的人物、禁止删除或改写动态正文。评论必须符合该角色/NPC本人，不得捏造没有提供的背景。\n\n【可见范围】\n${visibility}\n\n【目标动态】\n动态ID：${targetId}\n作者：${post.author || '用户'}\n正文：${originalText || '[图片动态]'}\n\n【现有评论】\n${commentContext}\n\n【已按可见范围筛选的候选名单】\n${roster}`;
+只返回合法 JSON 数组，不要 Markdown、解释或其他字段。每项格式：{"actorId":"候选名单中的真实ID","action":"reply|like|both","targetId":"post或现有评论ID","text":"评论正文；纯点赞时为空"}。回复动态时 targetId 填 post；回复评论时必须填写现有评论的真实评论ID。禁止回复自己已有的评论、禁止互动不可见的人物、禁止删除或改写动态正文。评论必须符合该角色/NPC本人，不得捏造没有提供的背景。\n\n【可见范围】\n${visibility}\n\n【目标动态】\n动态ID：${targetId}\n${postAuthorContext}\n作者显示名：${postAuthorName}\n正文：${originalText || '[图片动态]'}\n\n【现有评论】\n${commentContext}\n\n【已按可见范围筛选的候选名单】\n${roster}`;
     momentBusyPostId = String(post.id);
     momentBusy = true;
-    render();
+    setMomentInteractionButtonsBusy(targetId, true);
     try {
       const request = window.IdealMachineFetch || window.fetch.bind(window);
-      const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'chat-moments-background', timeout:180000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:1800, stream:false, messages:[{ role:'system', content:'你是朋友圈可见性与互动调度器。先执行可见范围过滤，再控制互动数量。只输出合法 JSON 数组。' }, { role:'user', content:prompt }] }) });
+      const systemPrompt = isCharacterPost
+        ? '你是角色间的朋友圈互动调度器。先确认这条动态由哪个角色本人发布；其他角色/NPC只对发帖角色和动态内容互动，绝不能把用户当成作者、在场者或互动对象，也不要对用户说话。再执行可见范围过滤，只输出合法 JSON 数组。'
+        : '你是朋友圈可见性与互动调度器。先执行可见范围过滤，再控制互动数量。只输出合法 JSON 数组。';
+      const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'chat-moments-background', timeout:180000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:1800, stream:false, messages:[{ role:'system', content:systemPrompt }, { role:'user', content:prompt }] }) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       let results = parseMomentInteractionResults(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim());
       // 某些模型会返回带解释文字或空数组；不要让一次互动点击完全没有反馈。
-      if (!results.length) results = [{ actorId: actors[0].id, action: 'both', targetId: 'post', text: '看到这条动态了，想听听你最近的近况。' }];
+      if (!results.length) results = [{ actorId: actors[0].id, action: 'both', targetId: 'post', text: isCharacterPost ? '这条动态里的想法挺有意思，确实很像你会分享的事。' : '看到这条动态了，想听听你最近的近况。' }];
       // 如果模型把用户回复误判成了普通动态评论，优先把一条已有文字回复
       // 改挂到用户刚刚回复的那条评论下，确保线程能得到角色/NPC回应。
       if (userReply?.comment?.id) {
@@ -8218,6 +8357,7 @@ ${recentConversation}
         const requestedTarget = String(result?.targetId || 'post');
         const locatedParent = requestedTarget === 'post' ? null : locateMomentComment(target, requestedTarget);
         const parent = locatedParent?.comment || threadEntries.find(entry => String(entry.comment.id || '') === requestedTarget)?.comment || null;
+        if (isCharacterPost && requestedTarget !== 'post' && (!parent || momentCommentIsUser(parent))) return;
         const alreadyOwn = threadEntries.some(entry => entry.comment.authorId === actor.id && (!parent || String(entry.comment.replyTo || '') === String(parent.id || '')));
         if (!alreadyOwn && (action === 'reply' || action === 'both') && text) {
           const flatRoot = parent ? target.comments.find(comment => String(comment.id || '') === String(parent.replyTo || '')) : null;
@@ -8236,14 +8376,14 @@ ${recentConversation}
       if (!newActorIds.size) {
         const fallback = actors.find(actor => !(target.roleLikeIds || []).includes(actor.id) && !threadEntries.some(entry => entry.comment.authorId === actor.id));
         if (fallback) {
-          target.comments.push({ id:uid('comment'), author:fallback.displayName, text:'看到这条动态了，想听听你最近的近况。', authorType:fallback.actorType === 'npc' ? 'npc' : 'character', authorId:fallback.id, npcSourceRoleId:fallback.sourceRoleId || '', time:time() });
+          target.comments.push({ id:uid('comment'), author:fallback.displayName, text:isCharacterPost ? '这条动态里的想法挺有意思，确实很像你会分享的事。' : '看到这条动态了，想听听你最近的近况。', authorType:fallback.actorType === 'npc' ? 'npc' : 'character', authorId:fallback.id, npcSourceRoleId:fallback.sourceRoleId || '', time:time() });
           addLike(fallback);
         }
       }
       if (!newActorIds.size) throw new Error('没有可参与互动的角色或 NPC。');
       if (target.text !== originalText) target.text = originalText;
       save();
-    } catch (error) { window.alert(`生成互动失败：${error.message || '未知错误'}`); } finally { momentBusyPostId = ''; momentBusy = false; render(); }
+    } catch (error) { window.alert(`生成互动失败：${error.message || '未知错误'}`); } finally { momentBusyPostId = ''; momentBusy = false; setMomentInteractionButtonsBusy('', false); refreshMomentPostInPlace(targetId); }
   };
   const renderMomentPostWithNpcLikeNames = renderMomentPost;
   renderMomentPost = function(post) {
