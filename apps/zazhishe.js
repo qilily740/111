@@ -61,7 +61,8 @@
   }
   function coverImage(issue, className = '') { return issue.cover.image ? `<img class="${className}" data-magazine-asset="${esc(issue.cover.image)}" alt="${esc(issue.title)}封面图片">` : ''; }
   function coverMarkup(issue, compact = false) {
-    return `<div class="magazine-cover ${compact ? 'is-compact' : ''}" style="--mag-cover:${esc(issue.cover.color)};--mag-ink:${esc(issue.cover.ink)}">${coverImage(issue, 'magazine-cover-image')}<div class="magazine-cover-shade"></div><div class="magazine-cover-copy"><span>${esc(issue.cover.kicker)}</span><small>${esc(issue.edition)}</small><h2>${esc(issue.cover.headline || issue.title)}</h2><p>${esc(issue.cover.subhead || issue.theme)}</p></div></div>`;
+    const layoutCopy = issue.cover.embeddedTypography ? '' : `<div class="magazine-cover-copy"><span>${esc(issue.cover.kicker)}</span><small>${esc(issue.edition)}</small><h2>${esc(issue.cover.headline || issue.title)}</h2><p>${esc(issue.cover.subhead || issue.theme)}</p></div>`;
+    return `<div class="magazine-cover ${compact ? 'is-compact' : ''}" style="--mag-cover:${esc(issue.cover.color)};--mag-ink:${esc(issue.cover.ink)}">${coverImage(issue, 'magazine-cover-image')}<div class="magazine-cover-shade"></div>${layoutCopy}</div>`;
   }
 
   function homeIcon(type) {
@@ -322,7 +323,7 @@
   function saveArticle(articleId) { const issue = activeIssue(); const article = issue?.articles.find(item=>item.id===articleId); if (!article) return; article.title = app.querySelector(`[data-magazine-article-title="${articleId}"]`)?.value.trim() || '未命名稿件'; article.deck = app.querySelector(`[data-magazine-article-deck="${articleId}"]`)?.value.trim() || ''; article.content = app.querySelector(`[data-magazine-article-content="${articleId}"]`)?.value || ''; article.updatedAt = now(); issue.updatedAt = now(); save(); render(); }
 
   async function generateCover() { const issue = activeIssue(); if (!issue || busy || !window.IdealMachineImageAPI?.generate) return; busy = 'cover'; render(); try { const people = issue.participants.map(item=>`${item.name}：${item.persona}`).join('\n'); const result = await window.IdealMachineImageAPI.generate({ purpose:'moments', count:1, prompt:`为一本人物杂志生成竖版封面摄影底图，不要生成任何文字、字母、数字、边框或排版。杂志主题：${issue.theme}。内容方向：${issue.direction}。${people ? `可能出现的人物设定：${people}` : '以主题相关的静物或环境为主体'}。构图需要为顶部刊名和下方大标题预留干净空间。` }); if (!result.assetId) throw new Error('没有返回图片'); issue.cover.image = result.assetId; issue.updatedAt = now(); save(); } catch (error) { console.warn('magazine_cover_generation_failed', error); } finally { busy=''; render(); } }
-  async function uploadCover(file) { const issue = activeIssue(); if (!issue || !file) return; const data = window.IdealMachineReadImage ? await window.IdealMachineReadImage(file,1500,.8) : await new Promise(resolve => { const reader=new FileReader(); reader.onload=()=>resolve(reader.result); reader.readAsDataURL(file); }); issue.cover.image = window.IdealMachinePutImage ? await window.IdealMachinePutImage(data) : data; issue.updatedAt=now(); save(); render(); }
+  async function uploadCover(file) { const issue = activeIssue(); if (!issue || !file) return; const data = window.IdealMachineReadImage ? await window.IdealMachineReadImage(file,1500,.8) : await new Promise(resolve => { const reader=new FileReader(); reader.onload=()=>resolve(reader.result); reader.readAsDataURL(file); }); issue.cover.image = window.IdealMachinePutImage ? await window.IdealMachinePutImage(data) : data; issue.cover.embeddedTypography = false; issue.updatedAt=now(); save(); render(); }
 
   let batchProgress = 0;
   const magazineJobStorageKey = 'ideal-machine-magazine-background-job';
@@ -407,9 +408,37 @@
     const failed = sections.length - completed; finishMagazineJob(jobId, failed ? 'error' : 'done', failed ? `已生成 ${completed} 篇，${failed} 篇失败` : `已生成 ${completed} 篇栏目初稿`); busy = ''; activeTab = completed ? 'articles' : 'plan'; batchProgress = 0; render(); if (failed) window.alert(`初稿生成完成：成功 ${completed} 篇，失败 ${failed} 篇。请查看 API 配置或稍后重试。`);
   }
 
+  function magazineCoverImagePrompt(issue) {
+    const participants = (issue?.participants || [])
+      .map(item => magazineLiveRole(issue, item.id))
+      .filter(role => role.id || role.name)
+      .slice(0, 4)
+      .map(role => `- ${role.name}${role.identity ? ` (${role.identity})` : ''}: ${String(role.persona || 'No additional character description.').slice(0, 1400)}`)
+      .join('\n');
+    return `Create a finished, unmistakable Chinese editorial magazine cover as one complete image—not a photo background waiting for webpage text. It must visibly feel like a professionally art-directed magazine cover at first glance.
+
+ART DIRECTION: Build one memorable cover concept from the issue's theme and content direction. Use a deliberate editorial color palette, expressive but believable lighting, rich photographic texture, and a strong hero image. Combine polished editorial photography with refined graphic design, asymmetric but balanced layout, purposeful alignment, fine rules or restrained graphic accents, and clear typographic hierarchy. It should feel like a real premium Chinese culture/people magazine—not a poster, invitation, passport photo, stock-photo banner, or plain portrait.
+
+COVER COMPOSITION: Portrait 2:3 cover, full bleed, with a strong foreground/midground/background and intentional visual hierarchy. Feature selected participant(s) as the hero subject when provided; otherwise make the theme's most evocative person, object, or setting the focal subject. Use a natural, expressive pose and a setting that communicates the issue. Integrate the typography into the composition: prominent masthead at the top, a small edition marker, one large expressive Chinese headline, and a compact supporting line. Keep text crisp, correctly spelled, high-contrast, aligned to a coherent grid, with safe margins; do not cover faces. Do not leave empty bands or blank boxes—the whole cover should look art-directed.
+
+EXACT COVER TEXT (render these strings exactly in the image; preserve Chinese characters and punctuation, do not translate, invent, repeat, or add other copy):
+Masthead: ${String(issue?.cover?.kicker || 'IDEAL MAGAZINE').slice(0, 80)}
+Edition marker: ${String(issue?.edition || 'VOL. 01').slice(0, 40)}
+Main headline: ${String(issue?.cover?.headline || issue?.title || '未命名刊物').slice(0, 100)}
+Supporting line: ${String(issue?.cover?.subhead || issue?.theme || '记录人物、关系与正在发生的生活').slice(0, 160)}
+
+Do not add any other words, fake lettering, extra cover lines, logos, watermarks, borders, frames, collage panels, or interface elements. If exact text rendering is imperfect, keep the design clean and use only the specified text.
+
+ISSUE TITLE: ${String(issue?.title || 'Untitled magazine').slice(0, 120)}
+ISSUE THEME: ${String(issue?.theme || 'People and everyday life').slice(0, 500)}
+CONTENT DIRECTION: ${String(issue?.direction || 'Editorial portraiture and contemporary life').slice(0, 700)}
+FEATURED PEOPLE (use only explicitly stated, visually relevant traits; do not invent age or appearance):
+${participants || 'No named participants. Create a compelling thematic editorial scene instead.'}`;
+  }
+
   generateCover = async function() {
     const issue = activeIssue(); if (!issue || busy || !window.IdealMachineImageAPI?.generate) return; busy = 'cover'; const jobId = beginMagazineJob('cover', issue.id, '正在生成封面摄影'); render();
-    try { const result = await window.IdealMachineImageAPI.generate({ purpose:'moments', count:1, prompt:`为一本中文人物杂志生成竖版封面摄影底图。不要生成任何文字、字母、数字、边框、水印或社交软件界面，顶部刊名和下方大标题要预留干净空间。${magazineEditorialContext(issue)}\n请将人物气质、时代背景和世界规则转化为自然可信的摄影场景。` }); if (!result.assetId) throw new Error('没有返回图片'); issue.cover.image = result.assetId; issue.updatedAt = now(); persistMagazineIssue(issue); finishMagazineJob(jobId, 'done', '封面摄影已生成'); } catch (error) { console.warn('magazine_cover_generation_failed', error); writeMagazineJob(null); } finally { busy=''; render(); }
+    try { const result = await window.IdealMachineImageAPI.generate({ purpose:'moments', size:'1024x1536', count:1, prompt:magazineCoverImagePrompt(issue) }); if (!result.assetId) throw new Error('没有返回图片'); issue.cover.image = result.assetId; issue.cover.embeddedTypography = true; issue.updatedAt = now(); persistMagazineIssue(issue); finishMagazineJob(jobId, 'done', '封面摄影已生成'); } catch (error) { console.warn('magazine_cover_generation_failed', error); writeMagazineJob(null); } finally { busy=''; render(); }
   };
 
   askInterview = async function(question) {
@@ -463,7 +492,7 @@
     const articleDelete=event.target.closest('[data-magazine-article-delete]');if(articleDelete){const issue=activeIssue();issue.articles=issue.articles.filter(item=>item.id!==articleDelete.dataset.magazineArticleDelete);save();render();return;}
     const color=event.target.closest('[data-magazine-cover-color]');if(color){const issue=activeIssue();issue.cover.color=color.dataset.magazineCoverColor;issue.cover.ink=color.dataset.magazineCoverInk;save();render();return;}
     if(event.target.closest('[data-magazine-generate-cover]')){generateCover();return;}
-    if(event.target.closest('[data-magazine-remove-cover]')){const issue=activeIssue();issue.cover.image='';save();render();return;}
+    if(event.target.closest('[data-magazine-remove-cover]')){const issue=activeIssue();issue.cover.image='';issue.cover.embeddedTypography=false;save();render();return;}
     if(event.target.closest('[data-magazine-preview]')){previewIndex=0;setPage('preview');render();return;}
     if(event.target.closest('[data-magazine-publish]')){const issue=activeIssue();if(!issue||issue.status==='已发布')return;issue.status='已发布';issue.publishedAt=now();issue.updatedAt=now();save();previewIndex=0;setPage('preview');render();return;}
     if (!magazineDockCollapsed && app.contains(event.target) && !event.target.closest('button,a,input,textarea,select,label,[contenteditable="true"],.magazine-home-dock')) { magazineDockCollapsed = true; render(); }

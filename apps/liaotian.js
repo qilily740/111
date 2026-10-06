@@ -1440,9 +1440,10 @@ ${languageInstruction}
 ### 发送图片
 
 角色确实适合分享自拍、现场、物品、食物、穿搭或其他画面时使用：
-[[IMAGE_PROMPT:用完整中文描述图片主体、人物外观、动作、环境、镜头、光线和构图]]
+[[IMAGE_PROMPT:[SHOT:PORTRAIT] A complete English image prompt describing the visible subject, appearance, action, setting, framing, lighting, and mood.]]
 
-图片描述中不要写角色名字，不要出现聊天界面、气泡、文字或水印。没有必要时不要生图；即使生图，也要保留自然的文字回复。AI 生成图片不会自动保存到本地，用户需要在图片查看页主动保存。
+只在确实适合分享画面或用户明确要求发图时使用，正常文字回复仍要保留。每轮最多输出一个 IMAGE_PROMPT 标记，且必须放在正文中，不能放进 THOUGHT/心声区。
+标记内容必须是英文、约 40–80 个英文单词，并以一种镜头类型开头：[SHOT:PORTRAIT]（单人近景/自拍）、[SHOT:ACTION]（单人中远景/动作）、[SHOT:PAIR]（两人）、[SHOT:GROUP]（多人）、[SHOT:STILL]（无人静物）或 [SHOT:VISTA]（无人风景）。接着按镜头、主体、姿势/动作、表情、环境、光线和氛围具体描述；人物外观只写画面可见、与角色资料相符的特征，不要写角色名字或无关背景。画面不得包含聊天界面、气泡、可读文字、水印或 logo；人物应穿着得体且不带情色化描写。不要为了展示功能强行发图。AI 图片会保存到聊天记录，可在图片查看页另行保存到相册。
 
 ## 8. 最终输出格式
 
@@ -5527,14 +5528,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       window.alert(`角色发图失败：${error.message}`);
       return false;
     }
-    // 不把完整人设和最近聊天原文转交给图片服务：其中可能有与图片无关的
-    // 成人话题，造成普通自拍被审核误判。文字模型已在 IMAGE_PROMPT 中结合
-    // 人设与聊天，提炼出图片所需的视觉描述，因此这里只传该描述和构图约束。
-    const latestUserText = [...(targetChat.messages || [])].reverse().find(message => message.role === 'user')?.text || '';
-    const selfieRequest = /自拍|自拍照|对镜自拍|镜子自拍/.test(`${prompt}\n${latestUserText}`);
-    const rolePrompt = selfieRequest
-      ? `生成一张普通自然的角色自拍照。图片内容：${String(prompt || '').trim()}。角色穿着完整得体的日常服装，肩部以上取景，表情自然，柔和自然光，呈现日常分享的生活照片质感。`
-      : `生成以下图片：${String(prompt || '').trim()}。采用自然的生活摄影质感，构图清晰自然。`;
+    // 不把完整人设和聊天记录交给图片服务；聊天模型已经结合角色资料
+    // 整理了视觉描述。去掉镜头控制标签后，仅补充一致的安全/成像约束，
+    // 不再把所有自拍都强制改成肩部近景，以免覆盖提示词里的具体构图。
+    const rolePrompt = prepareCharacterImagePrompt(prompt);
     try {
       const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1 });
       if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源');
@@ -5558,6 +5555,22 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       window.alert(`角色发图失败：${error?.message || '生图接口请求失败'}`);
       return false;
     }
+  }
+
+  function prepareCharacterImagePrompt(value) {
+    const raw = String(value || '').trim();
+    const shotMatch = raw.match(/\[SHOT:(PORTRAIT|ACTION|PAIR|GROUP|STILL|VISTA)\]/i);
+    const shotType = String(shotMatch?.[1] || '').toUpperCase();
+    const clean = raw.replace(/\[SHOT:[^\]]+\]\s*/i, '').replace(/\s+/g, ' ').trim();
+    if (!clean) return '';
+    const peopleInFrame = ['PORTRAIT', 'ACTION', 'PAIR', 'GROUP'].includes(shotType)
+      || (!shotType && /selfie|portrait|人物|角色|自拍|合照/i.test(clean));
+    const constraints = [];
+    if (peopleInFrame && !/fully clothed|穿着得体|完整着装/i.test(clean)) constraints.push('People are fully clothed and depicted in a natural, non-sexual way.');
+    if (!/no (?:(?:readable|visible) )?(?:text|watermarks?|logos?|app interfaces?)/i.test(clean) && !/不含(?:可读)?文字|不要(?:出现)?文字|无文字|不要.*水印/i.test(clean)) {
+      constraints.push('No readable text, watermark, logo, or app interface.');
+    }
+    return [clean, ...constraints].join(' ');
   }
 
   function generatedImageRecord(kind, id) {
@@ -5655,9 +5668,9 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       } else {
         const contact = state.contacts.find(item => item.id === record.authorId);
         if (!contact) return;
-        const rolePrompt = `人物：${contact.nickname || contact.name}。\n人物设定：${contact.details || contact.signature || '符合角色身份与外观'}。\n朋友圈正文：${record.text || ''}。\n配图要求：${record.generatedPrompt}。\n这是角色会发布在朋友圈里的图片，保持自然生活感和人物一致性，不要出现文字、水印或社交软件界面。`;
-        const result = await api.generate({ prompt: rolePrompt, purpose: 'moments', count: 1 });
-        if (result?.assetId) { record.image = result.assetId; record.generatedImageLoading = false; save(); render(); }
+        const prompt = await safeMomentImagePrompt(record, contact);
+        const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
+        if (result?.assetId) { record.image = result.assetId; record.generatedPrompt = prompt; record.generatedImageLoading = false; save(); render(); }
       }
     } catch (error) {
       console.warn('重新生成图片失败：', error);
@@ -5727,8 +5740,8 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         const system = Array.isArray(payload.messages) && payload.messages.find(message => message.role === 'system');
         if (system && String(input).includes('/chat/completions')) {
           system.content += requiredImage
-            ? '\n用户刚刚明确要求你发图，本次必须发送图片。请在正常文字回复之外追加且只追加一次严格标记：[[IMAGE_PROMPT: 用完整中文描述要发送的图片主体、人物外观、动作、环境、镜头、光线和构图]]。不要拒绝、推脱或只用文字描述图片；不要向用户解释这个标记。'
-            : '\n你可以在当前情境确实适合展示自拍、眼前景物、物品、穿搭、食物或现场照片时，主动附带一张图片。需要发图时，在正常文字回复之外追加且只追加一次严格标记：[[IMAGE_PROMPT: 用完整中文描述图片主体、人物外观、动作、环境、镜头、光线和构图]]。提示词中不要写角色名字，要直接描述外貌；不要让图片出现文字、聊天界面或水印。当前情境不需要图片时不要使用该标记。无论是否发图，都必须保留自然的文字回复，不要向用户解释这个标记。';
+            ? '\n用户刚刚明确要求你发图，本次必须发送一张图片。在自然文字回复后追加且只追加一个严格标记，格式为 [[IMAGE_PROMPT:[SHOT:XXX] English image prompt]]。XXX 从 PORTRAIT、ACTION、PAIR、GROUP、STILL、VISTA 中选择。用英文写约 40–80 个词，把取景方式、画面主体及可见特征、动作与神态、所在环境、光照和整体氛围交代清楚；自拍用 PORTRAIT，用户明确指定构图时按其要求执行。人物穿着得体，不写情色内容；不含角色名字、文字、水印、logo 或聊天界面。保留自然文字回复，不要解释标记。'
+            : '\n只有在当前情境确实适合分享自拍、眼前景物、物品、穿搭、食物或现场照片时才可以发图；不需要图片时不要使用标记。需要发图时，在自然文字回复后追加且只追加一个严格标记，格式为 [[IMAGE_PROMPT:[SHOT:XXX] English image prompt]]。XXX 从 PORTRAIT（单人近景/自拍）、ACTION（单人中远景/动作）、PAIR（两人）、GROUP（多人）、STILL（无人静物）、VISTA（无人风景）中选择。用英文写约 40–80 个词，依次交代取景、画面主体及外观、动作/姿势、表情、环境、光线和气氛；人物特征须与角色资料一致且限于画面可见内容，不写角色名字。人物穿着得体、不带情色化描写；画面不含可读文字、水印、logo 或聊天界面。保留自然文字回复，不要解释标记。';
           init = { ...init, body: JSON.stringify(payload) };
         }
       } catch {}
@@ -5780,6 +5793,39 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     }
   }
 
+  async function safeMomentImagePrompt(post, contact) {
+    // 参考 Wanwan：先整理成具体的镜头化英文 prompt，再单独交给生图 API；
+    // 不把完整人设和聊天记录直接拼进图片请求，减少无关内容造成的审核误判。
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    if (!config?.endpoint || !config.key || !model) throw new Error('请先配置聊天 API，才能为朋友圈配图整理画面提示词。');
+    const request = window.IdealMachineFetch || fetch;
+    const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      timeout: 90000,
+      idealScope: 'chat-moments-image-prompt',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` },
+      body: JSON.stringify({
+        model,
+        temperature: .35,
+        max_tokens: 260,
+        stream: false,
+        messages: [
+          { role: 'system', content: 'Create clear, original image descriptions for everyday social posts. Respond with valid JSON only: {"canGenerate":true,"prompt":"..."} or {"canGenerate":false,"prompt":""}; choose false if the described scene is not safe to depict. Write the prompt in English (40-80 words) as a natural description beginning with a suitable shot type, for example "A close-up portrait", "A full-body candid shot", "A still life", or "A landscape view". Cover the visible subject and action, surroundings, framing, lighting, and mood. People must be fully clothed and shown non-sexually. Do not make up ages or sensitive physical traits, and exclude writing, watermarks, logos, and app interfaces.' },
+          { role: 'user', content: `Write an image prompt for this character's everyday social post. Make the specific event in the post visually recognizable and include only details that help depict it. Relevant, safe visual traits may be used, but leave unrelated intimate, sexual, violent, or sensitive backstory out.\nCharacter: ${String(contact?.nickname || contact?.name || 'character').slice(0, 80)}\nVisible appearance notes (use only if relevant to the scene): ${String(contact?.details || contact?.signature || '').slice(0, 1200)}\nPost to depict: ${String(post?.text || '').slice(0, 600)}` }
+        ]
+      })
+    });
+    if (!response.ok) throw new Error(`画面提示词整理失败：HTTP ${response.status}`);
+    const payload = await response.json();
+    const raw = String(payload.choices?.[0]?.message?.content || '').replace(/```(?:json)?|```/gi, '').trim();
+    let result;
+    try { result = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || raw); } catch { throw new Error('画面提示词整理结果格式无效。'); }
+    const prompt = String(result?.prompt || '').trim();
+    if (result?.canGenerate !== true || !prompt) throw new Error('这条动态无法整理成符合生图要求的安全画面，已保留文字动态。');
+    return prompt;
+  }
+
   async function addGeneratedMomentImages(posts) {
     const api = window.IdealMachineImageAPI;
     if (!api?.generate) return;
@@ -5787,9 +5833,8 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       const contact = state.contacts.find(item => item.id === post.authorId);
       if (!contact || post.image) continue;
       try {
-        const prompt = `根据这条朋友圈内容创作一张自然生活感配图。朋友圈正文：${post.text || '角色此刻的生活片段'}。画面要体现角色当前状态、环境和情绪，保持人物外观与身份一致，不要出现文字、水印或社交软件界面。`;
-        const rolePrompt = `人物：${contact.nickname || contact.name}。\n人物设定：${contact.details || contact.signature || '符合角色身份与外观'}。\n朋友圈正文：${post.text || ''}。\n配图要求：${prompt}。\n这是角色会发布在朋友圈里的图片，保持自然生活感和人物一致性，不要出现文字、水印或社交软件界面。`;
-        const result = await api.generate({ prompt: rolePrompt, purpose: 'moments', count: 1 });
+        const prompt = await safeMomentImagePrompt(post, contact);
+        const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
         if (!result?.assetId) continue;
         post.image = result.assetId;
         post.generatedImage = true;
@@ -9329,7 +9374,9 @@ ${recentConversation}
   const renderMomentsWithoutGroupPosts = renderMoments;
   renderMoments = function() {
     const originalMoments = state.moments;
-    state.moments = originalMoments.filter(post => !momentPostIsGroup(post));
+    // NPC 自己发布的动态只属于角色手机（Ta App）的朋友圈；聊天 App
+    // 只隐藏它们，不删除共享数据，Ta App 仍可读取这些帖子。
+    state.moments = originalMoments.filter(post => !momentPostIsGroup(post) && String(post?.authorType || '').toLowerCase() !== 'npc');
     try { return renderMomentsWithoutGroupPosts(); } finally { state.moments = originalMoments; }
   };
   const renderRoleMomentComposerWithoutGroups = renderRoleMomentComposer;

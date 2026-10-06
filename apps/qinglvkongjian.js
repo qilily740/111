@@ -987,7 +987,7 @@
     return `<button class="love-letter-card love-letter-card-${card.key}" data-love-letter-card="${index}" title="${esc(card.text)}" aria-label="${esc(card.name)}：${esc(card.text)}" type="button" ${playable ? '' : 'disabled'}><img src="${loveLetterCardImage(card.key)}" alt="${esc(card.name)}"></button>`;
   }
   function loveLetterRulesMarkup() {
-    const rules = LOVE_LETTER_CARDS.map(card => `<li><img src="${loveLetterCardImage(card.key)}" alt=""><span><b>${card.value} · ${esc(card.name)}</b><small>${esc(card.text)}</small></span></li>`).join('');
+    const rules = LOVE_LETTER_CARDS.map(card => `<li><img src="${loveLetterCardImage(card.key)}" alt=""><span><b>${card.value} · ${esc(card.name)} ×${card.count}张</b><small>${esc(card.text)}</small></span></li>`).join('');
     return `<section class="love-letter-rules-backdrop"><article class="love-letter-rules-modal"><header><small>PLAY GUIDE</small><b>第一次玩，先看这里</b></header><p>标准版共 16 张牌。本轮先移出 1 张暗牌，2 人局再额外亮出 3 张；每回合摸 1 张并打出 1 张。牌库耗尽时比较手牌点数，相同则双方都获得 1 枚钟情标记。</p><ul>${rules}</ul><button data-love-letter-rules-close type="button" ${loveLetterRulesCountdown ? 'disabled' : ''}>${loveLetterRulesCountdown ? `${loveLetterRulesCountdown} 秒后开始` : '我知道了，开始游戏'}</button></article></section>`;
   }
   function loveLetterMarkup(role, profile) {
