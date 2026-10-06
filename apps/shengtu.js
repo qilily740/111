@@ -84,8 +84,31 @@
   function imageEndpoint(endpoint) {
     const clean = String(endpoint || '').trim().replace(/\/$/, '');
     if (!clean) return '';
-    if (/\/chat\/completions$/i.test(clean)) return clean.replace(/\/chat\/completions$/i, '/images/generations');
-    return /\/images\/generations$/i.test(clean) ? clean : `${clean}/images/generations`;
+    if (/\/(?:chat\/completions|images\/(?:generations|edits))$/i.test(clean)) return clean.replace(/\/(?:chat\/completions|images\/(?:generations|edits))$/i, '/images/generations');
+    return `${clean}/images/generations`;
+  }
+
+  function imageEditsEndpoint(endpoint) {
+    return imageEndpoint(endpoint).replace(/\/images\/generations$/i, '/images/edits');
+  }
+
+  async function referenceImageDataUrl(source) {
+    const value = String(source || '').trim();
+    if (!value) throw new Error('角色还没有头像，无法锁定自拍身份。请先给该角色设置头像。');
+    let response;
+    try { response = await fetch(value); }
+    catch (error) { throw new Error(`无法读取角色头像作为参考图：${error?.message || '图片读取失败'}`); }
+    if (!response.ok) throw new Error(`读取角色参考图失败（HTTP ${response.status}）`);
+    const blob = await response.blob();
+    if (!/^image\/(?:png|jpeg|webp)$/i.test(blob.type || '')) {
+      throw new Error('角色头像格式暂不支持作为参考图，请使用 PNG、JPG 或 WebP 图片。');
+    }
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('角色头像无法转换为参考图数据。'));
+      reader.readAsDataURL(blob);
+    });
   }
 
   function modelsEndpoint(endpoint) {
@@ -184,12 +207,18 @@
     if (!prompt) throw new Error('缺少生图提示词');
     if (negativePrompt && config.protocol === 'openai') prompt += `\n画面中避免出现：${negativePrompt}`;
     const count = Math.max(1, Math.min(4, Number(options.count || config.count) || 1));
+    if (options.requireReferenceImage && !options.referenceImage) throw new Error('缺少角色参考图；为避免生成陌生人物，已停止本次生图。');
+    if (options.requireReferenceImage && config.protocol !== 'openai') {
+      throw new Error('当前图片 API 协议不支持已验证的参考图编辑链路。为避免把角色生成为陌生人，本次没有退回普通文生图。');
+    }
     const body = { model: config.model, prompt, n: count, size };
+    const imageReference = options.requireReferenceImage ? await referenceImageDataUrl(options.referenceImage) : '';
+    if (imageReference) body.images = [{ image_url:imageReference }];
     if (config.quality) body.quality = config.quality;
     // Wanwan 的 OpenAI 兼容链路优先让服务直接返回 base64，减少依赖
     // 图片 CDN 的跨域读取；只在服务明确不支持此字段时降级重试。
     const canRequestBase64 = config.protocol !== 'extended';
-    if (canRequestBase64) body.response_format = 'b64_json';
+    if (canRequestBase64 && !options.requireReferenceImage) body.response_format = 'b64_json';
     if (config.protocol === 'extended') {
       const dimensions = imageSize(size);
       Object.assign(body, dimensions, {
@@ -197,7 +226,7 @@
       });
       Object.keys(body).forEach(key => body[key] === undefined && delete body[key]);
     }
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type':'application/json' };
     if (config.key) headers.Authorization = `Bearer ${config.key}`;
     const requestOptions = { idealScope:purpose === 'chat' ? 'chat-image-generation' : 'image', idealPurpose:purpose === 'chat' ? '聊天 App－生成聊天图片' : '生图 App－生成图片', method:'POST', headers, body:'' };
     let response;
@@ -206,7 +235,7 @@
     while (true) {
       requestOptions.body = JSON.stringify(body);
       try {
-        response = await fetch(endpoint, requestOptions);
+        response = await fetch(imageReference ? imageEditsEndpoint(config.endpoint) : endpoint, requestOptions);
       } catch (error) {
         if (error instanceof TypeError || error?.message === 'Failed to fetch') {
           const localFileHint = location.protocol === 'file:'
@@ -220,7 +249,7 @@
       try { responseText = await response.clone().text(); } catch {}
       try { payload = responseText ? JSON.parse(responseText) : null; } catch { payload = null; }
       const providerMessage = String(payload?.error?.message || payload?.error || payload?.message || payload?.detail || responseText || '');
-      const rejectsResponseFormat = canRequestBase64 && !retriedWithoutResponseFormat && !response.ok
+      const rejectsResponseFormat = !imageReference && canRequestBase64 && !retriedWithoutResponseFormat && !response.ok
         && /response[_ -]?format|unsupported.{0,30}(?:parameter|field)|unknown.{0,20}(?:parameter|field)|不支持.{0,12}(?:参数|字段)/i.test(providerMessage);
       if (rejectsResponseFormat) {
         delete body.response_format;
@@ -228,6 +257,9 @@
         continue;
       }
       if (!response.ok) {
+        if (imageReference && [404, 405, 501].includes(response.status)) {
+          throw new Error(`当前图片服务未提供参考图编辑接口（HTTP ${response.status}）。为确保自拍仍是该角色，本次没有改用随机文生图。`);
+        }
         const detail = providerMessage.replace(/Bearer\s+\S+/gi, 'Bearer [已隐藏]').slice(0, 400);
         throw new Error(detail ? `HTTP ${response.status}：${detail}` : `HTTP ${response.status}`);
       }

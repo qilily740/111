@@ -290,6 +290,32 @@
     if (idealChatBilingualNeedsExplicitLabels(chat)) return `上一条回复没有遵守理想机双语格式。请保持原意、语气、消息数量和所有控制标记不变，只修正每条可见消息及心声的格式：严格写成“原文：${idealChatBilingualLanguageLabel(settings.sourceLang)}内容「译文：${idealChatBilingualLanguageLabel(settings.targetLang)}内容」”。必须保留“原文：”和“译文：”标签；两段都要有实际内容，不得因两种语言都使用汉字而省略译文。只输出完整回复，不要解释。`;
     return `上一条回复没有遵守理想机双语格式。请保持原意、语气、消息数量和控制标记不变，只修正语言格式：非${idealChatBilingualLanguageLabel(settings.targetLang)}消息必须在同一条原文末尾追加「${idealChatBilingualLanguageLabel(settings.targetLang)}译文」；${idealChatBilingualLanguageLabel(settings.targetLang)}消息可保持原文。只输出完整回复，不要解释。`;
   }
+  function idealChatBilingualThoughtCompliant(value, chat) {
+    if (!idealChatBilingualFor(chat).enabled) return true;
+    const parsed = idealChatBilingualParse(value);
+    if (idealChatBilingualNeedsExplicitLabels(chat)) return parsed.explicitPair === true;
+    return !idealChatBilingualHasForeign(parsed.text) || Boolean(parsed.translation);
+  }
+  async function idealChatBilingualCorrectThought(raw, chat, config, model, thoughtPrompt) {
+    if (idealChatBilingualThoughtCompliant(raw, chat) || !config?.endpoint || !config.key || !model) return raw;
+    try {
+      const response = await (window.IdealMachineFetch || nativeChatFetch)(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
+        method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` },
+        body:JSON.stringify({ model, temperature:.15, max_tokens:1024, messages:[
+          { role:'system', content:thoughtPrompt },
+          { role:'user', content:`请只校正下面这条心声的双语格式，保持原意和第一人称口吻，不要补写聊天中没有的事实。格式规则：${idealChatBilingualCorrectionPrompt(chat)}\n\n原心声：${String(raw || '').slice(0, 1200)}` }
+        ] }),
+        idealScope:'chat-thought-format'
+      });
+      if (!response.ok) return raw;
+      const data = await response.json();
+      const corrected = String(data.choices?.[0]?.message?.content || '').trim();
+      return idealChatBilingualThoughtCompliant(corrected, chat) ? corrected : raw;
+    } catch (error) {
+      console.warn('[理想机双语] 心声格式校正失败：', error);
+      return raw;
+    }
+  }
   async function idealChatBilingualCorrectReply(raw, chat, config, model, systemText, history, scope = 'chat') {
     if (!idealChatBilingualFor(chat).enabled || idealChatBilingualReplyCompliant(raw, chat) || !config?.endpoint || !config.key || !model) return raw;
     try {
@@ -1949,7 +1975,13 @@ ${languageInstruction}
     // 中文角色的旧心声如果已经混入英文/其他文字，必须重新校正；之前这里
     // 用“没有外语 languageProfile”判断，恰好会跳过 code === 'zh' 的角色。
     const chineseThoughtNeedsRefresh = false;
-    if (!force && savedThought?.text && !chineseThoughtNeedsRefresh) {
+    const bilingual = idealChatBilingualFor(chat);
+    const bilingualThoughtNeedsRefresh = Boolean(savedThought?.text && bilingual.enabled && (
+      idealChatBilingualNeedsExplicitLabels(chat)
+        ? !savedThought.translation
+        : idealChatBilingualHasForeign(savedThought.text) && !savedThought.translation
+    ));
+    if (!force && savedThought?.text && !chineseThoughtNeedsRefresh && !bilingualThoughtNeedsRefresh) {
       thoughtKey = key;
       thoughtText = savedThought.text;
       thoughtTranslation = savedThought.translation || '';
@@ -2021,7 +2053,10 @@ ${rerollRule}
       const data = await response.json();
       const choice = data.choices?.[0] || {};
       if (requestId === thoughtRequestId) {
-        const thoughtParts = extractCharacterTranslation(choice.message?.content || '');
+        const rawThought = String(choice.message?.content || '');
+        const formattedThought = await idealChatBilingualCorrectThought(rawThought, chat, config, model, thoughtPrompt);
+        if (requestId !== thoughtRequestId) return;
+        const thoughtParts = extractCharacterTranslation(formattedThought);
         let completeThought = cleanThoughtText(thoughtParts.text);
         if (!thoughtLooksIncomplete(completeThought, choice.finish_reason)) completeThought = cleanThoughtText(completeThought);
         thoughtText = thoughtLooksIncomplete(completeThought, choice.finish_reason) ? '这条心声没有生成完整，请点击重roll再试。' : completeThought;
@@ -5558,16 +5593,30 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       window.alert(`角色发图失败：${error.message}`);
       return false;
     }
-    // 自拍请求走稳定的安全简短提示词：不把聊天历史或聊天模型展开的
-    // 亲密/身体描写带入图片 API，避免普通“发自拍”被扩写成触发 400 的内容。
-    // 这是正常的内容边界处理，不重试或绕过图片服务的审核。
+    // 自拍必须以角色头像作为身份参考，不能退回纯文生图，否则模型会
+    // 自行随机生成人物。参考图编辑不支持或图片无法读取时，直接报错停止。
     const latestUserMessage = [...(targetChat.messages || [])].reverse().find(message => message.role === 'user');
     const selfieRequested = isExplicitSelfieRequest(latestUserMessage?.text);
-    const rolePrompt = selfieRequested
-      ? 'A natural everyday selfie portrait of a fictional character, fully clothed in ordinary casual clothing, relaxed friendly expression, soft natural daylight, simple private indoor background, realistic personal snapshot, tasteful and non-suggestive, no readable text, watermark, logo, or app interface.'
-      : prepareCharacterImagePrompt(prompt);
+    let rolePrompt = prepareCharacterImagePrompt(prompt);
+    let referenceImage = '';
+    if (selfieRequested) {
+      rolePrompt = 'Create a new casual smartphone selfie of the exact same character shown in the supplied reference image. Preserve the reference character’s recognizable face and identity, facial features, hairstyle, hair color, skin tone, gender presentation, and original visual/art style. Do not replace the character with a different person; do not add any other people. Natural relaxed expression, ordinary fully clothed everyday outfit, soft natural light, simple believable background, candid personal-photo framing. No text, watermark, logo, or app interface.';
+      referenceImage = String(contact.avatar || '').trim();
+      if (/^idb:image:/i.test(referenceImage) && window.IdealMachineGetImage) {
+        try { referenceImage = String(await window.IdealMachineGetImage(referenceImage) || '').trim(); }
+        catch (error) {
+          console.warn('无法读取角色参考头像：', error);
+          window.alert('读取角色头像失败，本次没有请求生图，避免生成不属于该角色的人物。');
+          return false;
+        }
+      }
+      if (!referenceImage) {
+        window.alert('角色还没有可用头像，无法保证自拍是这个角色。请先给角色设置头像，再让角色发自拍。');
+        return false;
+      }
+    }
     try {
-      const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1 });
+      const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1, ...(selfieRequested ? { referenceImage, requireReferenceImage:true } : {}) });
       if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源');
       if (existingMessage) Object.assign(existingMessage, { text: result.assetId, generated: true, generatedPrompt: rolePrompt, generatedImageLoading: false });
       else {
