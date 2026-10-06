@@ -6065,6 +6065,39 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     return result;
   };
 
+  const renderMomentPostWithPersistentImage = renderMomentPost;
+  renderMomentPost = function(post) {
+    const html = renderMomentPostWithPersistentImage(post);
+    if (!/^idb:image:/i.test(String(post?.image || ''))) return html;
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const image = template.content.querySelector('.chat-moment > img[src]');
+    if (image) {
+      image.dataset.chatMomentImageAsset = post.image;
+      image.removeAttribute('src');
+    }
+    return template.innerHTML;
+  };
+
+  function hydrateGeneratedMomentImages() {
+    const resolveAsset = window.IdealMachineGetImage || window.IdealMachineImageAPI?.resolveAsset;
+    if (!resolveAsset) return;
+    app.querySelectorAll('img[data-chat-moment-image-asset]').forEach(image => {
+      if (image.dataset.generatedImageLoading === 'true') return;
+      image.dataset.generatedImageLoading = 'true';
+      const assetId = image.dataset.chatMomentImageAsset;
+      Promise.resolve(resolveAsset(assetId)).then(source => {
+        if (!image.isConnected) return;
+        if (source) {
+          image.src = source;
+          delete image.dataset.chatMomentImageAsset;
+        } else image.alt = '图片读取失败，稍后重试';
+      }).catch(() => {
+        if (image.isConnected) image.alt = '图片读取失败，稍后重试';
+      }).finally(() => { delete image.dataset.generatedImageLoading; });
+    });
+  }
+
   function hydrateGeneratedImages() {
     const resolveAsset = window.IdealMachineGetImage || window.IdealMachineImageAPI?.resolveAsset;
     if (!resolveAsset) return;
@@ -6098,7 +6131,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   const baseRenderWithGeneratedImages = render;
   render = function() {
     baseRenderWithGeneratedImages();
-    requestAnimationFrame(hydrateGeneratedImages);
+    requestAnimationFrame(() => {
+      hydrateGeneratedImages();
+      hydrateGeneratedMomentImages();
+    });
   };
 
   // 三级记忆：聊天设置、上下文注入与自动整理。

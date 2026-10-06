@@ -188,11 +188,50 @@
     return [config.positivePrompt, prompt].map(item => String(item || '').trim()).filter(Boolean).join('\n');
   }
 
-  async function storeImage(value) {
-    // 远端 URL 直接作为消息资源使用，避免额外包一层 IndexedDB key 后，
-    // 还要经历本地解引用才可显示；base64 则继续放入 IndexedDB，避免撑爆 localStorage。
-    if (/^https?:\/\//i.test(String(value || ''))) return String(value);
-    return window.IdealMachinePutImage ? window.IdealMachinePutImage(value) : value;
+  async function imageSourceToBlob(value, config) {
+    const source = String(value || '').trim();
+    if (!source) throw new Error('图片接口返回了空图片');
+    const headers = new Headers();
+    let requestUrl = source;
+    if (/^https?:\/\//i.test(source)) {
+      const imageUrl = new URL(source, location.href);
+      const endpointUrl = new URL(imageEndpoint(config.endpoint), location.href);
+      if (config.key && imageUrl.origin === endpointUrl.origin) headers.set('Authorization', `Bearer ${config.key}`);
+      requestUrl = imageUrl.href;
+    } else if (!/^data:image\//i.test(source) && !/^blob:/i.test(source)) {
+      throw new Error('图片接口返回了不支持的图片地址');
+    }
+    let response;
+    try {
+      response = await fetch(requestUrl, {
+        method: 'GET',
+        headers,
+        idealScope: 'image-download',
+        idealPurpose: '生图 App－保存生成图片'
+      });
+    } catch (error) {
+      throw new Error('图片已生成，但服务返回的是无法下载的临时链接。请确认图片地址允许跨域读取，或让接口返回 b64_json。', { cause:error });
+    }
+    if (!response.ok) throw new Error(`图片已生成，但下载保存失败（HTTP ${response.status}）。请确认临时图片链接仍有效。`);
+    const blob = await response.blob();
+    if (!blob.size) throw new Error('图片已生成，但下载到的文件为空。');
+    if (blob.type && !/^image\//i.test(blob.type)) throw new Error(`图片已生成，但服务返回了非图片文件（${blob.type}）。`);
+    return blob;
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('图片已生成，但无法读取下载内容。'));
+      reader.onerror = () => reject(new Error('图片已生成，但无法读取下载内容。'));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function storeImage(value, config) {
+    // Provider URL 往往是签名临时链接；立即下载为本地持久资源，避免过期后历史消息丢图。
+    const blob = await imageSourceToBlob(value, config);
+    return window.IdealMachinePutImage ? window.IdealMachinePutImage(blob) : blobToDataUrl(blob);
   }
 
   async function generate(options = {}) {
@@ -267,7 +306,7 @@
     }
     const sources = extractImages(payload, endpoint);
     if (!sources.length) throw new Error('接口已响应，但没有返回可识别的图片（支持 data[].b64_json、base64 或 url 格式）');
-    const assets = await Promise.all(sources.map(storeImage));
+    const assets = await Promise.all(sources.map(source => storeImage(source, config)));
     return { assetId: assets[0], assetIds: assets, prompt, revisedPrompt: payload?.data?.[0]?.revised_prompt || '' };
   }
 
