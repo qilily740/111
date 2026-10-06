@@ -1518,6 +1518,7 @@ ${languageInstruction}
     draft.gender = read('#contactGender');
     draft.worldbook = read('#contactWorldbook');
     draft.details = read('#contactDetails');
+    draft.imageAppearance = read('#contactImageAppearance');
     draft.avatarUrl = read('#contactAvatarUrl');
     editorDraft = draft;
     return draft;
@@ -1656,10 +1657,9 @@ ${languageInstruction}
     const importedWorldbookOption = editorWorldbookDraft ? `<option value="__imported_worldbook__" selected>已导入并绑定：${esc(editorWorldbookDraft.name)}</option>` : '';
     const cardAction = unlocked ? `<label class="chat-file-button" data-chat-import-card>选择角色卡<input id="chatCharacterCardFile" type="file" accept="image/png,.png,application/json,.json"></label>` : `<span class="chat-card-lock" aria-label="导入功能已锁定">🔒</span><button class="chat-card-unlock" type="button" data-chat-card-unlock>解锁导入</button>`;
     editor.innerHTML = `<section class="chat-editor-sheet"><header><div><span class="chat-kicker">CHARACTER PROFILE</span><h2>${editorMode === 'edit' ? '编辑角色' : '添加角色'}</h2></div><button data-chat-editor-close type="button" ${contactSaving ? 'disabled' : ''}>×</button></header><div class="chat-editor-body"><div class="chat-card-import-box"><div><b>导入 SillyTavern 角色卡</b><small>支持 PNG、JSON；角色资料和世界书会自动读取。</small></div><div class="chat-card-import-actions">${cardAction}</div>${worldbook}</div><div class="chat-avatar-picker"><span class="chat-editor-avatar">${editorAvatar ? `<img src="${esc(editorAvatar)}" alt="角色头像">` : esc((source.name || '角').slice(0, 1))}</span><div><div class="chat-avatar-actions"><label class="chat-file-button">上传头像<input id="chatContactAvatar" type="file" accept="image/*"></label><label class="chat-file-button" data-chat-import-text>导入资料<input id="chatCharacterTextFile" type="file" accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label></div><input class="chat-avatar-url" id="contactAvatarUrl" type="url" value="${esc(editorDraft?.avatarUrl ?? (editorAvatar.startsWith('data:') ? '' : editorAvatar))}" placeholder="或粘贴头像 URL"></div></div><div class="chat-editor-grid"><label>角色名字<input id="contactName" value="${esc(source.name)}" placeholder="填写角色名字"></label><label>网名<input id="contactNickname" value="${esc(source.nickname)}" placeholder="填写网名"></label><label>身份<input id="contactIdentity" value="${esc(source.identity)}" placeholder="填写身份"></label><label>国籍<input id="contactNationality" value="${esc(source.nationality || '')}" placeholder="例如：中国、日本、美国"></label><label>生日<input id="contactBirthday" type="text" value="${esc(source.birthday)}" placeholder="例如：2000-01-01"></label><label>性别<select id="contactGender"><option value="">未设置</option><option ${source.gender === '男' ? 'selected' : ''}>男</option><option ${source.gender === '女' ? 'selected' : ''}>女</option><option ${source.gender === '其他' ? 'selected' : ''}>其他</option></select></label><label>绑定局部世界书<select id="contactWorldbook"><option value="">不绑定</option>${importedWorldbookOption}${worldbookOptions(source.worldbook)}</select></label></div><label class="chat-editor-wide">具体设定<textarea id="contactDetails" placeholder="填写性格、经历、关系和说话方式">${esc(source.details)}</textarea></label></div><footer><button data-chat-editor-close type="button" ${contactSaving ? 'disabled' : ''}>取消</button><button data-chat-editor-save type="button" ${contactSaving ? 'disabled' : ''}>${contactSaving ? '正在保存…' : '保存角色'}</button></footer></section>`;
-    const avatarActions = editor.querySelector('.chat-avatar-actions');
-    const importTextLabel = editor.querySelector('[data-chat-import-text]');
-    if (avatarActions && importTextLabel && !avatarActions.querySelector('[data-chat-album-avatar]')) {
-      importTextLabel.insertAdjacentHTML('beforebegin', '<button class="chat-file-button" data-chat-album-avatar type="button">从相册选择</button>');
+    const detailsField = editor.querySelector('#contactDetails')?.closest('label');
+    if (detailsField && !editor.querySelector('#contactImageAppearance')) {
+      detailsField.insertAdjacentHTML('afterend', `<label class="chat-editor-wide">生图外貌设定<textarea id="contactImageAppearance" placeholder="只填写角色画面中可见的外貌">${esc(source.imageAppearance || contactImageAppearance(source))}</textarea></label>`);
     }
   }
 
@@ -2140,6 +2140,7 @@ ${rerollRule}
     const file = editor.querySelector('#chatContactAvatar')?.files[0];
     const avatarUrl = editor.querySelector('#contactAvatarUrl')?.value.trim();
     const values = { nickname:editor.querySelector('#contactNickname')?.value.trim() || '', identity:editor.querySelector('#contactIdentity')?.value.trim() || '', nationality:editor.querySelector('#contactNationality')?.value.trim() || '', birthday:editor.querySelector('#contactBirthday')?.value || '', gender:editor.querySelector('#contactGender')?.value || '', worldbook:editor.querySelector('#contactWorldbook')?.value || '', details:editor.querySelector('#contactDetails')?.value.trim() || '' };
+    values.imageAppearance = editor.querySelector('#contactImageAppearance')?.value.trim().slice(0, 2400) || '';
     // Do not rebuild the editor while saving. Replacing the form here can
     // invalidate the button/event target and leave the UI showing a stale
     // "saving" state even though the data has already been written.
@@ -2854,14 +2855,11 @@ ${rerollRule}
   document.addEventListener('click', event => { if (!app.classList.contains('is-open')) return; const momentProfileButton = event.target.closest('[data-chat-moment-profile]'); const momentNicknameButton = event.target.closest('[data-chat-moment-nickname]'); const create = event.target.closest('[data-chat-create-profile]'); const add = event.target.closest('[data-chat-add-profile]'); const edit = event.target.closest('[data-chat-edit-profile]'); const remove = event.target.closest('[data-chat-delete-profile]'); const close = event.target.closest('[data-profile-editor-close]'); const saveButton = event.target.closest('[data-profile-editor-save]'); if (momentProfileButton) { event.preventDefault(); event.stopImmediatePropagation(); chooseMomentAvatar(); return; } if (momentNicknameButton) { event.preventDefault(); event.stopImmediatePropagation(); editMomentNickname(); return; } if (create || add) { event.stopImmediatePropagation(); profilePickerOpen = false; openProfileEditor(); return; } if (edit) { event.stopImmediatePropagation(); openProfileEditor(state.profiles.find(item => item.id === edit.dataset.chatEditProfile)); return; } if (remove) { event.stopImmediatePropagation(); const profile = state.profiles.find(item => item.id === remove.dataset.chatDeleteProfile); if (profile && window.confirm(`确定删除用户设定“${profile.name}”吗？`)) { state.profiles = state.profiles.filter(item => item.id !== profile.id); Object.values(state.chats).forEach(chat => { if (chat.profileId === profile.id) chat.profileId = ''; }); save(); render(); } return; } if (close) { event.stopImmediatePropagation(); profileEditorPurpose = ''; profileDraft = null; profileEditorOpen = false; renderProfileEditor(); return; } if (saveButton) { event.stopImmediatePropagation(); saveProfileEditor(); } }, true);
   document.addEventListener('click', event => {
     if (!app.classList.contains('is-open')) return;
-    const characterAvatar = event.target.closest('[data-chat-album-avatar]');
     const userAvatar = event.target.closest('[data-profile-album-avatar]');
-    if (!characterAvatar && !userAvatar) return;
+    if (!userAvatar) return;
     event.preventDefault(); event.stopImmediatePropagation();
-    if (characterAvatar && !window.IdealMachineAlbum?.pick) return window.alert('相册 App 还没有准备好，请先打开相册导入图片。');
     window.IdealMachineAlbum?.pick?.(value => {
-      if (characterAvatar) { captureEditorDraft(); if (editorDraft) editorDraft.avatarUrl = ''; editorAvatar = value || ''; renderEditor(); }
-      else { captureProfileDraft(); profileAvatar = value || ''; renderProfileEditor(); }
+      captureProfileDraft(); profileAvatar = value || ''; renderProfileEditor();
     });
   }, true);
   document.addEventListener('submit', event => { const form = event.target.closest('[data-emoji-create-form]'); if (!form) return; event.preventDefault(); const input = form.querySelector('#emojiNewGroupName'); const name = input?.value.trim(); if (!name) return; const item = { id: uid('emoji-group'), name, items: [] }; state.emojis.groups.push(item); activeEmojiGroup = item.id; save(); render(); });
@@ -3879,34 +3877,109 @@ ${rerollRule}
     }
     save(); syncDeletedMemory(chat, [message]); chatMessageEditingId = ''; renderMessageEditor(); render();
   });
-  function contactImageAppearance(contact) { return [contact?.imageAppearance, contact?.faceDescription, contact?.appearanceDescription, contact?.appearance, contact?.details, contact?.signature].find(value => typeof value === 'string' && value.trim())?.trim().slice(0, 2400) || ''; }
+  const chatImageAppearancePartLabels = { type:'物种/整体类型', features:'五官', hair:'发型与发色', skin:'肤色与皮肤特征', height:'身高与体型', moles:'痣与胎记', tattoos:'纹身', scars:'伤疤', other:'其他固定外貌' };
+  function emptyChatImageAppearanceParts() { return Object.fromEntries(Object.keys(chatImageAppearancePartLabels).map(key => [key, ''])); }
+  function parseChatImageAppearanceParts(value) {
+    const result = emptyChatImageAppearanceParts();
+    const aliases = [
+      ['type', /^(?:物种(?:\/整体类型)?|角色类型|整体类型)\s*[:：]/i], ['features', /^(?:五官|脸型|面部特征|面容)\s*[:：]/i], ['hair', /^(?:发型(?:与发色)?|头发|发色)\s*[:：]/i],
+      ['skin', /^(?:肤色(?:与皮肤特征)?|皮肤特征)\s*[:：]/i], ['height', /^(?:身高(?:与体型)?|体型|身材)\s*[:：]/i],
+      ['moles', /^(?:痣(?:与胎记)?|胎记)\s*[:：]/i], ['tattoos', /^(?:纹身|刺青)\s*[:：]/i], ['scars', /^(?:伤疤|疤痕)\s*[:：]/i],
+      ['other', /^(?:其他外貌|补充外貌|其他固定外貌)\s*[:：]/i]
+    ];
+    const keywords = [
+      ['type', /(?:物种|整体类型|角色类型|动物角色|品种)\s*[:：]?|(?:角色|物种|品种)(?:是|为|属于)\s*(?:人类|男性|女性|猫|狗|犬|狐狸|兔|狼|鸟|马|龙)|(?:一只|一条|一头|一匹)\s*(?:猫|狗|犬|狐狸|兔|狼|鸟|马|龙)|^(?:人类|男性|女性|男生|女生|男人|女人|猫咪|狗狗|狐狸|兔子|狼族|鸟类|猫娘|犬娘|兽人|精灵|妖精|机器人|拟人|human|man|woman|cat|dog|fox|rabbit|wolf|elf|robot)(?:角色|形态|物种|品种)?$/i],
+      ['features', /五官|脸型|面部|面容|长相|狗狗眼|小狗眼|猫猫眼|猫眼|犬系眼|狐狸眼|眼睛|眼型|眼尾|瞳孔|眉毛|鼻梁|鼻子|嘴唇|唇形|下颌|颌线|脸颊|酒窝|清秀|浓颜|淡颜|\b(?:face|facial|eyes?|puppy eyes|cat eyes|eyelids?|pupils?|eyebrows?|nose|lips?|jawline|cheeks?)\b/i],
+      ['hair', /发型|头发|发色|短发|长发|卷发|直发|刘海|马尾|辫子|挑染|银发|黑发|白发|棕发|金发|\b(?:hair|hairstyle|fringe|bangs|ponytail|braid)\b/i],
+      ['skin', /肤色|皮肤|肤质|冷白皮|小麦色|白皙|黝黑|雀斑|\b(?:skin|complexion|freckles)\b/i],
+      ['height', /身高|体型|身材|肩宽|高挑|矮小|纤细|健壮|肌肉|体态|\b(?:height|build|stature|shoulders?|muscular|slim|slender)\b/i],
+      ['moles', /痣|胎记|\b(?:mole|birthmark)\b/i], ['tattoos', /纹身|刺青|\b(?:tattoo|inked)\b/i], ['scars', /伤疤|疤痕|刀疤|烧伤痕|缝合痕|\b(?:scar|scarring)\b/i]
+    ];
+    const append = (key, text) => { const clean = String(text || '').trim(); if (clean) result[key] = [result[key], clean].filter(Boolean).join('；'); };
+    String(value || '').split(/\r?\n/).forEach(rawLine => {
+      const line = rawLine.trim();
+      if (!line) return;
+      const match = aliases.find(([, pattern]) => pattern.test(line));
+      if (match) { const [key, pattern] = match; append(key, line.replace(pattern, '')); return; }
+      line.split(/[，,。；;、]+/).map(part => part.trim()).filter(Boolean).forEach(part => {
+        const matches = keywords.filter(([, pattern]) => pattern.test(part)).map(([key]) => key);
+        if (!matches.length) { append('other', part); return; }
+        [...new Set(matches)].forEach(key => append(key, part));
+      });
+    });
+    return result;
+  }
+  function formatChatImageAppearance(parts) {
+    return Object.entries(chatImageAppearancePartLabels).map(([key, label]) => {
+      const value = String(parts?.[key] || '').trim();
+      return value ? `${label}：${value}` : '';
+    }).filter(Boolean).join('\n').slice(0, 2400);
+  }
+  function contactImageAppearance(contact) {
+    if (!contact) return '';
+    const explicit = [contact.imageAppearance, contact.faceDescription, contact.appearanceDescription, contact.appearance]
+      .find(value => typeof value === 'string' && value.trim());
+    if (explicit) return explicit.trim().slice(0, 2400);
+    // 旧角色卡有时把外貌写在“具体设定”中；只取明确标注的外貌段，
+    // 不再把性格、经历、关系、签名等整段设定误当作长相。
+    const lines = String(contact.details || '').split(/\r?\n/);
+    const heading = /^\s*【?\s*(生图外貌|人物外貌|外貌设定|外貌特征|外貌|外形|长相|五官|physical appearance|appearance)\s*】?\s*(?:[:：]\s*(.*))?$/i;
+    const stop = /^\s*【?\s*(?:性格|经历|关系|背景|身份|说话方式|口吻|喜好|世界观|故事|设定补充)\s*】?\s*(?:[:：]|$)/i;
+    const start = lines.findIndex(line => heading.test(line));
+    if (start < 0) return '';
+    const first = lines[start].match(heading)?.[2] || '';
+    const sectionLines = [first];
+    for (const line of lines.slice(start + 1, start + 17)) { if (stop.test(line)) break; sectionLines.push(line); }
+    const section = sectionLines.join('\n').trim();
+    return section.replace(/(?:【\s*)?(?:性格|经历|关系|背景|身份|说话方式|口吻|喜好|世界观|故事|设定补充)(?:\s*】)?\s*[:：][\s\S]*$/i, '').trim().slice(0, 2400);
+  }
+  function contactImageAppearanceParts(contact) {
+    const parts = parseChatImageAppearanceParts(contactImageAppearance(contact));
+    const saved = contact?.imageAppearanceParts;
+    if (saved && typeof saved === 'object') Object.keys(chatImageAppearancePartLabels).forEach(key => { if (typeof saved[key] === 'string') parts[key] = saved[key].trim().slice(0, 500); });
+    return parts;
+  }
   function syncChatImageAppearance(chat, contact) {
     if (!chat) return false;
     chat.settings ||= {};
     const settings = chat.settings;
     const sourceAppearance = contactImageAppearance(contact);
+    const sourceFeatures = contactImageAppearanceParts(contact);
     if (!Object.prototype.hasOwnProperty.call(settings, 'imageCharacterDescription')) {
       settings.imageCharacterDescription = sourceAppearance;
+      settings.imageCharacterFeatures = sourceFeatures;
       settings.imageCharacterDescriptionSource = 'contact';
       return true;
     }
-    if (settings.imageCharacterDescriptionSource === 'contact' && settings.imageCharacterDescription !== sourceAppearance) {
+    if (settings.imageCharacterDescriptionSource === 'contact' && (settings.imageCharacterDescription !== sourceAppearance || JSON.stringify(settings.imageCharacterFeatures || {}) !== JSON.stringify(sourceFeatures))) {
       settings.imageCharacterDescription = sourceAppearance;
+      settings.imageCharacterFeatures = sourceFeatures;
       return true;
     }
+    if (!settings.imageCharacterFeatures || typeof settings.imageCharacterFeatures !== 'object') settings.imageCharacterFeatures = parseChatImageAppearanceParts(settings.imageCharacterDescription);
     return false;
   }
-  function getChatImageAppearance(chat, contact) {
-    if (!chat) return contactImageAppearance(contact);
+  function getChatImageAppearanceParts(chat, contact) {
+    if (!chat) return contactImageAppearanceParts(contact);
     const changed = syncChatImageAppearance(chat, contact);
     if (changed) save();
-    return String(chat?.settings?.imageCharacterDescription || '').trim().slice(0, 2400);
+    const features = { ...emptyChatImageAppearanceParts(), ...(chat.settings?.imageCharacterFeatures || {}) };
+    const hasClassifiedFeature = Object.entries(features).some(([key, value]) => key !== 'other' && String(value || '').trim());
+    if (!hasClassifiedFeature) {
+      const source = String(chat.settings?.imageCharacterDescription || features.other || '').trim();
+      const parsed = source ? parseChatImageAppearanceParts(source) : features;
+      if (Object.values(parsed).some(Boolean)) { chat.settings.imageCharacterFeatures = parsed; save(); return parsed; }
+    }
+    return features;
+  }
+  function getChatImageAppearance(chat, contact) {
+    return formatChatImageAppearance(getChatImageAppearanceParts(chat, contact));
   }
   function lockCharacterImageAppearance(prompt, appearance) {
     const description = String(appearance || '').replace(/\s+/g, ' ').trim();
     if (!description) return prompt;
     const basePrompt = String(prompt || '').replace(/^Character identity constraint:[\s\S]*?\n\n/, '').trim();
-    return `Character identity constraint: whenever this character is visible, depict the same person and do not substitute a generic or different person. Preserve the described face, facial features, hairstyle, hair color, skin tone, and gender presentation. Highest-priority appearance description: ${description}\n\n${basePrompt}`;
+    return `Character identity constraint: whenever this character is visible, depict the same character; do not substitute a generic or different person or animal. Preserve the described species or character type and the visible appearance traits. Highest-priority appearance description: ${description}\n\n${basePrompt}`;
   }
   function chatSettingsFor(chat = currentChat()) { if (!chat) return { hideAvatar: false, hideTimestamp: false, realTimeAwareness: true, internalNotificationEnabled: true, userBubbleColor: '#222222', userBubbleTextColor: '#ffffff', userBubbleBorderColor: '#222222', characterBubbleColor: '#ffffff', characterBubbleTextColor: '#111111', characterBubbleBorderColor: '#dddddd', wallpaper: '', visionEnabled: false, visionModel: '', activeMessageEnabled: false, activeMessageIdleMinutes: 15, activeMessageCooldownMinutes: 30, activeMessageDailyLimit: 3 }; chat.settings ||= {}; chat.settings.hideAvatar = Boolean(chat.settings.hideAvatar); chat.settings.hideTimestamp = Boolean(chat.settings.hideTimestamp); chat.settings.realTimeAwareness = chat.settings.realTimeAwareness !== false; chat.settings.internalNotificationEnabled = chat.settings.internalNotificationEnabled !== false; chat.settings.userBubbleColor ||= '#222222'; chat.settings.userBubbleTextColor ||= '#ffffff'; chat.settings.userBubbleBorderColor ||= '#222222'; chat.settings.characterBubbleColor ||= '#ffffff'; chat.settings.characterBubbleTextColor ||= '#111111'; chat.settings.characterBubbleBorderColor ||= '#dddddd'; chat.settings.wallpaper ||= ''; chat.settings.visionEnabled = chat.settings.visionEnabled === true; chat.settings.visionModel = String(chat.settings.visionModel || ''); normalizeActiveMessageSettings(chat); return chat.settings; }
   function renderChat() { const contact = state.contacts.find(item => item.id === activeContact); if (!contact) return `<div class="chat-launch-list"><div class="chat-launch-head"><span>YOUR CONTACTS</span><p>选择一个角色进入聊天</p></div>${state.contacts.length ? state.contacts.map(item => `<button class="chat-launch-contact" data-chat-open="${item.id}" type="button">${avatarMarkup(item)}<span><b>${esc(item.nickname || item.name)}</b><small>${esc(item.name || item.identity || '等待开始聊天')}</small></span><i>›</i></button>`).join('') : '<div class="chat-empty"><div class="chat-empty-mark">✦</div><h2>还没有角色</h2><p>添加一个角色，绑定你的用户设定后开始聊天。</p><button data-chat-go="contacts" type="button">添加角色</button></div>'}</div>`; const chat = currentChat(); const profile = state.profiles.find(item => item.id === chat.profileId); const settings = chatSettingsFor(chat); const wallpaper = settings.wallpaper ? `background-image:url("${esc(settings.wallpaper)}")` : ''; return `<div class="chat-conversation" style="${wallpaper};--chat-user-bubble:${esc(settings.userBubbleColor)};--chat-user-text:${esc(settings.userBubbleTextColor)};--chat-character-bubble:${esc(settings.characterBubbleColor)};--chat-character-text:${esc(settings.characterBubbleTextColor)}"><div class="chat-person">${avatarMarkup(contact)}<div><b>${esc(contact.nickname || contact.name)}</b><small>${profile ? `使用设定：${esc(profile.nickname || profile.realName || profile.name)}` : '尚未绑定用户设定'}</small></div><button data-chat-bind type="button">${profile ? '更换设定' : '绑定设定'}</button></div>${profilePickerOpen ? profilePicker() : ''}${messageEditBar()}<div class="chat-messages" id="chatMessages">${chat.messages.length ? chat.messages.map(messageHtml).join('') : '<div class="chat-hint">你可以从一句问候开始。</div>'}</div><div class="chat-compose-wrap">${menuOpen ? toolMenu() : ''}${emojiOpen ? emojiPanel() : ''}<div class="chat-compose"><input id="chatInput" placeholder="输入消息…" autocomplete="off"><button class="chat-emoji" data-chat-emoji type="button">${actionIcon('emoji')}</button><button class="chat-plus" data-chat-plus type="button">${actionIcon('plus')}</button><button class="chat-send" data-chat-send type="button">${actionIcon('send')}</button><button class="chat-reply" data-chat-reply type="button" ${replying ? 'disabled' : ''}>${actionIcon('reply')}</button></div></div></div>`; }
@@ -3919,46 +3992,40 @@ ${rerollRule}
     const chat = currentChat();
     const contact = state.contacts.find(item => item.id === activeContact);
     if (!chat || !main || !chatSettingsOpen) return;
-    const appearance = getChatImageAppearance(chat, contact);
+    const appearanceParts = getChatImageAppearanceParts(chat, contact);
     const section = document.createElement('section');
     section.className = 'chat-wallpaper-settings chat-image-appearance-settings';
-    section.innerHTML = `<h3>生图角色面部与形象</h3><p>角色设定会自动同步到这里；你编辑后将优先使用自定义内容。生图时会把这段描述作为角色身份依据。</p><textarea class="chat-wallpaper-url" data-chat-image-appearance rows="5" style="height:auto;min-height:120px;padding:10px;line-height:1.5;resize:vertical" placeholder="例如：年轻男性，窄长眼型，黑色短发，左眉尾有一道浅疤；保持与角色设定一致。">${esc(appearance)}</textarea><div class="chat-wallpaper-actions"><button type="button" data-chat-image-appearance-sync>从联系人设定重新同步</button></div>`;
+    section.innerHTML = `<h3>生图角色外貌</h3><div class="chat-image-appearance-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px">${Object.entries(chatImageAppearancePartLabels).map(([key, label]) => `<label style="display:grid;gap:5px;color:#666;font-size:11px;${key === 'other' ? 'grid-column:1 / -1;' : ''}"><span>${label}</span><textarea data-chat-image-appearance-part="${key}" rows="2" maxlength="500" placeholder="填写${label}；没有可留空" style="width:100%;min-height:56px;padding:8px;border:1px solid rgba(0,0,0,.12);border-radius:9px;background:#fff;color:#222;font:inherit;line-height:1.45;resize:vertical">${esc(appearanceParts[key] || '')}</textarea></label>`).join('')}</div><div class="chat-wallpaper-actions"><button type="button" data-chat-image-appearance-sync>从联系人外貌同步</button><button type="button" data-chat-image-appearance-save>保存外貌</button></div><small data-chat-image-appearance-status aria-live="polite" style="color:#888;font-size:10px"></small>`;
     const wallpaper = main.querySelector('.chat-wallpaper-settings');
     if (wallpaper) main.insertBefore(section, wallpaper);
     else main.appendChild(section);
   };
-  let chatImageAppearanceSaveTimer = 0;
   document.addEventListener('input', event => {
-    const field = event.target.closest('[data-chat-image-appearance]');
+    const field = event.target.closest('[data-chat-image-appearance-part]');
     if (!field || !field.closest('#chatSettings')) return;
-    const chat = currentChat();
-    if (!chat) return;
-    chat.settings ||= {};
-    chat.settings.imageCharacterDescription = field.value.slice(0, 2400);
-    chat.settings.imageCharacterDescriptionSource = 'custom';
-    clearTimeout(chatImageAppearanceSaveTimer);
-    chatImageAppearanceSaveTimer = setTimeout(save, 250);
-  });
-  document.addEventListener('change', event => {
-    const field = event.target.closest('[data-chat-image-appearance]');
-    if (!field || !field.closest('#chatSettings')) return;
-    clearTimeout(chatImageAppearanceSaveTimer);
-    save();
+    const status = document.querySelector('#chatSettings [data-chat-image-appearance-status]');
+    if (status) status.textContent = '有未保存的修改';
   });
   document.addEventListener('click', event => {
-    const button = event.target.closest('[data-chat-image-appearance-sync]');
-    if (!button || !button.closest('#chatSettings')) return;
+    const saveButton = event.target.closest('[data-chat-image-appearance-save]');
+    const syncButton = event.target.closest('[data-chat-image-appearance-sync]');
+    if ((!saveButton && !syncButton) || !(saveButton || syncButton).closest('#chatSettings')) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     const chat = currentChat();
     const contact = state.contacts.find(item => item.id === activeContact);
     if (!chat) return;
     chat.settings ||= {};
-    chat.settings.imageCharacterDescription = contactImageAppearance(contact);
-    chat.settings.imageCharacterDescriptionSource = 'contact';
+    const parts = syncButton ? contactImageAppearanceParts(contact) : Object.fromEntries(
+      Object.keys(chatImageAppearancePartLabels).map(key => [key, document.querySelector(`#chatSettings [data-chat-image-appearance-part="${key}"]`)?.value.trim().slice(0, 500) || ''])
+    );
+    chat.settings.imageCharacterFeatures = parts;
+    chat.settings.imageCharacterDescription = formatChatImageAppearance(parts);
+    chat.settings.imageCharacterDescriptionSource = syncButton ? 'contact' : 'custom';
     save();
-    const field = document.querySelector('#chatSettings [data-chat-image-appearance]');
-    if (field) field.value = chat.settings.imageCharacterDescription;
+    if (syncButton) Object.entries(parts).forEach(([key, value]) => { const field = document.querySelector(`#chatSettings [data-chat-image-appearance-part="${key}"]`); if (field) field.value = value; });
+    const status = document.querySelector('#chatSettings [data-chat-image-appearance-status]');
+    if (status) status.textContent = syncButton ? '已同步联系人外貌并保存' : '外貌设定已保存';
   }, true);
   function updateChatWallpaperWithoutPageJump(value, chat = currentChat()) {
     if (!chat) return;
@@ -5148,14 +5215,21 @@ ${rerollRule}
     const selectedGroups = new Set(settings.characterEmojiGroupIds || []);
     const items = characterEmojiItems().filter(item => selectedGroups.has(item.groupId));
     const byId = new Map(items.map(item => [item.id, item]));
-    let normalizedReply = text;
-    if (idealChatBilingualFor(chat).enabled && !idealChatBilingualReplyCompliant(text, chat)) {
+    // 先把图片动作从角色正文里剥离出来，避免双语纠正、分条或富媒体解析
+    // 把 IMAGE_PROMPT 当普通英文消息发送。模型有时会漏掉外层 [[...]]，
+    // generatedImageMarker 同时兼容这种未闭合/裸标记。
+    const initialImagePromptMatch = String(text || '').match(generatedImageMarker);
+    let normalizedReply = initialImagePromptMatch
+      ? String(text || '').replace(initialImagePromptMatch[0], '').trim()
+      : text;
+    if (idealChatBilingualFor(chat).enabled && !idealChatBilingualReplyCompliant(normalizedReply, chat)) {
       const contact = state.contacts.find(item => item.id === currentContactId()) || {};
       const profile = state.profiles.find(item => item.id === chat?.profileId) || {};
       const config = window.IdealMachineAPI?.getConfig?.();
       const model = window.IdealMachineAPI?.getModel?.('chat');
-      normalizedReply = await idealChatBilingualCorrectReply(text, chat, config, model, buildChatSystemPrompt(contact, profile, chat), [{ role:'assistant', content:text }]);
+      normalizedReply = await idealChatBilingualCorrectReply(normalizedReply, chat, config, model, buildChatSystemPrompt(contact, profile, chat), [{ role:'assistant', content:normalizedReply }]);
     }
+    if (initialImagePromptMatch?.[1]?.trim()) normalizedReply = `${normalizedReply}\n[[IMAGE_PROMPT: ${initialImagePromptMatch[1].trim()}]]`;
     const combined = extractCombinedThought(normalizedReply);
     const replyRoundKey = replyThoughtRoundKey(chat);
     // 思考、正文和音乐选择已经在同一次聊天模型请求中完成；不要在尾部再
@@ -5655,7 +5729,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   document.addEventListener('submit', event => { if (!event.target.matches('[data-offline-form]')) return; event.preventDefault(); const input = event.target.querySelector('[data-offline-input]'); const text = input?.value.trim(); if (!text || offlineBusy) return; const chat = currentChat(); const session = chat?.offlineSessions?.find(item => item.id === offlineSessionId); if (!session) return; session.messages.push({ role:'user', text }); input.value=''; save(); openOfflineMode(); offlineReply(text); });
 
   // 生图由文字模型先决定是否触发，再交给独立的图片接口生成。
-  const generatedImageMarker = /\[\[IMAGE_PROMPT\s*:\s*([\s\S]*?)\]\]/i;
+  // Accept both the documented [[IMAGE_PROMPT: ...]] form and common model
+  // variants that omit one/both opening brackets or the closing brackets.
+  // These prompts must be consumed as actions, never rendered as chat bubbles.
+  const generatedImageMarker = /\[{0,2}\s*IMAGE_PROMPT\s*:\s*([\s\S]*?)(?:\]\]|\s*$)/i;
   let generatedImageMarkerCount = 0;
   let latestGeneratedImagePromise = Promise.resolve(false);
   let generatedImageViewerState = { open: false, kind: '', id: '', source: '', loading: false };
@@ -5690,31 +5767,15 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       window.alert(`角色发图失败：${error.message}`);
       return false;
     }
-    // 自拍必须以角色头像作为身份参考，不能退回纯文生图，否则模型会
-    // 自行随机生成人物。参考图编辑不支持或图片无法读取时，直接报错停止。
     const latestUserMessage = [...(targetChat.messages || [])].reverse().find(message => message.role === 'user');
     const selfieRequested = isExplicitSelfieRequest(latestUserMessage?.text);
     let rolePrompt = prepareCharacterImagePrompt(prompt);
-    let referenceImage = '';
     if (selfieRequested) {
-      rolePrompt = 'Create a new casual smartphone selfie of the exact same character shown in the supplied reference image. Preserve the reference character’s recognizable face and identity, facial features, hairstyle, hair color, skin tone, gender presentation, and original visual/art style. Do not replace the character with a different person; do not add any other people. Natural relaxed expression, ordinary fully clothed everyday outfit, soft natural light, simple believable background, candid personal-photo framing. No text, watermark, logo, or app interface.';
-      referenceImage = String(contact.avatar || '').trim();
-      if (/^idb:image:/i.test(referenceImage) && window.IdealMachineGetImage) {
-        try { referenceImage = String(await window.IdealMachineGetImage(referenceImage) || '').trim(); }
-        catch (error) {
-          console.warn('无法读取角色参考头像：', error);
-          window.alert('读取角色头像失败，本次没有请求生图，避免生成不属于该角色的人物。');
-          return false;
-        }
-      }
-      if (!referenceImage) {
-        window.alert('角色还没有可用头像，无法保证自拍是这个角色。请先给角色设置头像，再让角色发自拍。');
-        return false;
-      }
+      rolePrompt = 'Create a natural, casual smartphone selfie-style image of the character themself. Show one subject only, following the human or animal type in the appearance description. Use a relaxed expression or natural look, an ordinary fitting everyday appearance, soft natural light, and believable candid framing. Follow the supplied character appearance description; do not invent a different identity. No text, watermark, logo, or app interface.';
     }
     rolePrompt = lockCharacterImageAppearance(rolePrompt, getChatImageAppearance(targetChat, contact));
     try {
-      const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1, ...(selfieRequested ? { referenceImage, requireReferenceImage:true } : {}) });
+      const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1 });
       if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源');
       if (existingMessage) Object.assign(existingMessage, { text: result.assetId, generated: true, generatedPrompt: rolePrompt, generatedImageLoading: false });
       else {
@@ -6000,15 +6061,20 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         const prompt = await safeMomentImagePrompt(post, contact);
         const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
         if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源。');
-        post.image = result.assetId;
-        post.generatedImage = true;
-        post.generatedPrompt = prompt;
+        // API 等待期间可能发生状态刷新；始终更新仍在当前朋友圈状态中的那条动态。
+        const livePost = state.moments.find(item => String(item.id) === String(post.id));
+        if (!livePost) continue;
+        livePost.image = result.assetId;
+        livePost.generatedImage = true;
+        livePost.generatedPrompt = prompt;
         api.recordAutoGenerate?.('moments');
         save();
-        render();
       } catch (error) {
         console.warn('朋友圈配图失败，已保留文字动态：', error);
         failures.push(`${contact?.nickname || contact?.name || '角色'}：${error?.message || '生图请求失败'}`);
+      } finally {
+        // 即使本地保存或图片资源登记出错，也刷新已保存的文字动态，不能让整条帖子消失。
+        if (app.classList.contains('is-open') && activeTab === 'moments') render();
       }
     }
     if (failures.length && showErrors) window.alert(`朋友圈配图未成功：\n${failures.join('\n')}`);
@@ -6020,11 +6086,14 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     try {
       await generateRoleMoment(null);
       const created = state.moments.filter(post => !before.has(post.id) && post.authorType === 'character');
+      if (created.length && app.classList.contains('is-open') && activeTab === 'moments') render();
       if (withImage && created.length) await addGeneratedMomentImages(created, { showErrors: true });
       else if (withImage) window.alert('角色动态没有成功生成，因此没有可配图的内容。');
     } catch (error) {
       console.error('生成角色朋友圈失败：', error);
       window.alert(`生成角色朋友圈失败：${error?.message || '请求失败'}`);
+    } finally {
+      if (app.classList.contains('is-open') && activeTab === 'moments') render();
     }
   }
 
@@ -7985,7 +8054,7 @@ ${recentConversation}
     };
     restoreScroll();
     requestAnimationFrame(restoreScroll);
-    const actions = document.querySelector('#chatSettings .chat-wallpaper-actions');
+    const actions = document.querySelector('#chatSettings .chat-wallpaper-settings:not(.chat-image-appearance-settings) .chat-wallpaper-actions');
     if (actions && !actions.querySelector('[data-chat-wallpaper-album]')) {
       const reset = actions.querySelector('[data-chat-wallpaper-reset]');
       const button = document.createElement('button');
@@ -9910,6 +9979,9 @@ ${recentConversation}
     };
     state.moments.unshift(post);
     save();
+    // 先呈现文字动态，再异步补图；生图 API 较慢或暂时不可用时，
+    // 不应让整条朋友圈看起来像没有发布。
+    if (app.classList.contains('is-open') && activeTab === 'moments') render();
     if (settings?.imageEnabled === true) await addGeneratedMomentImages([post]);
     if (app.classList.contains('is-open') && activeTab === 'moments') render();
     return true;
