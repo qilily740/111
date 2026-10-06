@@ -13743,6 +13743,37 @@ body.ideal-keyboard-open .chat-offline-modal .offline-meeting-v2 > .chat-offline
 
 /* Desktop icon collections: the list stays in flow so mobile scrolling cannot clip it. */
 .beauty-icon-sets { margin:10px 0; padding:5px; max-height:220px; overflow-y:auto; border:1px solid #ddd; border-radius:12px; background:#fafafa; }
+
+/* 聊天设置里的固定外貌需要能完整展开编辑，输入框也要给足多行高度。 */
+.chat-image-appearance-settings { gap:12px; }
+.chat-image-appearance-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.chat-image-appearance-heading h3 { margin:0; }
+.chat-image-appearance-heading small { display:block; margin-top:5px; color:#999; font-size:10px; line-height:1.5; }
+.chat-image-appearance-heading button { flex:0 0 auto; min-height:32px; padding:0 11px; border:1px solid rgba(0,0,0,.11); border-radius:10px; background:#fff; color:#555; font:inherit; font-size:11px; cursor:pointer; }
+.chat-image-appearance-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; }
+.chat-image-appearance-field { display:grid; gap:6px; color:#666; font-size:11px; }
+.chat-image-appearance-field.is-other { grid-column:1 / -1; }
+.chat-image-appearance-field textarea { width:100%; min-height:76px; padding:9px; border:1px solid rgba(0,0,0,.12); border-radius:9px; outline:0; background:#fff; color:#222; font:inherit; font-size:12px; line-height:1.5; resize:vertical; }
+.chat-image-appearance-field.is-other textarea { min-height:92px; }
+.chat-image-appearance-settings:not(.is-expanded) .chat-image-appearance-field.is-other textarea { min-height:76px; }
+.chat-image-appearance-settings.is-expanded .chat-image-appearance-grid { grid-template-columns:1fr; }
+.chat-image-appearance-settings.is-expanded .chat-image-appearance-field textarea { min-height:112px; }
+.chat-image-appearance-settings.is-expanded .chat-image-appearance-field.is-other textarea { min-height:180px; }
+@media not all {
+  .chat-image-appearance-heading button,
+  .chat-image-appearance-field textarea { border-color:rgba(255,255,255,.14); background:rgba(0,0,0,.2); color:#eee; }
+}
+
+/* 设置页也是 fixed 层；键盘出现时同步到 visual viewport，避免编辑文字被底部遮住。 */
+body.ideal-keyboard-open .chat-settings.is-open {
+  top:var(--ideal-keyboard-viewport-top,0px);
+  right:0;
+  bottom:auto;
+  left:0;
+  height:var(--ideal-keyboard-viewport-height,100dvh);
+}
+body.ideal-keyboard-open .chat-settings-page > main { padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+body.ideal-keyboard-open .chat-image-appearance-field textarea { scroll-margin-bottom:120px; }
 .beauty-icon-sets[hidden] { display:none; }
 .beauty-icon-set-row { display:flex; align-items:center; gap:6px; min-height:40px; border-radius:9px; }
 .beauty-icon-set-row.is-active { background:#ededed; }

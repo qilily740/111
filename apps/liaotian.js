@@ -3915,6 +3915,15 @@ ${rerollRule}
       return value ? `${label}：${value}` : '';
     }).filter(Boolean).join('\n').slice(0, 2400);
   }
+  function chatImageApiReady() {
+    try {
+      const config = window.IdealMachineImageAPI?.getConfig?.() || {};
+      return Boolean(String(config.endpoint || '').trim() && String(config.model || '').trim());
+    } catch { return false; }
+  }
+  function characterImageEnabled(chat) {
+    return Boolean(chatImageApiReady() && chat?.settings?.imageGenerationEnabled === true);
+  }
   function contactImageAppearance(contact) {
     if (!contact) return '';
     const explicit = [contact.imageAppearance, contact.faceDescription, contact.appearanceDescription, contact.appearance]
@@ -3992,10 +4001,13 @@ ${rerollRule}
     const chat = currentChat();
     const contact = state.contacts.find(item => item.id === activeContact);
     if (!chat || !main || !chatSettingsOpen) return;
+    const displaySettings = main.querySelector('.chat-display-settings');
+    displaySettings?.insertAdjacentHTML('beforeend', `<label class="chat-setting-toggle"><span>角色生图<small>${chatImageApiReady() ? '允许此角色在聊天和朋友圈生成图片' : '请先在设置中配置生图 API'}</small></span><input type="checkbox" data-chat-setting-toggle="imageGenerationEnabled" ${chat.settings?.imageGenerationEnabled === true ? 'checked' : ''} ${chatImageApiReady() ? '' : 'disabled'}></label>`);
+    if (!characterImageEnabled(chat)) return;
     const appearanceParts = getChatImageAppearanceParts(chat, contact);
     const section = document.createElement('section');
     section.className = 'chat-wallpaper-settings chat-image-appearance-settings';
-    section.innerHTML = `<h3>生图角色外貌</h3><div class="chat-image-appearance-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px">${Object.entries(chatImageAppearancePartLabels).map(([key, label]) => `<label style="display:grid;gap:5px;color:#666;font-size:11px;${key === 'other' ? 'grid-column:1 / -1;' : ''}"><span>${label}</span><textarea data-chat-image-appearance-part="${key}" rows="2" maxlength="500" placeholder="填写${label}；没有可留空" style="width:100%;min-height:56px;padding:8px;border:1px solid rgba(0,0,0,.12);border-radius:9px;background:#fff;color:#222;font:inherit;line-height:1.45;resize:vertical">${esc(appearanceParts[key] || '')}</textarea></label>`).join('')}</div><div class="chat-wallpaper-actions"><button type="button" data-chat-image-appearance-sync>从联系人外貌同步</button><button type="button" data-chat-image-appearance-save>保存外貌</button></div><small data-chat-image-appearance-status aria-live="polite" style="color:#888;font-size:10px"></small>`;
+    section.innerHTML = `<div class="chat-image-appearance-heading"><div><h3>生图角色外貌</h3><small>仅在已接入生图 API 时启用；用于固定角色身份与外观。</small></div><button type="button" data-chat-image-appearance-expand aria-expanded="false">完整编辑</button></div><div class="chat-image-appearance-grid">${Object.entries(chatImageAppearancePartLabels).map(([key, label]) => `<label class="chat-image-appearance-field${key === 'other' ? ' is-other' : ''}"><span>${label}</span><textarea data-chat-image-appearance-part="${key}" rows="3" maxlength="500" placeholder="填写${label}；没有可留空">${esc(appearanceParts[key] || '')}</textarea></label>`).join('')}</div><div class="chat-wallpaper-actions"><button type="button" data-chat-image-appearance-sync>从联系人外貌同步</button><button type="button" data-chat-image-appearance-save>保存外貌</button></div><small data-chat-image-appearance-status aria-live="polite" style="color:#888;font-size:10px"></small>`;
     const wallpaper = main.querySelector('.chat-wallpaper-settings');
     if (wallpaper) main.insertBefore(section, wallpaper);
     else main.appendChild(section);
@@ -4007,6 +4019,17 @@ ${rerollRule}
     if (status) status.textContent = '有未保存的修改';
   });
   document.addEventListener('click', event => {
+    const expandButton = event.target.closest('[data-chat-image-appearance-expand]');
+    if (expandButton && expandButton.closest('#chatSettings')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const section = expandButton.closest('.chat-image-appearance-settings');
+      const expanded = section?.classList.toggle('is-expanded') || false;
+      expandButton.setAttribute('aria-expanded', String(expanded));
+      expandButton.textContent = expanded ? '收起面板' : '完整编辑';
+      if (expanded) section?.querySelector('[data-chat-image-appearance-part="other"]')?.focus({ preventScroll: true });
+      return;
+    }
     const saveButton = event.target.closest('[data-chat-image-appearance-save]');
     const syncButton = event.target.closest('[data-chat-image-appearance-sync]');
     if ((!saveButton && !syncButton) || !(saveButton || syncButton).closest('#chatSettings')) return;
@@ -5761,6 +5784,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   async function generateCharacterChatImage(prompt, targetChat, contact, existingMessage = null) {
     const api = window.IdealMachineImageAPI;
+    if (!characterImageEnabled(targetChat)) return false;
     if (!api?.generate || !targetChat || !contact) {
       const error = new Error(!api?.generate ? '生图模块尚未加载，请刷新页面后重试。' : '无法识别当前聊天角色，请重新进入聊天后重试。');
       console.warn('角色生图失败：', error);
@@ -5909,7 +5933,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         await generateCharacterChatImage(record.generatedPrompt, chat, contact, record);
       } else {
         const contact = state.contacts.find(item => item.id === record.authorId);
-        if (!contact) return;
+        if (!contact || !characterImageEnabled(state.chats?.[contact.id])) return;
         const prompt = await safeMomentImagePrompt(record, contact);
         const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
         if (result?.assetId) { record.image = result.assetId; record.generatedPrompt = prompt; record.generatedImageLoading = false; save(); render(); }
@@ -5970,6 +5994,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   reply = async function() {
     const api = window.IdealMachineImageAPI;
     const targetChat = currentChat();
+    if (!characterImageEnabled(targetChat)) return baseGeneratedImageReply();
     const contact = state.contacts.find(item => item.id === currentContactId());
     const latestUserMessage = [...(targetChat?.messages || [])].reverse().find(item => item.role === 'user');
     const requiredImage = isExplicitImageRequest(latestUserMessage?.text);
@@ -6007,6 +6032,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   async function decideMomentImage(post, contact) {
     const api = window.IdealMachineImageAPI;
+    if (!characterImageEnabled(state.chats?.[contact?.id])) return null;
     if (!api?.canAutoGenerate?.('moments')) return null;
     const textConfig = window.IdealMachineAPI?.getConfig?.();
     const model = window.IdealMachineAPI?.getModel?.('chat');
@@ -6057,6 +6083,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     for (const post of posts) {
       const contact = state.contacts.find(item => item.id === post.authorId);
       if (!contact || post.image) continue;
+      if (!characterImageEnabled(state.chats?.[contact.id])) {
+        if (showErrors) failures.push(`${contact.nickname || contact.name || '角色'}：请先在该角色的聊天设置中开启角色生图`);
+        continue;
+      }
       try {
         const prompt = await safeMomentImagePrompt(post, contact);
         const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
@@ -6197,12 +6227,25 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     });
   }
 
+  function retryHydrateGeneratedImages() {
+    hydrateGeneratedImages();
+    hydrateGeneratedMomentImages();
+    // IndexedDB may finish opening just after the first paint. Keep the
+    // idb:image key on the element and retry instead of turning a temporary
+    // read delay into a permanently blank message.
+    [180, 720, 1800].forEach(delay => setTimeout(() => {
+      if (app.classList.contains('is-open')) {
+        hydrateGeneratedImages();
+        hydrateGeneratedMomentImages();
+      }
+    }, delay));
+  }
+
   const baseRenderWithGeneratedImages = render;
   render = function() {
     baseRenderWithGeneratedImages();
     requestAnimationFrame(() => {
-      hydrateGeneratedImages();
-      hydrateGeneratedMomentImages();
+      retryHydrateGeneratedImages();
     });
   };
 
@@ -10290,6 +10333,27 @@ ${recentConversation}
     const enabled = chatSettingsFor(chat).internalNotificationEnabled;
     section.insertAdjacentHTML('beforeend', `<label class="chat-setting-toggle"><span>理想机内消息弹窗<small>关闭后此角色不显示顶部通知，即使全局通知开启；不影响手机系统通知</small></span><input type="checkbox" data-chat-setting-toggle="internalNotificationEnabled" ${enabled ? 'checked' : ''}></label>`);
   };
+  const renderChatSettingsWithImageToggleLast = renderChatSettings;
+  renderChatSettings = function() {
+    renderChatSettingsWithImageToggleLast();
+    const section = document.querySelector('#chatSettings .chat-display-settings');
+    const toggleRow = section?.querySelector('[data-chat-setting-toggle="imageGenerationEnabled"]')?.closest('label');
+    if (toggleRow) section.appendChild(toggleRow);
+  };
+  document.addEventListener('change', event => {
+    const toggle = event.target.closest?.('#chatSettings [data-chat-setting-toggle="imageGenerationEnabled"]');
+    if (!toggle) return;
+    event.stopImmediatePropagation();
+    const chat = currentChat();
+    if (!chat) return;
+    chatSettingsFor(chat).imageGenerationEnabled = toggle.checked;
+    save();
+    const page = toggle.closest('.chat-settings-page');
+    const scrollTop = page?.scrollTop || 0;
+    renderChatSettings();
+    const restoredPage = document.querySelector('#chatSettings .chat-settings-page');
+    if (restoredPage) restoredPage.scrollTop = scrollTop;
+  }, true);
   document.addEventListener('change', event => {
     const toggle = event.target.closest?.('#chatSettings [data-chat-setting-toggle="internalNotificationEnabled"]');
     if (!toggle) return;

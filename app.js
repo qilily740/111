@@ -321,7 +321,7 @@
   function putImageAsset(value) { return assetDBPromise.then(db => new Promise(resolve => { const isBlob = typeof Blob !== 'undefined' && value instanceof Blob; const fallback = () => isBlob ? imageAssetDataUrl(value) : Promise.resolve(value); if (!db) return fallback().then(resolve); const id = 'idb:image:' + Date.now() + ':' + Math.random().toString(36).slice(2); const storedValue = isBlob ? value : String(value || ''); const transaction = db.transaction('images', 'readwrite'); transaction.objectStore('images').put(storedValue, id); transaction.oncomplete = () => resolve(id); transaction.onerror = () => fallback().then(resolve); })); }
   function getImageAsset(value) { if (!String(value || '').startsWith('idb:image:')) return Promise.resolve(value); return assetDBPromise.then(db => new Promise(resolve => { if (!db) return resolve(''); const request = db.transaction('images').objectStore('images').get(value); request.onsuccess = () => { const asset = request.result; if (typeof Blob !== 'undefined' && asset instanceof Blob) { const reader = new FileReader(); reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : ''); reader.onerror = () => resolve(''); reader.readAsDataURL(asset); } else resolve(asset || ''); }; request.onerror = () => resolve(''); })); }
   function deleteImageAsset(value) { if (!String(value || '').startsWith('idb:image:')) return Promise.resolve(false); return assetDBPromise.then(db => new Promise(resolve => { if (!db) return resolve(false); const transaction = db.transaction('images', 'readwrite'); transaction.objectStore('images').delete(value); transaction.oncomplete = () => resolve(true); transaction.onerror = () => resolve(false); })); }
-  function cleanupImageAssets() { return assetDBPromise.then(db => new Promise(resolve => { if (!db) return resolve(0); const referenced = new Set(); Object.keys(localStorage).forEach(key => { const text = localStorage.getItem(key) || ''; (text.match(/idb:image:[^"'\\\s,}\]]+/g) || []).forEach(value => referenced.add(value)); }); const transaction = db.transaction('images', 'readwrite'); const store = transaction.objectStore('images'); const request = store.getAllKeys(); let removed = 0; request.onsuccess = () => { (request.result || []).forEach(key => { if (!referenced.has(String(key))) { store.delete(key); removed += 1; } }); }; transaction.oncomplete = () => resolve(removed); transaction.onerror = () => resolve(0); })); }
+  function cleanupImageAssets() { return assetDBPromise.then(db => new Promise(resolve => { if (!db) return resolve(0); const referenced = new Set(); const storageKeys = new Set(Object.keys(localStorage)); (window.IdealMachineStorage?.largeKeys || []).forEach(key => storageKeys.add(String(key))); storageKeys.forEach(key => { const text = localStorage.getItem(key) || window.IdealMachineStorage?.get?.(key, '') || ''; (String(text).match(/idb:image:[^"'\\\s,}\]]+/g) || []).forEach(value => referenced.add(value)); }); const transaction = db.transaction('images', 'readwrite'); const store = transaction.objectStore('images'); const request = store.getAllKeys(); let removed = 0; const keepRecent = 30 * 86400000; request.onsuccess = () => { (request.result || []).forEach(key => { const value = String(key); const createdAt = Number(value.split(':')[2] || 0); const isRecent = createdAt > 0 && Date.now() - createdAt < keepRecent; if (!referenced.has(value) && !isRecent) { store.delete(key); removed += 1; } }); }; transaction.oncomplete = () => resolve(removed); transaction.onerror = () => resolve(0); })); }
   window.IdealMachinePutImage = putImageAsset;
   window.IdealMachineGetImage = getImageAsset;
   window.IdealMachineDeleteImage = deleteImageAsset;
@@ -386,7 +386,7 @@
   });
   wallpaperToneObserver.observe(document.body, { attributes:true, attributeFilter:['style'] });
   window.addEventListener('storage', event => { if (event.key === 'ideal-machine-beauty') detectWallpaperTone(); });
-  setTimeout(cleanupImageAssets, 5000);
+  Promise.resolve(window.IdealMachineStorageReady).catch(() => {}).finally(() => setTimeout(cleanupImageAssets, 5000));
   function updateStoredObject(key, fallback, update) {
     try {
       const current = JSON.parse(localStorage.getItem(key) || 'null') ?? fallback;
@@ -972,7 +972,7 @@
     const editable = target => target?.closest?.(editableSelector) || null;
     document.addEventListener('focusin', event => {
       const target = editable(event.target);
-      if (!target || target.matches('#chatInput')) return;
+      if (!target) return;
       focusedEditable = target;
       window.clearTimeout(adjustTimer);
       // 让 iOS 先完成键盘动画和自身的焦点定位，只在仍被遮挡时校正一次。
@@ -982,6 +982,11 @@
         const viewport = window.visualViewport;
         const top = Math.round(viewport?.offsetTop || 0) + 12;
         const bottom = Math.round((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight)) - 16;
+        if (target.matches('#chatInput')) {
+          const messages = target.closest('.chat-conversation')?.querySelector('#chatMessages');
+          if (messages) messages.scrollTop = Math.max(0, messages.scrollHeight - messages.clientHeight);
+          return;
+        }
         const rect = target.getBoundingClientRect();
         if (target.matches('.beauty-app-name')) {
           const scroller = target.closest('.beauty-content');
