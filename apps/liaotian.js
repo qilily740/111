@@ -8458,7 +8458,17 @@ ${recentConversation}
     const replacement = holder.firstElementChild;
     if (!replacement) return;
     current.replaceWith(replacement);
+    hydrateGeneratedMomentImages();
     if (anchor && anchorTop != null && scroller) scroller.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
+  }
+  function momentImageInteractionContext(post) {
+    if (!post?.image) return '无图片。';
+    const savedPrompt = String(post.generatedPrompt || '');
+    const plannedScene = savedPrompt.match(/先阅读正文后确定的画面方案：([^\n]+)/)?.[1]?.trim();
+    const description = String(post.imageDescription || post.description || plannedScene || '').trim().slice(0, 600);
+    return description
+      ? `附有图片。已有画面说明（仅供参考，以实际图片为准）：${description}`
+      : '附有图片。若无法读取实际图片，不要猜测图中的人物、物品或事件；可以根据正文互动，纯图片动态也可以点赞或作不涉及具体画面细节的简短评论。';
   }
   generateRoleInteraction = async function(post) {
     if (!post || post.visibility === 'private' || post.userOnly) return window.alert('仅用户可见的动态，其他角色和 NPC 看不见也不能互动。');
@@ -8486,10 +8496,11 @@ ${recentConversation}
     const commentContext = ((contextComments.slice(-30).map(({ comment, parentId }) => `评论ID：${comment.id}\n${parentId ? `回复评论ID：${parentId}\n` : ''}评论者：${comment.author || '用户'}\n评论内容：${comment.text || ''}`).join('\n\n') || '暂无相关评论。') + (userReply ? `\n\n【必须优先回复】用户刚刚回复了角色评论，目标评论ID为 ${userReply.comment.id}。请让至少一位合适的角色或 NPC 使用 reply 或 both 直接回复这条用户评论，targetId 必须填写该 ID，不能只点赞或另起无关评论。` : '')) + `\n\n【本次批量互动要求】一次点击要产生多条互动：候选人数超过 1 人时，至少新增 1 条评论和 1 个点赞，优先安排 2—4 个不同角色或 NPC；某个角色或 NPC 可以同时评论和点赞。候选人数只有 1 人时，让其使用 both，同时完成评论和点赞。`;
     const roster = actors.slice(0, 24).map(actor => `${actor.actorType === 'npc' ? 'NPC' : '角色'}ID：${actor.id}\n姓名：${actor.displayName}\n身份：${actor.identity || '未填写'}\n人设：${String(actor.persona || '暂无').slice(0, 1400)}\n${actor.actorType === 'npc' ? `所属角色：${state.contacts.find(item => item.id === actor.sourceRoleId)?.nickname || state.contacts.find(item => item.id === actor.sourceRoleId)?.name || '未知'}` : ''}`).join('\n\n');
     const minimum = actors.length > 1 ? 2 : 1;
-    const prompt = `请为这条朋友圈安排自然的角色/NPC互动。必须严格按以下顺序执行：
+    let prompt = `请为这条朋友圈安排自然的角色/NPC互动。带图动态与纯文字动态一样可以被点赞和评论；看到图片时结合正文和实际画面互动，无法读取图片时不要臆测具体细节。必须严格按以下顺序执行：
 第一步，先读取【可见范围】。仅自己可见时禁止返回任何互动；指定分组可见时，只能从已经筛选出的可见角色和 NPC 中选择；所有人可见或仅角色可见时，只能使用下方候选名单。
 第二步，再根据动态内容、评论、每个角色/NPC的人设、身份、关系和背景控制互动数量。一次互动至少安排 ${minimum} 个独立互动单位；如果候选名单只有 1 人，可以让该人物同时点赞并评论，但不能只返回一个孤立点赞。候选人数超过 1 人时，至少安排 2 个不同角色/NPC，其中至少 1 个应该在动态有具体内容时发表评论，其他人可以点赞或评论。不要让所有人使用相同语气，也不要为了凑数量强行让不合适的人互动。
 只返回合法 JSON 数组，不要 Markdown、解释或其他字段。每项格式：{"actorId":"候选名单中的真实ID","action":"reply|like|both","targetId":"post或现有评论ID","text":"评论正文；纯点赞时为空"}。回复动态时 targetId 填 post；回复评论时必须填写现有评论的真实评论ID。禁止回复自己已有的评论、禁止互动不可见的人物、禁止删除或改写动态正文。评论必须符合该角色/NPC本人，不得捏造没有提供的背景。\n\n【可见范围】\n${visibility}\n\n【目标动态】\n动态ID：${targetId}\n${postAuthorContext}\n作者显示名：${postAuthorName}\n正文：${originalText || '[图片动态]'}\n\n【现有评论】\n${commentContext}\n\n【已按可见范围筛选的候选名单】\n${roster}`;
+    if (post.image) prompt = prompt.replace('\n\n【现有评论】', `\n图片：${momentImageInteractionContext(post)}\n\n【现有评论】`);
     momentBusyPostId = String(post.id);
     momentBusy = true;
     setMomentInteractionButtonsBusy(targetId, true);
@@ -8498,12 +8509,21 @@ ${recentConversation}
       const systemPrompt = isCharacterPost
         ? '你是角色间的朋友圈互动调度器。先确认这条动态由哪个角色本人发布；其他角色/NPC只对发帖角色和动态内容互动，绝不能把用户当成作者、在场者或互动对象，也不要对用户说话。再执行可见范围过滤，只输出合法 JSON 数组。'
         : '你是朋友圈可见性与互动调度器。先执行可见范围过滤，再控制互动数量。只输出合法 JSON 数组。';
-      const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'chat-moments-background', timeout:180000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model, temperature:.78, max_tokens:1800, stream:false, messages:[{ role:'system', content:systemPrompt }, { role:'user', content:prompt }] }) });
+      let imageSource = '';
+      if (post.image) {
+        try { imageSource = await resolveVisionImageSource(post.image); } catch (error) { console.warn('朋友圈图片读取失败，改用文案与画面说明互动：', error); }
+      }
+      const sendInteractionRequest = withImage => request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { idealScope:'chat-moments-background', timeout:180000, method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${config.key}`}, body:JSON.stringify({ model:withImage ? (window.IdealMachineAPI?.getModel?.('vision') || model) : model, temperature:.78, max_tokens:1800, stream:false, messages:[{ role:'system', content:systemPrompt }, { role:'user', content:withImage ? [{ type:'text', text:prompt }, { type:'image_url', image_url:{ url:imageSource, detail:'auto' } }] : prompt }] }) });
+      let response = null;
+      if (imageSource) {
+        try { response = await sendInteractionRequest(true); } catch (error) { console.warn('朋友圈图片读图失败，改用文案与画面说明互动：', error); }
+      }
+      if (!response?.ok) response = await sendInteractionRequest(false);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       let results = parseMomentInteractionResults(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim());
       // 某些模型会返回带解释文字或空数组；不要让一次互动点击完全没有反馈。
-      if (!results.length) results = [{ actorId: actors[0].id, action: 'both', targetId: 'post', text: isCharacterPost ? '这条动态里的想法挺有意思，确实很像你会分享的事。' : '看到这条动态了，想听听你最近的近况。' }];
+      if (!results.length) results = [{ actorId: actors[0].id, action: 'both', targetId: 'post', text: post.image && !originalText ? '看到你分享的照片了。' : isCharacterPost ? '这条动态里的想法挺有意思，确实很像你会分享的事。' : '看到这条动态了，想听听你最近的近况。' }];
       // 如果模型把用户回复误判成了普通动态评论，优先把一条已有文字回复
       // 改挂到用户刚刚回复的那条评论下，确保线程能得到角色/NPC回应。
       if (userReply?.comment?.id) {
@@ -8546,7 +8566,7 @@ ${recentConversation}
       if (!newActorIds.size) {
         const fallback = actors.find(actor => !(target.roleLikeIds || []).includes(actor.id) && !threadEntries.some(entry => entry.comment.authorId === actor.id));
         if (fallback) {
-          target.comments.push({ id:uid('comment'), author:fallback.displayName, text:isCharacterPost ? '这条动态里的想法挺有意思，确实很像你会分享的事。' : '看到这条动态了，想听听你最近的近况。', authorType:fallback.actorType === 'npc' ? 'npc' : 'character', authorId:fallback.id, npcSourceRoleId:fallback.sourceRoleId || '', time:time() });
+          target.comments.push({ id:uid('comment'), author:fallback.displayName, text:post.image && !originalText ? '看到你分享的照片了。' : isCharacterPost ? '这条动态里的想法挺有意思，确实很像你会分享的事。' : '看到这条动态了，想听听你最近的近况。', authorType:fallback.actorType === 'npc' ? 'npc' : 'character', authorId:fallback.id, npcSourceRoleId:fallback.sourceRoleId || '', time:time() });
           addLike(fallback);
         }
       }
