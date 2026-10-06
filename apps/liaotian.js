@@ -5943,7 +5943,8 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       } else {
         const contact = state.contacts.find(item => item.id === record.authorId);
         if (!contact || !characterImageEnabled(state.chats?.[contact.id])) return;
-        const prompt = await safeMomentImagePrompt(record, contact);
+        const plan = await planMomentImage(record);
+        const prompt = safeMomentImagePrompt(record, contact, plan);
         const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
         if (result?.assetId) { record.image = result.assetId; record.generatedPrompt = prompt; record.generatedImageLoading = false; save(); render(); }
       }
@@ -6039,45 +6040,55 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     return result;
   };
 
-  async function decideMomentImage(post, contact) {
-    const api = window.IdealMachineImageAPI;
-    if (!characterImageEnabled(state.chats?.[contact?.id])) return null;
-    if (!api?.canAutoGenerate?.('moments')) return null;
+  function momentTextShowsCharacter(text) {
+    return /自拍|对镜自拍|拍我|给我拍|我的背影|我出镜|我入镜|我穿着|我站在|我坐在|我走在|我跑在|我和.{0,10}合照|我们.{0,8}合照/.test(String(text || ''));
+  }
+
+  async function planMomentImage(post) {
+    const text = String(post?.text || '').trim().slice(0, 600);
+    if (!text) return null;
     const textConfig = window.IdealMachineAPI?.getConfig?.();
     const model = window.IdealMachineAPI?.getModel?.('chat');
     if (!textConfig?.endpoint || !model) return null;
     const headers = { 'Content-Type': 'application/json' };
     if (textConfig.key) headers.Authorization = `Bearer ${textConfig.key}`;
-    const response = await fetch(`${textConfig.endpoint.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST', headers,
-      body: JSON.stringify({
-        model,
-        temperature: .65,
-        messages: [
-          { role: 'system', content: '判断角色朋友圈是否适合配一张角色本人可能拍摄或发布的图片。只输出 JSON，不要 Markdown。格式：{"needImage":true或false,"prompt":"完整中文生图提示词"}。不要为了配图而强行配图。' },
-          { role: 'user', content: `角色：${contact.nickname || contact.name}\n角色设定：${contact.details || contact.signature || '暂无'}\n朋友圈正文：${post.text || ''}\n最近聊天：${generatedConversationContext(state.chats[contact.id], contact)}\n如果适合配图，prompt 要具体描述主体、人物外观、动作、环境、镜头、光线和构图；不要在画面中放文字、水印或聊天界面。` }
-        ]
-      })
-    });
-    if (!response.ok) return null;
-    const payload = await response.json();
-    const raw = String(payload.choices?.[0]?.message?.content || '').replace(/```json|```/gi, '').trim();
     try {
-      const decision = JSON.parse(raw);
-      return decision.needImage && String(decision.prompt || '').trim() ? String(decision.prompt).trim() : null;
-    } catch {
+      const response = await fetch(`${textConfig.endpoint.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          model, temperature: .35, max_tokens: 400, stream: false,
+          messages: [
+            { role: 'system', content: '你是朋友圈配图策划。只根据动态正文决定照片拍什么，不要默认拍发帖者。优先抓住正文中具体可见的食物、物品、宠物、地点、风景或事件；正文没有具体对象时，选择贴合情绪的普通环境或静物，不编造新的故事。只有正文明确表示自拍、合照或发帖者本人出镜时，characterVisible 才能为 true。只返回 JSON：{"subjectType":"character|people|food|object|animal|scenery|event 中的一种","characterVisible":false,"imagePrompt":"具体的中文画面描述，包含主体、场景、构图和光线"}。不要写角色外貌，不要 Markdown。' },
+            { role: 'user', content: `朋友圈动态正文：${text}` }
+          ]
+        })
+      });
+      if (!response.ok) return null;
+      const payload = await response.json();
+      const raw = String(payload.choices?.[0]?.message?.content || '').replace(/```(?:json)?|```/gi, '').trim();
+      const plan = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || raw);
+      const imagePrompt = String(plan?.imagePrompt || '').trim().slice(0, 800);
+      const subjectType = String(plan?.subjectType || '').toLowerCase();
+      const characterVisible = plan?.characterVisible === true && !['food', 'object', 'animal', 'scenery'].includes(subjectType);
+      if (subjectType === 'character' && !characterVisible) return null;
+      if (characterVisible && !momentTextShowsCharacter(text)) return null;
+      return imagePrompt ? { subjectType, characterVisible, imagePrompt } : null;
+    } catch (error) {
+      console.warn('朋友圈画面策划失败，改用动态正文直接配图：', error);
       return null;
     }
   }
 
-  function safeMomentImagePrompt(post, contact) {
+  function safeMomentImagePrompt(post, contact, plan = null) {
     const text = String(post?.text || '').trim().slice(0, 600);
-    const characterVisible = /自拍|对镜|镜中|镜子里|给自己拍|我的照片|我.{0,12}(?:穿着|站在|坐在|走在|跑在|出镜|入镜|合照)|我们.{0,8}合照/.test(text);
+    const characterVisible = /自拍|对镜自拍/.test(text) || (momentTextShowsCharacter(text) && (plan ? plan.characterVisible === true : true));
     const appearance = characterVisible ? getChatImageAppearance(state.chats[contact?.id], contact).slice(0, 1200) : '';
     if (!text) throw new Error('朋友圈正文为空，无法根据动态生成配图。');
     return [
-      '请为这条朋友圈动态生成一张自然的照片。先依据正文确定最值得拍摄的主体：食物、物品、宠物、风景或现场事件都可以成为主角。只有正文明确提到自拍、合照或角色本人出镜时才画角色；发帖者的身份本身不是出镜理由。不要把其他画面改成自拍或人物肖像。采用可信的日常摄影观感，构图清楚，环境、光线和氛围贴合正文。',
+      '请根据这条朋友圈的画面方案生成一张自然的照片。正文是事实依据，画面方案负责选择主体和构图；不要添入文案之外的角色或无关事件。只有正文明确提到自拍、合照或发帖者本人出镜时才画发帖者。不要把食物、物品、宠物或风景改成自拍。',
       `朋友圈正文：${text}`,
+      plan?.imagePrompt ? `先阅读正文后确定的画面方案：${plan.imagePrompt}` : '请从正文中选择最具体、最值得拍摄的主体，安排自然的生活场景、构图与光线。',
+      characterVisible ? '' : '发帖角色不出镜；画面中不要出现角色本人。',
       appearance ? `仅当角色本人出镜时使用的外观参考：${appearance}` : '',
       '人物如出现须穿着完整、自然得体；不要加入情色描写、臆造年龄或敏感身体特征。画面中不要出现可读文字、水印、logo、聊天气泡或社交软件界面。'
     ].filter(Boolean).join('\n');
@@ -6098,7 +6109,8 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         continue;
       }
       try {
-        const prompt = await safeMomentImagePrompt(post, contact);
+        const plan = await planMomentImage(post);
+        const prompt = safeMomentImagePrompt(post, contact, plan);
         const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
         if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源。');
         // API 等待期间可能发生状态刷新；始终更新仍在当前朋友圈状态中的那条动态。
