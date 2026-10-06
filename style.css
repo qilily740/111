@@ -3402,13 +3402,13 @@ body > .desktop-scroll-wrap {
 .chat-role-choice { width:100%; box-sizing:border-box; padding:8px 0; border-bottom:1px solid rgba(0,0,0,.07); }
 .chat-role-choice input { appearance:none; -webkit-appearance:none; width:15px; height:15px; margin:0; border:1px solid #aaa; border-radius:50%; background:transparent; }
 .chat-role-choice input:checked { border:4px solid #222; background:#fff; }
-.chat-role-image-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:48px; box-sizing:border-box; padding:0 12px; border:0; border-bottom:1px solid rgba(0,0,0,.08); border-radius:0; background:transparent; color:#333; cursor:pointer; }
+.chat-role-image-toggle { position:relative; display:flex; align-items:center; justify-content:space-between; width:100%; min-height:48px; box-sizing:border-box; padding:0 12px; border:0; border-bottom:1px solid rgba(0,0,0,.08); border-radius:0; background:transparent; color:#333; cursor:pointer; }
 .chat-role-image-toggle span { display:grid; order:1; gap:3px; font-size:12px; }
 .chat-role-image-toggle b { color:#333; font-size:12px; font-weight:500; }
 .chat-role-image-toggle small { color:#999; font-size:10px; line-height:1.45; }
 .chat-role-image-toggle i { display:grid; order:2; place-items:center; width:17px; min-width:17px; height:17px; border:1px solid #999; border-radius:50%; background:transparent; color:transparent; font-size:0; font-style:normal; }
 .chat-role-image-toggle:has(input:checked) i { border-color:#999; background:radial-gradient(circle,#222 0 3.5px,transparent 4px); }
-.chat-role-image-toggle input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+.chat-role-image-toggle input { position:absolute; top:50%; right:4px; z-index:2; width:40px; height:40px; margin:0; opacity:0; pointer-events:auto; transform:translateY(-50%); cursor:pointer; }
 .chat-role-image-toggle:has(input:disabled) { color:#aaa; cursor:not-allowed; opacity:.72; }
 .chat-role-action-choice { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:48px; padding:0 12px; border:0; border-bottom:1px solid rgba(0,0,0,.08); background:transparent; color:#333; font:inherit; text-align:left; cursor:pointer; }
 .chat-role-action-choice span { display:grid; gap:3px; font-size:12px; }
@@ -3557,6 +3557,9 @@ body > .desktop-scroll-wrap {
 .chat-moments-icon-back { fill:none; stroke-width:3.1; }
 .chat-moments-icon-refresh { stroke-width:3.8; }
 .chat-moments-icon-refresh path:last-child { stroke:none; }
+.chat-moments-icon-button[data-chat-role-post]:disabled .chat-moments-icon-refresh { animation:chat-moments-role-refresh-spin .85s linear infinite; transform-origin:50% 50%; }
+@keyframes chat-moments-role-refresh-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .chat-moments-icon-button[data-chat-role-post]:disabled .chat-moments-icon-refresh { animation:none; } }
 .chat-moments-icon-bell, .chat-moments-icon-camera { stroke:none; }
 .chat-moments-profile { position:absolute; right:22px; bottom:-28px; z-index:3; display:flex; align-items:center; gap:12px; }
 .chat-moments-profile-copy { max-width:180px; padding:0; border:0; background:transparent; color:inherit; font:inherit; text-align:right; text-shadow:0 1px 3px rgba(0,0,0,.45); cursor:pointer; }
@@ -9543,7 +9546,7 @@ select,
 .couple-games-installed-copy i { width:55px; height:8px; border-radius:99px; background:rgba(139,119,113,.14); }
 .couple-games-installed-copy b { width:160px; height:14px; border-radius:99px; background:rgba(70,55,51,.13); }
 .couple-games-installed-copy span { width:215px; height:8px; border-radius:99px; background:rgba(139,119,113,.12); }
-.couple-games-installed-copy button { position:absolute; right:16px; bottom:17px; min-width:76px; height:35px; padding:0 14px; border:0; border-radius:99px; background:rgba(226,226,226,.68); color:#1684e8; font:600 12px/1 inherit; cursor:pointer; -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+.couple-games-installed-copy button { position:absolute; right:16px; bottom:17px; width:76px; min-width:76px; height:35px; box-sizing:border-box; padding:0 10px; border:0; border-radius:99px; background:rgba(226,226,226,.68); color:#1684e8; font:600 12px/1 inherit; cursor:pointer; -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
 .couple-games-installed-card.is-filled .couple-games-installed-copy { height:105px; padding-top:28px; background:linear-gradient(180deg,rgba(15,10,20,0),rgba(15,10,20,.9) 50%); }
 .couple-games-installed-card.is-filled .couple-games-installed-copy i { width:auto; height:auto; color:rgba(255,255,255,.76); background:none; font-size:9px; font-style:normal; letter-spacing:.08em; }
 .couple-games-installed-card.is-filled .couple-games-installed-copy b { width:auto; height:auto; color:#fff; background:none; font:600 22px/1.1 Georgia,"Songti SC",serif; letter-spacing:-.04em; }
@@ -9612,17 +9615,17 @@ select,
 .couple-games-list-slot > header h2 { color:#342b2b; font:600 22px/1.1 Georgia,"Songti SC",serif; letter-spacing:-.04em; }
 .couple-games-list-slot > header span { color:#a99b97; font-size:10px; }
 .couple-games-list-slot > header button { border:0; background:none; color:#4b8ee8; font:inherit; font-size:13px; cursor:default; }
-.couple-games-row { display:flex; align-items:center; gap:12px; min-height:81px; border-bottom:1px solid rgba(82,59,54,.09); }
+.couple-games-row { display:grid; grid-template-columns:54px minmax(0,1fr) 78px; align-items:center; gap:12px; min-height:81px; border-bottom:1px solid rgba(82,59,54,.09); }
 .couple-games-row-icon { flex:0 0 54px; width:54px; height:54px; border-radius:14px; background:rgba(139,119,113,.13); }
-.couple-games-row > div { display:grid; flex:1; gap:8px; }
-.couple-games-row > .couple-games-row-action { display:grid; flex:0 0 78px; width:78px; min-width:78px; }
-.couple-games-row > div b { width:145px; height:12px; border-radius:99px; background:rgba(70,55,51,.12); }
+.couple-games-row > div { display:grid; min-width:0; gap:8px; }
+.couple-games-row > .couple-games-row-action { display:grid; width:78px; min-width:78px; justify-self:center; }
+.couple-games-row > div b { width:145px; max-width:100%; box-sizing:border-box; height:12px; border-radius:99px; background:rgba(70,55,51,.12); }
 .couple-games-row > div:not(.couple-games-row-action) > span { width:205px; max-width:78%; height:8px; border-radius:99px; background:rgba(139,119,113,.11); }
 .couple-games-row-action { display:grid; flex:0 0 78px; justify-items:center; align-content:start; gap:4px; width:78px; }
-.couple-games-row-action button { min-width:72px; height:34px; padding:0 14px; border:0; border-radius:99px; background:rgba(226,226,226,.68); color:#1684e8; font:600 12px/1 inherit; cursor:pointer; -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+.couple-games-row-action button { width:76px; min-width:76px; height:34px; box-sizing:border-box; padding:0 10px; border:0; border-radius:99px; background:rgba(226,226,226,.68); color:#1684e8; font:600 12px/1 inherit; cursor:pointer; -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
 .couple-games-row-action small { color:#989898; font-size:8px; line-height:1; white-space:nowrap; }
-.couple-game-action-slot { display:grid; place-items:center; width:72px; height:34px; }
-.couple-game-action-slot > .couple-game-get-button { width:72px; min-width:72px; height:34px; box-sizing:border-box; }
+.couple-game-action-slot { display:grid; place-items:center; width:76px; height:34px; }
+.couple-game-action-slot > .couple-game-get-button { width:76px; min-width:76px; height:34px; box-sizing:border-box; }
 .couple-love-letter-row .couple-love-letter-icon { display:grid; place-items:center; overflow:hidden; background:linear-gradient(145deg,#fff5f3,#f0a7a0 62%,#c85b68); box-shadow:0 7px 15px rgba(178,84,91,.2); color:#fff; font-size:25px; font-style:normal; }
 .couple-love-letter-row .couple-love-letter-icon img { display:block; width:100%; height:100%; border-radius:inherit; object-fit:cover; }
 .couple-love-letter-row .couple-love-letter-icon span { display:block; transform:translateY(-1px); text-shadow:0 2px 5px rgba(142,47,62,.2); }

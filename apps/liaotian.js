@@ -346,10 +346,12 @@
     }
   }, true);
   document.addEventListener('contextmenu', event => { if (event.target.closest?.('.chat-app')) event.preventDefault(); }, true);
+  document.addEventListener('click', event => { const saveButton = event.target.closest?.('[data-chat-role-moment-save]'); if (!saveButton) return; const checkbox = document.querySelector('#chatRoleMomentComposer [data-chat-role-moment-image]'); const config = window.IdealMachineImageAPI?.getConfig?.() || {}; if (checkbox?.checked && !(config.endpoint && config.model)) { event.preventDefault(); event.stopImmediatePropagation(); window.alert('请先在设置中配置生图 API，再生成带图动态。'); } }, true);
+  document.addEventListener('click', event => { const button = event.target.closest?.('#chatRoleMomentComposer [data-chat-role-moment-image-toggle]'); if (!button) return; event.preventDefault(); event.stopImmediatePropagation(); roleMomentWithImage = !roleMomentWithImage; button.classList.toggle('is-selected', roleMomentWithImage); button.setAttribute('aria-pressed', String(roleMomentWithImage)); const checkbox = document.querySelector('#chatRoleMomentComposer [data-chat-role-moment-image]'); if (checkbox) checkbox.checked = roleMomentWithImage; }, true);
   document.addEventListener('click', event => { const saveButton = event.target.closest?.('[data-chat-reading-chat-settings-save]'); if (!saveButton) return; const modal = document.querySelector('[data-chat-reading]'); const book = readBooks().find(item => item.id === readingBookId); if (!modal || !book) return; event.preventDefault(); event.stopImmediatePropagation(); const size = Number(modal.querySelector('[data-reading-chat-font-size]')?.value || 11); const font = modal.querySelector('[data-reading-chat-font]')?.value === 'reading' && book.fontSource ? 'reading' : 'default'; book.readingChatTextColor = modal.querySelector('[data-reading-chat-text-color]')?.value || '#222222'; book.readingChatFontSize = Math.max(10, Math.min(24, Number.isFinite(size) ? size : 11)); book.readingChatFontChoice = font; book.readingChatBackground = readingImageSource(modal.querySelector('[data-chat-reading-background]')?.value || book.readingChatBackground || ''); if (/^https?:\/\//i.test(book.readingChatBackground)) window.IdealMachineAlbum?.archiveUrl?.(book.readingChatBackground, '阅读聊天背景'); saveBooks(readBooks().map(item => item.id === book.id ? book : item)); readingChatSettingsOpen = false; modal.querySelector('.chat-reading-chat-settings')?.remove(); renderReadingChat(modal); }, true);
   document.addEventListener('click', event => { if (event.target.closest?.('[data-chat-tool="offline"]')) offlineExitRequested = false; }, true);
   document.addEventListener('click', event => { const offline = event.target.closest?.('[data-chat-tool="offline"]'); if (!offline || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); menuOpen = true; emojiOpen = false; syncChatPanelDOM(); openOfflineMode(); }, true);
-  document.addEventListener('click', event => { const action = event.target.closest?.('.chat-role-action-choice'); if (!action || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); const target = action.dataset.chatRoleTarget; roleMomentMode = target === 'select' ? 'select' : 'random'; document.querySelectorAll('.chat-role-action-choice').forEach(button => button.classList.toggle('is-selected', button === action)); const list = document.querySelector('[data-chat-role-list]'); const count = document.querySelector('[data-chat-role-random-count]'); if (list) list.classList.toggle('hidden', target !== 'select'); if (count) count.classList.toggle('hidden', target !== 'random'); }, true);
+  document.addEventListener('click', event => { const action = event.target.closest?.('.chat-role-action-choice[data-chat-role-target="random"], .chat-role-action-choice[data-chat-role-target="select"]'); if (!action || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); const target = action.dataset.chatRoleTarget; roleMomentMode = target === 'select' ? 'select' : 'random'; document.querySelectorAll('#chatRoleMomentComposer .chat-role-action-choice[data-chat-role-target="random"], #chatRoleMomentComposer .chat-role-action-choice[data-chat-role-target="select"]').forEach(button => button.classList.toggle('is-selected', button === action)); const list = document.querySelector('[data-chat-role-list]'); const count = document.querySelector('[data-chat-role-random-count]'); if (list) list.classList.toggle('hidden', target !== 'select'); if (count) count.classList.toggle('hidden', target !== 'random'); }, true);
   document.addEventListener('click', event => { const addGroup = event.target.closest?.('[data-chat-group-add]'); if (!addGroup || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); contactGroupComposerOpen = true; renderGroupComposer(); }, true);
   app.addEventListener('click', event => { if (event.target.closest('[data-chat-group-add]')) { const name = window.prompt('分组名称'); if (name?.trim()) { state.contactGroups.push({ id: uid('contact-group'), name: name.trim() }); save(); render(); } return; } if (event.target.closest('[data-chat-group-manage]')) { state.contactGroupManageOpen = !state.contactGroupManageOpen; render(); return; } if (event.target.closest('[data-chat-moment-image]')) { document.querySelector('#chatMomentImageFile')?.click(); return; } if (event.target.closest('[data-chat-post]')) { event.preventDefault(); event.stopImmediatePropagation(); momentComposerOpen = true; momentImageData = ''; momentVisibility = []; renderMomentComposer(); return; } if (event.target.closest('[data-chat-moment-compose-close]')) { event.preventDefault(); event.stopImmediatePropagation(); momentComposerOpen = false; renderMomentComposer(); return; } if (event.target.closest('[data-chat-moment-compose-save]')) { event.preventDefault(); event.stopImmediatePropagation(); const text = document.querySelector('#chatMomentText')?.value.trim(); if (!text && !momentImageData) return window.alert('请至少填写文字或添加一张图片。'); const profile = momentProfile(); const author = profile.nickname || profile.realName || '我'; state.moments.unshift({ id: uid('moment'), author, realName: '', authorType: 'user', authorId: 'moments-user', avatar: profile.avatar || '', text, image: momentImageData, location: document.querySelector('#chatMomentLocation')?.value.trim() || '', visibleGroups: momentVisibility.slice(), time: time(), likes: 0, comments: [] }); save(); momentComposerOpen = false; render(); } });
   app.addEventListener('click', event => { if (event.target.closest('[data-chat-moments-refresh]')) { render(); return; } if (event.target.closest('[data-chat-moment-notifications]')) { window.alert('暂无新的朋友圈提醒。'); return; } });
@@ -1689,9 +1691,16 @@ ${languageInstruction}
     return String(value || '').match(/\[\[(?:IMAGE_PROMPT\s*:[\s\S]*?|MUSIC\b[^\]]*|STICKER\s*:[^\]]*|VOICE\b[^\]]*|VIDEO_CALL\b[^\]]*|VIDEO_HANGUP\b[^\]]*|TRANSFER(?:_ACCEPT|_RETURN)?\b[^\]]*|LOCATION\b[^\]]*|SHOPPING_PAID\b[^\]]*|TOGETHER\b[^\]]*)\]\]/ig) || [];
   }
   function extractCombinedThought(value) {
-    const source = String(value || '');
+    const original = String(value || '');
+    // 生图动作不能进入心声：模型偶尔会把 IMAGE_PROMPT 放进 THOUGHT 区块，
+    // 先提取再附回正文，让后续统一的图片处理链路消费它。
+    const imageMarkers = [...original.matchAll(/\[\[\s*IMAGE_PROMPT\s*:\s*([\s\S]*?)\]\]/ig)]
+      .map(match => match[1].trim())
+      .filter(Boolean)
+      .map(prompt => `[[IMAGE_PROMPT: ${prompt}]]`);
+    const source = original.replace(/\[\[\s*IMAGE_PROMPT\s*:[\s\S]*?\]\]/ig, ' ');
     const opening = /\[\[\s*THOUGHT\s*\]\]/i.exec(source);
-    if (!opening) return { reply:source.replace(/\[\[\s*\/\s*THOUGHT\s*\]\]/ig, '').trim(), thought:'', thoughtTranslation:'' };
+    if (!opening) return { reply:[source.replace(/\[\[\s*\/\s*THOUGHT\s*\]\]/ig, '').trim(), ...imageMarkers].filter(Boolean).join('\n'), thought:'', thoughtTranslation:'' };
     const bodyStart = opening.index + opening[0].length;
     const closingPattern = /\[\[\s*\/\s*THOUGHT\s*\]\]/ig;
     closingPattern.lastIndex = bodyStart;
@@ -1704,7 +1713,7 @@ ${languageInstruction}
       const messageStart = /\[\[\s*MSG\s*\]\]/i.exec(malformedTail);
       const recoveredMessages = messageStart ? malformedTail.slice(messageStart.index).replace(/\[\[\s*\/?\s*THOUGHT\s*\]\]/ig, '') : '';
       const recoveredActions = messageStart ? [] : thoughtActionMarkers(malformedTail);
-      return { reply:[prefix, recoveredMessages, ...recoveredActions].filter(Boolean).join('\n').trim(), thought:'', thoughtTranslation:'' };
+      return { reply:[prefix, recoveredMessages, ...recoveredActions, ...imageMarkers].filter(Boolean).join('\n').trim(), thought:'', thoughtTranslation:'' };
     }
     let thoughtSource = source.slice(bodyStart, closing.index);
     let recoveredMessage = '';
@@ -1719,7 +1728,7 @@ ${languageInstruction}
     const thought = cleanThoughtText(thoughtParts.text);
     const thoughtTranslation = cleanThoughtText(thoughtParts.translation);
     const suffix = source.slice(closing.index + closing[0].length).replace(/\[\[\s*\/?\s*THOUGHT\s*\]\]/ig, '').trim();
-    return { reply:[prefix, recoveredMessage, suffix, ...recoveredActions].filter(Boolean).join('\n').trim(), thought, thoughtTranslation };
+    return { reply:[prefix, recoveredMessage, suffix, ...recoveredActions, ...imageMarkers].filter(Boolean).join('\n').trim(), thought, thoughtTranslation };
   }
   async function saveCombinedThought(chat, value, translation = '', roundKey = '') {
     let text = cleanThoughtText(value);
@@ -2782,7 +2791,7 @@ ${rerollRule}
   document.addEventListener('click', event => { if (event.target.closest('[data-chat-group-compose-close]')) { event.preventDefault(); event.stopImmediatePropagation(); contactGroupComposerOpen = false; renderGroupComposer(); return; } if (event.target.closest('[data-chat-group-compose-save]')) { event.preventDefault(); event.stopImmediatePropagation(); const name = document.querySelector('#chatGroupName')?.value.trim(); if (!name) return window.alert('请填写分组名称。'); if (state.contactGroups.some(group => group.name === name)) return window.alert('这个分组已经存在。'); state.contactGroups.push({ id: uid('contact-group'), name }); save(); contactGroupComposerOpen = false; render(); } }, true);
   document.addEventListener('click', event => { if (event.target.closest('[data-chat-post]')) { event.preventDefault(); event.stopImmediatePropagation(); momentComposerOpen = true; momentImageData = ''; momentVisibility = []; momentVisibilityMode = 'all'; renderMomentComposer(); return; } if (event.target.closest('[data-chat-moment-compose-close]')) { event.preventDefault(); event.stopImmediatePropagation(); momentComposerOpen = false; renderMomentComposer(); return; } if (event.target.closest('[data-chat-moment-compose-save]')) { event.preventDefault(); event.stopImmediatePropagation(); const text = document.querySelector('#chatMomentText')?.value.trim(); if (!text && !momentImageData) return window.alert('请至少填写文字或添加一张图片。'); const profile = momentProfile(); const author = profile.nickname || profile.realName || '我'; state.moments.unshift({ id: uid('moment'), author, realName: '', authorType: 'user', authorId: 'moments-user', avatar: profile.avatar || '', text, image: momentImageData, location: document.querySelector('#chatMomentLocation')?.value.trim() || '', visibility: momentVisibilityMode, visibleGroups: momentVisibilityMode === 'groups' ? momentVisibility.slice() : [], time: time(), likes: 0, comments: [] }); save(); momentComposerOpen = false; render(); } }, true);
   document.addEventListener('change', event => { const mode = event.target.closest('[data-chat-moment-visibility-mode]'); if (!mode) return; momentVisibilityMode = mode.dataset.chatMomentVisibilityMode; if (momentVisibilityMode !== 'groups') momentVisibility = []; renderMomentComposer(); });
-  document.addEventListener('click', event => { if (event.target.closest('[data-chat-role-post]')) { event.preventDefault(); event.stopImmediatePropagation(); roleMomentComposerOpen = true; roleMomentTarget = 'random'; roleMomentMode = 'random'; roleMomentTargets = []; roleMomentCount = 1; roleMomentWithImage = false; renderRoleMomentComposer(); return; } if (event.target.closest('[data-chat-role-moment-close]')) { event.preventDefault(); event.stopImmediatePropagation(); roleMomentComposerOpen = false; renderRoleMomentComposer(); return; } if (event.target.closest('[data-chat-role-moment-save]')) { event.preventDefault(); event.stopImmediatePropagation(); const selected = document.querySelector('[data-chat-role-target]:checked'); if (roleMomentMode === 'select') roleMomentTargets = [...document.querySelectorAll('#chatRoleMomentComposer [data-chat-role-target]:checked')].map(input => input.dataset.chatRoleTarget); roleMomentWithImage = Boolean(document.querySelector('[data-chat-role-moment-image]')?.checked); roleMomentTarget = selected?.dataset.chatRoleTarget || 'random'; roleMomentComposerOpen = false; renderRoleMomentComposer(); return generateRoleMoment(roleMomentTarget === 'random' ? null : roleMomentTarget); } }, true);
+  document.addEventListener('click', event => { if (event.target.closest('[data-chat-role-post]')) { event.preventDefault(); event.stopImmediatePropagation(); roleMomentComposerOpen = true; roleMomentTarget = 'random'; roleMomentMode = 'random'; roleMomentTargets = []; roleMomentCount = 1; roleMomentWithImage = false; renderRoleMomentComposer(); return; } if (event.target.closest('[data-chat-role-moment-close]')) { event.preventDefault(); event.stopImmediatePropagation(); roleMomentComposerOpen = false; renderRoleMomentComposer(); return; } if (event.target.closest('[data-chat-role-moment-save]')) { event.preventDefault(); event.stopImmediatePropagation(); if (roleMomentMode === 'select') roleMomentTargets = [...document.querySelectorAll('#chatRoleMomentComposer [data-chat-role-target]:checked')].map(input => input.dataset.chatRoleTarget); roleMomentWithImage = Boolean(document.querySelector('#chatRoleMomentComposer [data-chat-role-moment-image]')?.checked); roleMomentComposerOpen = false; renderRoleMomentComposer(); return generateRoleMoment(null); } }, true);
   document.addEventListener('click', event => { const roleChoice = event.target.closest('[data-chat-role-target]'); if (roleChoice && roleChoice.closest('#chatRoleMomentComposer')) { if (roleChoice.dataset.chatRoleTarget === 'select') { roleMomentMode = 'select'; roleMomentTarget = 'select'; const list = document.querySelector('[data-chat-role-list]'); const count = document.querySelector('[data-chat-role-random-count]'); if (list) list.classList.remove('hidden'); if (count) count.classList.add('hidden'); return; } if (roleChoice.dataset.chatRoleTarget === 'random') { roleMomentMode = 'random'; roleMomentTarget = 'random'; const list = document.querySelector('[data-chat-role-list]'); const count = document.querySelector('[data-chat-role-random-count]'); if (list) list.classList.add('hidden'); if (count) count.classList.remove('hidden'); return; } roleMomentTargets = [...document.querySelectorAll('[data-chat-role-target]:checked')].map(input => input.dataset.chatRoleTarget); roleMomentTarget = roleChoice.dataset.chatRoleTarget; return; } const interact = event.target.closest('[data-moment-interact]'); if (!interact || !app.classList.contains('is-open')) return; event.preventDefault(); event.stopImmediatePropagation(); const post = state.moments.find(item => item.id === interact.dataset.momentInteract); if (post) generateRoleInteraction(post); }, true);
   document.addEventListener('change', event => { if (event.target.id === 'chatRoleMomentCount') { roleMomentCount = Math.max(1, Number(event.target.value) || 1); return; } if (event.target.matches('#chatRoleMomentComposer [data-chat-role-target]')) { roleMomentTargets = [...document.querySelectorAll('#chatRoleMomentComposer [data-chat-role-target]:checked')].map(input => input.dataset.chatRoleTarget); } });
   document.addEventListener('keydown', event => {
@@ -5793,6 +5802,31 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       }
     }
   }
+
+  const baseRoleMomentComposerRender = renderRoleMomentComposer;
+  renderRoleMomentComposer = function() {
+    baseRoleMomentComposerRender();
+    const panel = document.querySelector('#chatRoleMomentComposer');
+    const input = panel?.querySelector('[data-chat-role-moment-image]');
+    if (!panel || !input) return;
+    input.disabled = false;
+    const config = window.IdealMachineImageAPI?.getConfig?.() || {};
+    if (!(config.endpoint && config.model)) {
+      const hint = input.closest('.chat-role-image-toggle')?.querySelector('small');
+      if (hint) hint.textContent = '尚未配置生图 API，提交时会提示';
+    }
+    const row = input.closest('.chat-role-image-toggle');
+    if (!row || row.tagName !== 'LABEL') return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `chat-role-action-choice chat-role-image-toggle${roleMomentWithImage ? ' is-selected' : ''}`;
+    button.dataset.chatRoleMomentImageToggle = 'true';
+    button.setAttribute('aria-pressed', String(roleMomentWithImage));
+    button.innerHTML = `${row.querySelector('span')?.outerHTML || ''}<i aria-hidden="true">${roleMomentWithImage ? '✓' : ''}</i>`;
+    input.hidden = true;
+    panel.append(input);
+    row.replaceWith(button);
+  };
 
   const baseGeneratedRoleMoment = generateRoleMoment;
   generateRoleMoment = async function(contactId, targetPost = null) {
@@ -9676,8 +9710,13 @@ ${recentConversation}
     if (!config?.endpoint || !config.key || !model || !profile) return false;
     const history = activeMessageHistory(chat, contact);
     const idleMinutes = Math.max(1, Math.floor((now - activeMessageTimestamp(chat.messages.at(-1))) / 60000));
+    const chatSettings = chatSettingsFor(chat);
+    const bounds = characterReplyBounds(chat, chatSettings.characterMultiMessage);
+    const targetCount = chatSettings.characterMultiMessage
+      ? bounds.min + Math.floor(Math.random() * (bounds.max - bounds.min + 1))
+      : 1;
     let systemText = buildChatSystemPrompt(contact, profile, chat);
-    systemText += `\n\n【主动消息任务】用户在你上一条消息后已经沉默约 ${idleMinutes} 分钟。现在判断你是否真的有自然理由主动联系用户。只有确实想起用户、想分享眼前事情、关心对方或延续未完话题时才发送；如果没有自然理由，只输出 [NO_MESSAGE]。如果发送，只输出一条完整、短小、像即时聊天的角色消息，不要输出旁白、动作、分析、标题、JSON、Markdown、[[MSG]]、[[THOUGHT]] 或任何富媒体控制标记。不要假装用户刚刚说了新话，也不要提到“主动消息”“定时”“沉默时间”或 AI。${idealChatBilingualInstruction(chat)}`;
+    systemText += `\n\n【主动消息任务】用户在你上一条消息后已经沉默约 ${idleMinutes} 分钟。现在判断你是否真的有自然理由主动联系用户。只有确实想起用户、想分享眼前事情、关心对方或延续未完话题时才发送；如果没有自然理由，只输出 [NO_MESSAGE]。不要假装用户刚刚说了新话，也不要提到“主动消息”“定时”“沉默时间”或 AI。${chatSettings.characterMultiMessage ? `如果决定发送，请输出恰好 ${targetCount} 条自然、完整、像即时聊天的角色消息，并用 [[MSG]] 分隔；每条都要是可以单独发送的完整表达，不能拆断句子，也不要为了凑数重复内容。` : '如果决定发送，只输出一条完整、短小、像即时聊天的角色消息；不要使用 [[MSG]]。'}不要输出旁白、动作、分析、标题、JSON、Markdown、[[THOUGHT]] 或任何富媒体控制标记。${idealChatBilingualInstruction(chat)}`;
     const request = window.IdealMachineFetch || nativeChatFetch;
     const response = await request(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST', timeout: 180000, idealScope: 'chat-active-message',
@@ -9688,17 +9727,67 @@ ${recentConversation}
     const data = await response.json();
     const raw = requireCharacterReplyText(data).trim();
     if (/^\[\s*NO_MESSAGE\s*\]$/i.test(raw)) return false;
-    const parsed = extractCharacterTranslation(raw.split(/\[\[MSG\]\]/i)[0]);
-    const text = cleanCharacterReplyText(parsed.text);
-    if (!text || /^\[\s*NO_MESSAGE\s*\]$/i.test(text)) return false;
+    const parsedChunks = raw.split(/\[\[MSG\]\]/i).map(item => extractCharacterTranslation(item)).filter(item => item.text);
+    const hasInlineTranslations = parsedChunks.some(item => item.translation);
+    const stripActiveMessageControls = value => String(value || '').replace(/\[\[(?:IMAGE_PROMPT|STICKER|MUSIC|QUOTE|VOICE|VIDEO_CALL|VIDEO_HANGUP|TRANSFER(?:_ACCEPT|_RETURN)?|LOCATION|SHOPPING_PAID|TOGETHER)\b[\s\S]*?(?:\]\]|$)/ig, ' ');
+    let chunks = parsedChunks.map(item => cleanCharacterReplyText(stripActiveMessageControls(item.text))).filter(Boolean);
+    let translations = parsedChunks.map(item => cleanCharacterReplyText(stripActiveMessageControls(item.translation || '')));
+    if (!chatSettings.characterMultiMessage) {
+      const text = cleanCharacterReplyText(chunks.join(' '));
+      if (!text || /^\[\s*NO_MESSAGE\s*\]$/i.test(text)) return false;
+      chunks = [text];
+      translations = [cleanCharacterReplyText(translations.filter(Boolean).join(' '))];
+    } else {
+      const plain = chunks.join(' ').trim();
+      if (!plain || /^\[\s*NO_MESSAGE\s*\]$/i.test(plain)) return false;
+      if (!hasInlineTranslations) {
+        chunks = parsedChunks.length > 1
+          ? chunks.flatMap(item => splitCharacterReplyNaturally(item))
+          : splitCharacterReplyFallback(plain, targetCount);
+        chunks = chunks.flatMap(item => splitCharacterReplyNaturally(item));
+        chunks = capCharacterChunks(chunks, targetCount);
+        chunks = mergeUnsafeCharacterChunks(chunks).map(cleanCharacterReplyText).filter(Boolean);
+        // 某些短回复没有足够的自然断点；仅在文本确实允许时再尝试达到设置的下限，
+        // 不为了凑条数制造残句或重复消息。
+        if (chunks.length < bounds.min && plain.length >= bounds.min * 8) {
+          const minimumChunks = splitCharacterReplyFallback(plain, bounds.min)
+            .flatMap(item => splitCharacterReplyNaturally(item));
+          const safeMinimumChunks = mergeUnsafeCharacterChunks(capCharacterChunks(minimumChunks, bounds.max))
+            .map(cleanCharacterReplyText).filter(Boolean);
+          if (safeMinimumChunks.length >= chunks.length) chunks = safeMinimumChunks;
+        }
+        translations = chunks.map(() => '');
+      } else {
+        const paired = chunks.map((text, index) => ({ text, translation:translations[index] || '' }));
+        if (paired.length > targetCount) {
+          const grouped = [];
+          for (let index = 0; index < targetCount; index += 1) {
+            const start = Math.floor(index * paired.length / targetCount);
+            const end = Math.floor((index + 1) * paired.length / targetCount);
+            const group = paired.slice(start, end);
+            grouped.push({ text:group.map(item => item.text).join(' ').trim(), translation:group.map(item => item.translation).filter(Boolean).join(' ').trim() });
+          }
+          chunks = grouped.map(item => item.text);
+          translations = grouped.map(item => item.translation);
+        }
+      }
+    }
+    if (!chunks.length) return false;
     const viewingTargetChat = isViewingChat(contact.id);
-    const translationMeta = characterTranslationMeta(text, chat, contact, { translation: parsed.translation });
-    const message = { id: uid('message'), text, role: 'character', type: '', ...translationMeta, proactive: true, proactiveAt: now, time: time(), createdAt: now, unread: !viewingTargetChat };
-    chat.messages.push(message);
+    const sentMessages = [];
+    for (let index = 0; index < chunks.length; index += 1) {
+      const text = cleanCharacterReplyText(chunks[index]);
+      if (!text) continue;
+      const translationMeta = characterTranslationMeta(text, chat, contact, { translation:translations[index] || '' });
+      const message = { id:uid('message'), text, role:'character', type:'', ...translationMeta, proactive:true, proactiveAt:now, time:time(), createdAt:now + index, unread:!viewingTargetChat };
+      chat.messages.push(message);
+      sentMessages.push(message);
+    }
+    if (!sentMessages.length) return false;
     settings.activeMessageLastSentAt = now;
     settings.activeMessageSentToday = Number(settings.activeMessageSentToday || 0) + 1;
     save();
-    if (!viewingTargetChat) window.IdealMachineNotifications?.show?.({ contactId: contact.id, name: contact.nickname || contact.name || '角色', avatar: contact.avatar || '', message: text, messageId: message.id });
+    if (!viewingTargetChat) window.IdealMachineNotifications?.show?.({ contactId:contact.id, name:contact.nickname || contact.name || '角色', avatar:contact.avatar || '', message:sentMessages.map(message => message.text).join(' '), messageId:sentMessages[sentMessages.length - 1].id });
     if (activeContact === contact.id && app.classList.contains('is-open')) render();
     return true;
   }
