@@ -1490,10 +1490,10 @@ ${languageInstruction}
 ### 发送图片
 
 角色确实适合分享自拍、现场、物品、食物、穿搭或其他画面时使用：
-[[IMAGE_PROMPT:[SHOT:PORTRAIT] A complete English image prompt describing the visible subject, appearance, action, setting, framing, lighting, and mood.]]
+[[IMAGE_PROMPT:[SHOT:STILL] A complete English image prompt describing the requested subject, setting, framing, lighting, and mood.]]
 
 只在确实适合分享画面或用户明确要求发图时使用，正常文字回复仍要保留。每轮最多输出一个 IMAGE_PROMPT 标记，且必须放在正文中，不能放进 THOUGHT/心声区。
-标记内容必须是英文、约 40–80 个英文单词，并以一种镜头类型开头：[SHOT:PORTRAIT]（单人近景/自拍）、[SHOT:ACTION]（单人中远景/动作）、[SHOT:PAIR]（两人）、[SHOT:GROUP]（多人）、[SHOT:STILL]（无人静物）或 [SHOT:VISTA]（无人风景）。接着按镜头、主体、姿势/动作、表情、环境、光线和氛围具体描述；人物外观只写画面可见、与角色资料相符的特征，不要写角色名字或无关背景。画面不得包含聊天界面、气泡、可读文字、水印或 logo；人物应穿着得体且不带情色化描写。不要为了展示功能强行发图。AI 图片会保存到聊天记录，可在图片查看页另行保存到相册。
+标记内容必须是英文、约 40–80 个英文单词，并以一种镜头类型开头：[SHOT:PORTRAIT]（单人近景/自拍）、[SHOT:ACTION]（单人中远景/动作）、[SHOT:PAIR]（两人）、[SHOT:GROUP]（多人）、[SHOT:STILL]（无人静物）或 [SHOT:VISTA]（无人风景）。按用户具体要求选择主体：食物、物品、宠物或桌面用 STILL，空旷场景用 VISTA；只有明确要自拍、角色出镜或画面确实需要人物时才用人物镜头。接着描述实际可见的主体、动作、环境、光线和氛围；角色入镜时才描述其外貌，无人画面不得添加角色。画面不得包含聊天界面、气泡、可读文字、水印或 logo；人物应穿着得体且不带情色化描写。不要为了展示功能强行发图。AI 图片会保存到聊天记录，可在图片查看页另行保存到相册。
 
 ## 8. 最终输出格式
 
@@ -5779,7 +5779,18 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   }
 
   function isExplicitSelfieRequest(text) {
-    return /自拍|自拍照|对镜自拍|镜子自拍|镜面自拍|mirror\s*selfie/i.test(String(text || ''));
+    const request = String(text || '');
+    return /自拍|\bselfie\b/i.test(request)
+      && !/(?:不要|别|不用|不想|无需|不是|不默认|禁止|避免).{0,12}自拍|\b(?:no|not|without|avoid)\b.{0,20}\bselfie\b/i.test(request);
+  }
+
+  function chatImageShowsCharacter(prompt, request) {
+    if (isExplicitSelfieRequest(request)) return true;
+    const shot = String(prompt || '').match(/\[SHOT:(PORTRAIT|ACTION|PAIR|GROUP|STILL|VISTA)\]/i)?.[1]?.toUpperCase();
+    if (shot === 'STILL' || shot === 'VISTA') return false;
+    if (shot) return true;
+    return isExplicitSelfieRequest(prompt)
+      || /self.portrait|portrait of (?:the )?character|the character (?:is|wears|stands|sits)|角色本人|角色出镜|合照|人物肖像/i.test(String(prompt || ''));
   }
 
   async function generateCharacterChatImage(prompt, targetChat, contact, existingMessage = null) {
@@ -5794,10 +5805,8 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const latestUserMessage = [...(targetChat.messages || [])].reverse().find(message => message.role === 'user');
     const selfieRequested = isExplicitSelfieRequest(latestUserMessage?.text);
     let rolePrompt = prepareCharacterImagePrompt(prompt);
-    if (selfieRequested) {
-      rolePrompt = 'Create a natural, casual smartphone selfie-style image of the character themself. Show one subject only, following the human or animal type in the appearance description. Use a relaxed expression or natural look, an ordinary fitting everyday appearance, soft natural light, and believable candid framing. Follow the supplied character appearance description; do not invent a different identity. No text, watermark, logo, or app interface.';
-    }
-    rolePrompt = lockCharacterImageAppearance(rolePrompt, getChatImageAppearance(targetChat, contact));
+    if (selfieRequested) rolePrompt = `The user explicitly requested a selfie of the character. Keep the requested location, clothing, action and framing from the image description; show the character visibly in a natural selfie composition.\n${rolePrompt}`;
+    if (chatImageShowsCharacter(prompt, latestUserMessage?.text)) rolePrompt = lockCharacterImageAppearance(rolePrompt, getChatImageAppearance(targetChat, contact));
     try {
       const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1 });
       if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源');
@@ -6007,8 +6016,8 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         const system = Array.isArray(payload.messages) && payload.messages.find(message => message.role === 'system');
         if (system && String(input).includes('/chat/completions')) {
           system.content += requiredImage
-            ? '\n用户刚刚明确要求你发图，本次必须发送一张图片。在自然文字回复后追加且只追加一个严格标记，格式为 [[IMAGE_PROMPT:[SHOT:XXX] English image prompt]]。XXX 从 PORTRAIT、ACTION、PAIR、GROUP、STILL、VISTA 中选择。用英文写约 40–80 个词，把取景方式、画面主体及可见特征、动作与神态、所在环境、光照和整体氛围交代清楚；自拍用 PORTRAIT，用户明确指定构图时按其要求执行。人物穿着得体，不写情色内容；不含角色名字、文字、水印、logo 或聊天界面。保留自然文字回复，不要解释标记。'
-            : '\n只有在当前情境确实适合分享自拍、眼前景物、物品、穿搭、食物或现场照片时才可以发图；不需要图片时不要使用标记。需要发图时，在自然文字回复后追加且只追加一个严格标记，格式为 [[IMAGE_PROMPT:[SHOT:XXX] English image prompt]]。XXX 从 PORTRAIT（单人近景/自拍）、ACTION（单人中远景/动作）、PAIR（两人）、GROUP（多人）、STILL（无人静物）、VISTA（无人风景）中选择。用英文写约 40–80 个词，依次交代取景、画面主体及外观、动作/姿势、表情、环境、光线和气氛；人物特征须与角色资料一致且限于画面可见内容，不写角色名字。人物穿着得体、不带情色化描写；画面不含可读文字、水印、logo 或聊天界面。保留自然文字回复，不要解释标记。';
+            ? '\n用户刚刚明确要求你发图，本次必须发送一张图片。在自然文字回复后追加且只追加一个严格标记，格式为 [[IMAGE_PROMPT:[SHOT:XXX] English image prompt]]。XXX 从 PORTRAIT、ACTION、PAIR、GROUP、STILL、VISTA 中选择。严格按用户说的画面主体选择镜头：食物、物品、宠物用 STILL，风景用 VISTA；只有要求自拍或角色出镜才画角色。用英文写约 40–80 个词，描述主体、构图、环境、光照和氛围；角色确实入镜时才写外貌。不要把普通发图请求擅自改为自拍。画面不含可读文字、水印、logo 或聊天界面。保留自然文字回复，不要解释标记。'
+            : '\n只有在当前情境确实适合分享眼前景物、物品、食物、宠物、现场照片或自拍时才可以发图；不需要图片时不要使用标记。需要发图时，在自然文字回复后追加且只追加一个严格标记，格式为 [[IMAGE_PROMPT:[SHOT:XXX] English image prompt]]。XXX 从 PORTRAIT（单人近景/自拍）、ACTION（单人中远景/动作）、PAIR（两人）、GROUP（多人）、STILL（无人静物）、VISTA（无人风景）中选择。优先呈现本轮谈话实际提到的可拍摄对象，只有情境明确需要角色出镜时才用人物镜头；不要默认自拍。用英文写约 40–80 个词，描述可见主体、构图、环境、光线和氛围；角色入镜时才写外貌。画面不含可读文字、水印、logo 或聊天界面。保留自然文字回复，不要解释标记。';
           init = { ...init, body: JSON.stringify(payload) };
         }
       } catch {}
@@ -6021,9 +6030,9 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       if (generatedImageMarkerCount > markerCountBeforeReply) await latestGeneratedImagePromise;
       else {
         const request = String(latestUserMessage?.text || '').trim();
-        const fallbackPrompt = /自拍|自拍照|对镜|镜子/.test(request)
-          ? '角色本人自然的日常自拍，肩部以上取景，穿着完整得体的日常服装，表情自然，柔和自然光，生活照片质感，不含文字、水印或聊天界面。'
-          : `角色根据用户刚才的明确请求分享一张相关的日常照片：${request.replace(/^(?:请|麻烦|能不能|可不可以|可以)?\s*/, '').slice(0, 100)}。画面自然真实，不含文字、水印或聊天界面。`;
+        const fallbackPrompt = isExplicitSelfieRequest(request)
+          ? `角色本人自然的自拍，按照用户要求呈现：${request.slice(0, 100)}。保留用户指定的场景、穿搭和构图；表情自然，生活照片质感，不含文字、水印或聊天界面。`
+          : `根据用户刚才的明确请求生成一张照片：${request.replace(/^(?:请|麻烦|能不能|可不可以|可以)?\s*/, '').slice(0, 100)}。只拍摄请求中的主体和场景，不默认加入角色或改为自拍。画面自然真实，不含文字、水印或聊天界面。`;
         await generateCharacterChatImage(fallbackPrompt, targetChat, contact);
       }
     }
@@ -6063,12 +6072,13 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   function safeMomentImagePrompt(post, contact) {
     const text = String(post?.text || '').trim().slice(0, 600);
-    const appearance = getChatImageAppearance(state.chats[contact?.id], contact).slice(0, 1200);
+    const characterVisible = /自拍|对镜|镜中|镜子里|给自己拍|我的照片|我.{0,12}(?:穿着|站在|坐在|走在|跑在|出镜|入镜|合照)|我们.{0,8}合照/.test(text);
+    const appearance = characterVisible ? getChatImageAppearance(state.chats[contact?.id], contact).slice(0, 1200) : '';
     if (!text) throw new Error('朋友圈正文为空，无法根据动态生成配图。');
     return [
-      '请直接为这条角色朋友圈生成一张具体、自然的生活场景图片。画面应呈现动态正文里实际发生的事情，保留其中的主体、动作和情境；不要把有具体事件的动态改成无关的人像或静物。采用可信的日常摄影观感，构图清楚，环境、光线和氛围贴合这条动态。',
+      '请为这条朋友圈动态生成一张自然的照片。先依据正文确定最值得拍摄的主体：食物、物品、宠物、风景或现场事件都可以成为主角。只有正文明确提到自拍、合照或角色本人出镜时才画角色；发帖者的身份本身不是出镜理由。不要把其他画面改成自拍或人物肖像。采用可信的日常摄影观感，构图清楚，环境、光线和氛围贴合正文。',
       `朋友圈正文：${text}`,
-      appearance ? `角色外观参考（只采用与画面相关、可见的特征）：${appearance}` : '',
+      appearance ? `仅当角色本人出镜时使用的外观参考：${appearance}` : '',
       '人物如出现须穿着完整、自然得体；不要加入情色描写、臆造年龄或敏感身体特征。画面中不要出现可读文字、水印、logo、聊天气泡或社交软件界面。'
     ].filter(Boolean).join('\n');
   }
