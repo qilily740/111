@@ -7,6 +7,10 @@
   const beautyApp = ['meihua','美化','beauty','#9ba9c8'];
   const desktopApps = [...apps, beautyApp];
   let state = readState(); let activeApp = ''; let activeChatTarget = ''; let activeTaChatTab = 'chats'; let activeTaCoupleTab = 'today'; let activeDetail = null; let activeCalendarDate = localDateKey(new Date()); let calendarAutoOpenKey = ''; let npcBusy = false; let refreshing = false; let taRefreshTimeout = 180000; let refreshPickerOpen = false; let appearanceOpen = false; let appearanceDraft = null; let appearanceSwapKey = ''; let reverseOpen = false; let reverseBusy = false; let reverseLive = null; let reverseForceCaught = false; let reverseRateOpen = false; let reverseViewer = null; let reverseAppearance = {wallpaper:'',icons:{},names:{}}; let reverseStep = 0; let selectedRefreshApps = new Set(); let doubaoHistoryOpen = false; let selectedDoubaoHistory = -1; let groupLongPressTimer = 0; let suppressGroupEntryClick = false; let taChatListScrollByTab = {chats:0,contacts:0,moments:0}; let taChatSkipCaptureOnce = false; let taChatListScrollRoleId = '';
+  let taCoupleArchiveRoleId = '';
+  const taCoupleArchiveSelected = { today:-1, dates:-1, wishes:-1, us:-1 };
+  const taCoupleArchiveOpen = { today:false, dates:false, wishes:false, us:false };
+  const taCoupleArchiveScroll = { today:0, dates:0, wishes:0, us:0 };
   function readState() { try { const value=JSON.parse(localStorage.getItem(storageKey) || '{}'); return { roleId:value.roleId || '', appearance:{ wallpaper:value.appearance?.wallpaper || '', icons:value.appearance?.icons && typeof value.appearance.icons === 'object' ? value.appearance.icons : {} } }; } catch { return { roleId:'', appearance:{ wallpaper:'', icons:{} } }; } }
   function saveState() { localStorage.setItem(storageKey, JSON.stringify(state)); }
   function captureTaChatListScroll() {
@@ -1334,6 +1338,17 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
     } catch (error) { window.alert(`回复已保存，但 Ta 的回应暂时生成失败：${error.message}`); }
     finally { refreshing = false; render(); }
   }
+  function taCoupleArchive(tab, label, records, describe, detail, wishStyle = false) {
+    if (!records.length) return '<p class="ta-couple-empty">还没有记录。</p>';
+    const selected = Math.min(taCoupleArchiveSelected[tab], records.length - 1);
+    const fileClass = wishStyle ? 'couple-wish-archive-files' : 'couple-archive-files';
+    const papers = records.map((item, index) => {
+      const info = describe(item, index);
+      if (wishStyle) return `<button class="couple-wish-archive-paper wish-tone-${index % 4}${selected === index ? ' is-selected' : ''}" data-ta-couple-archive-item="${index}" type="button" aria-pressed="${selected === index}"><small>${esc(info.date || '')}</small><b>${esc(info.title)}</b><span>${esc(info.subtitle || '点击查看')} ›</span></button>`;
+      return `<button class="couple-date-folder${selected === index ? ' is-selected' : ''}" data-ta-couple-archive-item="${index}" type="button" aria-pressed="${selected === index}"><span>${String(index + 1).padStart(2, '0')}</span><b>${esc(info.title)}</b><small>${esc(info.date || info.subtitle || '')}</small></button>`;
+    }).join('');
+    return `<details class="couple-archive-box${wishStyle ? ' couple-wish-archive-box' : ''} ta-couple-archive-box" data-ta-couple-archive="${tab}" ${taCoupleArchiveOpen[tab] ? 'open' : ''}><summary><span class="couple-archive-object" aria-hidden="true"><i></i><i></i><i></i><b>♡</b></span><span class="couple-archive-caption"><b>${label}</b><small>${records.length} 份记录 · 点击打开</small></span></summary><div class="couple-archive-inside"><small>左右滑动，点开一份记录</small><div class="${fileClass}">${papers}</div><div class="couple-archive-detail ta-couple-archive-detail">${selected >= 0 ? detail(records[selected]) : '<p>挑选一份记录，看看里面留下了什么。</p>'}</div></div></details>`;
+  }
   function roleContent(key, owner) {
     const name = owner.nickname || owner.name;
     if (key === 'liaotian') return roleChatPage(owner);
@@ -1341,6 +1356,10 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
     if (key === 'luntan') return roleForumFeed(owner);
     if (key === 'rili') return roleCalendar(owner);
     if (key === 'qinglvkongjian') {
+      if (taCoupleArchiveRoleId !== owner.id) {
+        taCoupleArchiveRoleId = owner.id;
+        Object.keys(taCoupleArchiveSelected).forEach(tab => { taCoupleArchiveSelected[tab] = -1; taCoupleArchiveOpen[tab] = false; taCoupleArchiveScroll[tab] = 0; });
+      }
       const couple = read('ideal-machine-couple', {});
       const space = couple.spaces?.[owner.id] || {};
       const wishes = Array.isArray(space.wishes) ? space.wishes : [];
@@ -1348,15 +1367,19 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
       const exchanges = Array.isArray(space.exchangeRecords) ? space.exchangeRecords : [];
       if (space.exchange?.createdAt && !exchanges.some(item => item.createdAt === space.exchange.createdAt)) exchanges.unshift(space.exchange);
       const section = (title, body) => `<section class="ta-couple-section"><h3>${title}</h3>${body || '<p class="ta-couple-empty">还没有记录。</p>'}</section>`;
-      const wishCards = wishes.map(item => `<article class="ta-couple-card"><small>${item.author === 'role' ? `${esc(name)} 的心愿` : '你的心愿'} · ${item.done ? '已完成' : '未完成'}</small><b>${esc(item.text || '')}</b>${item.note ? `<p>${esc(item.note)}</p>` : ''}${item.author === 'role' ? `${item.userReply ? `<p>${esc(item.userReply)}</p>` : ''}${item.roleReaction ? `<p>${esc(name)} 的反应：${esc(item.roleReaction)}</p>` : ''}<button class="ta-couple-reply-wish" data-ta-couple-reply-wish="${esc(item.id)}" type="button" ${refreshing ? 'disabled' : ''}>${refreshing ? 'Ta 正在回应…' : item.userReply ? item.roleReaction ? '修改回复' : '重新让 Ta 回应' : '回复 Ta'}</button>` : space.wishReplies?.[item.id] ? `<p>${esc(name)} 说：${esc(space.wishReplies[item.id])}</p>` : ''}</article>`).join('');
-      const dateCards = [...(Array.isArray(space.dates) ? space.dates.map(item => ({ ...item, planned:true })) : []), ...(space.dateSession ? [{ ...space.dateSession, live:true }] : []), ...dates].map(item => `<details class="ta-couple-date-file"><summary><span>${item.planned ? '约定' : item.live ? '正在相处' : '已收录'} · ${esc(item.date || (item.startAt ? new Date(item.startAt).toLocaleDateString('zh-CN') : ''))}</span><b>${esc(item.place || item.title || '一次约会')}</b><small>${esc(item.activity || '点开看看这次约会')}　⌄</small></summary><div>${item.thinkingNote ? `<p><strong>起初的犹豫</strong>${esc(item.thinkingNote)}</p>` : ''}${item.decisionNote ? `<p><strong>后来怎么决定</strong>${esc(item.decisionNote)}</p>` : ''}${item.detail ? `<p><strong>安排</strong>${esc(item.detail)}</p>` : ''}${(item.moments || []).map(moment => `<p><strong>${esc(moment.label || '片段')}</strong>${esc(moment.text || '')}</p>`).join('')}${item.summary ? `<p><strong>留下的话</strong>${esc(item.summary)}</p>` : ''}</div></details>`).join('');
-      const exchangeCards = exchanges.map(item => `<article class="ta-couple-card"><small>${item.createdAt ? esc(new Date(item.createdAt).toLocaleDateString('zh-CN')) : '交换记录'}</small><b>你给了 ${esc(item.userItem || '物品')} · ${esc(name)} 给了 ${esc(item.roleItem || '物品')}</b>${item.reason ? `<p>${esc(name)} 说：${esc(item.reason)}</p>` : ''}${item.roleFeeling ? `<p>Ta 收到时：${esc(item.roleFeeling)}</p>` : ''}${item.userFeeling ? `<p>你收到时：${esc(item.userFeeling)}</p>` : ''}${item.message ? `<p>交换时的话：${esc(item.message)}</p>` : ''}</article>`).join('');
-      const intro = `<div class="ta-role-intro"><i>${avatar(owner)}</i><div><b>${esc(name)} 的情侣空间</b><small>角色视角 · 与情侣空间同步</small></div></div>`;
-      if (activeTaCoupleTab === 'today') return intro + section('交换物品', exchangeCards);
-      if (activeTaCoupleTab === 'dates') return intro + section('约会手记', dateCards);
-      if (activeTaCoupleTab === 'wishes') return intro + section('我们的心愿', `<button class="ta-couple-new-wish" data-ta-couple-role-wish type="button" ${refreshing ? 'disabled' : ''}>${refreshing ? `${esc(name)} 正在想…` : `＋ 让 ${esc(name)} 挂一个心愿`}</button>${wishCards}`);
+      const note = (label, text) => text ? `<p><strong>${esc(label)}</strong>${esc(text)}</p>` : '';
+      const dateRecords = [...(Array.isArray(space.dates) ? space.dates.map(item => ({ ...item, planned:true })) : []), ...(space.dateSession ? [{ ...space.dateSession, live:true }] : []), ...dates];
+      const dateLabel = item => item.date || (item.startAt ? new Date(item.startAt).toLocaleDateString('zh-CN') : '');
+      const dateArchive = taCoupleArchive('dates', '约会收藏盒', dateRecords, item => ({ title:item.place || item.title || '一次约会', date:dateLabel(item), subtitle:item.activity || '' }), item => `<article class="ta-couple-archive-record"><small>${item.planned ? '约定' : item.live ? '正在相处' : '已收录'} · ${esc(dateLabel(item))}</small><h4>${esc(item.place || item.title || '一次约会')}</h4>${note('活动', item.activity)}${note('起初的犹豫', item.thinkingNote)}${note('后来怎么决定', item.decisionNote)}${note('安排', item.detail)}${(item.moments || []).map(moment => note(moment.label || '片段', moment.text || '')).join('')}${note('留下的话', item.summary)}</article>`);
+      const exchangeArchive = taCoupleArchive('today', '交换物品收藏盒', exchanges, item => ({ title:`${item.userItem || '物品'} ⇄ ${item.roleItem || '物品'}`, date:item.createdAt ? new Date(item.createdAt).toLocaleDateString('zh-CN') : '交换记录' }), item => `<article class="ta-couple-archive-record"><small>${item.createdAt ? esc(new Date(item.createdAt).toLocaleDateString('zh-CN')) : '交换记录'}</small><h4>你给了 ${esc(item.userItem || '物品')} · ${esc(name)} 给了 ${esc(item.roleItem || '物品')}</h4>${note(`${name} 说`, item.reason)}${note('Ta 收到时', item.roleFeeling)}${note('你收到时', item.userFeeling)}${note('交换时的话', item.message)}</article>`);
+      const wishArchive = taCoupleArchive('wishes', '心愿收纳盒', wishes, item => ({ title:item.text || '一个心愿', date:item.date || (item.createdAt ? new Date(item.createdAt).toLocaleDateString('zh-CN') : ''), subtitle:item.author === 'role' ? `${name} 的心愿` : '你的心愿' }), item => `<article class="ta-couple-archive-record"><small>${item.author === 'role' ? `${esc(name)} 的心愿` : '你的心愿'} · ${item.done ? '已完成' : '未完成'}</small><h4>${esc(item.text || '')}</h4>${note('心愿缘由', item.note)}${item.author === 'role' ? `${note('你的回复', item.userReply)}${note(`${name} 的反应`, item.roleReaction)}<button class="ta-couple-reply-wish" data-ta-couple-reply-wish="${esc(item.id)}" type="button" ${refreshing ? 'disabled' : ''}>${refreshing ? 'Ta 正在回应…' : item.userReply ? item.roleReaction ? '修改回复' : '重新让 Ta 回应' : '回复 Ta'}</button>` : note(`${name} 说`, space.wishReplies?.[item.id])}</article>`, true);
       const memories = Array.isArray(space.memories) ? space.memories : [];
-      return intro + section('一起留下的回忆', memories.map(item => `<article class="ta-couple-card"><small>${esc(item.date || '')}</small><b>${esc(item.title || '')}</b><p>${esc(item.text || '')}</p></article>`).join(''));
+      const memoryArchive = taCoupleArchive('us', '回忆收藏盒', memories, item => ({ title:item.title || '一段回忆', date:item.date || '' }), item => `<article class="ta-couple-archive-record"><small>${esc(item.date || '')}</small><h4>${esc(item.title || '一段回忆')}</h4>${note('留下的故事', item.text)}</article>`);
+      const intro = `<div class="ta-role-intro"><i>${avatar(owner)}</i><div><b>${esc(name)} 的情侣空间</b><small>角色视角 · 与情侣空间同步</small></div></div>`;
+      if (activeTaCoupleTab === 'today') return intro + section('交换物品', exchangeArchive);
+      if (activeTaCoupleTab === 'dates') return intro + section('约会手记', dateArchive);
+      if (activeTaCoupleTab === 'wishes') return intro + section('我们的心愿', `<button class="ta-couple-new-wish" data-ta-couple-role-wish type="button" ${refreshing ? 'disabled' : ''}>${refreshing ? `${esc(name)} 正在想…` : `＋ 让 ${esc(name)} 挂一个心愿`}</button>${wishArchive}`);
+      return intro + section('一起留下的回忆', memoryArchive);
     }
     if (key === 'yinyue') return roleMusic(owner);
     if (key === 'doubao') return roleDoubao(owner, fresh);
@@ -1438,6 +1461,30 @@ GROUP_MESSAGE｜新的真实群名称｜发送者姓名｜时间｜原文｜TRAN
     return `<section class="ta-role-app-page${activeApp === 'liaotian' ? ' is-ta-chat-app' : ''}${activeApp === 'qinglvkongjian' ? ' is-ta-couple-app' : ''}"><header class="ta-role-app-header"><button type="button" data-ta-home>‹</button><div><small>${esc(owner.nickname || owner.name)} 的手机</small><h1>${meta[1]}</h1></div>${refreshButton}</header><main class="ta-role-app-main">${roleContent(activeApp, owner)}</main>${chatDock}${coupleDock}${roleDetailSheet(owner)}</section>`;
   }
   document.addEventListener('click', event => { const tab = event.target.closest('[data-ta-couple-tab]'); if (!tab || !app.classList.contains('is-open') || activeApp !== 'qinglvkongjian') return; event.preventDefault(); activeTaCoupleTab = tab.dataset.taCoupleTab; render(); });
+  document.addEventListener('toggle', event => {
+    const archive = event.target.closest?.('[data-ta-couple-archive]');
+    if (archive) taCoupleArchiveOpen[archive.dataset.taCoupleArchive] = archive.open;
+  }, true);
+  document.addEventListener('scroll', event => {
+    const files = event.target.closest?.('.ta-couple-archive-box .couple-archive-files, .ta-couple-archive-box .couple-wish-archive-files');
+    const archive = files?.closest('[data-ta-couple-archive]');
+    if (archive) taCoupleArchiveScroll[archive.dataset.taCoupleArchive] = files.scrollLeft;
+  }, true);
+  document.addEventListener('click', event => {
+    const file = event.target.closest?.('[data-ta-couple-archive-item]');
+    const archive = file?.closest('[data-ta-couple-archive]');
+    if (!archive || !app.classList.contains('is-open') || activeApp !== 'qinglvkongjian') return;
+    const tab = archive.dataset.taCoupleArchive;
+    taCoupleArchiveSelected[tab] = Number(file.dataset.taCoupleArchiveItem);
+    taCoupleArchiveOpen[tab] = archive.open;
+    taCoupleArchiveScroll[tab] = archive.querySelector('.couple-archive-files, .couple-wish-archive-files')?.scrollLeft || 0;
+    const pageScroll = app.querySelector('.ta-role-app-main')?.scrollTop || 0;
+    render();
+    const main = app.querySelector('.ta-role-app-main');
+    const nextFiles = app.querySelector(`[data-ta-couple-archive="${tab}"] .couple-archive-files, [data-ta-couple-archive="${tab}"] .couple-wish-archive-files`);
+    if (main) main.scrollTop = pageScroll;
+    if (nextFiles) nextFiles.scrollLeft = taCoupleArchiveScroll[tab];
+  });
   document.addEventListener('click', event => {
     const tab = event.target.closest('[data-ta-chat-tab]');
     if (!tab || !app.classList.contains('is-open') || activeApp !== 'liaotian' || activeChatTarget) return;

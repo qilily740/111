@@ -3891,11 +3891,11 @@ ${rerollRule}
     ];
     const keywords = [
       ['type', /(?:物种|整体类型|角色类型|动物角色|品种)\s*[:：]?|(?:角色|物种|品种)(?:是|为|属于)\s*(?:人类|男性|女性|猫|狗|犬|狐狸|兔|狼|鸟|马|龙)|(?:一只|一条|一头|一匹)\s*(?:猫|狗|犬|狐狸|兔|狼|鸟|马|龙)|^(?:人类|男性|女性|男生|女生|男人|女人|猫咪|狗狗|狐狸|兔子|狼族|鸟类|猫娘|犬娘|兽人|精灵|妖精|机器人|拟人|human|man|woman|cat|dog|fox|rabbit|wolf|elf|robot)(?:角色|形态|物种|品种)?$/i],
-      ['features', /五官|脸型|面部|面容|长相|狗狗眼|小狗眼|猫猫眼|猫眼|犬系眼|狐狸眼|眼睛|眼型|眼尾|瞳孔|眉毛|鼻梁|鼻子|嘴唇|唇形|下颌|颌线|脸颊|酒窝|清秀|浓颜|淡颜|\b(?:face|facial|eyes?|puppy eyes|cat eyes|eyelids?|pupils?|eyebrows?|nose|lips?|jawline|cheeks?)\b/i],
-      ['hair', /发型|头发|发色|短发|长发|卷发|直发|刘海|马尾|辫子|挑染|银发|黑发|白发|棕发|金发|\b(?:hair|hairstyle|fringe|bangs|ponytail|braid)\b/i],
-      ['skin', /肤色|皮肤|肤质|冷白皮|小麦色|白皙|黝黑|雀斑|\b(?:skin|complexion|freckles)\b/i],
-      ['height', /身高|体型|身材|肩宽|高挑|矮小|纤细|健壮|肌肉|体态|\b(?:height|build|stature|shoulders?|muscular|slim|slender)\b/i],
-      ['moles', /痣|胎记|\b(?:mole|birthmark)\b/i], ['tattoos', /纹身|刺青|\b(?:tattoo|inked)\b/i], ['scars', /伤疤|疤痕|刀疤|烧伤痕|缝合痕|\b(?:scar|scarring)\b/i]
+      ['features', /五官|脸型|面部|面容|长相|轮廓|鹅蛋脸|瓜子脸|狗狗眼|小狗眼|猫猫眼|猫眼|犬系眼|狐狸眼|杏眼|丹凤眼|双眼皮|单眼皮|内双|卧蚕|眼睛|双眼|眼型|眼尾|眼角|眼距|眼神|眼睫|睫毛|上挑|下垂|眸子|眸色|瞳孔|瞳色|虹膜|眼珠|眉毛|眉眼|眉形|鼻梁|鼻子|鼻尖|鼻翼|鼻头|山根|嘴唇|唇形|唇色|唇珠|唇峰|薄唇|厚唇|下颌|颌线|脸颊|酒窝|清秀|浓颜|淡颜|[\u3400-\u9fff]{1,4}眼(?!镜)|\b(?:face|facial|eyes?|puppy eyes|cat eyes|eyelids?|pupils?|eyebrows?|lashes|iris|nose|lips?|jawline|cheeks?)\b/i],
+      ['hair', /发型|头发|发色|发丝|发根|发梢|发尾|发量|发质|发际线|鬓发|鬓角|额发|短发|长发|卷发|直发|自然卷|微卷|卷曲|柔顺|蓬松|波浪卷|刘海|马尾|双马尾|辫子|盘发|丸子头|中分|侧分|背头|寸头|挑染|染发|银发|黑发|白发|棕发|金发|披肩发|齐肩|及腰长发|\b(?:hair|hairstyle|fringe|bangs|ponytail|braid|curls?)\b/i],
+      ['skin', /肤色|皮肤|肤质|冷白皮|冷白肤|暖白皮|瓷白|象牙白|小麦色|古铜色|蜜色肌肤|白皙|白净|黝黑|晒黑|苍白|红润|雀斑|\b(?:skin|complexion|freckles|tan|tanned)\b/i],
+      ['height', /身高|体型|身材|肩宽|肩窄|腰线|细腰|腰身|四肢|手臂|臂膀|长腿|腿长|骨架|高挑|高大|娇小|矮小|颀长|修长|纤细|匀称|健壮|精瘦|壮实|魁梧|肌肉|体态|体格|(?:^|约)\s*(?:1[3-9]\d\s*cm|1米\d{1,2}|1\.\d{1,2}\s*米)|\b(?:height|build|stature|shoulders?|muscular|slim|slender|petite|tall)\b/i],
+      ['moles', /痣|胎记|\b(?:mole|birthmark)\b/i], ['tattoos', /纹身|刺青|文身|\b(?:tattoo|inked)\b/i], ['scars', /伤疤|疤痕|刀疤|旧疤|刀伤痕|烧伤痕|烫伤痕|抓痕|划痕|缝合痕|\b(?:scar|scarring)\b/i]
     ];
     const append = (key, text) => { const clean = String(text || '').trim(); if (clean) result[key] = [result[key], clean].filter(Boolean).join('；'); };
     String(value || '').split(/\r?\n/).forEach(rawLine => {
@@ -3903,10 +3903,26 @@ ${rerollRule}
       if (!line) return;
       const match = aliases.find(([, pattern]) => pattern.test(line));
       if (match) { const [key, pattern] = match; append(key, line.replace(pattern, '')); return; }
-      line.split(/[，,。；;、]+/).map(part => part.trim()).filter(Boolean).forEach(part => {
+      const fragments = line.split(/([，,。；;、！？!?]+)/);
+      let previousPart = '';
+      fragments.forEach((fragment, index) => {
+        if (index % 2) return;
+        const part = fragment.trim();
+        if (!part) return;
+        if (/[。；;！？!?]/.test(fragments[index - 1] || '')) previousPart = '';
         const matches = keywords.filter(([, pattern]) => pattern.test(part)).map(([key]) => key);
-        if (!matches.length) { append('other', part); return; }
-        [...new Set(matches)].forEach(key => append(key, part));
+        if (matches.length) {
+          // “眼角有痣”“鼻梁有疤”按固定标记归档，部位只说明它的位置。
+          const mark = ['scars', 'tattoos', 'moles'].find(key => matches.includes(key));
+          const categories = mark ? [mark] : [...new Set(matches)];
+          categories.forEach(key => append(key, part));
+          previousPart = categories.length === 1 ? categories[0] : '';
+        } else if (previousPart && !/^(?:穿着|身穿|衣着|服装|配饰|性格|气质|神情|神态|表情|情绪|声音|说话|喜欢|常穿)/.test(part)) {
+          append(previousPart, part);
+        } else {
+          append('other', part);
+          previousPart = '';
+        }
       });
     });
     return result;

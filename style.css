@@ -13855,6 +13855,19 @@ body.ideal-keyboard-open .chat-image-appearance-field textarea { scroll-margin-b
 .music-sheet { z-index:20; }
 .music-page.is-invite-open .music-tonearm { visibility:hidden !important; }
 
+/* Ta 情侣空间沿用独立情侣空间的收纳盒、横向文件夹和心愿纸。 */
+.ta-couple-archive-box { width:min(100%,540px); margin:6px auto 18px; }
+.ta-couple-archive-box .couple-archive-files,
+.ta-couple-archive-box .couple-wish-archive-files { width:100%; }
+.ta-couple-archive-box .couple-wish-archive-paper.is-selected { outline:2px solid #a2766e; outline-offset:2px; transform:translateY(-4px); }
+.ta-couple-archive-detail { box-sizing:border-box; min-width:0; }
+.ta-couple-archive-record { display:grid; gap:9px; min-width:0; }
+.ta-couple-archive-record > small { color:#858684; font-size:10px; }
+.ta-couple-archive-record > h4 { margin:0 0 2px; color:#3d3e3c; font:500 17px/1.4 Georgia,"Songti SC",serif; overflow-wrap:anywhere; }
+.ta-couple-archive-record > p { margin:0; color:#5c625f; font-size:11px; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
+.ta-couple-archive-record > p strong { display:block; margin-bottom:2px; color:#444845; font-size:10px; }
+.ta-couple-archive-record .ta-couple-reply-wish { margin-top:5px; }
+
 /* iOS 键盘打开时引用栏外围只保留聊天壁纸，不叠加输入区的灰色毛玻璃底。 */
 body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote,
 body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-chatting .chat-conversation.has-chat-quote > .chat-compose-wrap {
