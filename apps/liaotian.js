@@ -8175,6 +8175,26 @@ ${recentConversation}
   }, true);
 
   window.IdealMachineChat = window.IdealMachineChat || {};
+  window.IdealMachineChat.importRepositoryCharacterFile = async (file, postId) => {
+    if (!(await window.IdealMachineActivation?.ensureUnlocked?.())) throw new Error('请先解锁角色卡导入功能。');
+    const existing = state.contacts.find(item => item.repositoryPostId === postId);
+    if (existing) return existing;
+    const extension = String(file.name || '').toLowerCase().split('.').pop();
+    const parsed = ['png', 'json'].includes(extension) ? await parseSillyTavernCard(file) : await parseCharacterTextFile(file);
+    const worldbook = parsed.book?.entries?.length ? commitImportedWorldbook(parsed.book) : '';
+    const contact = { id:uid('contact'), groupIds:[], name:parsed.name, nickname:parsed.nickname || '', identity:parsed.identity || '', nationality:parsed.nationality || '', birthday:parsed.birthday || '', gender:parsed.gender || '', worldbook, details:parsed.details || '', signature:parsed.details || '', firstMessage:parsed.firstMessage || '', repositoryPostId:postId };
+    state.contacts.unshift(contact);
+    try {
+      if (parsed.avatar) await setCharacterAvatar(contact.id, parsed.avatar);
+      normalizeChatState(state);
+      save();
+      if (app.classList.contains('is-open')) render();
+      return contact;
+    } catch (error) {
+      state.contacts = state.contacts.filter(item => item.id !== contact.id);
+      throw error;
+    }
+  };
   window.IdealMachineChat.openConversation = function(contactId) {
     refreshConversationFromStorage(contactId);
     activeContact = state.contacts.some(item => item.id === contactId) ? contactId : null;

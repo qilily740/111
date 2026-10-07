@@ -273,6 +273,7 @@
     } else throw new Error('仅支持 DOC、DOCX 和 TXT 文件；解锁后还支持 JSON。');
     return addImportedBooks(importedBooks, name);
   }
+  window.IdealMachineWorldbooksImportFile = importWorldbookFile;
   async function importEntryFile(file, options = {}) {
     if (!file) return;
     const book = activeBook();

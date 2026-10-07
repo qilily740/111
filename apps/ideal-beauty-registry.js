@@ -87,7 +87,7 @@
     });
   }
   function addAsset(asset) {
-    const item = { id:asset.id || `beauty-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`, name:String(asset.name || '未命名美化'), author:String(asset.author || ''), appId:asset.appId, sectionId:asset.sectionId, css:String(asset.css || ''), source:asset.source || 'local', imported:Boolean(asset.imported || asset.source === 'imported-code' || asset.source === 'json'), code:asset.code || '', previewImage:asset.previewImage || '', createdAt:asset.createdAt || new Date().toISOString(), updatedAt:new Date().toISOString() };
+    const item = { id:asset.id || `beauty-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`, name:String(asset.name || '未命名美化'), author:String(asset.author || ''), appId:asset.appId, sectionId:asset.sectionId, css:String(asset.css || ''), source:asset.source || 'local', imported:Boolean(asset.imported || asset.source === 'imported-code' || asset.source === 'json'), code:asset.code || '', repositoryPostId:asset.repositoryPostId || '', previewImage:asset.previewImage || '', createdAt:asset.createdAt || new Date().toISOString(), updatedAt:new Date().toISOString() };
     const list = readLibrary(); list.unshift(item); writeLibrary(list); return item;
   }
   function updateAsset(id, patch) { const list = readLibrary(); const item = list.find(entry => entry.id === id); if (!item) return null; Object.assign(item, patch, { updatedAt:new Date().toISOString() }); writeLibrary(list); return item; }
