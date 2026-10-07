@@ -13854,3 +13854,15 @@ body.ideal-keyboard-open .chat-image-appearance-field textarea { scroll-margin-b
 .music-playlist-name-sheet footer button:disabled { cursor:default; opacity:.55; }
 .music-sheet { z-index:20; }
 .music-page.is-invite-open .music-tonearm { visibility:hidden !important; }
+
+/* iOS 键盘打开时引用栏外围只保留聊天壁纸，不叠加输入区的灰色毛玻璃底。 */
+body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote,
+body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-chatting .chat-conversation.has-chat-quote > .chat-compose-wrap {
+  background:transparent !important;
+  background-color:transparent !important;
+  background-image:none !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  -webkit-backdrop-filter:none !important;
+  backdrop-filter:none !important;
+}

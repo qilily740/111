@@ -7185,6 +7185,20 @@ ${recentConversation}
     setTimeout(scrollLatest, 80);
     setTimeout(scrollLatest, 180);
   }
+  function scrollOfflineMeetingToLatest() {
+    const card = document.querySelector('[data-chat-offline-modal].is-open .offline-meeting-v2');
+    if (!card || !document.activeElement?.matches?.('[data-offline-input]')) return;
+    card.scrollTop = card.scrollHeight;
+    const messages = card.querySelector('.chat-offline-messages');
+    if (messages) messages.scrollTop = messages.scrollHeight;
+  }
+  document.addEventListener('focusin', event => {
+    if (!event.target?.matches?.('[data-offline-input]')) return;
+    [0, 100, 260, 480].forEach(delay => window.setTimeout(() => requestAnimationFrame(scrollOfflineMeetingToLatest), delay));
+  }, true);
+  window.visualViewport?.addEventListener('resize', () => {
+    if (document.activeElement?.matches?.('[data-offline-input]')) requestAnimationFrame(scrollOfflineMeetingToLatest);
+  });
   function chooseChatQuote(id) {
     const message = state.chats?.[activeContact]?.messages.find(item => item.id === id);
     if (!message || message.recalled) return;
