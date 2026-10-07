@@ -868,7 +868,10 @@
     let chatKeyboardTransitionTimer = 0;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || !!window.navigator.standalone;
-    const hasFocusedEditable = () => Boolean(document.activeElement?.matches?.('textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]), [contenteditable]:not([contenteditable="false"])'));
+    const hasFocusedEditable = () => {
+      const element = document.activeElement;
+      return Boolean(element?.matches?.('textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]), [contenteditable]:not([contenteditable="false"])') && element.getClientRects().length);
+    };
     const sync = () => {
       const visualHeight = Math.ceil(window.visualViewport?.height || window.innerHeight);
       const visualTop = Math.floor(window.visualViewport?.offsetTop || 0);
@@ -960,6 +963,12 @@
           if (!hasFocusedEditable()) document.body.classList.remove('ideal-keyboard-transition');
         }, 500);
       }
+    }, true);
+    document.addEventListener('click', event => {
+      if (!event.target?.closest?.('[data-chat-close], [data-offline-close]')) return;
+      if (hasFocusedEditable()) document.activeElement.blur();
+      document.body.classList.remove('ideal-keyboard-transition');
+      scheduleSync();
     }, true);
     sync();
     if (isIOS && isStandalone()) [120, 500, 1500, 3000].forEach(delay => window.setTimeout(sync, delay));

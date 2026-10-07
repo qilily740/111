@@ -6152,6 +6152,9 @@ body > .desktop-scroll-wrap {
   padding-top:10px !important;
   padding-bottom:8px !important;
   overflow:visible !important;
+  background:transparent !important;
+  -webkit-backdrop-filter:none !important;
+  backdrop-filter:none !important;
 }
 .chat-app.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote > .chat-quote-bar {
   position:relative !important;
@@ -13670,11 +13673,11 @@ body.ideal-keyboard-open > [data-chat-offline-modal].is-open {
    composer above iOS's visual keyboard viewport. Resize the app itself while
    the keyboard is open; the conversation flex layout then keeps its composer
    at the viewport bottom, including when a quote preview is present. */
-body:is(.ideal-keyboard-transition,.ideal-keyboard-open) {
+body:is(.ideal-keyboard-transition,.ideal-keyboard-open):has(.chat-app.is-open, .chat-offline-modal.is-open, .beauty-sheet, .world-editor-sheet) {
   background-color:#f5f5f3 !important;
   background-image:none !important;
 }
-body:is(.ideal-keyboard-transition,.ideal-keyboard-open)::before {
+body:is(.ideal-keyboard-transition,.ideal-keyboard-open):has(.chat-app.is-open, .chat-offline-modal.is-open, .beauty-sheet, .world-editor-sheet)::before {
   position:fixed;
   z-index:28;
   inset:-100vh 0;
@@ -13682,7 +13685,7 @@ body:is(.ideal-keyboard-transition,.ideal-keyboard-open)::before {
   background:#f5f5f3;
   pointer-events:none;
 }
-html:has(body:is(.ideal-keyboard-transition,.ideal-keyboard-open)) {
+html:has(body:is(.ideal-keyboard-transition,.ideal-keyboard-open):has(.chat-app.is-open, .chat-offline-modal.is-open, .beauty-sheet, .world-editor-sheet)) {
   background-color:#f5f5f3 !important;
   background-image:none !important;
 }
@@ -13695,7 +13698,7 @@ body.ideal-keyboard-open .chat-app.is-open.is-chatting {
   background-color:#f5f5f3 !important;
 }
 body.ideal-keyboard-open .chat-app.is-open.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote {
-  background-color:#f5f5f3 !important;
+  background-color:transparent !important;
   -webkit-backdrop-filter:none !important;
   backdrop-filter:none !important;
 }
@@ -13729,10 +13732,22 @@ body.ideal-keyboard-open .world-editor-sheet #worldEditorForm {
   overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;
 }
-body.ideal-keyboard-open .chat-offline-modal .offline-meeting-v2 { min-height:0; }
-body.ideal-keyboard-open .chat-offline-modal .offline-meeting-v2 > .chat-offline-messages {
+body.ideal-keyboard-open .chat-offline-modal .offline-meeting-v2 {
   min-height:0;
-  flex:1 1 0;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+body.ideal-keyboard-open .chat-offline-modal .offline-meeting-v2 > .chat-offline-messages {
+  flex:0 0 auto;
+  min-height:max(230px,38vh);
+  overflow:visible;
+}
+body.ideal-keyboard-open .chat-offline-modal .offline-meeting-v2 > .chat-offline-v2-dock {
+  position:sticky;
+  bottom:0;
+  z-index:2;
 }
 .chat-transfer-message > .chat-transfer-cny {
   display:block;
