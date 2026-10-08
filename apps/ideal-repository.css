@@ -122,3 +122,109 @@
 .ir-beauty-code{display:grid;gap:9px;margin:18px 0;padding:15px;border:1px solid #dedee2;border-radius:10px;background:#f0f0f2;color:#36363b}
 .ir-beauty-code small{font-size:10px;color:#888}.ir-beauty-code code{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
 .ir-beauty-code button{justify-self:start;padding:7px 11px;border:0;border-radius:7px;background:#333;color:#fff;font-size:11px}
+/* Personal profile: monochrome, plain avatar, three destinations. */
+.ideal-repository .ir-profile-page{position:relative;min-height:100%;background:#f6f6f6;color:#252525;padding-bottom:1px}
+.ideal-repository .ir-profile-header{position:relative;z-index:1;max-width:800px;margin:auto;border:0;background:#dedede;padding-left:24px;padding-right:24px}
+.ideal-repository .ir-profile-header strong{font-size:13px;font-weight:500;letter-spacing:.12em;color:#555}
+.ideal-repository .ir-profile-header button{background:#ffffff90;width:34px;height:34px}
+.ir-profile-cover{height:132px;background:#dedede;max-width:800px;margin:auto}
+.ideal-repository .ir-profile-content{max-width:800px;padding:0 26px calc(140px + env(safe-area-inset-bottom));margin:auto}
+.ir-profile-identity{display:flex;justify-content:space-between;align-items:flex-end;margin-top:-44px;position:relative}
+.ideal-repository .ir-profile-avatar-picker{gap:9px;font-size:10px;color:#888}
+.ideal-repository .ir-profile-big-avatar{width:92px;height:92px;border:0;background:#373737;color:white;border-radius:50%;font-weight:400;font-size:34px}
+.ir-profile-eyebrow{font-size:9px;letter-spacing:.18em;color:#999;padding-bottom:5px}
+.ir-profile-name{font-size:29px;line-height:1.3;margin:25px 0 7px;letter-spacing:-.04em;overflow-wrap:anywhere}
+.ir-profile-account{margin:0;color:#8a8a8a;font-size:13px;letter-spacing:.02em;overflow-wrap:anywhere}
+.ir-profile-edit{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;border:0;border-radius:12px;background:#282828;color:#fff;min-height:46px;margin-top:25px;font-size:13px!important;font-weight:600!important}
+.ir-profile-edit span{color:#bdbdbd;font-size:17px}.ir-profile-edit:disabled{opacity:.45;cursor:wait}
+.ir-profile-about{margin-top:32px}.ir-profile-about h2,.ir-profile-joined h2{font-size:13px;font-weight:600;margin:0 0 13px}
+.ir-profile-about p{font-size:14px;line-height:1.9;color:#666;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.ir-profile-joined{margin-top:29px;padding-bottom:27px;border-bottom:1px solid #e2e2e2}.ir-profile-joined p{display:flex;align-items:center;gap:9px;font-size:13px;color:#777;margin:0}
+.ir-profile-page svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.ir-profile-joined svg{width:17px;height:17px}
+.ir-profile-rows{display:grid;gap:12px;margin-top:24px}.ir-profile-rows>button{display:flex;align-items:center;justify-content:space-between;min-height:65px;border:0;border-radius:15px;padding:15px 18px;background:#ececec;color:#333;font-size:14px}
+.ir-profile-rows>button>span{display:flex;align-items:center;gap:11px}.ir-profile-rows small{font-size:11px;color:#999}.ir-profile-rows b{font-size:23px;font-weight:400;color:#888}.ir-profile-rows button:disabled{opacity:.5;cursor:wait}
+.ir-profile-note{margin:0 8px;color:#666;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.ir-profile-dock{position:fixed;z-index:3;bottom:calc(22px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:grid;grid-template-columns:repeat(3,1fr);width:min(340px,calc(100% - 54px));min-height:77px;padding:10px 12px;background:#fffffff5;border:1px solid #ececec;border-radius:25px;box-shadow:0 12px 40px #00000010;backdrop-filter:blur(16px)}
+.ir-profile-dock button{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:7px;background:transparent;border:0;border-radius:15px;color:#333;font-size:11px;font-weight:500}.ir-profile-dock svg{width:24px;height:24px}.ir-profile-dock button:hover,.ir-profile-dock button[aria-current=page]{background:#efefef}
+.ideal-repository .ir-profile-list{padding-top:32px}.ir-profile-list h2{margin:12px 0;font-size:25px}.ir-profile-muted{color:#999;font-size:13px;margin-bottom:30px}
+.ir-profile-empty{text-align:center;padding:65px 8px;color:#999;font-size:38px}.ir-profile-empty>svg{width:40px;height:40px}.ir-profile-empty p{font-size:15px;color:#555;margin:16px 0 8px}.ir-profile-empty small{display:block;font-size:12px;line-height:1.8}
+.ir-profile-dialog{width:min(440px,calc(100% - 32px));max-height:85dvh;overflow:auto;border:1px solid #ddd;border-radius:22px;padding:24px;background:#fafafa;color:#222;box-shadow:0 24px 80px #0003;font-family:inherit}
+.ir-profile-dialog::backdrop{background:#0006;backdrop-filter:blur(4px)}.ir-profile-dialog header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}.ir-profile-dialog h2{font-size:19px;margin:0}.ir-profile-dialog header button{border:0;background:#eee;border-radius:50%;width:32px;height:32px;font-size:23px;color:#555}
+.ir-profile-dialog label{display:grid;gap:9px;font-size:12px;color:#666;margin-top:20px}.ir-profile-dialog input,.ir-profile-dialog textarea{box-sizing:border-box;width:100%;font:inherit;font-size:15px;border:1px solid #ddd;border-radius:10px;padding:12px;background:white;color:#222}.ir-profile-dialog textarea{resize:vertical;min-height:100px;line-height:1.6}.ir-profile-dialog input[readonly]{background:#eee;color:#888}.ir-profile-dialog small{display:block;font-size:11px;color:#999;margin-top:8px}.ir-profile-dialog [role=alert]{font-size:12px;color:#555}.ir-profile-dialog footer button{width:100%;padding:13px;border:0;border-radius:12px;background:#282828;color:white;font:inherit}.ir-profile-dialog button:disabled{opacity:.5}
+.ideal-repository.ir-profile-mode button:focus-visible,.ir-profile-dialog :focus-visible{outline:2px solid #777;outline-offset:4px}
+@media(min-width:761px){.ideal-repository .ir-profile-content{padding-left:48px;padding-right:48px}.ir-profile-cover{height:170px}.ideal-repository .ir-profile-header{padding-left:38px;padding-right:38px}.ir-profile-dock{width:370px}.ir-profile-name{font-size:34px}}
+
+/* Center the edit sheet in the actual viewport, including mobile browsers. */
+.ideal-repository dialog.ir-profile-dialog{position:fixed;inset:50% auto auto 50%;transform:translate(-50%,-50%);margin:0;width:min(440px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:min(85dvh,760px);overscroll-behavior:contain}
+.ideal-repository .ir-profile-cover{position:relative;display:block;width:min(100%,800px);height:132px;padding:0;border:0;border-radius:0;margin:0 auto;background-color:#dedede;background-position:center;background-size:cover;background-repeat:no-repeat;cursor:pointer;color:#333}
+.ideal-repository .ir-profile-cover>span{position:absolute;right:18px;bottom:15px;display:grid;place-items:center;width:36px;height:36px;border:1px solid #fff9;border-radius:50%;background:#ffffffd9;color:#454545;box-shadow:0 2px 8px #00000012;transition:background .15s ease,transform .15s ease}
+.ideal-repository .ir-profile-cover:hover>span{background:white;transform:scale(1.04)}
+.ideal-repository .ir-profile-cover svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ideal-repository .ir-profile-avatar-picker{gap:0;cursor:pointer}
+.ideal-repository .ir-profile-avatar-picker .ir-profile-big-avatar{cursor:pointer}
+.ideal-repository .ir-profile-cover:focus-visible,.ideal-repository .ir-profile-avatar-picker:focus-within .ir-profile-big-avatar{outline:2px solid #777;outline-offset:4px}
+@media(min-width:761px){.ideal-repository .ir-profile-cover{height:170px}}
+
+/* Let the cover continue behind the personal page's translucent top bar. */
+.ideal-repository .ir-profile-page{position:relative}
+.ideal-repository .ir-profile-header{position:absolute;top:0;left:50%;z-index:4;width:min(100%,800px);transform:translateX(-50%);margin:0;border:0;background:transparent!important;backdrop-filter:none}
+.ideal-repository .ir-profile-header strong{color:#353535;text-shadow:0 1px 8px #ffffff70}
+.ideal-repository .ir-profile-header button{background:#ffffffaa;backdrop-filter:blur(12px)}
+.ideal-repository .ir-profile-cover{height:calc(132px + 58px + env(safe-area-inset-top))}
+@media(min-width:761px){.ideal-repository .ir-profile-cover{height:calc(170px + 58px + env(safe-area-inset-top))}}
+.ideal-repository .ir-rail-tool{position:relative}
+.ideal-repository .ir-rail-tool.is-active{background:#65656d;color:#fff}
+.ideal-repository .ir-rail-tool.is-active:before{content:"";position:absolute;left:-11px;top:9px;width:4px;height:32px;border-radius:0 4px 4px 0;background:#65656d}
+.ideal-repository .ir-rail-tool.is-active svg{stroke:#fff}
+.ir-friends-page{width:min(100%,900px);margin:0 auto;padding:clamp(22px,5vw,54px) clamp(18px,5vw,54px) calc(env(safe-area-inset-bottom) + 44px)}
+.ir-friends-heading>span{font-size:10px;letter-spacing:.2em;color:#888}.ir-friends-heading h1{margin:12px 0 7px;font-size:clamp(27px,4vw,38px);letter-spacing:-.04em}.ir-friends-heading p{margin:0;color:#858585;font-size:14px}
+.ir-friends-search{display:flex;gap:10px;margin:26px 0 18px}.ir-friends-search input{flex:1;min-width:0;height:48px;padding:0 15px;border:1px solid #d9d9dc;border-radius:12px;background:#fff;color:#222;font-size:14px}.ir-friends-search input:focus{outline:2px solid #888;outline-offset:2px}.ir-friends-search button,.ir-friend-item>button{flex:none;border:0;border-radius:11px;padding:0 17px;background:#29292b;color:#fff;font-size:13px;font-weight:600}.ir-friends-status{margin:12px 0;color:#707077;font-size:13px}.ir-friends-results{margin:22px 0}.ir-friends-results h2{margin:0 0 9px;font-size:14px;color:#777}
+.ir-friends-tabs{display:flex;gap:7px;overflow:auto;margin-top:32px;padding-bottom:0;border-bottom:1px solid #dedee1}.ir-friends-tabs button{display:flex;align-items:center;gap:7px;flex:none;padding:12px 13px 11px;border:0;border-bottom:2px solid transparent;background:transparent;color:#818187;font-size:12px}.ir-friends-tabs button.is-selected{border-color:#626269;color:#252529;font-weight:700}.ir-friends-tabs button span{display:grid;place-items:center;min-width:19px;height:19px;padding:0 5px;border-radius:12px;background:#e8e8eb;color:#666;font-size:10px}
+.ir-friends-list{min-height:165px}.ir-friend-item{display:flex;align-items:center;gap:12px;min-height:70px;padding:11px 2px;border-bottom:1px solid #e7e7e9}.ir-friend-avatar{display:grid;place-items:center;flex:none;width:43px;height:43px;border-radius:50%;background:#dedee1;color:#4e4e53;font-size:17px;font-weight:650}.ir-friend-copy{display:grid;gap:4px;flex:1;min-width:0}.ir-friend-copy strong,.ir-friend-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ir-friend-copy strong{font-size:14px}.ir-friend-copy small{font-size:11px;color:#909096}.ir-friend-item>button{min-height:35px;padding:0 14px}.ir-friend-item>button.is-muted{border:1px solid #dedee1;background:#f1f1f3;color:#68686f}.ir-friend-item>button:disabled{background:#e6e6e8;color:#777;cursor:default}
+.ir-friends-empty{text-align:center;padding:45px 15px;color:#777}.ir-friends-empty>span{display:block;margin-bottom:12px;color:#777;font-size:32px}.ir-friends-empty strong{display:block;color:#505056;font-size:15px}.ir-friends-empty small{display:block;margin-top:8px;color:#929298;font-size:12px;line-height:1.6}
+@media(max-width:760px){.ir-friends-page{padding:27px 19px calc(env(safe-area-inset-bottom) + 35px)}.ir-friends-search{gap:8px}.ir-friends-search input{height:45px}.ir-friends-search button{padding:0 12px}.ir-friends-tabs{gap:1px}.ir-friends-tabs button{padding-left:9px;padding-right:9px;font-size:11px}.ir-friend-item{gap:9px}.ir-friend-item>button{padding:0 10px;font-size:12px}}
+.ir-message-toolbar{display:flex;align-items:center;gap:10px;margin:23px 0 22px}
+.ir-message-toolbar>button{position:relative;display:grid;place-items:center;flex:none;height:48px;border:1px solid #d9d9dc;border-radius:13px;background:#ececef;color:#34343a}
+.ir-message-toolbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.ir-message-toolbar .ir-message-icon{width:48px}
+.ir-message-toolbar .ir-message-inbox{width:62px}
+.ir-message-toolbar .ir-message-inbox svg{fill:#55555c;stroke:#55555c}
+.ir-message-toolbar .ir-message-inbox svg path:last-child{fill:none;stroke:#ececef}
+.ir-message-toolbar .ir-message-add{display:flex;align-items:center;justify-content:center;gap:10px;flex:1;min-width:0;font-size:clamp(14px,2vw,19px);font-weight:650}
+.ir-message-toolbar .ir-message-add b{white-space:nowrap}
+.ir-message-toolbar .ir-message-add svg{width:25px;height:25px}
+.ir-message-toolbar .ir-message-plus{width:48px;border-color:#5d63ec;background:#5d63ec;color:#fff;font-size:34px;font-weight:300;line-height:1}
+.ir-message-toolbar button:active{transform:scale(.98)}
+.ir-inbox-heading{display:flex;align-items:center;gap:14px;margin:4px 0 30px}
+.ir-inbox-heading>button{display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:50%;background:#ebebed;color:#333;font-size:30px}
+.ir-inbox-heading span{font-size:10px;letter-spacing:.18em;color:#888}.ir-inbox-heading h1{margin:5px 0;font-size:26px}
+.ir-inbox-empty{display:grid;justify-items:center;gap:10px;padding:70px 16px;color:#777;text-align:center}
+.ir-inbox-empty>span{display:grid;place-items:center;width:60px;height:60px;border-radius:18px;background:#ececef}
+.ir-inbox-empty svg{width:30px;height:30px;fill:none;stroke:#666;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ir-inbox-empty strong{font-size:15px;color:#555}.ir-inbox-empty small{font-size:12px;color:#929298}
+@media(max-width:760px){.ir-message-toolbar{gap:7px;margin:18px 0 18px}.ir-message-toolbar>button{height:44px;border-radius:12px}.ir-message-toolbar .ir-message-icon,.ir-message-toolbar .ir-message-plus{width:44px}.ir-message-toolbar .ir-message-inbox{width:53px}.ir-message-toolbar .ir-message-add{gap:6px;padding:0 9px;font-size:14px}.ir-message-toolbar .ir-message-add svg{width:21px;height:21px}.ir-message-toolbar .ir-message-toolbar svg{width:21px;height:21px}}
+/* Keep the message actions compact and strictly monochrome. */
+.ir-message-toolbar{gap:8px;margin:16px 0 18px}
+.ir-message-toolbar>button{height:40px;border-radius:11px}
+.ir-message-toolbar .ir-message-icon{width:40px}
+.ir-message-toolbar .ir-message-inbox{width:52px}
+.ir-message-toolbar .ir-message-add{gap:8px;font-size:15px}
+.ir-message-toolbar .ir-message-add svg{width:22px;height:22px}
+.ir-message-toolbar .ir-message-plus{width:40px;border-color:#d7d7d9;background:#dedee0;color:#36363a;font-size:28px}
+@media(max-width:760px){
+  .ir-message-toolbar{gap:6px;margin:14px 0 16px}
+  .ir-message-toolbar>button{height:36px;border-radius:10px}
+  .ir-message-toolbar .ir-message-icon,.ir-message-toolbar .ir-message-plus{width:36px}
+  .ir-message-toolbar .ir-message-inbox{width:44px}
+  .ir-message-toolbar .ir-message-add{gap:5px;padding:0 7px;font-size:12px}
+  .ir-message-toolbar .ir-message-add svg{width:18px;height:18px}
+  .ir-message-toolbar .ir-message-icon svg,.ir-message-toolbar .ir-message-inbox svg{width:19px;height:19px}
+  .ir-message-toolbar .ir-message-plus{font-size:25px}
+}
+.ir-friends-page>.ir-friends-heading h1{margin:12px 0 3px;font-size:23px;line-height:1.2;letter-spacing:-.035em}
+@media(max-width:760px){.ir-friends-page{padding-top:17px}.ir-friends-page>.ir-friends-heading h1{font-size:22px}}
+.ideal-repository .ir-page-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ideal-repository .ir-friends-page>.ir-page-heading h1{margin:12px 0 3px}
+.ideal-repository .ir-content-heading h2{margin:0;font-size:23px;line-height:1.2;letter-spacing:-.035em}
+.ideal-repository .ir-page-heading .ir-page-close{width:35px;height:35px}

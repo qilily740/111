@@ -1,0 +1,17 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "ideal-machine-repository",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://qilily740.github.io,http://localhost:8787,http://127.0.0.1:8787"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "ideal-machine-repository",
+    "database_id": "9623bdc1-41ec-46a0-ae07-266fab0f21c0",
+    "migrations_dir": "migrations"
+  }],
+  "services": [{ "binding": "AUTH", "service": "ideal-machine-auth" }]
+}

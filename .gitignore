@@ -32,3 +32,6 @@ coverage/
 
 # Keep private Worker source out of the public repository.
 cloudflare/beauty-worker/
+!cloudflare/repository-worker/
+!cloudflare/repository-worker/**
+cloudflare/repository-worker/.wrangler/

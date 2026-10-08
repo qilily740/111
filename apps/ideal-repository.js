@@ -12,10 +12,10 @@
   root.innerHTML = `
     <div class="ir-shell">
       <aside class="ir-rail" aria-label="服务器">
-        <button class="ir-rail-tool" type="button" data-ir-home aria-label="仓库首页"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 3a9 9 0 0 0-7.4 14.1L3 21l4.6-1.2A9 9 0 1 0 12 3Z"/></svg></button>
+        <button class="ir-rail-tool" type="button" data-ir-friends-open aria-label="好友"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 3a9 9 0 0 0-7.4 14.1L3 21l4.6-1.2A9 9 0 1 0 12 3Z"/></svg></button>
         <button class="ir-rail-tool" type="button" data-ir-activity aria-label="最近动态"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v3c0 3-3 4-5 6 2 2 5 3 5 6v3H6v-3c0-3 3-4 5-6-2-2-5-3-5-6V3Z"/><path d="M9 6h6m-6 12h6"/></svg></button>
         <span class="ir-rail-line"></span>
-        <button class="ir-server is-active" type="button" data-ir-home aria-label="理想机服务器"><img src="assets/icons/default-ios17/ideal.webp" alt=""></button>
+        <button class="ir-server" type="button" data-ir-home aria-label="理想机服务器"><img src="assets/icons/default-ios17/ideal.webp" alt=""></button>
       </aside>
       <aside class="ir-sidebar">
         <header class="ir-sidebar-header"><h1>理想机 <span>›</span></h1><button class="ir-close" type="button" data-ir-close aria-label="返回桌面">×</button></header>
@@ -45,9 +45,24 @@
   let oldestFirst = false;
   let listScroll = 0;
   let savedPosts = [];
-  let profileStatus = '';
+  let personal = {};
+  let profilePanel = '';
+  let likedPosts = [];
+  let likesMore = false;
+  let likesStatus = '';
+  let profileSerial = 0;
+  let friendsTab = 'friends';
+  let friendPanel = '';
+  let friendSearchOpen = false;
+  let friendData = { friends:[], incoming:[], outgoing:[] };
+  let friendResults = [];
+  let friendQuery = '';
+  let friendStatus = '';
+  let friendBusy = false;
+  let friendSearchSerial = 0;
   let profileOrigin = false;
   let avatarUrl = '';
+  let coverUrl = '';
   let saveBusy = false;
   let remotePosts = [];
   let remoteHasMore = false;
@@ -59,9 +74,14 @@
   let requestSerial = 0;
   let searchTimer = 0;
   const imageUrls = new Set();
-  const avatarStorageKey = () => `ideal-repository-avatar-v1:${window.IdealMachineAuth?.getUser?.()?.id || 'guest'}`;
+  const accountStorageId = () => { const user = window.IdealMachineAuth?.getUser?.(); return String(user?.id || user?.username || 'guest'); };
+  const avatarStorageKey = () => `ideal-repository-avatar-v1:${accountStorageId()}`;
+  const personalStorageKey = () => `ideal-repository-profile-v1:${accountStorageId()}`;
+  const coverStorageKey = () => `ideal-repository-cover-v1:${accountStorageId()}`;
+  function readLocalProfile() { try { const value = JSON.parse(localStorage.getItem(personalStorageKey()) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; } }
+  function writeLocalProfile(value) { localStorage.setItem(personalStorageKey(), JSON.stringify({ nickname:value.nickname || '', bio:value.bio || '', note:value.note || '' })); }
   const apiBase = () => String(window.IdealMachineConfig?.repositoryApiBase || '').replace(/\/+$/, '');
-  const apiError = { UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试' };
+  const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试' };
   async function requestApi(path, options = {}) {
     if (!apiBase()) throw new Error('仓库后端尚未部署或配置。请先设置 repositoryApiBase。');
     const token = window.IdealMachineAuth?.getToken?.();
@@ -120,16 +140,147 @@
     }
   }
   async function loadProfile() {
-    if (!apiBase()) { savedPosts = []; profileStatus = '仓库服务尚未配置，暂时无法同步收藏。'; render(); return; }
-    profileStatus = '正在加载收藏…'; render();
+    const serial = ++profileSerial;
+    personal = readLocalProfile();
+    if (screen === 'profile') render();
     try {
-      const result = await requestApi('/api/me/saved');
-      if (screen !== 'profile') return;
-      savedPosts = result.posts || []; profileStatus = ''; render();
-    } catch (error) { if (screen === 'profile') { profileStatus = error.message; render(); } }
+      const result = await requestApi('/api/me/profile');
+      if (serial !== profileSerial || !result.profile) return;
+      const local = readLocalProfile();
+      personal = {
+        nickname:result.profile.nickname || local.nickname || '',
+        bio:result.profile.bio ?? local.bio ?? '',
+        note:result.profile.note ?? local.note ?? '',
+        createdAt:result.profile.createdAt || ''
+      };
+      try { writeLocalProfile(personal); } catch {}
+    } catch {
+      // Keep the account-scoped local copy available when an older server has not
+      // deployed the profile endpoint or profile migration yet.
+    }
+    if (screen === 'profile' && serial === profileSerial) render();
+  }
+  async function loadFriends() {
+    friendStatus = ''; friendBusy = true; render();
+    try { friendData = await requestApi('/api/me/friends'); }
+    catch (error) { friendStatus = error.message; }
+    finally { friendBusy = false; if (screen === 'friends') render(); }
+  }
+  async function searchFriends() {
+    const query = friendQuery.trim();
+    friendResults = [];
+    if (query.length < 3) { friendStatus = query ? '请输入至少 3 位账号再搜索。' : ''; render(); return; }
+    const serial = ++friendSearchSerial;
+    friendStatus = '正在搜索账号…'; render();
+    try {
+      const result = await requestApi(`/api/users/search?q=${encodeURIComponent(query)}`);
+      if (serial !== friendSearchSerial || screen !== 'friends') return;
+      friendResults = result.users || []; friendStatus = '';
+    } catch (error) { if (serial === friendSearchSerial) friendStatus = error.message; }
+    if (serial === friendSearchSerial && screen === 'friends') render();
+  }
+  const friendIdentity = item => `<span class="ir-friend-avatar">${escapeHTML((item.nickname || item.username || '?').slice(0,1).toUpperCase())}</span><span class="ir-friend-copy"><strong>${escapeHTML(item.nickname || item.username)}</strong><small>ID · ${escapeHTML(item.username)}</small></span>`;
+  function renderFriends() {
+    if (friendPanel === 'inbox') return `<div class="ir-friends-page"><header class="ir-inbox-heading"><button type="button" data-ir-inbox-back aria-label="返回消息">‹</button><div><span>IDEAL / INBOX</span><h1>私信提醒</h1></div></header><div class="ir-inbox-empty"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><path d="m3 6 9 7 9-7"/></svg></span><strong>暂时没有私信提醒</strong><small>收到的私信提醒会显示在这里。</small></div></div>`;
+    const tabs = [['friends','我的好友',friendData.friends.length],['incoming','好友申请',friendData.incoming.length],['outgoing','已发送',friendData.outgoing.length]];
+    const users = friendsTab === 'friends' ? friendData.friends : friendsTab === 'incoming' ? friendData.incoming : friendData.outgoing;
+    const list = users.map(item => `<article class="ir-friend-item">${friendIdentity(item)}${friendsTab === 'incoming' ? `<button type="button" data-ir-friend-accept="${escapeHTML(item.id)}">接受</button><button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">拒绝</button>` : friendsTab === 'outgoing' ? `<button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">撤回</button>` : `<button type="button" class="is-muted" data-ir-friend-remove="${escapeHTML(item.id)}">移除</button>`}</article>`).join('');
+    const resultList = friendResults.map(item => `<article class="ir-friend-item">${friendIdentity(item)}<button type="button" ${item.relation ? 'disabled' : ''} data-ir-friend-add="${escapeHTML(item.username)}">${item.relation === 'friend' ? '已添加' : item.relation === 'outgoing' ? '已申请' : item.relation === 'incoming' ? '待处理' : '添加好友'}</button></article>`).join('');
+    const search = friendSearchOpen ? `<form class="ir-friends-search"><input name="account" type="search" maxlength="32" autocomplete="off" placeholder="输入 Ideal ID" value="${escapeHTML(friendQuery)}"><button type="submit">搜索</button></form>` : '';
+    return `<div class="ir-friends-page"><header class="ir-friends-heading ir-page-heading"><h1>消息</h1><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><nav class="ir-message-toolbar" aria-label="消息操作"><button type="button" class="ir-message-icon" data-ir-search-toggle aria-label="搜索好友">${profileIcon('search')}</button><button type="button" class="ir-message-inbox" data-ir-friend-inbox aria-label="私信提醒"><span>${profileIcon('mail')}</span></button><button type="button" class="ir-message-add" data-ir-add-friend><span>${profileIcon('addPerson')}</span><b>添加好友</b></button><button type="button" class="ir-message-plus" data-ir-plus aria-label="添加好友">＋</button></nav>${search}${friendStatus ? `<p class="ir-friends-status" role="status">${escapeHTML(friendStatus)}</p>` : ''}${resultList ? `<section class="ir-friends-results"><h2>搜索结果</h2>${resultList}</section>` : friendQuery.length >= 3 && !friendStatus && !friendResults.length ? '<p class="ir-friends-empty">没有找到匹配的账号。</p>' : ''}<nav class="ir-friends-tabs" aria-label="好友分类">${tabs.map(([id,label,count]) => `<button type="button" data-ir-friend-tab="${id}" class="${friendsTab === id ? 'is-selected' : ''}">${label}<span>${count}</span></button>`).join('')}</nav><section class="ir-friends-list">${friendBusy ? '<p class="ir-friends-empty">正在加载好友…</p>' : list || `<div class="ir-friends-empty"><span>${friendsTab === 'friends' ? '♧' : '♡'}</span><strong>${friendsTab === 'friends' ? '还没有好友' : friendsTab === 'incoming' ? '暂时没有新的好友申请' : '还没有发出好友申请'}</strong><small>${friendsTab === 'friends' ? '搜索 Ideal 账号，添加你的第一位好友。' : '新的动态会显示在这里。'}</small></div>`}</section></div>`;
+  }
+  async function sendFriendRequest(username) {
+    friendBusy = true; friendStatus = ''; render();
+    let message = '';
+    try { await requestApi('/api/me/friends/requests', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({accountId:username}) }); message = '好友申请已发送。'; }
+    catch (error) { message = error.message; }
+    await loadFriends();
+    if (friendQuery) await searchFriends();
+    friendStatus = message;
+    if (screen === 'friends') render();
+  }
+  async function handleFriendRequest(id, action) {
+    friendBusy = true; friendStatus = ''; render();
+    if (action === 'remove' && !window.confirm('确定移除这位好友吗？')) { friendBusy = false; render(); return; }
+    let message = '';
+    try {
+      const path = action === 'remove' ? `/api/me/friends/${encodeURIComponent(id)}` : `/api/me/friends/requests/${encodeURIComponent(id)}/${action}`;
+      await requestApi(path, { method:action === 'remove' ? 'DELETE' : 'POST' });
+    } catch (error) { message = error.message; }
+    await loadFriends();
+    friendStatus = message;
+    if (screen === 'friends') render();
+  }
+  async function loadLikes(more = false) {
+    const serial = profileSerial;
+    likesStatus = '正在加载…'; render();
+    try {
+      const result = await requestApi(`/api/me/likes?offset=${more ? likedPosts.length : 0}`);
+      if (serial !== profileSerial || profilePanel !== 'likes') return;
+      likedPosts = more ? [...likedPosts, ...(result.posts || [])] : result.posts || [];
+      likesMore = Boolean(result.hasMore); likesStatus = '';
+    } catch (error) { if (serial !== profileSerial) return; likesStatus = error.message; }
+    if (screen === 'profile') render();
+  }
+  const profileIcon = name => {
+    const paths = { search:'<circle cx="10.8" cy="10.8" r="7"/><path d="m16 16 5 5"/>', mail:'<path d="M3 5h18v14H3z"/><path d="m3 6 9 7 9-7"/>', addPerson:'<circle cx="9" cy="8" r="4"/><path d="M2.5 21v-2a6.5 6.5 0 0 1 13 0v2M19 8v8m-4-4h8"/>', beauty:'<rect x="4" y="3" width="16" height="18" rx="3"/><path d="m8 3 0 8 4-2 4 2V3"/>', likes:'<path d="M20.5 5.5a5 5 0 0 0-8.5 2 5 5 0 0 0-8.5-2C0 10 6 15 12 20c6-5 12-10 8.5-14.5Z"/>', settings:'<path d="m9 3-1 3-3 1-2 4 2 2v4l4 3 3-1 3 1 4-3v-4l2-2-2-4-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/>', friends:'<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5"/>', note:'<path d="M14 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7M7 8h8M7 12h5m6 3v6m-3-3h6"/>', date:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/>' };
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
+  };
+  function profileMarkup() {
+    const user = window.IdealMachineAuth?.getUser?.();
+    const account = escapeHTML(user?.username || '未登录');
+    const joined = personal.createdAt || user?.createdAt;
+    const joinedNumber = typeof joined === 'number' ? (joined < 100000000000 ? joined * 1000 : joined) : null;
+    const date = joined ? new Date(joinedNumber ?? joined) : null;
+    const validDate = date && Number.isFinite(date.getTime()) && date.getFullYear() >= 2000 && date.getTime() <= Date.now() + 86400000;
+    const joinedMarkup = validDate ? `<section class="ir-profile-joined"><h2>加入理想机</h2><p>${profileIcon('date')}${escapeHTML(date.toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric' }))}</p></section>` : '';
+    const header = `<header class="ir-profile-header"><button type="button" ${profilePanel ? 'data-ir-panel-back' : 'data-ir-profile-back'} aria-label="返回">←</button><strong>${profilePanel === 'likes' ? '点赞记录' : profilePanel === 'friends' ? '好友' : '个人资料'}</strong><button type="button" data-ir-close aria-label="返回桌面">×</button></header>`;
+    let content;
+    if (profilePanel === 'likes') {
+      content = `<div class="ir-profile-content ir-profile-list"><span class="ir-profile-eyebrow">MY LIKES</span><h2>喜欢过的灵感</h2><p class="ir-profile-muted">每一次喜欢，都留在这里。</p>${likedPosts.map(post => `<button type="button" class="ir-saved-item" data-ir-saved-post="${escapeHTML(post.id)}" data-ir-saved-channel="${escapeHTML(post.channel)}"><span><strong>${escapeHTML(post.title)}</strong><small>${escapeHTML(channels[post.channel]?.name || '')} · ${escapeHTML(post.authorName)}</small></span><b>↗</b></button>`).join('')}${likesStatus ? `<p role="status">${escapeHTML(likesStatus)}</p><button type="button" data-ir-likes>重新加载</button>` : !likedPosts.length ? '<div class="ir-profile-empty">♡<p>还没有点赞记录</p><small>在仓库中喜欢的作品会出现在这里。</small></div>' : ''}${likesMore && !likesStatus ? '<button type="button" class="ir-load-more" data-ir-more-likes>加载更多</button>' : ''}</div>`;
+    } else if (profilePanel === 'friends') {
+      content = `<div class="ir-profile-content ir-profile-list"><span class="ir-profile-eyebrow">FRIENDS</span><h2>我的好友</h2><div class="ir-profile-empty">${profileIcon('friends')}<p>好友列表尚未开放</p><small>好友功能接入后，会在这里显示。</small></div></div>`;
+    } else {
+      content = `<button type="button" class="ir-profile-cover" data-ir-change-cover aria-label="更换个人背景图"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="4"/></svg></span><input type="file" data-ir-cover-input accept="image/png,image/jpeg,image/webp" hidden></button><div class="ir-profile-content"><div class="ir-profile-identity"><label class="ir-profile-avatar-picker" aria-label="更换头像"><span class="ir-profile-big-avatar" data-ir-big-avatar></span><input type="file" data-ir-avatar-input accept="image/png,image/jpeg,image/webp" hidden></label><span class="ir-profile-eyebrow">IDEAL / PERSONAL</span></div><h1 class="ir-profile-name">${escapeHTML(userName())}</h1><p class="ir-profile-account">ID · ${account}</p><button type="button" class="ir-profile-edit" data-ir-edit>编辑个人资料 <span>↗</span></button><section class="ir-profile-about"><h2>自我介绍</h2><p>${escapeHTML(personal.bio || '还没有写自我介绍。')}</p></section>${joinedMarkup}<div class="ir-profile-rows"><button type="button" data-ir-friends><span>${profileIcon('friends')}好友</span><b>›</b></button><button type="button" data-ir-note><span>${profileIcon('note')}备注 <small>仅对你可见</small></span><b>＋</b></button>${personal.note ? `<p class="ir-profile-note">${escapeHTML(personal.note)}</p>` : ''}</div></div>`;
+    }
+    return `<div class="ir-profile-page">${header}${content}<nav class="ir-profile-dock" aria-label="个人页面导航"><button type="button" data-ir-legacy="beauty">${profileIcon('beauty')}<span>保存的美化</span></button><button type="button" data-ir-likes aria-current="${profilePanel === 'likes' ? 'page' : 'false'}">${profileIcon('likes')}<span>点赞记录</span></button><button type="button" data-ir-legacy="account">${profileIcon('settings')}<span>设置</span></button></nav></div>`;
+  }
+  function editProfile(noteOnly = false) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'ir-profile-dialog';
+    dialog.innerHTML = `<form><header><h2>${noteOnly ? '私人备注' : '编辑个人资料'}</h2><button type="button" aria-label="关闭">×</button></header>${noteOnly ? `<label>备注（仅对你可见）<textarea name="note" maxlength="2000" rows="6">${escapeHTML(personal.note || '')}</textarea></label>` : `<label>昵称<input name="nickname" required maxlength="32" value="${escapeHTML(personal.nickname || userName())}"></label><label>ID · 账号<input value="${escapeHTML(window.IdealMachineAuth?.getUser?.()?.username || '')}" readonly></label><small>账号是你的唯一 ID，创建后不可修改。</small><label>自我介绍<textarea name="bio" maxlength="1000" rows="5">${escapeHTML(personal.bio || '')}</textarea></label>`}<p role="alert"></p><footer><button type="submit">保存</button></footer></form>`;
+    root.appendChild(dialog);
+    dialog.querySelector('button[type=button]').onclick = () => dialog.close();
+    dialog.addEventListener('close', () => { dialog.remove(); root.querySelector(noteOnly ? '[data-ir-note]' : '[data-ir-edit]')?.focus(); });
+    dialog.querySelector('form').onsubmit = async event => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(event.currentTarget));
+      if ('nickname' in data && !data.nickname.trim()) { dialog.querySelector('[role=alert]').textContent = '请填写昵称。'; return; }
+      const save = dialog.querySelector('[type=submit]'); save.disabled = true; save.textContent = '保存中…';
+      try {
+        personal = { ...personal, ...data };
+        writeLocalProfile(personal);
+        dialog.close();
+        render();
+        requestApi('/api/me/profile', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(data) })
+          .then(result => {
+            if (result.profile) {
+              personal = { ...personal, ...result.profile };
+              try { writeLocalProfile(personal); } catch {}
+              if (screen === 'profile') render();
+            }
+          }).catch(() => {});
+      } catch {
+        const error = dialog.querySelector('[role=alert]');
+        error.textContent = '保存失败，请检查设备存储空间后重试。';
+        save.disabled = false; save.textContent = '保存';
+      }
+    };
+    dialog.showModal();
   }
   function loadAvatar() {
     try { avatarUrl = localStorage.getItem(avatarStorageKey()) || ''; } catch { avatarUrl = ''; }
+    try { coverUrl = localStorage.getItem(coverStorageKey()) || ''; } catch { coverUrl = ''; }
     syncProfile();
   }
   async function saveLocalAvatar(file) {
@@ -145,6 +296,23 @@
       const data = canvas.toDataURL('image/jpeg', .78);
       localStorage.setItem(avatarStorageKey(), data);
       avatarUrl = data; syncProfile();
+    } finally { URL.revokeObjectURL(url); }
+  }
+  async function saveLocalCover(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error('背景图片无法读取。')); image.src = url; });
+      const ratio = Math.min(1, 1440 / image.naturalWidth, 640 / image.naturalHeight);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
+      canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+      const data = canvas.toDataURL('image/jpeg', .78);
+      localStorage.setItem(coverStorageKey(), data);
+      coverUrl = data;
+      const cover = root.querySelector('[data-ir-change-cover]');
+      if (cover) cover.style.backgroundImage = `url("${data}")`;
     } finally { URL.revokeObjectURL(url); }
   }
   async function attachmentFile(attachment) {
@@ -262,12 +430,14 @@
   const searchIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg>';
   const userName = () => {
     const user = window.IdealMachineAuth?.getUser?.();
-    return String(user?.username || user?.name || user?.email?.split('@')[0] || '我的主页');
+    return String(personal.nickname || user?.username || user?.name || user?.email?.split('@')[0] || '我的主页');
   };
   const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   const syncProfile = () => {
     const name = userName();
     root.querySelector('[data-ir-username]').textContent = name;
+    const cover = root.querySelector('[data-ir-change-cover]');
+    if (cover) cover.style.backgroundImage = coverUrl ? `url("${coverUrl}")` : '';
     root.querySelectorAll('[data-ir-avatar], [data-ir-big-avatar]').forEach(node => {
       node.textContent = avatarUrl ? '' : name === '我的主页' ? '我' : name.slice(0, 1).toUpperCase();
       if (avatarUrl) { const image = document.createElement('img'); image.src = avatarUrl; image.alt = ''; node.appendChild(image); }
@@ -280,6 +450,8 @@
     root.classList.toggle('ir-show-detail', screen !== 'welcome');
     root.querySelectorAll('[data-ir-channel]').forEach(button => button.classList.toggle('is-selected', button.dataset.irChannel === screen));
     root.querySelector('[data-ir-profile]').classList.toggle('is-selected', screen === 'profile');
+    root.querySelector('[data-ir-friends-open]').classList.toggle('is-active', screen === 'friends');
+    root.querySelector('[data-ir-home]').classList.toggle('is-active', screen !== 'friends');
     const main = root.querySelector('[data-ir-main]');
     if (screen === 'welcome') {
       main.innerHTML = `<div class="ir-hero"><div class="ir-hero-mark">✳</div><span class="ir-kicker">WELCOME TO THE ARCHIVE</span><h2>灵感在这里<br>有了自己的位置。</h2><p>美化、世界设定与角色故事，收进同一个仓库。先从左侧选一个频道看看。</p><div class="ir-hero-rule"></div><span class="ir-hero-foot">IDEAL MACHINE · 01 / 03</span></div><div class="ir-category-grid">${Object.entries(channels).map(([key, item], index) => `<button type="button" class="ir-category" data-ir-channel="${key}"><span class="ir-category-top">0${index + 1} / COLLECTION <span>↗</span></span><span class="ir-category-icon">${item.icon}</span><strong>${item.name}</strong><small>${item.description}</small></button>`).join('')}</div>`;
@@ -287,10 +459,11 @@
       const title = { members: '社区成员', events: '社区活动', notifications: '通知' }[screen];
       main.innerHTML = `<div class="ir-content"><h2>${title}</h2><p class="ir-preview-note">${screen === 'notifications' ? '暂时没有新通知。' : '仓库上线后，这里会展示' + title + '。'}</p></div>`;
     } else if (screen === 'activity') {
-      main.innerHTML = `<div class="ir-content"><h2>最近动态</h2><p class="ir-preview-note">暂时没有动态。仓库上线后，可以在这里查看新的作品与互动。</p></div>`;
+      main.innerHTML = `<div class="ir-content"><header class="ir-page-heading ir-content-heading"><h2>最近动态</h2><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><p class="ir-preview-note">暂时没有动态。仓库上线后，可以在这里查看新的作品与互动。</p></div>`;
+    } else if (screen === 'friends') {
+      main.innerHTML = renderFriends();
     } else if (screen === 'profile') {
-      const name = escapeHTML(userName());
-      main.innerHTML = `<div class="ir-profile-page"><header class="ir-profile-header"><button type="button" data-ir-profile-back aria-label="返回仓库">←</button><strong>个人主页</strong><button type="button" data-ir-close aria-label="返回桌面">×</button></header><div class="ir-profile-content"><div class="ir-profile-hero"><label class="ir-profile-avatar-picker"><span class="ir-profile-big-avatar" data-ir-big-avatar></span><span>更换头像</span><input type="file" data-ir-avatar-input accept="image/png,image/jpeg,image/webp" hidden></label><div><h2>${name}</h2><p>收藏的作品都在这里，点开可以回到原帖。</p></div></div><div class="ir-profile-links"><button type="button" data-ir-legacy="beauty"><span>✦</span><span><strong>我的美化</strong><small>查看已导入的美化</small></span><span>↗</span></button><button type="button" data-ir-legacy="account"><span>◯</span><span><strong>账号设置</strong><small>管理理想机账号</small></span><span>↗</span></button></div><div class="ir-saved-groups">${Object.entries(channels).map(([key, channel]) => `<section class="ir-saved-group"><h3>${channel.icon} 保存的${channel.name}</h3>${savedPosts.filter(post => post.channel === key).map(post => `<button type="button" class="ir-saved-item" data-ir-saved-post="${post.id}" data-ir-saved-channel="${key}"><span><strong>${escapeHTML(post.title)}</strong><small>${escapeHTML(post.authorName)} · ${timeText(post.createdAt)}</small></span><b>查看原帖 ↗</b></button>`).join('') || '<p>还没有保存的帖子。</p>'}</section>`).join('')}</div>${profileStatus ? `<p class="ir-profile-status">${escapeHTML(profileStatus)}</p>` : ''}</div></div>`;
+      main.innerHTML = profileMarkup();
       syncProfile();
     } else {
       clearImages();
@@ -299,12 +472,14 @@
     }
   };
   const show = next => {
-    screen = next; activePost = null; postQuery = ''; postTag = ''; listScroll = 0; uploadOpen = false;
+    screen = next; activePost = null; postQuery = '';
+    if (next !== 'friends') ++friendSearchSerial; postTag = ''; listScroll = 0; uploadOpen = false;
     profileOrigin = false;
     remotePosts = []; remoteDetail = null; remoteStatus = '';
     ++requestSerial; render();
     if (channels[screen]) loadPosts();
-    if (screen === 'profile') loadProfile();
+    if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
+    if (screen === 'friends') loadFriends();
   };
   const open = () => { show('welcome'); root.classList.add('is-open'); syncViewport(); loadAvatar(); };
   const close = () => {
@@ -315,6 +490,13 @@
   root.addEventListener('click', event => {
     const button = event.target.closest('button');
     if (!button) return;
+    if (button.hasAttribute('data-ir-change-cover')) { root.querySelector('[data-ir-cover-input]')?.click(); return; }
+    if (button.hasAttribute('data-ir-edit')) return editProfile();
+    if (button.hasAttribute('data-ir-note')) return editProfile(true);
+    if (button.hasAttribute('data-ir-friends')) { profilePanel = ''; friendsTab = 'friends'; friendQuery = ''; friendResults = []; friendStatus = ''; return show('friends'); }
+    if (button.hasAttribute('data-ir-panel-back')) { profilePanel = ''; render(); return; }
+    if (button.hasAttribute('data-ir-likes')) { profilePanel = 'likes'; likedPosts = []; loadLikes(); return; }
+    if (button.hasAttribute('data-ir-more-likes')) { loadLikes(true); return; }
     if (button.hasAttribute('data-ir-upload-close')) { uploadOpen = false; uploadError = ''; render(); return; }
     if (button.hasAttribute('data-ir-copy-code')) {
       if (!remoteDetail?.liked) return;
@@ -388,12 +570,22 @@
     }
     if (button.hasAttribute('data-ir-close')) return close();
     if (button.hasAttribute('data-ir-home')) return show('welcome');
+    if (button.hasAttribute('data-ir-friends-open') || button.hasAttribute('data-ir-friends')) { profilePanel = ''; friendsTab = 'friends'; friendPanel = ''; friendSearchOpen = false; friendQuery = ''; friendResults = []; friendStatus = ''; return show('friends'); }
+    if (button.hasAttribute('data-ir-inbox-back')) { friendPanel = ''; return render(); }
+    if (button.hasAttribute('data-ir-friend-inbox')) { friendPanel = 'inbox'; return render(); }
+    if (button.hasAttribute('data-ir-search-toggle')) { friendSearchOpen = !friendSearchOpen; render(); if (friendSearchOpen) root.querySelector('.ir-friends-search input')?.focus(); return; }
+    if (button.hasAttribute('data-ir-add-friend') || button.hasAttribute('data-ir-plus')) { friendPanel = ''; friendSearchOpen = true; render(); root.querySelector('.ir-friends-search input')?.focus(); return; }
+    if (button.dataset.irFriendTab) { friendsTab = button.dataset.irFriendTab; return render(); }
+    if (button.dataset.irFriendAdd) return sendFriendRequest(button.dataset.irFriendAdd);
+    if (button.dataset.irFriendAccept) return handleFriendRequest(button.dataset.irFriendAccept, 'accept');
+    if (button.dataset.irFriendDecline) return handleFriendRequest(button.dataset.irFriendDecline, friendsTab === 'outgoing' ? 'cancel' : 'decline');
+    if (button.dataset.irFriendRemove) return handleFriendRequest(button.dataset.irFriendRemove, 'remove');
     if (button.hasAttribute('data-ir-activity')) return show('activity');
     if (button.hasAttribute('data-ir-members')) return show('members');
     if (button.hasAttribute('data-ir-events')) return show('events');
     if (button.hasAttribute('data-ir-notifications')) return show('notifications');
     if (button.hasAttribute('data-ir-back')) return show('welcome');
-    if (button.hasAttribute('data-ir-profile')) return show('profile');
+    if (button.hasAttribute('data-ir-profile')) { profilePanel = ''; return show('profile'); }
     if (button.dataset.irChannel) return show(button.dataset.irChannel);
     if (button.dataset.irLegacy) return window.IdealMachineOpenBeautyCenter?.(button.dataset.irLegacy);
     if (button.hasAttribute('data-ir-upload')) { uploadOpen = true; uploadError = ''; render(); }
@@ -424,6 +616,14 @@
     root.querySelector('[data-ir-filter]').focus();
   });
   root.addEventListener('change', event => {
+    if (event.target.matches('[data-ir-cover-input]')) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 8 * 1024 * 1024) { window.alert('请选择不超过 8 MB 的 PNG、JPEG 或 WebP 背景图片。'); event.target.value = ''; return; }
+      saveLocalCover(file).catch(error => window.alert(error.message));
+      event.target.value = '';
+      return;
+    }
     if (event.target.matches('[data-ir-avatar-input]')) {
       const file = event.target.files?.[0];
       if (!file) return;
@@ -435,6 +635,7 @@
     postTag = event.target.value; loadPosts();
   });
   root.addEventListener('submit', async event => {
+    if (event.target.matches('.ir-friends-search')) { event.preventDefault(); friendQuery = String(new FormData(event.target).get('account') || '').trim(); searchFriends(); return; }
     if (event.target.matches('.ir-upload-form')) {
       event.preventDefault();
       if (uploadBusy) return;
@@ -487,14 +688,20 @@
   }, true);
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || !root.classList.contains('is-open')) return;
-    if (activePost) { activePost = null; render(); }
+    if (root.querySelector('dialog[open]')) return;
+    if (screen === 'profile' && profilePanel) { profilePanel = ''; render(); }
+    else if (activePost && profileOrigin) show('profile');
+    else if (activePost) { activePost = null; render(); }
     else if (screen === 'welcome') close(); else show('welcome');
   });
   window.addEventListener('ideal-machine-auth-changed', () => {
+    ++profileSerial; personal = {}; profilePanel = ''; likedPosts = []; friendData = { friends:[], incoming:[], outgoing:[] }; friendResults = [];
+    root.querySelector('dialog')?.close();
     savedPosts = [];
     avatarUrl = '';
     syncProfile();
-    if (screen === 'profile') loadProfile();
+    if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
+    if (screen === 'friends') loadFriends();
     loadAvatar();
   });
   window.IdealMachineRepository = { open, close };

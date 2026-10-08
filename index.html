@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="apps/tushu.css?v=20261002-book-annotation-chapters-3">
   <link rel="stylesheet" href="apps/ideal-beauty.css?v=20261001-asset-info-height-1">
   <link rel="stylesheet" href="apps/ideal-auth.css?v=20260930-auth-charset-1">
-  <link rel="stylesheet" href="apps/ideal-repository.css?v=20261007-like-save-1">
+  <link rel="stylesheet" href="apps/ideal-repository.css?v=20261008-friends-layout-2">
 </head>
 <body class="desktop-layout-pending">
   <main class="desktop-scroll-wrap">
@@ -155,7 +155,7 @@
       (async () => {
         try { await window.IdealMachineStorageReady; } catch {}
         const scripts = [...document.querySelectorAll('script[data-ideal-script]')];
-        const beautySources = ['apps/ideal-beauty-registry.js?v=20261007-repository-import-1', 'apps/ideal-repository.js?v=20261007-like-save-1', 'apps/ideal-beauty-center.js?v=20261001-asset-info-height-2'];
+        const beautySources = ['apps/ideal-beauty-registry.js?v=20261007-repository-import-1', 'apps/ideal-repository.js?v=20261008-friends-layout-2', 'apps/ideal-beauty-center.js?v=20261001-asset-info-height-2'];
         const sourceHref = source => new URL(source, location.href).href;
         const sourceByFile = new Map(scripts.map(source => [source.src.split('?')[0].split('/').pop(), source.src]));
         const loadPromises = new Map();
