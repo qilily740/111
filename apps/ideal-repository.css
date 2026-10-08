@@ -305,12 +305,11 @@
 .ir-chat-message p strong{color:#55555b;font-weight:650}
 .ir-chat-message-meta{justify-content:flex-start;min-height:18px;margin:0}
 .ir-chat-message.is-mine p{border-radius:0;background:transparent;color:#29292c}
-.ir-chat-quoted{position:relative;display:block;max-width:100%;min-width:0;overflow:visible;margin:4px 0 5px;padding-left:0;color:#85858b;font-size:14px;line-height:1.45}
+.ir-chat-quoted{position:relative;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:6px;max-width:100%;min-width:0;overflow:visible;margin:4px 0 5px;padding-left:0;color:#85858b;font-size:14px;line-height:1.45}
 .ir-chat-message.has-reply .ir-chat-quoted{grid-column:2;grid-row:1;width:100%;margin:0}
-.ir-chat-quoted::before{position:absolute;top:14px;bottom:0;left:-38px;width:38px;border-top:2px solid #d0d0d4;border-left:2px solid #d0d0d4;border-radius:8px 0 0;content:""}
-.ir-chat-quoted::after{display:block;clear:both;content:""}
-.ir-chat-quoted-avatar{position:relative;float:left;display:grid;place-items:center;width:28px;height:28px;margin-right:7px;overflow:hidden;border-radius:50%;background:#e5e5e7;color:#555;font-size:11px;font-weight:650}
-.ir-chat-quoted-copy{display:block;min-width:0;overflow:visible;color:#77777d;font-size:14px;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
+.ir-chat-quoted::before{position:absolute;top:10px;bottom:0;left:-38px;width:38px;border-top:2px solid #d0d0d4;border-left:2px solid #d0d0d4;border-radius:8px 0 0;content:""}
+.ir-chat-quoted-avatar{position:relative;grid-column:1;grid-row:1;display:grid;place-items:center;width:20px;height:20px;overflow:hidden;border-radius:50%;background:#e5e5e7;color:#555;font-size:9px;font-weight:650}
+.ir-chat-quoted-copy{display:block;grid-column:2;grid-row:1;min-width:0;overflow:visible;color:#77777d;font-size:14px;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
 .ir-chat-quoted-copy strong{color:#85858b;font-size:14px;font-weight:600}
 .ir-chat-quoted-copy>span{color:#77777d;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
 .ir-chat-status{margin:0 0 6px;text-align:center}
