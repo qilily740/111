@@ -2237,11 +2237,7 @@ ${rerollRule}
   function chatMessageSearchResultsMarkup(query) { const value = String(query || '').trim(); if (!value) return '<div class="chat-message-search-results" data-chat-message-search-results></div>'; const results = chatMessageSearchResults(value); return `<div class="chat-message-search-results" data-chat-message-search-results>${results.length ? results.map(({ contact, message, index }) => `<button type="button" data-chat-search-result data-chat-search-contact="${esc(contact.id)}" data-chat-search-message="${esc(message.id || '')}" data-chat-search-index="${index}"><span><b>${esc(contact.nickname || contact.name || '联系人')}</b><small>${esc(messageTimeLabel(message))}</small></span><p>${esc(chatMessageSearchPreview(message))}</p><i>›</i></button>`).join('') : '<small class="chat-message-search-empty">没有找到匹配的聊天消息</small>'}</div>`; }
   function chatMessageSearchMarkup() { return `<section class="chat-message-search"><label><svg class="chat-message-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.6"></circle><path d="m16 16 5 5"></path></svg><input type="search" data-chat-message-search value="${esc(chatMessageSearchQuery)}" placeholder="输入消息内容" aria-label="搜索聊天消息" autocomplete="off"><button type="button" data-chat-message-search-clear aria-label="清空搜索">×</button></label></section>${chatMessageSearchResultsMarkup(chatMessageSearchQuery)}`; }
 
-  function emojiPanel() { const group = state.emojis.groups.find(item => item.id === activeEmojiGroup) || state.emojis.groups[0]; const allSelected = Boolean(group?.items.length) && group.items.every(item => selectedEmojiIds.has(item.id)); return `<div class="chat-emoji-panel"><div class="chat-emoji-head"><div class="chat-emoji-groups">${state.emojis.groups.map(item => `<button class="${item.id === group?.id ? 'is-active' : ''}" data-emoji-group="${item.id}" type="button">${esc(item.name)}</button>`).join('')}</div></div>${emojiEditorOpen ? `<div class="chat-emoji-import"><form class="chat-emoji-create-form" data-emoji-create-form><input id="emojiNewGroupName" placeholder="新分组名称" required><button type="submit">添加分组</button></form><label>当前分组名称<input id="emojiGroupName" value="${esc(group?.name || '')}"></label><label>批量导入<small>支持“描述 + 裸链接”或“描述 + [链接](链接)”</small><textarea id="emojiImportText" placeholder="开心 https://example.com/happy.png"></textarea></label><div><button data-emoji-editor-cancel type="button">取消</button><button data-emoji-import type="button">导入并保存</button></div></div>` : `<div class="chat-emoji-list ${emojiEditMode ? 'is-editing' : ''}">${group?.items.length ? group.items.map(item => `<div class="chat-emoji-item ${selectedEmojiIds.has(item.id) ? 'is-selected' : ''}"><button data-emoji-use="${item.id}" type="button"><img src="${esc(item.url)}" alt="${esc(item.text)}"><span>${esc(item.text)}</span></button>${emojiEditMode ? `<label class="chat-emoji-check"><input type="checkbox" data-emoji-select="${item.id}" ${selectedEmojiIds.has(item.id) ? 'checked' : ''}>选择</label>` : ''}</div>`).join('') : '<div class="chat-emoji-empty">这个分组还没有表情包</div>'}</div><div class="chat-emoji-footer">${emojiEditMode ? `<button data-emoji-select-all type="button">${allSelected ? '取消全选' : '全选'}</button><button data-emoji-delete-selected type="button">删除已选</button><button data-emoji-cancel-edit type="button">取消</button>` : '<button data-emoji-edit-mode type="button">编辑</button><button data-emoji-open-editor type="button">批量导入</button>'}</div>`}</div>`; }
-  const baseEmojiPanel = emojiPanel;
-  emojiPanel = function() {
-    return baseEmojiPanel().replace(/<img src="([^"]*)" alt=/g, (_, source) => `<img loading="lazy" decoding="async" fetchpriority="low" data-emoji-src="${source}" src="${emojiDisplaySource(source)}" referrerpolicy="no-referrer" alt=`);
-  };
+  function emojiPanel() { const group = state.emojis.groups.find(item => item.id === activeEmojiGroup) || state.emojis.groups[0]; const allSelected = Boolean(group?.items.length) && group.items.every(item => selectedEmojiIds.has(item.id)); return `<div class="chat-emoji-panel"><div class="chat-emoji-head"><div class="chat-emoji-groups">${state.emojis.groups.map(item => `<button class="${item.id === group?.id ? 'is-active' : ''}" data-emoji-group="${item.id}" type="button">${esc(item.name)}</button>`).join('')}</div></div>${emojiEditorOpen ? `<div class="chat-emoji-import"><form class="chat-emoji-create-form" data-emoji-create-form><input id="emojiNewGroupName" placeholder="新分组名称" required><button type="submit">添加分组</button></form><label>当前分组名称<input id="emojiGroupName" value="${esc(group?.name || '')}"></label><label>批量导入<small>支持“描述 + 裸链接”或“描述 + [链接](链接)”</small><textarea id="emojiImportText" placeholder="开心 https://example.com/happy.png"></textarea></label><div><button data-emoji-editor-cancel type="button">取消</button><button data-emoji-import type="button">导入并保存</button></div></div>` : `<div class="chat-emoji-list ${emojiEditMode ? 'is-editing' : ''}">${group?.items.length ? group.items.map(item => `<div class="chat-emoji-item ${selectedEmojiIds.has(item.id) ? 'is-selected' : ''}"><button data-emoji-use="${item.id}" type="button">${emojiImageMarkup(emojiDisplaySource(normalizeEmojiImageSource(item.url))).replace('alt=""', `alt="${esc(item.text)}"`)}<span>${esc(item.text)}</span></button>${emojiEditMode ? `<label class="chat-emoji-check"><input type="checkbox" data-emoji-select="${item.id}" ${selectedEmojiIds.has(item.id) ? 'checked' : ''}>选择</label>` : ''}</div>`).join('') : '<div class="chat-emoji-empty">这个分组还没有表情包</div>'}</div><div class="chat-emoji-footer">${emojiEditMode ? `<button data-emoji-select-all type="button">${allSelected ? '取消全选' : '全选'}</button><button data-emoji-delete-selected type="button">删除已选</button><button data-emoji-cancel-edit type="button">取消</button>` : '<button data-emoji-edit-mode type="button">编辑</button><button data-emoji-open-editor type="button">批量导入</button>'}</div>`}</div>`; }
   function emojiDisplaySource(value) {
     const source = String(value || '').trim();
     const legacy = source.match(/^\.?\/?assets\/stickers\/postimg\/([^/]+?)-([^/?#]+)$/i);
@@ -2358,14 +2354,54 @@ ${rerollRule}
     else if (remove) deleteSelectedEmojisDOM();
     else leaveEmojiEditModeDOM();
   }, true);
+  const emojiImageCache = new Map();
+  const emojiImageRequests = new Map();
+  function rememberEmojiImage(source, patch) {
+    const previous = emojiImageCache.get(source) || {};
+    emojiImageCache.delete(source);
+    emojiImageCache.set(source, { ...previous, ...patch });
+    // Bound retained decoded sources to avoid keeping an entire sticker library.
+    while (emojiImageCache.size > 96) emojiImageCache.delete(emojiImageCache.keys().next().value);
+  }
+  function resolveEmojiImage(source) {
+    if (emojiImageCache.get(source)?.src) return Promise.resolve(emojiImageCache.get(source).src);
+    if (emojiImageRequests.has(source)) return emojiImageRequests.get(source);
+    const pending = Promise.resolve().then(() => window.IdealMachineGetImage?.(source)).then(value => {
+      if (value) rememberEmojiImage(source, { src:value });
+      return value || '';
+    }).catch(() => '').finally(() => emojiImageRequests.delete(source));
+    emojiImageRequests.set(source, pending);
+    return pending;
+  }
+  function emojiImageMarkup(source, bubble = false) {
+    const cached = emojiImageCache.get(source);
+    const resolved = cached?.src || (source.startsWith('idb:image:') ? '' : source);
+    const size = bubble && cached?.width && cached?.height
+      ? ` width="${cached.width}" height="${cached.height}" style="width:${cached.width}px!important;height:${cached.height}px!important;object-fit:contain"` : '';
+    return `<img decoding="async"${bubble ? '' : ' loading="lazy" fetchpriority="low"'} data-emoji-src="${esc(source)}"${resolved ? ` src="${esc(resolved)}"` : ''}${size} referrerpolicy="no-referrer" alt="${bubble ? '图片' : ''}">`;
+  }
   function hydrateEmojiImages(root = app) {
-    root.querySelectorAll?.('.chat-emoji-panel img, .chat-bubble.sticker img').forEach(image => {
+    const selector = '.chat-emoji-panel img, .chat-bubble.sticker img, img[data-emoji-src]';
+    const images = [...(root.querySelectorAll?.(selector) || [])];
+    if (root.matches?.(selector)) images.unshift(root);
+    images.forEach(image => {
       if (image.dataset.emojiImageReady === 'true') return;
       image.dataset.emojiImageReady = 'true';
       image.referrerPolicy = 'no-referrer';
       const source = image.dataset.emojiSrc || image.getAttribute('src') || '';
-      if (source.startsWith('idb:image:') && window.IdealMachineGetImage) {
-        window.IdealMachineGetImage(source).then(value => { if (value && image.isConnected) image.src = value; });
+      const rememberSize = () => {
+        if (!image.naturalWidth || !image.naturalHeight) return;
+        const scale = Math.min(1, 150 / image.naturalWidth, 150 / image.naturalHeight);
+        rememberEmojiImage(source, { width:Math.max(1, Math.round(image.naturalWidth * scale)), height:Math.max(1, Math.round(image.naturalHeight * scale)) });
+      };
+      image.addEventListener('load', rememberSize, { once:true });
+      if (image.complete) rememberSize();
+      if (source.startsWith('idb:image:')) {
+        resolveEmojiImage(source).then(value => {
+          if (value && image.isConnected && image.getAttribute('src') !== value) image.src = value;
+          // Failed reads may be retried on a later render.
+          if (!value) delete image.dataset.emojiImageReady;
+        });
       } else if (source && !image.getAttribute('src')) image.src = emojiDisplaySource(normalizeEmojiImageSource(source));
     });
   }
@@ -2381,13 +2417,20 @@ ${rerollRule}
     requestAnimationFrame(async () => {
       if (!image.isConnected) return;
       try {
-        const response = await nativeChatFetch(source, { mode:'cors', credentials:'omit', cache:'no-store', referrerPolicy:'no-referrer' });
+        const response = await nativeChatFetch(source, { mode:'cors', credentials:'omit', cache:'force-cache', referrerPolicy:'no-referrer' });
         if (!response.ok) return;
         const blob = await response.blob();
         if (!blob.type.startsWith('image/')) return;
-        const objectUrl = URL.createObjectURL(blob);
-        image.onload = () => URL.revokeObjectURL(objectUrl);
-        image.src = objectUrl;
+        const dataUrl = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(blob);
+        });
+        if (dataUrl) {
+          rememberEmojiImage(source, { src:dataUrl });
+          if (image.isConnected) image.src = dataUrl;
+        }
       } catch {}
     });
   }, true);
@@ -6332,7 +6375,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const resolveAsset = window.IdealMachineGetImage || window.IdealMachineImageAPI?.resolveAsset;
     if (!resolveAsset) return;
     app.querySelectorAll('img[data-chat-moment-image-asset]').forEach(image => {
-      if (image.dataset.generatedImageLoading === 'true') return;
+      if (image.dataset.generatedImageLoading === 'true' || image.dataset.emojiSrc || image.closest('.chat-bubble.sticker, .chat-emoji-panel')) return;
       image.dataset.generatedImageLoading = 'true';
       const assetId = image.dataset.chatMomentImageAsset;
       Promise.resolve(resolveAsset(assetId)).then(source => {
@@ -6351,7 +6394,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const resolveAsset = window.IdealMachineGetImage || window.IdealMachineImageAPI?.resolveAsset;
     if (!resolveAsset) return;
     app.querySelectorAll('img[data-chat-image-asset], img[src^="idb:image:"]').forEach(image => {
-      if (image.dataset.generatedImageLoading === 'true') return;
+      if (image.dataset.generatedImageLoading === 'true' || image.dataset.emojiSrc || image.closest('.chat-bubble.sticker, .chat-emoji-panel')) return;
       const assetId = image.dataset.chatImageAsset || image.getAttribute('src');
       image.dataset.generatedImageLoading = 'true';
       const messageId = image.closest('[data-chat-message-id]')?.dataset.chatMessageId;
@@ -9568,7 +9611,7 @@ ${recentConversation}
     if (!message?.sticker && !matchingEmoji) return html;
     const originalSource = matchingEmoji ? normalizeEmojiImageSource(matchingEmoji.url || rawSource) : rawSource;
     const displaySource = emojiDisplaySource(originalSource);
-    return html.replace(/<img src="[^"]*" alt="图片">/, `<img loading="lazy" decoding="async" fetchpriority="low" data-emoji-src="${esc(displaySource)}" src="${esc(displaySource)}" referrerpolicy="no-referrer" alt="图片">`);
+    return html.replace(/<img src="[^"]*" alt="图片">/, emojiImageMarkup(displaySource, true));
   };
   const messageHtmlWithChatTranslation = messageHtml;
   messageHtml = function(message) {
@@ -10579,5 +10622,22 @@ ${recentConversation}
     chatSettingsFor(chat).internalNotificationEnabled = toggle.checked;
     save();
   }, true);
+  const renderWithStableEmojiImages = render;
+  render = function() {
+    const contactId = activeContact;
+    const existing = new Map();
+    app.querySelectorAll('#chatMessages [data-chat-message-id] img[data-emoji-src]').forEach(image => {
+      const id = image.closest('[data-chat-message-id]').dataset.chatMessageId;
+      existing.set(`${id}:${image.dataset.emojiSrc}`, image);
+    });
+    renderWithStableEmojiImages();
+    if (activeContact !== contactId) return;
+    app.querySelectorAll('#chatMessages [data-chat-message-id] img[data-emoji-src]').forEach(image => {
+      const id = image.closest('[data-chat-message-id]').dataset.chatMessageId;
+      const previous = existing.get(`${id}:${image.dataset.emojiSrc}`);
+      if (previous) image.replaceWith(previous);
+    });
+    hydrateEmojiImages();
+  };
   startActiveMessageAutomation();
 })();

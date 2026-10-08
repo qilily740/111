@@ -63,6 +63,9 @@
   let chatList = [];
   let chatListLoadedAt = 0;
   let chatListPromise = null;
+  let chatListBusy = false;
+  let chatListSerial = 0;
+  let chatListLoaded = false;
   let chatFriend = null;
   let chatMessages = [];
   let chatDraft = '';
@@ -184,22 +187,49 @@
     catch (error) { friendStatus = error.message; }
     finally { friendBusy = false; if (screen === 'friends') render(); }
   }
+  // Short-lived, account-scoped tab cache; never display expired messages.
+  const chatRetentionMs = 7 * 24 * 60 * 60 * 1000;
+  function readChatCache(name) {
+    try {
+      const entry = JSON.parse(sessionStorage.getItem(`ideal-chat-v1:${accountStorageId()}:${name}`) || 'null');
+      if (!entry || Date.now() - entry.at > 5 * 60 * 1000) return null;
+      return entry.value;
+    } catch { return null; }
+  }
+  function writeChatCache(name, value) {
+    try { sessionStorage.setItem(`ideal-chat-v1:${accountStorageId()}:${name}`, JSON.stringify({ at:Date.now(), value })); } catch {}
+  }
+  const liveChatMessages = messages => messages.filter(item => Number(item.createdAt) + chatRetentionMs > Date.now()).map(item =>
+    item.replyCreatedAt && Number(item.replyCreatedAt) + chatRetentionMs <= Date.now()
+      ? { ...item, replyBody:null, replySenderId:null, replyCreatedAt:null } : item);
   function loadChats(silent = false, force = false) {
     if (chatListPromise) return chatListPromise;
     if (!force && chatListLoadedAt && Date.now() - chatListLoadedAt < 5000) return Promise.resolve();
+    const account = accountStorageId(), serial = ++chatListSerial;
+    if (!chatListLoaded) {
+      const cached = readChatCache('list');
+      if (Array.isArray(cached)) { chatList = cached.filter(item => Number(item.lastMessageAt) + chatRetentionMs > Date.now()); chatListLoaded = true; }
+    }
+    chatListBusy = true;
+    if (!silent && screen === 'friends') render();
     const pending = (async () => {
       try {
         const result = await requestApi('/api/me/chats');
-        const changed = JSON.stringify(chatList) !== JSON.stringify(result.chats || []);
+        if (account !== accountStorageId() || serial !== chatListSerial) return;
+        const changed = !chatListLoaded || JSON.stringify(chatList) !== JSON.stringify(result.chats || []);
+        chatListLoaded = true; chatListLoadedAt = Date.now(); chatListBusy = false;
         chatList = result.chats || [];
-        chatListLoadedAt = Date.now();
+        chatStatus = '';
+        writeChatCache('list', chatList);
         if (changed && screen === 'friends' && friendPanel !== 'chat' && friendsTab === 'inbox') {
-          const scroller = root.querySelector('.ir-chat-list'); const top = scroller?.scrollTop || 0;
-          render(); root.querySelector('.ir-chat-list')?.scrollTo(0, top);
+          const scroller = root.querySelector('.ir-friends-list.is-chat-list'); const top = scroller?.scrollTop || 0;
+          render(); root.querySelector('.ir-friends-list.is-chat-list')?.scrollTo(0, top);
         }
       } catch (error) {
-        if (!silent) chatStatus = error.message;
-        if (!silent && screen === 'friends' && friendPanel !== 'chat' && friendsTab === 'inbox') render();
+        if (account !== accountStorageId() || serial !== chatListSerial) return;
+        chatListBusy = false;
+        if (!silent || !chatListLoaded) chatStatus = error.message;
+        if (screen === 'friends' && friendPanel !== 'chat' && friendsTab === 'inbox') render();
       }
     })();
     chatListPromise = pending;
@@ -221,8 +251,9 @@
     if (!silent) { chatBusy = true; chatStatus = ''; render(); }
     try {
       const result = await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`);
-      if (serial !== chatRequestSerial || screen !== 'friends' || friendPanel !== 'chat' || (chatFriend.userId || chatFriend.id) !== friendId) return;
-      const next = result.messages || [];
+      if (serial !== chatRequestSerial || screen !== 'friends' || friendPanel !== 'chat' || (chatFriend?.userId || chatFriend?.id) !== friendId) return;
+      const next = liveChatMessages(result.messages || []);
+      writeChatCache(`messages:${friendId}`, next);
       const changed = JSON.stringify(chatMessages) !== JSON.stringify(next);
       const stateChanged = chatCanSend !== (result.canSend !== false) || chatBlockedByMe !== Boolean(result.blockedByMe);
       chatMessages = next;
@@ -243,7 +274,7 @@
     } catch (error) {
       if (serial === chatRequestSerial) {
         chatStatus = error.message;
-        if (!silent) {
+        if (screen === 'friends' && friendPanel === 'chat') {
           chatBusy = false;
           const status = root.querySelector('.ir-chat-status');
           if (status) status.textContent = chatStatus;
@@ -255,11 +286,12 @@
   function openChat(friend) {
     if (!friend) return;
     stopChatPolling();
-    chatFriend = friend; chatMessages = []; chatDraft = ''; chatStatus = ''; chatBusy = false; chatCanSend = true; chatBlockedByMe = false; chatReplyTo = null;
+    const cached = readChatCache(`messages:${friend.userId || friend.id}`);
+    chatFriend = friend; chatMessages = Array.isArray(cached) ? liveChatMessages(cached) : []; chatDraft = ''; chatStatus = ''; chatBusy = false; chatCanSend = true; chatBlockedByMe = false; chatReplyTo = null;
     ++chatRequestSerial;
     friendPanel = 'chat';
     render();
-    void loadChatMessages();
+    void loadChatMessages(Array.isArray(cached));
     startChatPolling();
   }
   async function sendChatMessage(event) {
@@ -275,6 +307,7 @@
       if (screen !== 'friends' || friendPanel !== 'chat' || (chatFriend?.userId || chatFriend?.id) !== friendId) return;
       const sent = result.message;
       if (sent) chatMessages.push({ ...sent, replyBody:chatReplyTo?.body || '', replySenderId:chatReplyTo?.senderId || '', replyCreatedAt:chatReplyTo?.createdAt || null });
+      writeChatCache(`messages:${friendId}`, liveChatMessages(chatMessages));
       chatDraft = ''; chatReplyTo = null;
       const input = root.querySelector('[data-ir-chat-input]');
       if (input) input.value = '';
@@ -368,7 +401,7 @@
     const resultList = friendResults.map(item => `<article class="ir-friend-item">${friendIdentity(item)}<button type="button" ${item.relation ? 'disabled' : ''} data-ir-friend-add="${escapeHTML(item.username)}">${item.relation === 'friend' ? '已添加' : item.relation === 'outgoing' ? '已申请' : item.relation === 'incoming' ? '待处理' : '添加好友'}</button></article>`).join('');
     const search = friendSearchOpen ? `<form class="ir-friends-search"><input name="account" type="search" maxlength="32" autocomplete="off" placeholder="输入 Ideal ID" value="${escapeHTML(friendQuery)}"><button type="submit">搜索</button></form>` : '';
     const empty = friendsTab === 'inbox' ? '<div class="ir-inbox-empty"><span aria-hidden="true">♡</span><strong>还没有私聊</strong><small>从“我的好友”选择一位好友，开始聊天。</small></div>' : `<div class="ir-friends-empty"><span>${friendsTab === 'friends' ? '♧' : '♡'}</span><strong>${friendsTab === 'friends' ? '还没有好友' : friendsTab === 'incoming' ? '暂时没有新的好友申请' : '还没有发出好友申请'}</strong><small>${friendsTab === 'friends' ? '搜索 Ideal 账号，添加你的第一位好友。' : '新的动态会显示在这里。'}</small></div>`;
-    const listContent = friendBusy && friendsTab !== 'inbox' ? '<p class="ir-friends-empty">正在加载好友…</p>' : list || empty;
+    const listContent = friendsTab === 'inbox' && chatListBusy && !chatListLoaded ? '<p class="ir-friends-empty">正在加载私聊…</p>' : friendBusy && friendsTab !== 'inbox' ? '<p class="ir-friends-empty">正在加载好友…</p>' : list || empty;
     return `<div class="ir-friends-page"><header class="ir-friends-heading ir-page-heading"><h1>消息</h1><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><nav class="ir-message-toolbar" aria-label="消息操作"><button type="button" class="ir-message-icon" data-ir-search-toggle aria-label="搜索好友">${profileIcon('search')}</button><button type="button" class="ir-message-inbox" data-ir-friend-inbox aria-label="私信提醒"><span>${profileIcon('mail')}</span></button><button type="button" class="ir-message-add" data-ir-add-friend><span>${profileIcon('addPerson')}</span><b>添加好友</b></button><button type="button" class="ir-message-plus" data-ir-plus aria-label="添加好友">＋</button></nav>${search}${friendStatus ? `<p class="ir-friends-status" role="status">${escapeHTML(friendStatus)}</p>` : ''}${resultList ? `<section class="ir-friends-results"><h2>搜索结果</h2>${resultList}</section>` : friendQuery.length >= 3 && !friendStatus && !friendResults.length ? '<p class="ir-friends-empty">没有找到匹配的账号。</p>' : ''}<nav class="ir-friends-tabs" aria-label="好友分类">${tabs.map(([id,label,count]) => `<button type="button" data-ir-friend-tab="${id}" class="${friendsTab === id ? 'is-selected' : ''}">${label}<span>${count}</span></button>`).join('')}</nav><section class="ir-friends-list ${friendsTab === 'inbox' ? 'is-chat-list' : ''}">${chatStatus && friendsTab === 'inbox' ? `<p class="ir-friends-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}${listContent}</section></div>`;
   }
   async function sendFriendRequest(username) {
@@ -734,7 +767,7 @@
     ++requestSerial; render();
     if (channels[screen]) loadPosts();
     if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
-    if (screen === 'friends') { loadFriends(); loadChats(true); }
+    if (screen === 'friends') { loadFriends(); void loadChats(true); }
   };
   const open = () => { personal = readLocalProfile(); show('welcome'); root.classList.add('is-open'); syncViewport(); loadAvatar(); syncAvatarWithServer(); };
   const close = () => {
@@ -1034,14 +1067,14 @@
   });
   window.addEventListener('ideal-machine-auth-changed', () => {
     ++profileSerial; personal = {}; profilePanel = ''; likedPosts = []; friendData = { friends:[], incoming:[], outgoing:[] }; friendResults = [];
-    stopChatPolling(); chatList = []; chatListLoadedAt = 0; chatListPromise = null; chatFriend = null; chatMessages = []; chatDraft = ''; chatStatus = ''; ++chatRequestSerial;
+    stopChatPolling(); ++chatListSerial; chatListBusy = false; chatListLoaded = false; chatListLoadedAt = 0; chatListPromise = null; chatBusy = false; friendPanel = ''; chatList = []; chatFriend = null; chatMessages = []; chatDraft = ''; chatStatus = ''; ++chatRequestSerial;
     friendAvatarObjectUrls.forEach(avatar => URL.revokeObjectURL(avatar.url)); friendAvatarObjectUrls.clear();
     root.querySelector('dialog')?.close();
     savedPosts = [];
     avatarUrl = '';
     syncProfile();
     if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
-    if (screen === 'friends') loadFriends();
+    if (screen === 'friends') { loadFriends(); void loadChats(true); }
     personal = readLocalProfile();
     loadAvatar();
     syncAvatarWithServer();
