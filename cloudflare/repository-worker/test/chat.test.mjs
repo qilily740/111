@@ -41,6 +41,7 @@ test('friends can send, list, and read direct messages with seven-day expiry', a
 
   const inbox = await (await request('user-bob','/api/me/chats')).json();
   assert.equal(inbox.chats[0].lastMessage,'你好，好友');
+  assert.equal(inbox.chats[0].lastMessageSenderId,'user-alice');
   assert.equal(inbox.chats[0].unreadCount,1);
   const conversation = await (await request('user-bob','/api/me/chats/user-alice/messages')).json();
   assert.equal(conversation.messages[0].senderId,'user-alice');

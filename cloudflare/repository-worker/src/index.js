@@ -440,7 +440,7 @@ async function listChats(request, env, user) {
     const friendId = message.sender_id === user.id ? message.recipient_id : message.sender_id;
     let item = byFriend.get(friendId);
     if (!item) {
-      item = { lastMessage:message.body, lastMessageAt:message.created_at, unreadCount:0 };
+      item = { lastMessage:message.body, lastMessageAt:message.created_at, lastMessageSenderId:message.sender_id, unreadCount:0 };
       byFriend.set(friendId, item);
     }
     if (message.recipient_id === user.id && message.read_at === null) item.unreadCount++;
