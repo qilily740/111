@@ -230,7 +230,7 @@
       if (!groups.includes(activeChatStickerGroup)) activeChatStickerGroup = groups[0] || '默认';
       chatStickersLoaded = true;
     } catch (error) { if (serial === chatStickerRequestSerial && account === accountStorageId()) chatStatus = error.message; }
-    finally { if (serial === chatStickerRequestSerial) { chatStickersBusy = false; if (screen === 'friends' && friendPanel === 'chat' && chatStickerPanelOpen) render(); } }
+    finally { if (serial === chatStickerRequestSerial) { chatStickersBusy = false; if (screen === 'friends' && friendPanel === 'chat' && chatStickerPanelOpen) updateChatStickerPanelUI(); } }
   }
   function parseChatStickerUrls(text) {
     return String(text || '').split(/\r?\n/).map(line => {
@@ -252,10 +252,10 @@
     const input = root.querySelector('[data-ir-chat-sticker-urls]');
     const items = parseChatStickerUrls(input?.value || '');
     const groupName = root.querySelector('[data-ir-chat-sticker-group-name]')?.value.trim() || activeChatStickerGroup || '默认';
-    if (!items.length) { chatStatus = '请按“描述 + HTTPS 图片 URL”格式添加。'; render(); return; }
+    if (!items.length) { chatStatus = '请按“描述 + HTTPS 图片 URL”格式添加。'; updateChatStickerPanelUI(); return; }
     const account = accountStorageId();
     if (input) input.value = '';
-    chatStickersBusy = true; chatStatus = ''; render();
+    chatStickersBusy = true; chatStatus = ''; updateChatStickerPanelUI();
     try {
       const results = [];
       for (const item of items) {
@@ -272,7 +272,7 @@
       const errors = results.filter(result => result.status === 'rejected').map(result => result.reason.message);
       chatStatus = errors.length ? `${added.length ? `已添加 ${added.length} 个；` : ''}${errors[0]}` : '';
     } catch (error) { if (account === accountStorageId()) chatStatus = error.message; }
-    finally { if (account === accountStorageId()) { chatStickersBusy = false; if (screen === 'friends' && friendPanel === 'chat') render(); } }
+    finally { if (account === accountStorageId()) { chatStickersBusy = false; if (screen === 'friends' && friendPanel === 'chat') updateChatStickerPanelUI(); } }
   }
   function renderChatStickerPanel() {
     if (!chatStickerPanelOpen) return '';
@@ -282,6 +282,26 @@
     const visible = chatStickers.filter(item => (item.groupName || '默认') === activeChatStickerGroup);
     const safeGroup = escapeHTML(activeChatStickerGroup);
     return `<section class="ir-chat-sticker-panel" aria-label="我的表情包"><header><strong>我的表情包 <small>${chatStickers.length}/20 · ${chatStickerBytesLabel(chatStickerStorageBytes)}/5 MiB</small></strong><button type="button" data-ir-chat-sticker-editor-toggle aria-label="添加表情包" title="添加表情包">＋</button><button type="button" data-ir-chat-sticker-manage-toggle>${chatStickerManageOpen ? '完成' : '管理'}</button><button type="button" data-ir-chat-sticker-close aria-label="关闭">×</button></header><nav class="ir-chat-sticker-groups" aria-label="表情包分组">${groups.map(name => `<button type="button" data-ir-chat-sticker-group="${escapeHTML(name)}" class="${name === activeChatStickerGroup ? 'is-active' : ''}">${escapeHTML(name)}</button>`).join('')}</nav>${chatStickerEditorOpen ? `<form class="ir-chat-sticker-import"><label>添加到分组<input data-ir-chat-sticker-group-name maxlength="24" value="${safeGroup}" placeholder="分组名称"></label><textarea data-ir-chat-sticker-urls rows="2" maxlength="6000" placeholder="每行一个：开心 https://example.com/happy.gif"></textarea><button type="button" data-ir-chat-sticker-add ${chatStickersBusy ? 'disabled' : ''}>${chatStickersBusy ? '添加中…' : '添加 URL'}</button></form>` : ''}${chatStickerManageOpen ? `<div class="ir-chat-sticker-manage"><button type="button" data-ir-rename-sticker-group>重命名分组</button><button type="button" data-ir-delete-sticker-group>删除分组</button><small>删除分组会同时从面板移除其中的表情包，已发送的聊天图片仍会保留至过期。</small></div>` : ''}${chatStickersBusy && !chatStickers.length ? '<p>正在加载…</p>' : visible.length ? `<div class="ir-chat-sticker-grid">${visible.map(item => `<div><button type="button" data-ir-send-sticker="${escapeHTML(item.id)}" aria-label="发送${escapeHTML(item.label)}"><img ${item.stored ? `data-ir-sticker-image="${escapeHTML(item.id)}"` : `src="${escapeHTML(item.sourceUrl)}"`} alt="" loading="lazy"><span>${escapeHTML(item.label)} · ${chatStickerBytesLabel(item.sizeBytes)}</span></button>${chatStickerManageOpen ? `<button type="button" data-ir-delete-sticker="${escapeHTML(item.id)}" aria-label="删除${escapeHTML(item.label)}">×</button>` : ''}</div>`).join('')}</div>` : '<p>这个分组还没有表情包，点右上角「＋」添加。</p>'}<small>每人最多 20 个自定义表情包、5 MiB；单张不超过 512 KiB，90 天未使用自动清理。支持 PNG、JPG、WebP、GIF、AVIF。</small></section>`;
+  }
+  function updateChatStickerPanelUI(scrollToBottom = false) {
+    const page = root.querySelector('.ir-chat-page');
+    if (!page) return;
+    page.classList.toggle('is-sticker-open', chatStickerPanelOpen);
+    const existing = page.querySelector('.ir-chat-sticker-panel');
+    const composer = page.querySelector('.ir-chat-composer');
+    if (chatStickerPanelOpen) {
+      const markup = renderChatStickerPanel();
+      if (existing) existing.outerHTML = markup;
+      else composer?.insertAdjacentHTML('beforebegin', markup);
+    } else existing?.remove();
+    const scroll = page.querySelector('[data-ir-chat-scroll]');
+    let status = page.querySelector('.ir-chat-status');
+    if (chatStatus) {
+      if (status) status.textContent = chatStatus;
+      else if (scroll) { scroll.insertAdjacentHTML('beforeend', `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>`); status = scroll.querySelector('.ir-chat-status'); }
+    } else status?.remove();
+    if (chatStickerPanelOpen && apiBase()) hydrateImages();
+    if (scrollToBottom && scroll) requestAnimationFrame(() => requestAnimationFrame(() => { if (scroll.isConnected) scroll.scrollTop = scroll.scrollHeight; }));
   }
   function loadChats(silent = false, force = false) {
     if (chatListPromise) return chatListPromise;
@@ -335,6 +355,7 @@
       if (serial !== chatRequestSerial || screen !== 'friends' || friendPanel !== 'chat' || (chatFriend?.userId || chatFriend?.id) !== friendId) return;
       const next = liveChatMessages(result.messages || []);
       writeChatCache(`messages:${friendId}`, next);
+      const previousCount = chatMessages.length;
       const changed = JSON.stringify(chatMessages) !== JSON.stringify(next);
       const stateChanged = chatCanSend !== (result.canSend !== false) || chatBlockedByMe !== Boolean(result.blockedByMe);
       chatMessages = next;
@@ -345,7 +366,7 @@
       if (!silent || changed || stateChanged) {
         const scroll = root.querySelector('[data-ir-chat-scroll]');
         const nearBottom = chatNeedsInitialScroll || (silent && (!scroll || scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 48));
-        updateChatMessageList(!silent || nearBottom);
+        if (!silent || changed) updateChatMessageList(!silent || nearBottom, silent && changed && next.length > previousCount ? previousCount : null);
         const input = root.querySelector('[data-ir-chat-input]');
         if (input) { input.disabled = !chatCanSend; input.placeholder = chatCanSend ? '发送消息…' : '此会话已屏蔽'; }
         const button = root.querySelector('.ir-chat-composer button[type="submit"]');
@@ -391,13 +412,14 @@
       const result = await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text, ...(chatReplyTo ? {replyToId:chatReplyTo.id} : {})}) });
       if (screen !== 'friends' || friendPanel !== 'chat' || (chatFriend?.userId || chatFriend?.id) !== friendId) return;
       const sent = result.message;
+      const previousCount = chatMessages.length;
       if (sent) chatMessages.push({ ...sent, replyBody:chatReplyTo?.body || '', replySenderId:chatReplyTo?.senderId || '', replyCreatedAt:chatReplyTo?.createdAt || null });
       writeChatCache(`messages:${friendId}`, liveChatMessages(chatMessages));
       chatDraft = ''; chatReplyTo = null;
       const input = root.querySelector('[data-ir-chat-input]');
       if (input) input.value = '';
       root.querySelector('.ir-chat-replying')?.remove();
-      updateChatMessageList(true);
+      updateChatMessageList(true, previousCount);
       await loadChats(true, true);
     } catch (error) {
       chatStatus = error.message;
@@ -413,6 +435,7 @@
   async function sendChatSticker(stickerId) {
     if (!chatFriend || !chatCanSend || chatSending) return;
     const friendId = chatFriend.userId || chatFriend.id;
+    const previousCount = chatMessages.length;
     const sticker = chatStickers.find(item => item.id === stickerId);
     if (!sticker) return;
     chatSending = true;
@@ -425,9 +448,9 @@
       if (result.message) chatMessages.push({ ...result.message, replyBody:chatReplyTo?.body || '', replySenderId:chatReplyTo?.senderId || '', replyCreatedAt:chatReplyTo?.createdAt || null });
       writeChatCache(`messages:${friendId}`, liveChatMessages(chatMessages));
       chatReplyTo = null;
-      updateChatMessageList(true);
+      updateChatMessageList(true, previousCount);
       await loadChats(true,true);
-    } catch (error) { chatStatus = error.message; render(); }
+    } catch (error) { chatStatus = error.message; updateChatStickerPanelUI(); }
     finally { chatSending = false; }
   }
   async function searchFriends() {
@@ -458,8 +481,9 @@
     if (!previous || Number(message.createdAt) - Number(previous.createdAt) >= 5 * 60 * 1000) return `<div class="ir-chat-divider"><span>${escapeHTML(chatDay(message.createdAt))} · ${escapeHTML(chatTime(message.createdAt))}</span></div>`;
     return '';
   }
-  function chatMessageRows() {
-    const rows = chatMessages.map((message,index) => {
+  function chatMessageRows(startIndex = 0) {
+    const rows = chatMessages.slice(startIndex).map((message,offset) => {
+      const index = startIndex + offset;
       const previous = chatMessages[index - 1];
       const grouped = Boolean(!message.replyToId && previous && previous.senderId === message.senderId && Number(message.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
       const next = chatMessages[index + 1];
@@ -477,10 +501,24 @@
     }).join('');
     return rows;
   }
-  function updateChatMessageList(scrollToBottom = false) {
+  function updateChatMessageList(scrollToBottom = false, preserveThrough = null) {
     const messages = root.querySelector('[data-ir-chat-messages]');
     if (!messages) return;
-    messages.innerHTML = chatMessages.length ? chatMessageRows() : '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>';
+    if (preserveThrough !== null) {
+      const existingRows = [...messages.querySelectorAll('[data-ir-message-id]')];
+      const prefixMatches = existingRows.length === preserveThrough && existingRows.every((row,index) => row.dataset.irMessageId === chatMessages[index]?.id);
+      if (prefixMatches) {
+        if (!preserveThrough) messages.replaceChildren();
+        else if (chatMessages.length > preserveThrough) {
+          const previous = chatMessages[preserveThrough - 1];
+          const next = chatMessages[preserveThrough];
+          const continues = Boolean(next && !next.replyToId && previous.senderId === next.senderId && Number(next.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
+          if (continues) existingRows[preserveThrough - 1]?.classList.add('has-continuation');
+        }
+        if (chatMessages.length > preserveThrough) messages.insertAdjacentHTML('beforeend', chatMessageRows(preserveThrough));
+        else if (!chatMessages.length) messages.innerHTML = '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>';
+      } else messages.innerHTML = chatMessages.length ? chatMessageRows() : '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>';
+    } else messages.innerHTML = chatMessages.length ? chatMessageRows() : '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>';
     if (scrollToBottom) {
       const scroll = root.querySelector('[data-ir-chat-scroll]');
       if (scroll) {
@@ -925,15 +963,14 @@
     if (!button) return;
     if (button.hasAttribute('data-ir-chat-sticker-toggle')) {
       chatStickerPanelOpen = !chatStickerPanelOpen;
-      if (chatStickerPanelOpen) void loadChatStickers(true);
-      render();
-      if (chatStickerPanelOpen) requestAnimationFrame(() => requestAnimationFrame(() => { const scroll = root.querySelector('[data-ir-chat-scroll]'); if (scroll) scroll.scrollTop = scroll.scrollHeight; }));
+      if (chatStickerPanelOpen) void loadChatStickers();
+      updateChatStickerPanelUI(chatStickerPanelOpen);
       return;
     }
-    if (button.hasAttribute('data-ir-chat-sticker-close')) { chatStickerPanelOpen = false; render(); return; }
-    if (button.hasAttribute('data-ir-chat-sticker-editor-toggle')) { chatStickerEditorOpen = !chatStickerEditorOpen; render(); return; }
-    if (button.hasAttribute('data-ir-chat-sticker-manage-toggle')) { chatStickerManageOpen = !chatStickerManageOpen; render(); return; }
-    if (button.dataset.irChatStickerGroup !== undefined) { activeChatStickerGroup = button.dataset.irChatStickerGroup; render(); return; }
+    if (button.hasAttribute('data-ir-chat-sticker-close')) { chatStickerPanelOpen = false; updateChatStickerPanelUI(); return; }
+    if (button.hasAttribute('data-ir-chat-sticker-editor-toggle')) { chatStickerEditorOpen = !chatStickerEditorOpen; updateChatStickerPanelUI(); return; }
+    if (button.hasAttribute('data-ir-chat-sticker-manage-toggle')) { chatStickerManageOpen = !chatStickerManageOpen; updateChatStickerPanelUI(); return; }
+    if (button.dataset.irChatStickerGroup !== undefined) { activeChatStickerGroup = button.dataset.irChatStickerGroup; updateChatStickerPanelUI(); return; }
     if (button.hasAttribute('data-ir-rename-sticker-group')) {
       const oldName = activeChatStickerGroup;
       const nextName = window.prompt('请输入新的分组名称', oldName)?.trim().slice(0,24);
@@ -942,7 +979,7 @@
         chatStickers = chatStickers.map(item => (item.groupName || '默认') === oldName ? {...item,groupName:nextName} : item);
         activeChatStickerGroup = nextName;
       } catch (error) { chatStatus = error.message; }
-      render(); return;
+      updateChatStickerPanelUI(); return;
     }
     if (button.hasAttribute('data-ir-delete-sticker-group')) {
       const name = activeChatStickerGroup;
@@ -952,7 +989,7 @@
         activeChatStickerGroup = [...new Set(chatStickers.map(item => item.groupName || '默认'))][0] || '默认';
         chatStickersLoaded = false; void loadChatStickers(true);
       } catch (error) { chatStatus = error.message; }
-      render(); return;
+      updateChatStickerPanelUI(); return;
     }
     if (button.dataset.irSendSticker) { await sendChatSticker(button.dataset.irSendSticker); return; }
     if (button.dataset.irChatStickerAdd !== undefined) { await addChatStickerUrls(); return; }
@@ -961,8 +998,8 @@
         await requestApi(`/api/me/chat-stickers/${encodeURIComponent(button.dataset.irDeleteSticker)}`, {method:'DELETE'});
         chatStickers = chatStickers.filter(item => item.id !== button.dataset.irDeleteSticker);
         chatStickersLoaded = false; void loadChatStickers(true);
-        render();
-      } catch (error) { chatStatus = error.message; render(); }
+        updateChatStickerPanelUI();
+      } catch (error) { chatStatus = error.message; updateChatStickerPanelUI(); }
       return;
     }
     if (button.hasAttribute('data-ir-change-cover')) { root.querySelector('[data-ir-cover-input]')?.click(); return; }
