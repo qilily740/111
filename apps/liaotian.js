@@ -2495,7 +2495,8 @@ ${rerollRule}
   const singleRoleMomentGenerator = generateRoleMoment;
   generateRoleMoment = async (contactId, targetPost = null) => {
     if (targetPost) return singleRoleMomentGenerator(contactId, targetPost);
-    const eligibleContacts = state.contacts.filter(contact => !isGroupChatContact(contact) && !momentActorIsDeceased(contact));
+    // 联系人页里的角色默认都是在世角色；去世筛选只用于下方由世界书提取的 NPC。
+    const eligibleContacts = state.contacts.filter(contact => !isGroupChatContact(contact));
     const selectedContacts = roleMomentTargets.map(id => eligibleContacts.find(contact => String(contact.id) === String(id))).filter(Boolean);
     const selectedIds = [...new Map(selectedContacts.map(contact => [String(contact.id), contact.id])).values()];
     const shuffled = eligibleContacts.slice().sort(() => Math.random() - .5);
@@ -8336,7 +8337,7 @@ ${recentConversation}
   const generatedMomentBeforeStable = generateRoleMoment;
   generateRoleMoment = async function(contactId, targetPost=null) {
     const contact = contactId ? state.contacts.find(item => item.id === contactId) : null;
-    if (contact && momentActorIsDeceased(contact)) return window.alert('已去世的角色不能发布或参与朋友圈互动。');
+    if (contact?.actorType === 'npc' && momentActorIsDeceased(contact)) return window.alert('已去世的 NPC 不能发布或参与朋友圈互动。');
     momentGenerationDepth += 1;
     momentBusyPostId = '';
     momentBusy = true;
@@ -8475,7 +8476,7 @@ ${recentConversation}
     } catch { return []; }
   }
   function momentInteractionActors(post) {
-    const roles = state.contacts.filter(contact => !momentActorIsDeceased(contact)).map(contact => ({ ...contact, actorType:'role', displayName:contact.nickname || contact.name || '角色', persona:contact.details || contact.signature || '暂无角色设定', groupIds:Array.isArray(contact.groupIds) ? contact.groupIds : [] }));
+    const roles = state.contacts.filter(contact => !isGroupChatContact(contact)).map(contact => ({ ...contact, actorType:'role', displayName:contact.nickname || contact.name || '角色', persona:contact.details || contact.signature || '暂无角色设定', groupIds:Array.isArray(contact.groupIds) ? contact.groupIds : [] }));
     const actors = [...roles, ...momentNpcActors()].filter(actor => actor.id !== post.authorId);
     if (post.visibility !== 'groups') return actors;
     const visibleGroups = new Set(Array.isArray(post.visibleGroups) ? post.visibleGroups : []);
@@ -10063,7 +10064,7 @@ ${recentConversation}
     return rows.length ? rows.join('\n') : '此前还没有发布过朋友圈。';
   }
   function momentAutomationShouldSkipContact(contact, settings, now, force = false) {
-    if (!contact || contact.isGroup || isGroupChatContact(contact) || momentActorIsDeceased(contact)) return true;
+    if (!contact || contact.isGroup || isGroupChatContact(contact)) return true;
     // 自动朋友圈只看当前角色自己的开关；每个角色独立保存，不能被全局旧配置或其他角色关闭/开启状态影响。
     if (!force && settings.enabled !== true) return true;
     if (!force && !momentAutomationInActiveHours(settings, now)) return true;
