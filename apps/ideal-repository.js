@@ -293,6 +293,16 @@
     if (!apiBase() || !window.IdealMachineAuth?.getToken?.()) return;
     try {
       const { profile } = await requestApi('/api/me/profile');
+      // Nicknames created before profile sync was deployed only lived in this
+      // browser. Publish that existing value so other users can see it in search.
+      const localProfile = readLocalProfile();
+      if (!profile?.nickname && typeof localProfile.nickname === 'string' && localProfile.nickname.trim()) {
+        await requestApi('/api/me/profile', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body:JSON.stringify({ nickname:localProfile.nickname.trim() })
+        });
+      }
       if (profile?.avatarUrl && !avatarUrl) {
         const response = await requestApi(profile.avatarUrl, { raw:true });
         const reader = new FileReader();
