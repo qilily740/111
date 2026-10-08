@@ -165,6 +165,24 @@
     return [config.positivePrompt, prompt].map(item => String(item || '').trim()).filter(Boolean).join('\n');
   }
 
+  async function fetchImageViaProxy(endpoint, requestOptions) {
+    const machineConfig = window.IdealMachineConfig || {};
+    const base = String(machineConfig.imageProxyBase || machineConfig.repositoryApiBase || '').trim().replace(/\/+$/, '');
+    if (!base) throw new Error('尚未配置生图代理地址');
+    const token = window.IdealMachineAuth?.getToken?.();
+    if (!token) throw new Error('直连失败；登录理想机账号后，才能使用安全代理重试。');
+    const headers = new Headers(requestOptions.headers || {});
+    headers.set('X-Ideal-Authorization', `Bearer ${token}`);
+    headers.set('X-Ideal-Target-URL', endpoint);
+    const fetcher = window.IdealMachineFetch || fetch;
+    return fetcher(`${base}/api/image-proxy`, {
+      ...requestOptions,
+      headers,
+      idealScope:'image-proxy',
+      idealPurpose:'生图 API 跨域兜底代理'
+    });
+  }
+
   async function imageSourceToBlob(value, config) {
     const source = String(value || '').trim();
     if (!source) throw new Error('图片接口返回了空图片');
@@ -243,6 +261,7 @@
     let payload;
     let retriedWithoutResponseFormat = false;
     let retriedTransport = false;
+    let usedImageProxy = false;
     while (true) {
       requestOptions.body = JSON.stringify(body);
       try {
@@ -254,17 +273,25 @@
             await new Promise(resolve => setTimeout(resolve, 800));
             continue;
           }
-          const localFileHint = location.protocol === 'file:'
-            ? ' 当前页面是 file:// 本地文件，请改用 HTTPS/localhost 地址打开。'
-            : '';
-          throw new Error(`生图请求没有收到接口响应，可能是跨域（CORS/OPTIONS）或网络连接失败。${localFileHint}请确认生图服务允许当前页面来源的 POST、Authorization 和 Content-Type。`, { cause:error });
-        }
-        throw error;
+          try {
+            response = await fetchImageViaProxy(endpoint, requestOptions);
+            usedImageProxy = true;
+          } catch (proxyError) {
+            if (/尚未配置生图代理地址|登录理想机账号/.test(String(proxyError?.message || ''))) throw proxyError;
+            throw new Error(`生图直连未收到响应，安全代理重试也失败：${proxyError?.message || '代理网络连接失败'}。请检查网络或稍后重试。`, { cause:proxyError });
+          }
+        } else throw error;
       }
       let responseText = '';
       try { responseText = await response.clone().text(); } catch {}
       try { payload = responseText ? JSON.parse(responseText) : null; } catch { payload = null; }
       const providerMessage = String(payload?.error?.message || payload?.error || payload?.message || payload?.detail || responseText || '');
+      if (usedImageProxy && response.status === 401 && /UNAUTHORIZED/.test(providerMessage)) {
+        throw new Error('理想机账号登录状态已失效，请重新登录后再尝试代理生图。');
+      }
+      if (usedImageProxy && response.status === 502 && /IMAGE_UPSTREAM_UNREACHABLE/.test(providerMessage)) {
+        throw new Error('生图代理已连接，但代理服务器无法连到该 API。请检查接口地址或服务商网络状态。');
+      }
       const rejectsResponseFormat = canRequestBase64 && !retriedWithoutResponseFormat && !response.ok
         && /response[_ -]?format|unsupported.{0,30}(?:parameter|field)|unknown.{0,20}(?:parameter|field)|不支持.{0,12}(?:参数|字段)/i.test(providerMessage);
       if (rejectsResponseFormat) {

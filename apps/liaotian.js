@@ -2240,7 +2240,7 @@ ${rerollRule}
   function emojiPanel() { const group = state.emojis.groups.find(item => item.id === activeEmojiGroup) || state.emojis.groups[0]; const allSelected = Boolean(group?.items.length) && group.items.every(item => selectedEmojiIds.has(item.id)); return `<div class="chat-emoji-panel"><div class="chat-emoji-head"><div class="chat-emoji-groups">${state.emojis.groups.map(item => `<button class="${item.id === group?.id ? 'is-active' : ''}" data-emoji-group="${item.id}" type="button">${esc(item.name)}</button>`).join('')}</div></div>${emojiEditorOpen ? `<div class="chat-emoji-import"><form class="chat-emoji-create-form" data-emoji-create-form><input id="emojiNewGroupName" placeholder="新分组名称" required><button type="submit">添加分组</button></form><label>当前分组名称<input id="emojiGroupName" value="${esc(group?.name || '')}"></label><label>批量导入<small>支持“描述 + 裸链接”或“描述 + [链接](链接)”</small><textarea id="emojiImportText" placeholder="开心 https://example.com/happy.png"></textarea></label><div><button data-emoji-editor-cancel type="button">取消</button><button data-emoji-import type="button">导入并保存</button></div></div>` : `<div class="chat-emoji-list ${emojiEditMode ? 'is-editing' : ''}">${group?.items.length ? group.items.map(item => `<div class="chat-emoji-item ${selectedEmojiIds.has(item.id) ? 'is-selected' : ''}"><button data-emoji-use="${item.id}" type="button"><img src="${esc(item.url)}" alt="${esc(item.text)}"><span>${esc(item.text)}</span></button>${emojiEditMode ? `<label class="chat-emoji-check"><input type="checkbox" data-emoji-select="${item.id}" ${selectedEmojiIds.has(item.id) ? 'checked' : ''}>选择</label>` : ''}</div>`).join('') : '<div class="chat-emoji-empty">这个分组还没有表情包</div>'}</div><div class="chat-emoji-footer">${emojiEditMode ? `<button data-emoji-select-all type="button">${allSelected ? '取消全选' : '全选'}</button><button data-emoji-delete-selected type="button">删除已选</button><button data-emoji-cancel-edit type="button">取消</button>` : '<button data-emoji-edit-mode type="button">编辑</button><button data-emoji-open-editor type="button">批量导入</button>'}</div>`}</div>`; }
   const baseEmojiPanel = emojiPanel;
   emojiPanel = function() {
-    return baseEmojiPanel().replace(/<img src="([^"]*)" alt=/g, (_, source) => `<img data-emoji-src="${source}" src="${emojiDisplaySource(source)}" referrerpolicy="no-referrer" alt=`);
+    return baseEmojiPanel().replace(/<img src="([^"]*)" alt=/g, (_, source) => `<img loading="lazy" decoding="async" fetchpriority="low" data-emoji-src="${source}" src="${emojiDisplaySource(source)}" referrerpolicy="no-referrer" alt=`);
   };
   function emojiDisplaySource(value) {
     const source = String(value || '').trim();
@@ -2465,6 +2465,24 @@ ${rerollRule}
     return count(post?.comments);
   }
   function renderMomentPost(post) { const own = post.authorType === 'user'; const liked = Boolean(post.liked); const comments = Array.isArray(post.comments) ? post.comments : []; const commentCount = momentCommentCount(post); const visibilityLabel = post.visibility === 'private' ? '仅自己可见' : post.visibility === 'groups' ? `分组可见${post.visibleGroups?.length ? ` · ${post.visibleGroups.map(id => esc(state.contactGroups.find(group => group.id === id)?.name || '')).filter(Boolean).join('、')}` : ''}` : own ? '所有人可见' : '仅角色可见'; return `<article class="chat-moment ${own ? 'is-user' : 'is-role'}" data-moment-id="${esc(post.id)}"><div class="chat-moment-head">${momentAvatar(post)}<div><b>${esc(post.author || '我')}</b><small>${esc(post.realName || (own ? '我的动态' : '角色动态'))} · ${esc(post.time || '')}</small></div>${own ? '<span class="chat-moment-owner">我的</span>' : '<span class="chat-moment-owner">角色</span>'}</div><p>${esc(post.text || '')}</p>${post.image ? `<img src="${esc(post.image)}" alt="动态图片">` : ''}${post.location ? `<div class="chat-moment-location">⌖ ${esc(post.location)}</div>` : ''}<small class="chat-moment-visibility-label">◉ ${visibilityLabel}</small><div class="chat-moment-footer"><button class="${liked ? 'is-liked' : ''}" data-moment-like="${esc(post.id)}" type="button">♡ ${Number(post.likes || 0)}</button><button data-moment-comment="${esc(post.id)}" type="button">◌ ${commentCount}</button><button data-moment-interact="${esc(post.id)}" type="button">✦ 互动</button>${own ? `<button class="chat-moment-delete" data-moment-delete="${esc(post.id)}" type="button">删除</button>` : ''}</div>${comments.length ? `<div class="chat-moment-comments">${comments.map(comment => `<div><b>${esc(comment.author || '我')}</b><span>${esc(comment.text)}</span></div>`).join('')}</div>` : ''}</article>`; }
+  const renderMomentPostWithoutBilingual = renderMomentPost;
+  renderMomentPost = function(post) {
+    const html = renderMomentPostWithoutBilingual(post);
+    if (post?.authorType !== 'character') return html;
+    const chat = state.chats?.[post.authorId];
+    const bilingual = idealChatBilingualFor(chat);
+    if (!bilingual.enabled) return html;
+    const parsed = idealChatBilingualParse(post.text || '');
+    if (!parsed.translation) return html;
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const body = template.content.querySelector('.chat-moment > p');
+    if (body) {
+      body.innerHTML = `<span class="ideal-chat-bilingual-original">${esc(parsed.text)}</span><span class="ideal-chat-bilingual-translation">${esc(parsed.translation)}</span>`;
+      if (bilingual.autoExpandTranslation) body.classList.add('ideal-chat-bilingual-open');
+    }
+    return template.innerHTML;
+  };
   function renderMomentCoverEditor() { const panel = document.querySelector('#chatMomentCoverEditor'); if (!panel) return; panel.classList.toggle('is-open', momentCoverEditorOpen); panel.setAttribute('aria-hidden', String(!momentCoverEditorOpen)); if (!momentCoverEditorOpen) { panel.innerHTML = ''; return; } const source = momentCoverDraftSource || state.momentsCover || ''; const preview = source ? ` style="background-image:url('${esc(source)}')"` : ''; panel.innerHTML = `<div class="chat-moment-composer-backdrop" data-chat-moment-cover-close></div><section class="chat-moment-composer-card chat-moment-cover-editor-card"><header><div><span class="chat-kicker">MOMENTS COVER</span><h2>更换朋友圈封面</h2><small>可以使用本地图片、图片 URL 或理想机相册。</small></div><button data-chat-moment-cover-close type="button">×</button></header><main><div class="chat-moment-cover-preview"${preview}>${source ? '' : '预览封面图片'}</div><div class="chat-moment-cover-source-row"><label class="chat-file-button chat-moment-cover-file">本地图片<input id="chatMomentCoverUpload" type="file" accept="image/*"></label><button class="chat-file-button" data-chat-moment-cover-url type="button">图片 URL</button><button class="chat-file-button" data-chat-moment-cover-album type="button">从相册选择</button><button class="chat-moment-cover-reset" data-chat-moment-cover-reset type="button">恢复默认</button></div></main><footer><button data-chat-moment-cover-close type="button">取消</button><button data-chat-moment-cover-save type="button">保存封面</button></footer></section>`; }
   function renderMomentComposer() { const panel = document.querySelector('#chatMomentComposer'); if (!panel) return; panel.classList.toggle('is-open', momentComposerOpen); panel.setAttribute('aria-hidden', String(!momentComposerOpen)); if (!momentComposerOpen) { panel.innerHTML = ''; return; } const profile = momentProfile(); const groups = state.contactGroups; const groupChoices = momentVisibilityMode === 'groups' && groups.length ? `<div class="chat-moment-group-choices" aria-label="选择可见分组">${groups.map(group => `<label><input type="checkbox" data-chat-moment-visibility="${esc(group.id)}" ${momentVisibility.includes(group.id) ? 'checked' : ''}>${esc(group.name)}</label>`).join('')}</div>` : ''; panel.innerHTML = `<div class="chat-moment-composer-backdrop" data-chat-moment-compose-close></div><section class="chat-moment-composer-card"><header><div><span class="chat-kicker">NEW MOMENT</span><h2>发布动态</h2><small>以 ${esc(profile.nickname || '朋友圈用户')} 的身份发布</small></div><button data-chat-moment-compose-close type="button">×</button></header><main><textarea id="chatMomentText" maxlength="500" placeholder="这一刻想分享什么？"></textarea><div class="chat-moment-image-picker">${momentImageData ? `<img src="${esc(momentImageData)}" alt="动态图片预览">` : '<div class="chat-moment-image-empty">还没有添加图片</div>'}<button data-chat-moment-image type="button">${momentImageData ? '更换图片' : '添加图片'}</button><input id="chatMomentImageFile" type="file" accept="image/*" hidden></div><input id="chatMomentLocation" maxlength="40" placeholder="添加地点（可选）"><div class="chat-moment-visibility"><b>谁可以看</b><div class="chat-moment-visibility-modes" role="radiogroup" aria-label="动态可见范围"><label><input type="radio" name="momentVisibilityMode" data-chat-moment-visibility-mode="all" ${momentVisibilityMode === 'all' ? 'checked' : ''}>所有人可见</label><label><input type="radio" name="momentVisibilityMode" data-chat-moment-visibility-mode="private" ${momentVisibilityMode === 'private' ? 'checked' : ''}>仅自己可见</label>${groups.length ? `<label><input type="radio" name="momentVisibilityMode" data-chat-moment-visibility-mode="groups" ${momentVisibilityMode === 'groups' ? 'checked' : ''}>指定分组可见</label>` : ''}</div>${groupChoices}<small>仅自己可见的动态不会出现在角色视角中。</small></div></main><footer><button data-chat-moment-compose-close type="button">取消</button><button data-chat-moment-compose-save type="button">发布</button></footer></section>`; }
   function renderGroupComposer() { const panel = document.querySelector('#chatGroupComposer'); if (!panel) return; panel.classList.toggle('is-open', contactGroupComposerOpen); panel.setAttribute('aria-hidden', String(!contactGroupComposerOpen)); if (!contactGroupComposerOpen) { panel.innerHTML = ''; return; } panel.innerHTML = `<div class="chat-moment-composer-backdrop" data-chat-group-compose-close></div><section class="chat-moment-composer-card chat-group-composer-card"><header><div><span class="chat-kicker">MOMENTS GROUP</span><h2>添加分组</h2><small>用于设置朋友圈的可见范围，不影响聊天。</small></div><button data-chat-group-compose-close type="button">×</button></header><main><label class="chat-group-name-field">分组名称<input id="chatGroupName" maxlength="20" placeholder="例如：朋友、家人、同事"></label></main><footer><button data-chat-group-compose-close type="button">取消</button><button data-chat-group-compose-save type="button">保存分组</button></footer></section>`; }
@@ -2599,7 +2617,67 @@ ${rerollRule}
     const background = [world.title && `世界名称：${world.title}`, world.summary && `世界背景：${world.summary}`, world.era && `时代：${world.era}`, world.location && `主要地点：${world.location}`, world.atmosphere && `氛围：${world.atmosphere}`, Array.isArray(world.rules) && world.rules.length ? `世界规则：${world.rules.join('；')}` : ''].filter(Boolean).join('\n');
     return { background: background || '', raw: boundWorldbookContext(contact) || '当前没有绑定世界书。', hasAnalysis: Boolean(background) };
   }
-  async function generateRoleMoment(contactId, targetPost = null) { const contact = contactId ? state.contacts.find(item => String(item.id) === String(contactId)) : state.contacts[Math.floor(Math.random() * state.contacts.length)]; if (!contact) return window.alert('请先添加角色。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。'); momentBusy = true; render(); const chat = state.chats[contact.id] || {}; const recent = (chat.messages || []).slice(-12).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name}：${item.text || `[${item.type || '消息'}]`}`).join('\n') || '最近没有聊天记录。'; const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }); const prompt = targetPost ? `请让角色“${contact.nickname || contact.name}”评论这条朋友圈，只输出评论正文，控制在1—2句。朋友圈内容：${targetPost.text || '[图片动态]'}\n角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：${recent}\n${boundWorldbookContext(contact)}\n请结合以上信息，不要提及你看到了世界书。` : `你就是角色“${contact.nickname || contact.name}”，只能以这个角色本人的身份和口吻发朋友圈，不要模仿其他正在聊天的角色。请生成一条自然的朋友圈动态，只输出正文，控制在1—3句。角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：\n${recent}\n${boundWorldbookContext(contact)}\n请结合角色绑定的局部世界书创作，不要提及世界书。`; try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', idealContactId:contact.id, idealScope:'chat-moments', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .85, messages: [{ role: 'system', content: `你是角色“${contact.nickname || contact.name}”的朋友圈文案助手。只使用该角色的设定和最近聊天，不得借用其他角色的身份、称呼或说话方式。` }, { role: 'user', content: prompt }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const text = requireCharacterReplyText(data).replace(/^['“”"\s]+|['“”"\s]+$/g, '').trim(); if (targetPost) { targetPost.comments ||= []; targetPost.comments.push({ id: uid('comment'), author: contact.nickname || contact.name, text, authorType: 'character', authorId: contact.id, time: time() }); } else state.moments.unshift({ id: uid('moment'), author: contact.nickname || contact.name, realName: contact.name, authorType: 'character', authorId: contact.id, avatar: contact.avatar || '', text, visibility: 'character', time: time(), likes: 0, comments: [] }); save(); } catch (error) { window.alert(`角色互动生成失败：${error.message}`); } finally { if (!momentGenerationDepth) { momentBusy = false; render(); } } }
+  async function generateRoleMoment(contactId, targetPost = null) {
+    const contact = contactId ? state.contacts.find(item => String(item.id) === String(contactId)) : state.contacts[Math.floor(Math.random() * state.contacts.length)];
+    if (!contact) return window.alert('请先添加角色。');
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。');
+    momentBusy = true;
+    render();
+    const chat = state.chats[contact.id] || {};
+    const bilingualRule = idealChatBilingualInstruction(chat);
+    const recent = (chat.messages || []).slice(-12).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name}：${item.text || `[${item.type || '消息'}]`}`).join('\n') || '最近没有聊天记录。';
+    const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    const prompt = targetPost
+      ? `请让角色“${contact.nickname || contact.name}”评论这条朋友圈，只输出评论正文，控制在1—2句。朋友圈内容：${targetPost.text || '[图片动态]'}\n角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：${recent}\n${boundWorldbookContext(contact)}\n请结合以上信息，不要提及你看到了世界书。${bilingualRule}`
+      : `你就是角色“${contact.nickname || contact.name}”，只能以这个角色本人的身份和口吻发朋友圈，不要模仿其他正在聊天的角色。请生成一条自然的朋友圈动态，只输出正文，控制在1—3句。角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：\n${recent}\n${boundWorldbookContext(contact)}\n请结合角色绑定的局部世界书创作，不要提及世界书。${bilingualRule}`;
+    try {
+      const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, {
+        method:'POST', idealContactId:contact.id, idealScope:'chat-moments',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${config.key}` },
+        body:JSON.stringify({ model, temperature:.85, messages:[
+          { role:'system', content:`你是角色“${contact.nickname || contact.name}”的朋友圈文案助手。只使用该角色的设定和最近聊天，不得借用其他角色的身份、称呼或说话方式。${bilingualRule}` },
+          { role:'user', content:prompt }
+        ] })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const text = requireCharacterReplyText(data).replace(/^['“”"\s]+|['“”"\s]+$/g, '').trim();
+      if (targetPost) {
+        targetPost.comments ||= [];
+        targetPost.comments.push({ id:uid('comment'), author:contact.nickname || contact.name, text, authorType:'character', authorId:contact.id, time:time() });
+      } else {
+        state.moments.unshift({ id:uid('moment'), author:contact.nickname || contact.name, realName:contact.name, authorType:'character', authorId:contact.id, avatar:contact.avatar || '', text, visibility:'character', time:time(), likes:0, comments:[] });
+      }
+      save();
+    } catch (error) {
+      window.alert(`角色互动生成失败：${error.message}`);
+    } finally {
+      if (!momentGenerationDepth) { momentBusy = false; render(); }
+    }
+  }
+
+  const generateRoleMomentBeforeBilingual = generateRoleMoment;
+  generateRoleMoment = async function(contactId, targetPost = null) {
+    const before = new Set(state.moments.map(post => String(post.id)));
+    const result = await generateRoleMomentBeforeBilingual(contactId, targetPost);
+    if (targetPost) return result;
+    const config = window.IdealMachineAPI?.getConfig?.();
+    const model = window.IdealMachineAPI?.getModel?.('chat');
+    for (const post of state.moments.filter(item => !before.has(String(item.id)) && item.authorType === 'character')) {
+      const chat = state.chats?.[post.authorId];
+      if (!idealChatBilingualFor(chat).enabled || idealChatBilingualReplyCompliant(post.text, chat) || !config?.endpoint || !config.key || !model) continue;
+      const contact = state.contacts.find(item => String(item.id) === String(post.authorId));
+      const systemText = `你是角色“${contact?.nickname || contact?.name || post.author}”本人，只能按该角色的身份和口吻写作。${idealChatBilingualInstruction(chat)}`;
+      const history = [{ role:'user', content:`请把这条角色朋友圈动态整理为双语格式，保持原意、事实、角色口吻和 1—3 句长度，不要额外扩写：\n${post.text}` }];
+      const corrected = await idealChatBilingualCorrectReply(post.text, chat, config, model, systemText, history, 'chat-moments-bilingual-format');
+      if (idealChatBilingualReplyCompliant(corrected, chat)) post.text = corrected;
+      else console.warn('[理想机双语] 朋友圈动态未能校正为双语格式：', post.authorId);
+    }
+    save();
+    return result;
+  };
 
   function renderProfileEditor() { const panel = document.querySelector('#chatProfileEditor'); if (!panel) return; panel.classList.toggle('is-open', profileEditorOpen); panel.setAttribute('aria-hidden', String(!profileEditorOpen)); if (!profileEditorOpen) { panel.innerHTML = ''; return; } const moments = profileEditorPurpose === 'moments'; const profile = moments ? (state.momentsProfile || {}) : (state.profiles.find(item => item.id === profileEditId) || {}); const source = { ...profile, ...(profileDraft || {}) }; const identityFields = moments ? `<label>网名<input id="profileNickname" value="${esc(source.nickname)}" placeholder="填写朋友圈网名"></label><label>性别<select id="profileGender"><option value="">未设置</option><option ${source.gender === '男' ? 'selected' : ''}>男</option><option ${source.gender === '女' ? 'selected' : ''}>女</option><option ${source.gender === '其他' ? 'selected' : ''}>其他</option></select></label>` : `<label>真实姓名<input id="profileRealName" value="${esc(source.realName)}" placeholder="填写真实姓名"></label><label>网名<input id="profileNickname" value="${esc(source.nickname)}" placeholder="填写网名"></label><label>生日<input id="profileBirthday" type="date" value="${esc(source.birthday)}"></label><label>性别<select id="profileGender"><option value="">未设置</option><option ${source.gender === '男' ? 'selected' : ''}>男</option><option ${source.gender === '女' ? 'selected' : ''}>女</option><option ${source.gender === '其他' ? 'selected' : ''}>其他</option></select></label>`; const extra = moments ? '<p class="chat-moment-profile-reminder">这是所有角色共用的朋友圈用户身份，只设置头像、网名和性别。</p>' : '<label class="chat-editor-wide">具体设定<textarea id="profilePersona" placeholder="填写身份、性格、经历和说话方式">' + esc(source.persona) + '</textarea></label>'; panel.innerHTML = `<section class="chat-editor-sheet"><header><div><span class="chat-kicker">USER IDENTITY</span><h2>${moments ? '朋友圈用户' : (profileEditId ? '编辑用户设定' : '新建用户设定')}</h2></div><button data-profile-editor-close type="button">×</button></header><div class="chat-editor-body"><div class="chat-avatar-picker"><span class="chat-editor-avatar">${profileAvatar ? `<img src="${esc(profileAvatar)}" alt="用户头像">` : esc((source.realName || source.nickname || '我').slice(0, 1))}</span><div><div class="chat-avatar-actions"><label class="chat-file-button">上传头像<input id="profileAvatarFile" type="file" accept="image/*"></label><button class="chat-file-button" data-profile-album-avatar type="button">从相册选择</button></div><input class="chat-avatar-url" id="profileAvatarUrl" type="url" value="${esc(profileDraft?.avatarUrl ?? (profileAvatar.startsWith('data:') ? '' : profileAvatar))}" placeholder="或粘贴头像 URL"></div></div><div class="chat-editor-grid">${identityFields}</div>${extra}</div><footer><button data-profile-editor-close type="button">取消</button><button data-profile-editor-save type="button">保存设定</button></footer></section>`; }
   function openProfileEditor(profile) { profileEditorOpen = true; profileEditId = profile?.id || null; profileAvatar = profileEditorPurpose === 'moments' ? (state.momentsProfile?.avatar || '') : (profile?.avatar || ''); profileDraft = null; renderProfileEditor(); }
@@ -3269,6 +3347,20 @@ ${rerollRule}
     if (styleSelect) styleSelect.value = style.id;
     if (styleDetail) styleDetail.value = style.prompt;
   }
+  document.addEventListener('focusin', event => {
+    const field = event.target.closest?.('[data-offline-preset], [data-offline-style-detail]');
+    const panel = field?.closest('[data-offline-settings-panel]');
+    if (!field || !panel) return;
+    panel.dataset.activeSettingField = field.matches('[data-offline-style-detail]') ? 'style' : 'prompt';
+    requestAnimationFrame(() => {
+      if (!field.isConnected || document.activeElement !== field) return;
+      const panelRect = panel.getBoundingClientRect();
+      const fieldRect = field.getBoundingClientRect();
+      const visibleBottom = Math.min(panelRect.bottom, window.visualViewport?.height || window.innerHeight);
+      if (fieldRect.top < panelRect.top + 12) panel.scrollTop -= panelRect.top + 12 - fieldRect.top;
+      else if (fieldRect.bottom > visibleBottom - 18) panel.scrollTop += fieldRect.bottom - visibleBottom + 18;
+    });
+  });
   function saveOfflineSettings(session) {
     const panel = document.querySelector('[data-chat-offline-modal] [data-offline-settings-panel]');
     if (!panel) return;
@@ -7983,6 +8075,11 @@ ${recentConversation}
   }
   function stopOfflinePress() { window.clearTimeout(offlinePressTimer); offlinePressTimer = 0; offlinePressStart = null; }
   openOfflineMode = function() {
+    const previousMessageBox = document.querySelector('[data-chat-offline-modal] .offline-meeting-v2 .chat-offline-messages');
+    const previousScrollTop = previousMessageBox?.scrollTop || 0;
+    const wasAtLatest = previousMessageBox
+      ? previousMessageBox.scrollHeight - previousMessageBox.clientHeight - previousMessageBox.scrollTop < 72
+      : true;
     renderOfflineMeetingPage();
     if (offlineSelectionSessionId !== offlineSessionId) {
       offlineSelectionSessionId = offlineSessionId;
@@ -8008,6 +8105,12 @@ ${recentConversation}
       else presetInput.before(controls);
     }
     syncOfflinePresetField(document.querySelector('[data-chat-offline-modal] [data-offline-settings-panel]'));
+    const nextMessageBox = document.querySelector('[data-chat-offline-modal] .offline-meeting-v2 .chat-offline-messages');
+    if (nextMessageBox) {
+      nextMessageBox.scrollTop = wasAtLatest
+        ? nextMessageBox.scrollHeight
+        : Math.min(previousScrollTop, Math.max(0, nextMessageBox.scrollHeight - nextMessageBox.clientHeight));
+    }
   };
   document.addEventListener('pointerdown', event => {
     const article = event.target.closest?.('[data-chat-offline-modal] .offline-meeting-v2 [data-offline-message-index]');
@@ -9465,7 +9568,7 @@ ${recentConversation}
     if (!message?.sticker && !matchingEmoji) return html;
     const originalSource = matchingEmoji ? normalizeEmojiImageSource(matchingEmoji.url || rawSource) : rawSource;
     const displaySource = emojiDisplaySource(originalSource);
-    return html.replace(/<img src="[^"]*" alt="图片">/, `<img data-emoji-src="${esc(displaySource)}" src="${esc(displaySource)}" referrerpolicy="no-referrer" alt="图片">`);
+    return html.replace(/<img src="[^"]*" alt="图片">/, `<img loading="lazy" decoding="async" fetchpriority="low" data-emoji-src="${esc(displaySource)}" src="${esc(displaySource)}" referrerpolicy="no-referrer" alt="图片">`);
   };
   const messageHtmlWithChatTranslation = messageHtml;
   messageHtml = function(message) {
