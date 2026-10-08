@@ -880,6 +880,11 @@
     render();
     root.querySelector('[data-ir-filter]').focus();
   });
+  root.addEventListener('keydown', event => {
+    if (!event.target.matches('[data-ir-chat-input]') || event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    if (!chatSending && chatCanSend && chatDraft.trim()) root.querySelector('.ir-chat-composer')?.requestSubmit();
+  });
   root.addEventListener('compositionend', event => {
     if (!event.target.matches('[data-ir-filter]')) return;
     postQuery = event.target.value;
