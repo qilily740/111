@@ -5,7 +5,7 @@
   const root = document.createElement('section');
   root.className = 'ideal-beauty-center';
   root.setAttribute('aria-label', '理想机美化中心');
-  root.innerHTML = '<div class="ideal-beauty-page"><header class="ideal-beauty-head"><div><span class="ideal-beauty-kicker">IDEAL MACHINE</span><h1 class="ideal-beauty-title" data-view-title>Ideal-美化</h1></div><div class="ideal-beauty-head-actions"><button class="ideal-beauty-icon-button" data-close-center type="button" aria-label="关闭">×</button></div></header><nav class="ideal-beauty-app-tabs" data-category-tabs aria-label="美化分类"></nav><main class="ideal-beauty-content" data-content></main><button class="ideal-beauty-fab" data-toggle-account type="button" aria-label="切换到 Ideal-账号" title="Ideal-账号"></button></div>';
+  root.innerHTML = '<div class="ideal-beauty-page"><header class="ideal-beauty-head"><div><span class="ideal-beauty-kicker">IDEAL MACHINE</span><h1 class="ideal-beauty-title" data-view-title>Ideal-美化</h1></div><div class="ideal-beauty-head-actions"><button class="ideal-beauty-icon-button" data-close-center type="button" aria-label="关闭">×</button></div></header><nav class="ideal-beauty-app-tabs" data-category-tabs aria-label="美化分类"></nav><main class="ideal-beauty-content" data-content></main></div>';
   document.body.appendChild(root);
 
   const categories = [
@@ -13,6 +13,7 @@
     { id:'online', name:'线上' },
     { id:'offline', name:'线下' },
     { id:'forum', name:'论坛' },
+    { id:'desktop', name:'桌面' },
     { id:'mine', name:'我的' }
   ];
   let category = 'chat';
@@ -29,6 +30,7 @@
 
   function categoryForTarget(target) {
     if (!target) return 'mine';
+    if (target.appId === 'meihua' || target.sectionId === 'desktop') return 'desktop';
     if (target.appId === 'luntan') return 'forum';
     if (target.appId === 'liaotian') {
       if (target.sectionId === 'offline') return 'offline';
@@ -39,6 +41,7 @@
   }
 
   function categoryForAsset(item) {
+    if (item?.appId === 'meihua' || item?.sectionId === 'desktop') return 'desktop';
     return categoryForTarget(api.find(item.appId, item.sectionId));
   }
 
@@ -53,6 +56,7 @@
   function targetName(item) {
     const target = api.find(item.appId, item.sectionId);
     if (!target) return categoryName(categoryForAsset(item));
+    if (categoryForTarget(target) === 'desktop') return '桌面图标、壁纸与 App 名称';
     if (categoryForTarget(target) === 'online') return target.name || '线上角色';
     if (categoryForTarget(target) === 'offline') return '线下';
     if (categoryForTarget(target) === 'forum') return target.name || '论坛';
@@ -77,14 +81,12 @@
   function openDialog(markup) {
     root.querySelector('.ideal-beauty-dialog-backdrop')?.remove();
     activeDialog = true;
-    $('[data-toggle-account]')?.classList.add('ideal-beauty-hidden');
     root.insertAdjacentHTML('beforeend', `<div class="ideal-beauty-dialog-backdrop" data-dialog-backdrop><section class="ideal-beauty-dialog" role="dialog" aria-modal="true">${markup}</section></div>`);
   }
 
   function closeDialog() {
     root.querySelector('.ideal-beauty-dialog-backdrop')?.remove();
     activeDialog = false;
-    $('[data-toggle-account]')?.classList.remove('ideal-beauty-hidden');
   }
 
   function setEditedPreview(source, label = '已选择图片') {
@@ -114,12 +116,6 @@
       info.style.maxHeight = `${height}px`;
     }
   }
-  function toggleIcon() {
-    return view === 'beauty'
-      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.2 20c.5-3.4 2.8-5.2 6.8-5.2s6.3 1.8 6.8 5.2"/></svg>'
-      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v3M12 17.5v3M3.5 12h3m11 0h3M6.1 6.1l2.1 2.1m7.6 7.6 2.1 2.1m0-11.8-2.1 2.1m-7.6 7.6-2.1 2.1"/><path d="m15.5 3 .55 1.7a1.2 1.2 0 0 0 .75.75l1.7.55-1.7.55a1.2 1.2 0 0 0-.75.75l-.55 1.7-.55-1.7a1.2 1.2 0 0 0-.75-.75L12.5 6.3l1.7-.55a1.2 1.2 0 0 0 .75-.75z"/></svg>';
-  }
-
   function renderTabs() {
     const items = api.library.list();
     const counts = Object.fromEntries(categories.map(item => [item.id, item.id === 'mine' ? items.length : items.filter(asset => categoryForAsset(asset) === item.id).length]));
@@ -174,10 +170,6 @@
       $('[data-view-title]').textContent = view === 'beauty' ? 'Ideal-美化' : 'Ideal-账号';
       $('[data-category-tabs]').classList.toggle('ideal-beauty-hidden', view !== 'beauty');
       $('.ideal-beauty-page').classList.toggle('is-asset-view', view === 'beauty' && screen === 'asset');
-      const toggle = $('[data-toggle-account]');
-      toggle.innerHTML = toggleIcon();
-      toggle.setAttribute('aria-label', view === 'beauty' ? '切换到 Ideal-账号' : '切换到 Ideal-美化');
-      toggle.title = view === 'beauty' ? 'Ideal-账号' : 'Ideal-美化';
       if (view === 'beauty') renderTabs();
       $('[data-close-center]').textContent = screen === 'asset' ? '‹' : '×';
       if (view === 'account') renderAccount(); else if (screen === 'asset') renderAsset(); else renderCategory();
@@ -193,9 +185,14 @@
     try {
       const payload = await api.api('/api/beauty/codes');
       const local = api.library.list();
-      (Array.isArray(payload.items) ? payload.items : []).filter(item => item?.code).forEach(item => {
-        if (!local.some(saved => saved.code === item.code)) api.library.add({ ...item, css:item.css || '', source:'generated' });
-      });
+      for (const item of (Array.isArray(payload.items) ? payload.items : []).filter(entry => entry?.code)) {
+        if (local.some(saved => saved.code === item.code)) continue;
+        if (item.appId === 'meihua') {
+          await window.IdealMachineEnsureAppLoaded?.('meihua');
+          const css = window.IdealMachineDesktopBeauty?.compactCss ? await window.IdealMachineDesktopBeauty.compactCss(item.css || '') : item.css || '';
+          api.library.add({ ...item, css, source:'generated' });
+        } else api.library.add({ ...item, css:item.css || '', source:'generated' });
+      }
       remoteStatus = '';
     } catch (error) {
       remoteStatus = `云端美化暂时无法同步：${error.message}`;
@@ -238,6 +235,7 @@
   function parseJsonEntries(raw, fileName) {
     let payload;
     try { payload = JSON.parse(String(raw || '')); } catch { throw new Error(`${fileName} 不是有效的 JSON 文件。`); }
+    if (payload?.format === 'ideal-machine-beauty') return [{ name:'桌面美化', appId:'meihua', sectionId:'desktop', css:JSON.stringify(payload), target:api.find('meihua', 'desktop') }];
     const entries = Array.isArray(payload) ? payload : Array.isArray(payload.items) ? payload.items : [payload];
     return entries.filter(Boolean).map(entry => {
       if (typeof entry.css !== 'string' || typeof entry.appId !== 'string' || typeof entry.sectionId !== 'string') throw new Error(`${fileName} 缺少有效的美化内容。`);
@@ -264,18 +262,28 @@
         try {
           const result = await api.api(`/api/beauty/codes/${encodeURIComponent(code)}`);
           const item = result.item || result;
+          if (item.appId === 'meihua') await window.IdealMachineEnsureAppLoaded?.('meihua');
           const target = api.find(item.appId, item.sectionId);
           if (typeof item.css !== 'string' || !target) throw new Error('美化码对应的分类当前不可用。');
-          const asset = api.library.add({ name:item.name || '未命名美化', author:item.author || '', appId:item.appId, sectionId:item.sectionId, css:item.css, code:item.code || code, previewImage:item.previewImage || '', source:'imported-code' });
-          api.applyBeauty(item); announceImportedAsset(asset); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
+          const localItem = item.appId === 'meihua' && window.IdealMachineDesktopBeauty?.compactCss ? { ...item, css:await window.IdealMachineDesktopBeauty.compactCss(item.css) } : item;
+          const asset = api.library.add({ name:item.name || '未命名美化', author:item.author || '', appId:item.appId, sectionId:item.sectionId, css:localItem.css, code:item.code || code, previewImage:item.previewImage || '', source:'imported-code' });
+          if (item.appId === 'meihua') await window.IdealMachineDesktopBeauty.apply(localItem.css); else api.applyBeauty(item);
+          announceImportedAsset(asset); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
         } catch (error) { errors.push(`${code}：${error.message || '导入失败'}`); }
       }
       for (const file of jsonFiles) {
         try {
-          const entries = parseJsonEntries(await file.text(), file.name);
+          const raw = await file.text();
+          const preflight = JSON.parse(raw);
+          const rawEntries = Array.isArray(preflight) ? preflight : Array.isArray(preflight.items) ? preflight.items : [preflight];
+          if (rawEntries.some(entry => entry?.appId === 'meihua')) await window.IdealMachineEnsureAppLoaded?.('meihua');
+          const entries = parseJsonEntries(raw, file.name);
           for (const entry of entries) {
-            const asset = api.library.add({ name:entry.name || '未命名美化', author:entry.author || '', appId:entry.appId, sectionId:entry.sectionId, css:entry.css, code:entry.code || '', previewImage:entry.previewImage || '', source:'json' });
-            api.applyBeauty(entry); announceImportedAsset(asset); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
+            if (entry.appId === 'meihua') await window.IdealMachineEnsureAppLoaded?.('meihua');
+            const localCss = entry.appId === 'meihua' && window.IdealMachineDesktopBeauty?.compactCss ? await window.IdealMachineDesktopBeauty.compactCss(entry.css) : entry.css;
+            const asset = api.library.add({ name:entry.name || '未命名美化', author:entry.author || '', appId:entry.appId, sectionId:entry.sectionId, css:localCss, code:entry.code || '', previewImage:entry.previewImage || '', source:'json' });
+            if (entry.appId === 'meihua') await window.IdealMachineDesktopBeauty.apply(localCss); else api.applyBeauty(entry);
+            announceImportedAsset(asset); selectedAssetId = asset.id; importedAssets.push(asset); imported++;
           }
         } catch (error) { errors.push(error.message || `${file.name} 导入失败`); }
       }
@@ -308,16 +316,16 @@
     const card = event.target.closest('[data-open-asset]');
     if (card && !button) { selectedAssetId = card.dataset.openAsset; screen = 'asset'; render(); return; }
     if (!button) return;
-    if (button.matches('[data-toggle-account]')) { if (activeDialog) return; view = view === 'beauty' ? 'account' : 'beauty'; screen = 'categories'; render(); return; }
     if (button.matches('[data-close-center]')) { if (view === 'beauty' && screen === 'asset') { screen = 'categories'; render(); } else close(); return; }
-    if (button.matches('[data-select-category]')) { category = button.dataset.selectCategory; screen = 'categories'; render(); return; }
+    if (button.matches('[data-select-category]')) { category = button.dataset.selectCategory; screen = 'categories'; if (category === 'desktop') await window.IdealMachineEnsureAppLoaded?.('meihua'); render(); return; }
     if (button.matches('[data-import-code]')) { showImportDialog(); return; }
     if (button.matches('[data-confirm-import]')) { const codes = root.querySelector('[data-import-codes]')?.value || ''; const jsonFiles = [...(root.querySelector('[data-import-json-files]')?.files || [])]; await importBatch(codes, jsonFiles, button); return; }
     if (button.matches('[data-save-post-previews]')) { await savePostImportPreviews(importedAssetsForPreview, button); return; }
-    if (button.matches('[data-use-asset]')) { const item = selectedAsset(); if (!item) return; try { api.applyBeauty(item); toast('美化已应用'); } catch (error) { toast(error.message); } return; }
+    if (button.matches('[data-use-asset]')) { const item = selectedAsset(); if (!item) return; try { if (item.appId === 'meihua') await window.IdealMachineDesktopBeauty?.apply(item.css); else api.applyBeauty(item); toast('美化已应用'); } catch (error) { toast(error.message); } return; }
     if (button.matches('[data-copy-code]')) { const item = selectedAsset(); if (!item?.code) return; try { await navigator.clipboard.writeText(item.code); toast('美化码已复制'); } catch { window.prompt('复制美化码', item.code); } return; }
     if (button.matches('[data-edit-css]')) {
       const item = selectedAsset(); if (!item) return;
+      if (item.appId === 'meihua') return toast('桌面方案包含图标和图片，请在美化 App 中调整后重新导出。');
       openDialog(`<h2>编辑美化</h2><p class="ideal-beauty-import-note">只修改本机副本，不会改变作者的原始美化码。修改后的导入副本仍不能再次导出或分享。</p><label class="ideal-beauty-field">名称<input data-edit-css-name maxlength="60" value="${esc(item.name || '')}"></label><label class="ideal-beauty-field">CSS 美化代码<textarea data-edit-css-input rows="12" spellcheck="false">${esc(item.css || '')}</textarea></label><div class="ideal-beauty-dialog-actions"><button class="ideal-beauty-action" data-dialog-cancel type="button">取消</button><button class="ideal-beauty-action is-primary" data-save-css type="button">保存并应用</button></div>`);
       return;
     }

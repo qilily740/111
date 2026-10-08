@@ -737,7 +737,9 @@
       const source = await attachmentFile(file);
       if (/\.json$/i.test(file.name)) {
         const parsed = JSON.parse(await source.text());
-        assets = (Array.isArray(parsed) ? parsed : Array.isArray(parsed.items) ? parsed.items : [parsed]).map(item => ({ ...item, source:'json' }));
+        assets = parsed?.format === 'ideal-machine-beauty'
+          ? [{ name:post.title || '桌面美化', author:post.authorName || '', appId:'meihua', sectionId:'desktop', css:JSON.stringify(parsed), source:'json' }]
+          : (Array.isArray(parsed) ? parsed : Array.isArray(parsed.items) ? parsed.items : [parsed]).map(item => ({ ...item, source:'json' }));
       } else if (!assets.length) {
         const sections = beauty.listSections();
         const choice = window.prompt(`请选择 CSS 要存入的位置：\n${sections.map((item, index) => `${index + 1}. ${item.appName} / ${item.name}`).join('\n')}`, '1');
@@ -750,13 +752,15 @@
     if (!assets.length) throw new Error('这篇美化帖缺少可导入的美化码、JSON 或 CSS 文件；仍可单独下载附件。');
     assets = [...new Map(assets.filter(item => item?.appId && item?.sectionId).map(item => [`${item.appId}:${item.sectionId}`, item])).values()];
     for (const appId of new Set(assets.map(item => item.appId))) {
+      if (appId === 'meihua') await window.IdealMachineEnsureAppLoaded?.('meihua');
       if (appId === 'liaotian') await window.IdealMachineEnsureAppLoaded?.('liaotian');
       if (appId === 'luntan') await window.IdealMachineEnsureAppLoaded?.('luntan');
     }
     if (!assets.length || assets.some(item => !beauty.find(item.appId, item.sectionId) || !String(item.css || '').trim())) throw new Error('美化文件缺少可识别的应用、位置或 CSS。');
     for (const item of assets) {
       if (beauty.library.list().some(saved => saved.repositoryPostId === post.id && saved.appId === item.appId && saved.sectionId === item.sectionId)) continue;
-      beauty.library.add({ ...item, repositoryPostId:post.id, imported:true });
+      const localItem = item.appId === 'meihua' && window.IdealMachineDesktopBeauty?.compactCss ? { ...item, css:await window.IdealMachineDesktopBeauty.compactCss(item.css) } : item;
+      beauty.library.add({ ...localItem, repositoryPostId:post.id, imported:true });
     }
     window.dispatchEvent(new CustomEvent('ideal-machine-beauty-imported'));
   }

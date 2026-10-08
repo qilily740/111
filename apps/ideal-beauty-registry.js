@@ -35,7 +35,8 @@
     const tags = new Set();
     for (const asset of assets) {
       const value = `${asset.appId || ''} ${asset.sectionId || ''} ${asset.appName || ''} ${asset.name || ''}`.toLowerCase();
-      if (asset.appId === 'luntan' || /论坛|forum/.test(value)) tags.add('论坛');
+      if (asset.appId === 'meihua' || /桌面|壁纸|图标|launcher/.test(value)) tags.add('桌面');
+      else if (asset.appId === 'luntan' || /论坛|forum/.test(value)) tags.add('论坛');
       else if (/线下|offline/.test(value)) tags.add('线下');
       else if (/线上|online/.test(value)) tags.add('线上');
       else if (asset.appId === 'liaotian' || /聊天|chat/.test(value)) tags.add('聊天');
@@ -54,7 +55,10 @@
       if (!item.code) throw new Error(`“${asset.name || asset.sectionId}”没有生成美化码。`);
       created.push(item);
       if (!readLibrary().some(entry => entry.code && entry.code === item.code)) {
-        try { addAsset({ ...item, source:'generated' }); } catch {}
+        try {
+          const localItem = item.appId === 'meihua' && window.IdealMachineDesktopBeauty?.compactCss ? { ...item, css:await window.IdealMachineDesktopBeauty.compactCss(item.css) } : item;
+          addAsset({ ...localItem, source:'generated' });
+        } catch {}
       }
     }
     const bundle = { format:'ideal-machine-beauty-bundle', version:1, items:created.map(item => ({ ...toJSON(item), code:item.code })) };
@@ -118,7 +122,10 @@
           const item = { ...asset, ...(result.item || {}), code:result.item?.code || result.code };
           created.push({ ...item, reused:Boolean(result.reused) });
           if (!readLibrary().some(entry => entry.code && entry.code === item.code)) {
-            try { addAsset({ ...item, source:'generated' }); } catch {}
+            try {
+              const localItem = item.appId === 'meihua' && window.IdealMachineDesktopBeauty?.compactCss ? { ...item, css:await window.IdealMachineDesktopBeauty.compactCss(item.css) } : item;
+              addAsset({ ...localItem, source:'generated' });
+            } catch {}
           }
         }
         message.textContent = `${created.some(item => item.reused) ? '已有相同美化码，已复用原码。' : `已生成 ${created.length} 个美化码：`}\n${created.map(item => `${item.name || '美化'}：${item.code}`).join('\n')}`;

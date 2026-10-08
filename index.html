@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="apps/chat-mobile-keyboard.css?v=20261008-quote-transparent-3">
   <link rel="stylesheet" href="apps/jiaocheng.css?v=20261003-tutorial-1">
   <link rel="stylesheet" href="apps/tushu.css?v=20261002-book-annotation-chapters-3">
-  <link rel="stylesheet" href="apps/ideal-beauty.css?v=20261001-asset-info-height-1">
+  <link rel="stylesheet" href="apps/ideal-beauty.css?v=20261008-remove-switch-fab-1">
   <link rel="stylesheet" href="apps/ideal-auth.css?v=20260930-auth-charset-1">
   <link rel="stylesheet" href="apps/ideal-repository.css?v=20261008-repository-preview-1">
 </head>
@@ -132,7 +132,7 @@
   <script type="text/plain" data-ideal-script src="apps/shezhi.js?v=20261005-silent-media-card-2"></script>
 <script type="text/plain" data-ideal-script src="apps/floating-assist.js?v=20261002-app-api-labels-1"></script>
   <script type="text/plain" data-ideal-script src="apps/shengtu.js?v=20261008-image-proxy-fallback-1"></script>
-  <script type="text/plain" data-ideal-script src="apps/meihua.js?v=20261002-ios-icons-only-1"></script>
+  <script type="text/plain" data-ideal-script src="apps/meihua.js?v=20261008-desktop-beauty-codes-1"></script>
   <script type="text/plain" data-ideal-script src="apps/shijieshu.js?v=20261007-repository-import-1"></script>
   <script type="text/plain" data-ideal-script src="apps/activation.js?v=20261004-activation-sync-1"></script>
   <script type="text/plain" data-ideal-script src="apps/qinglvkongjian.js?v=20261006-love-letter-card-counts-1"></script>
@@ -158,7 +158,7 @@
       (async () => {
         try { await window.IdealMachineStorageReady; } catch {}
         const scripts = [...document.querySelectorAll('script[data-ideal-script]')];
-        const beautySources = ['apps/ideal-beauty-registry.js?v=20261008-publish-to-repository-1', 'apps/ideal-repository.js?v=20261008-prefilled-beauty-post-1', 'apps/ideal-beauty-center.js?v=20261001-asset-info-height-2'];
+        const beautySources = ['apps/ideal-beauty-registry.js?v=20261008-desktop-category-1', 'apps/ideal-repository.js?v=20261008-desktop-beauty-import-1', 'apps/ideal-beauty-center.js?v=20261008-desktop-category-no-fab-1'];
         const sourceHref = source => new URL(source, location.href).href;
         const sourceByFile = new Map(scripts.map(source => [source.src.split('?')[0].split('/').pop(), source.src]));
         const loadPromises = new Map();

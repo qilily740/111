@@ -65,7 +65,7 @@
       </header>
       <div class="beauty-content">
         <section class="beauty-transfer">
-          <div><h3 class="beauty-section-title">桌面美化档案</h3><p>将壁纸、名称和图标保存为 JSON，方便备份或迁移。</p></div>
+          <div><h3 class="beauty-section-title">桌面美化档案</h3><p>可导出 JSON、生成美化码，或发布到 Ideal；包含壁纸、App 名称和图标。</p></div>
           <div class="beauty-transfer-actions"><button class="beauty-btn beauty-transfer-btn" id="beautyExport" type="button">导出</button><label class="beauty-btn beauty-transfer-btn">导入<input class="beauty-file" id="beautyImportFile" type="file" accept="application/json,.json"></label></div>
         </section>
         <section class="beauty-section">
@@ -734,22 +734,80 @@
     if (!source.startsWith('data:image/') || typeof window.IdealMachinePutImage !== 'function') return source;
     try { return String(await window.IdealMachinePutImage(source) || source); } catch { return source; }
   }
+  async function exportPayload() {
+    if (window.IdealMachineStorageReady) await window.IdealMachineStorageReady;
+    const icons = {};
+    for (const [key, value] of Object.entries(saved.icons || {})) icons[key] = await resolveBeautyAsset(value);
+    const launcherIcon = saved.launcherIcon && typeof saved.launcherIcon === 'object' ? normalizeLauncherIcon(saved.launcherIcon) : null;
+    if (launcherIcon?.custom) launcherIcon.custom = await resolveBeautyAsset(launcherIcon.custom);
+    return { format: 'ideal-machine-beauty', version: 3, exportedAt: new Date().toISOString(), wallpaper: await resolveBeautyAsset(saved.wallpaper), names: saved.names || {}, icons, launcherIcon };
+  }
+  async function desktopPreview(source) {
+    const value = String(source || '');
+    if (!value.startsWith('data:image/')) return value;
+    try {
+      const image = new Image();
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = value; });
+      const ratio = Math.min(1, 480 / (image.naturalWidth || image.width), 480 / (image.naturalHeight || image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round((image.naturalWidth || image.width) * ratio));
+      canvas.height = Math.max(1, Math.round((image.naturalHeight || image.height) * ratio));
+      canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/jpeg', .58);
+    } catch { return ''; }
+  }
   async function exportBeauty() {
     try {
-      if (window.IdealMachineStorageReady) await window.IdealMachineStorageReady;
-      const icons = {};
-      for (const [key, value] of Object.entries(saved.icons || {})) icons[key] = await resolveBeautyAsset(value);
-      const launcherIcon = saved.launcherIcon && typeof saved.launcherIcon === 'object' ? normalizeLauncherIcon(saved.launcherIcon) : null;
-      if (launcherIcon?.custom) launcherIcon.custom = await resolveBeautyAsset(launcherIcon.custom);
-      const payload = { format: 'ideal-machine-beauty', version: 3, exportedAt: new Date().toISOString(), wallpaper: await resolveBeautyAsset(saved.wallpaper), names: saved.names || {}, icons, launcherIcon };
+      const payload = await exportPayload();
+      const jsonExport = () => {
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = 'desktop-beauty.json';
       link.click();
       setTimeout(() => URL.revokeObjectURL(link.href), 0);
+      };
+      const css = JSON.stringify(payload);
+      if (window.IdealMachineBeauty?.exportWithChoice) {
+        window.IdealMachineBeauty.exportWithChoice({ jsonExport, codeAssets:[{ appId:'meihua', sectionId:'desktop', name:'桌面美化', css, previewImage:await desktopPreview(payload.wallpaper) }] });
+      } else jsonExport();
     } catch { window.alert('桌面美化导出失败，请稍后重试。'); }
   }
+  async function compactDesktopCss(raw) {
+    const payload = JSON.parse(String(raw || ''));
+    if (!payload || typeof payload !== 'object' || (payload.format && payload.format !== 'ideal-machine-beauty')) throw new Error('桌面美化文件格式不正确。');
+    if (window.IdealMachineStorageReady) await window.IdealMachineStorageReady;
+    const compact = { ...payload };
+    if (typeof compact.wallpaper === 'string') compact.wallpaper = await storeImportedBeautyAsset(compact.wallpaper);
+    compact.names = compact.names && typeof compact.names === 'object' ? compact.names : {};
+    const icons = {};
+    for (const [key, value] of Object.entries(compact.icons && typeof compact.icons === 'object' ? compact.icons : {})) icons[key] = await storeImportedBeautyAsset(value);
+    compact.icons = icons;
+    if (compact.launcherIcon && typeof compact.launcherIcon === 'object') {
+      compact.launcherIcon = normalizeLauncherIcon(compact.launcherIcon);
+      compact.launcherIcon.custom = await storeImportedBeautyAsset(compact.launcherIcon.custom);
+    }
+    return JSON.stringify(compact);
+  }
+  async function applyDesktopBeauty(raw) {
+    const compactCss = await compactDesktopCss(raw);
+    const payload = JSON.parse(compactCss);
+    saved = { ...saved };
+    if (typeof payload.wallpaper === 'string') saved.wallpaper = payload.wallpaper; else delete saved.wallpaper;
+    saved.names = payload.names;
+    saved.icons = payload.icons;
+    if (payload.launcherIcon) saved.launcherIcon = payload.launcherIcon; else delete saved.launcherIcon;
+    localStorage.setItem(storageKey, JSON.stringify(saved));
+    applySettings();
+    return compactCss;
+  }
+  window.IdealMachineDesktopBeauty = { apply:applyDesktopBeauty, compactCss:compactDesktopCss, exportPayload };
+  window.IdealMachineBeautyAdapters = window.IdealMachineBeautyAdapters || {};
+  window.IdealMachineBeautyAdapters.meihua = {
+    appId:'meihua', appName:'美化',
+    sections:() => [{ id:'desktop', name:'桌面', getCss:() => JSON.stringify({ format:'ideal-machine-beauty', version:3, wallpaper:saved.wallpaper || '', names:saved.names || {}, icons:saved.icons || {}, launcherIcon:saved.launcherIcon || null }), setCss:value => { applyDesktopBeauty(value); }, resetCss:() => { saved = {}; localStorage.removeItem(storageKey); applySettings(); } }]
+  };
+  window.IdealMachineBeauty?.register?.(window.IdealMachineBeautyAdapters.meihua);
   function importBeauty(file) {
     if (!file) return;
     const reader = new FileReader();

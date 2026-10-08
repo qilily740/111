@@ -153,3 +153,5 @@
 .ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline b{font-size:14px;line-height:1.2}
 .ideal-beauty-page.is-asset-view .ideal-beauty-asset-meta .ideal-beauty-inline span{width:100%;text-align:left;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
 .ideal-beauty-page.is-asset-view .ideal-beauty-actions{margin-top:8px;padding-top:0}
+.ideal-beauty-content{padding-bottom:20px}
+.ideal-beauty-toast{bottom:calc(26px + env(safe-area-inset-bottom))}
