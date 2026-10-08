@@ -309,3 +309,15 @@
 .ir-chat-composer .ir-chat-send:disabled{background:#c8c8cb;color:white}
 .ir-chat-retention{margin:5px 2px 0;font-size:9px}
 @media(max-width:760px){.ir-chat-page{min-height:calc(100dvh - 90px);padding:10px 12px calc(env(safe-area-inset-bottom) + 10px)}.ir-chat-profile{padding-top:28px;padding-bottom:18px}.ir-chat-messages{max-height:none}.ir-chat-message{max-width:none}.ir-chat-composer textarea{font-size:16px}}
+
+/* A direct conversation is its own full-screen surface, separate from Ideal's shell. */
+.ideal-repository.ir-chat-mode .ir-shell{position:relative;display:block;width:100%;height:100%;min-height:0;padding:0;overflow:hidden;background:#fff}
+.ideal-repository.ir-chat-mode .ir-rail,.ideal-repository.ir-chat-mode .ir-sidebar,.ideal-repository.ir-chat-mode .ir-profile-entry{display:none!important}
+.ideal-repository.ir-chat-mode .ir-main{position:absolute;inset:0;display:flex;flex-direction:column;width:100%;height:100%;min-height:0;margin:0;padding:0;overflow:hidden;border:0;border-radius:0;background:#fff}
+.ideal-repository.ir-chat-mode .ir-chat-page{width:100%;height:100%;min-height:0;margin:0;padding:0 20px calc(env(safe-area-inset-bottom) + 10px);background:#fff}
+.ideal-repository.ir-chat-mode .ir-chat-header{flex:none;min-height:calc(env(safe-area-inset-top) + 62px);padding:env(safe-area-inset-top) 0 10px;border-bottom:1px solid #e4e4e6;background:#fff}
+.ideal-repository.ir-chat-mode .ir-chat-profile{flex:none;padding:clamp(100px,18vh,220px) 12px 24px;background:#fff}
+.ideal-repository.ir-chat-mode .ir-chat-messages{min-height:0;max-height:none;flex:1;background:#fff}
+.ideal-repository.ir-chat-mode .ir-chat-composer{flex:none;margin-top:8px}
+.ideal-repository.ir-chat-mode .ir-chat-retention{flex:none;margin-bottom:2px}
+@media(max-width:760px){.ideal-repository.ir-chat-mode .ir-chat-page{padding:0 14px calc(env(safe-area-inset-bottom) + 8px)}.ideal-repository.ir-chat-mode .ir-chat-header{min-height:calc(env(safe-area-inset-top) + 58px);padding-bottom:9px}.ideal-repository.ir-chat-mode .ir-chat-profile{padding:clamp(100px,18vh,180px) 10px 20px}.ideal-repository.ir-chat-mode .ir-chat-messages{padding-bottom:10px}}

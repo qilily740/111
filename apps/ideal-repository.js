@@ -635,6 +635,7 @@
     syncProfile();
     root.classList.toggle('ir-forum-mode', Boolean(channels[screen]));
     root.classList.toggle('ir-profile-mode', screen === 'profile');
+    root.classList.toggle('ir-chat-mode', screen === 'friends' && friendPanel === 'chat');
     root.classList.toggle('ir-show-detail', screen !== 'welcome');
     root.querySelectorAll('[data-ir-channel]').forEach(button => button.classList.toggle('is-selected', button.dataset.irChannel === screen));
     root.querySelector('[data-ir-profile]').classList.toggle('is-selected', screen === 'profile');
