@@ -230,8 +230,9 @@
 .ideal-repository .ir-page-heading .ir-page-close{width:35px;height:35px}
 .ir-friend-avatar{position:relative;overflow:hidden}
 .ir-friend-avatar img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
-.ir-friend-item{flex-wrap:wrap}
-.ir-friend-item .ir-friend-copy{min-width:90px}
+.ir-friend-item{display:grid;grid-template-columns:43px minmax(0,1fr) auto auto;flex-wrap:nowrap;gap:clamp(6px,1vw,12px)}
+.ir-friend-item .ir-friend-copy{grid-column:2;min-width:0}
+.ir-friend-item>button:only-of-type{grid-column:4}
 .ir-chat-list{display:grid;gap:8px;margin-top:16px}
 .ir-chat-list-item{position:relative;display:grid;grid-template-columns:46px minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;column-gap:12px;min-height:74px;padding:12px;border:1px solid #e4e4e6;border-radius:14px;background:#f4f4f5;color:#29292c;text-align:left}
 .ir-chat-list-item .ir-friend-avatar{grid-row:1/3;width:44px;height:44px}
@@ -259,4 +260,4 @@
 .ir-chat-composer button{min-height:34px;padding:0 14px;border:0;border-radius:10px;background:#38383d;color:#fff;font-size:12px;font-weight:650}
 .ir-chat-composer button:disabled{background:#c9c9cc;color:#fff}
 .ir-chat-retention{display:block;margin:8px 2px 0;color:#999;font-size:10px;text-align:center}
-@media(max-width:760px){.ir-chat-page{min-height:calc(100dvh - 105px);padding:14px 14px calc(env(safe-area-inset-bottom) + 20px)}.ir-chat-messages{max-height:none}.ir-chat-message{max-width:86%}.ir-friend-item{gap:7px}.ir-friend-item .ir-friend-copy{flex:1 1 calc(100% - 65px)}}
+@media(max-width:760px){.ir-chat-page{min-height:calc(100dvh - 105px);padding:14px 14px calc(env(safe-area-inset-bottom) + 20px)}.ir-chat-messages{max-height:none}.ir-chat-message{max-width:86%}.ir-friend-item{gap:6px}.ir-friend-item>button{min-height:32px;padding:0 8px;font-size:11px}}
