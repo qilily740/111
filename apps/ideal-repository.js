@@ -314,8 +314,9 @@
   function chatMessageRows() {
     const rows = chatMessages.map((message,index) => {
       const previous = chatMessages[index - 1];
+      const grouped = Boolean(previous && previous.senderId === message.senderId && Number(message.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
       const quoted = message.replyToId ? `<div class="ir-chat-quoted">${messageAvatar({senderId:message.replySenderId || ''}, 'ir-chat-quoted-avatar')}<span class="ir-chat-quoted-copy"><strong>${escapeHTML(message.replySenderId === accountStorageId() ? (personal.nickname || userName()) : (chatFriend?.nickname || chatFriend?.username || '好友'))}</strong><time>${chatTime(message.replyCreatedAt || chatMessages.find(item => item.id === message.replyToId)?.createdAt)}</time><span>${escapeHTML(message.replyBody || '引用的消息已过期')}</span></span></div>` : '';
-      return `${chatDivider(message,previous)}<article class="ir-chat-message" data-ir-message-id="${escapeHTML(message.id)}">${messageAvatar(message)}<div class="ir-chat-message-body">${quoted}<div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div><p>${escapeHTML(message.body)}</p></div></article>`;
+      return `${chatDivider(message,previous)}<article class="ir-chat-message${grouped ? ' is-continuation' : ''}" data-ir-message-id="${escapeHTML(message.id)}">${grouped ? '' : messageAvatar(message)}<div class="ir-chat-message-body">${quoted}${grouped ? '' : `<div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>`}<p>${escapeHTML(message.body)}</p></div></article>`;
     }).join('');
     return rows;
   }
