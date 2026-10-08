@@ -5,3 +5,16 @@ body.ideal-keyboard-open .chat-app.is-open.is-chatting .chat-conversation > .cha
   -webkit-backdrop-filter:none !important;
   backdrop-filter:none !important;
 }
+
+/* 键盘状态下引用预览本身也要透出聊天壁纸，不能只清除外层输入区。 */
+body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote > .chat-quote-bar {
+  background:transparent !important;
+  background-color:transparent !important;
+  background-image:none !important;
+  box-shadow:none !important;
+  -webkit-backdrop-filter:none !important;
+  backdrop-filter:none !important;
+}
+body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-chatting .chat-conversation > .chat-compose-wrap.has-chat-quote > .chat-quote-bar > button {
+  background:transparent !important;
+}
