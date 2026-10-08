@@ -317,7 +317,11 @@
       const grouped = Boolean(!message.replyToId && previous && previous.senderId === message.senderId && Number(message.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
       const next = chatMessages[index + 1];
       const hasContinuation = Boolean(next && !next.replyToId && next.senderId === message.senderId && Number(next.createdAt) - Number(message.createdAt) <= 3 * 60 * 1000);
-      const quoted = message.replyToId ? `<div class="ir-chat-quoted">${messageAvatar({senderId:message.replySenderId || ''}, 'ir-chat-quoted-avatar')}<span class="ir-chat-quoted-copy"><strong>${escapeHTML(message.replySenderId === accountStorageId() ? (personal.nickname || userName()) : (chatFriend?.nickname || chatFriend?.username || '好友'))}</strong><time>${chatTime(message.replyCreatedAt || chatMessages.find(item => item.id === message.replyToId)?.createdAt)}</time><span>${escapeHTML(message.replyBody || '引用的消息已过期')}</span></span></div>` : '';
+      const repliedMessage = message.replyToId ? chatMessages.find(item => item.id === message.replyToId) : null;
+      const replySenderId = message.replySenderId || repliedMessage?.senderId || '';
+      const replyBody = message.replyBody ?? repliedMessage?.body ?? '引用的消息已过期';
+      const replySenderName = replySenderId === accountStorageId() ? (personal.nickname || userName()) : (chatFriend?.nickname || chatFriend?.username || '好友');
+      const quoted = message.replyToId ? `<div class="ir-chat-quoted">${messageAvatar({senderId:replySenderId}, 'ir-chat-quoted-avatar')}<span class="ir-chat-quoted-copy"><strong>${escapeHTML(replySenderName)}</strong><span>${escapeHTML(replyBody)}</span></span></div>` : '';
       const classes = `ir-chat-message${grouped ? ' is-continuation' : ''}${hasContinuation ? ' has-continuation' : ''}${message.replyToId ? ' has-reply' : ''}`;
       return `${chatDivider(message,previous)}<article class="${classes}" data-ir-message-id="${escapeHTML(message.id)}">${grouped ? '' : messageAvatar(message)}<div class="ir-chat-message-body">${quoted}${grouped ? '' : `<div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>`}<p>${escapeHTML(message.body)}</p></div></article>`;
     }).join('');
