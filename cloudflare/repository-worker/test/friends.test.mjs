@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import worker from '../src/index.js';
 
 const db = new DatabaseSync(':memory:');
-for (const file of ['0001_repository.sql', '0002_profile_saved.sql', '0003_google_drive.sql', '0003_personal_profile.sql', '0004_friends.sql', '0005_profile_avatar.sql']) {
+for (const file of ['0001_repository.sql', '0002_profile_saved.sql', '0003_google_drive.sql', '0003_personal_profile.sql', '0004_friends.sql', '0005_profile_avatar.sql', '0010_post_preview_image.sql']) {
   db.exec(readFileSync(new URL('../migrations/' + file, import.meta.url), 'utf8'));
 }
 const accounts = [

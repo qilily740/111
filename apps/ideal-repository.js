@@ -94,6 +94,7 @@
   let saveBusy = false;
   let remotePosts = [];
   let remoteHasMore = false;
+  const pendingLikeIds = new Set();
   let remoteDetail = null;
   let remoteStatus = '';
   let uploadOpen = false;
@@ -103,7 +104,7 @@
   let searchTimer = 0;
   let profileViewportBaselineHeight = 0;
   let profileViewportBaselineWidth = 0;
-  const imageUrls = new Set();
+  const repositoryImageObjectUrls = new Map();
   const friendAvatarObjectUrls = new Map();
   const accountStorageId = () => { const user = window.IdealMachineAuth?.getUser?.(); return String(user?.id || user?.username || 'guest'); };
   const avatarStorageKey = () => `ideal-repository-avatar-v1:${accountStorageId()}`;
@@ -112,7 +113,7 @@
   function readLocalProfile() { try { const value = JSON.parse(localStorage.getItem(personalStorageKey()) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; } }
   function writeLocalProfile(value) { localStorage.setItem(personalStorageKey(), JSON.stringify({ nickname:value.nickname || '', bio:value.bio || '', note:value.note || '' })); }
   const apiBase = () => String(window.IdealMachineConfig?.repositoryApiBase || '').replace(/\/+$/, '');
-  const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', STORAGE_UNAVAILABLE:'头像存储服务暂时不可用', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试', FRIENDSHIP_REQUIRED:'只有已添加的好友之间可以私聊', INVALID_MESSAGE:'消息不能为空，且不能超过 2000 字', INVALID_REPLY:'引用的消息已不存在或不属于此会话', ACCOUNT_BLOCKED:'此会话已被屏蔽，暂时不能发送消息', CHAT_RATE_LIMIT:'发送太频繁，请稍后再试' };
+  const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', PREVIEW_NOT_ALLOWED:'只有美化帖子可以上传单独的预览图', INVALID_PREVIEW_IMAGE:'预览图仅支持 PNG、JPEG 或 WebP 图片', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', STORAGE_UNAVAILABLE:'头像存储服务暂时不可用', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件（含预览图）', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试', FRIENDSHIP_REQUIRED:'只有已添加的好友之间可以私聊', INVALID_MESSAGE:'消息不能为空，且不能超过 2000 字', INVALID_REPLY:'引用的消息已不存在或不属于此会话', ACCOUNT_BLOCKED:'此会话已被屏蔽，暂时不能发送消息', CHAT_RATE_LIMIT:'发送太频繁，请稍后再试' };
   Object.assign(apiError, { INVALID_CHAT_STICKER:'请输入有效的 HTTPS 图片 URL，并填写表情描述', INVALID_CHAT_STICKER_IMAGE:'链接返回的不是支持的图片（PNG、JPG、WebP、GIF、AVIF）', CHAT_STICKER_FILE_TOO_LARGE:'单张表情图片不能超过 512 KiB', CHAT_STICKER_STORAGE_LIMIT:'表情包存储空间已达 5 MiB，请删除旧表情或等长期未用的表情自动清理', CHAT_STICKER_SOURCE_UNAVAILABLE:'无法读取这个图片链接，请确认链接可公开访问', CHAT_STICKER_SOURCE_NOT_FOUND:'这个图片链接返回了 404，请换一个有效的图片 URL', CHAT_STICKER_REDIRECT_NOT_ALLOWED:'图片链接发生跳转，请使用跳转后的 HTTPS 图片直链', CHAT_STICKER_LIMIT:'每个账号最多添加 20 个自定义表情包', CHAT_STICKER_EXISTS:'这个 URL 已经添加过了', CHAT_STICKER_NOT_FOUND:'这个表情包已不存在', CHAT_STICKER_GROUP_LIMIT:'每个账号最多创建 20 个分组', CHAT_STICKER_GROUP_NOT_FOUND:'这个分组已不存在' });
   async function requestApi(path, options = {}) {
     if (!apiBase()) throw new Error('仓库后端尚未部署或配置。请先设置 repositoryApiBase。');
@@ -134,15 +135,16 @@
     if (!channels[screen]) return;
     if (!apiBase()) { remotePosts = []; remoteStatus = '仓库服务尚未配置，暂无帖子。'; render(); return; }
     const channel = screen, serial = ++requestSerial;
-    remoteStatus = '正在加载帖子…'; render();
     const params = new URLSearchParams({ channel, q:postQuery, tag:postTag, order:oldestFirst ? 'oldest' : 'newest' });
     try {
       const result = await requestApi(`/api/posts?${params}`);
       if (serial !== requestSerial || screen !== channel) return;
-      remotePosts = result.posts || []; remoteHasMore = Boolean(result.hasMore); remoteStatus = ''; render();
+      remotePosts = result.posts || []; remoteHasMore = Boolean(result.hasMore); remoteStatus = '';
+      if (!refreshPostList()) render();
     } catch (error) {
       if (serial !== requestSerial || screen !== channel) return;
-      remoteStatus = error.message; render();
+      remoteStatus = error.message;
+      if (!refreshPostList()) render();
     }
   }
   async function loadMorePosts() {
@@ -154,8 +156,10 @@
     try {
       const result = await requestApi(`/api/posts?${params}`);
       if (screen !== channel || remotePosts.length !== offset) return;
-      remotePosts.push(...(result.posts || [])); remoteHasMore = Boolean(result.hasMore); render();
-      root.querySelector('[data-ir-post-list]').scrollTop = scrollTop;
+      remotePosts.push(...(result.posts || [])); remoteHasMore = Boolean(result.hasMore);
+      refreshPostList();
+      const updatedScroll = root.querySelector('[data-ir-post-list]');
+      if (updatedScroll) updatedScroll.scrollTop = scrollTop;
     } catch (error) { window.alert(error.message); }
   }
   async function loadPost(id) {
@@ -757,29 +761,28 @@
   }
   function clearImages() {
     remoteImageObserver?.disconnect();
-    imageUrls.forEach(url => URL.revokeObjectURL(url)); imageUrls.clear();
   }
   async function loadRemoteImage(image) {
     if (!apiBase() || !image.isConnected || image.dataset.irLoading === '1' || image.dataset.irLoaded === '1') return;
     image.dataset.irLoading = '1';
     const id = image.dataset.irImage || image.dataset.irPostAvatar || image.dataset.irFriendAvatar || image.dataset.irStickerImage;
-    const cachedAvatar = image.dataset.irFriendAvatar ? friendAvatarObjectUrls.get(id) : null;
-    if (cachedAvatar && cachedAvatar.expiresAt > Date.now()) {
-      image.src = cachedAvatar.url; image.dataset.irLoaded = '1'; delete image.dataset.irLoading; return;
-    }
-    if (cachedAvatar) { friendAvatarObjectUrls.delete(id); URL.revokeObjectURL(cachedAvatar.url); }
     const path = image.dataset.irImage ? `/api/attachments/${encodeURIComponent(id)}` : image.dataset.irPostAvatar ? `/api/posts/${encodeURIComponent(id)}/avatar` : image.dataset.irFriendAvatar ? `/api/users/${encodeURIComponent(id)}/avatar` : `/api/chat-stickers/${encodeURIComponent(id)}/image`;
+    const cache = image.dataset.irFriendAvatar ? friendAvatarObjectUrls : repositoryImageObjectUrls;
+    const cacheKey = image.dataset.irFriendAvatar ? id : path;
+    const cachedImage = cache.get(cacheKey);
+    if (cachedImage && cachedImage.expiresAt > Date.now()) {
+      image.src = cachedImage.url; image.dataset.irLoaded = '1'; delete image.dataset.irLoading; return;
+    }
+    if (cachedImage) { cache.delete(cacheKey); URL.revokeObjectURL(cachedImage.url); }
     try {
       const response = await requestApi(path, { raw:true });
       if (!image.isConnected) return;
       const url = URL.createObjectURL(await response.blob());
-      if (image.dataset.irFriendAvatar) {
-        friendAvatarObjectUrls.set(id, {url, expiresAt:Date.now() + 5 * 60 * 1000});
-        while (friendAvatarObjectUrls.size > 100) {
-          const [oldId, oldAvatar] = friendAvatarObjectUrls.entries().next().value;
-          friendAvatarObjectUrls.delete(oldId); URL.revokeObjectURL(oldAvatar.url);
-        }
-      } else imageUrls.add(url);
+      cache.set(cacheKey, {url, expiresAt:Date.now() + 10 * 60 * 1000});
+      while (cache.size > 100) {
+        const [oldKey, oldImage] = cache.entries().next().value;
+        cache.delete(oldKey); URL.revokeObjectURL(oldImage.url);
+      }
       image.src = url; image.dataset.irLoaded = '1';
     } catch {} finally { delete image.dataset.irLoading; }
   }
@@ -801,10 +804,40 @@
   const timeText = value => value ? new Date(value).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
   const postAvatar = post => `<span class="ir-author-avatar">${post.authorAvatar ? `<img data-ir-post-avatar="${escapeHTML(post.id)}" alt="">` : escapeHTML((post.authorName || '理')[0])}</span>`;
   const remoteCover = post => {
-    const image = post.attachments?.find(file => /^image\/(png|jpeg|webp)$/.test(file.type));
+    const image = post.attachments?.find(file => file.isPreview) || post.attachments?.find(file => /^image\/(png|jpeg|webp)$/.test(file.type));
     return image ? `<div class="ir-remote-cover"><img data-ir-image="${image.id}" alt="${escapeHTML(image.name)}"></div>` : `<div class="ir-remote-cover ir-remote-cover-text"><span>IDEAL / ${channels[screen].name}</span><strong>${escapeHTML(post.title)}</strong></div>`;
   };
-  const uploadForm = () => `<div class="ir-upload-mask"><form class="ir-upload-form"><header><h2>发布到 # ${channels[screen].name}</h2><button type="button" data-ir-upload-close aria-label="关闭发布窗口">×</button></header><label>标题<input name="title" maxlength="120" required placeholder="给作品起个名字"></label><label>介绍（选填）<textarea name="body" maxlength="30000" rows="5" placeholder="介绍作品、用法或设定…"></textarea></label>${screen === 'beauty' ? '<label>美化码（可与文件一起发布）<input name="codeText" maxlength="120" spellcheck="false" placeholder="例如 IDEAL-CHA-123456"></label>' : ''}<label>${screen === 'beauty' ? '美化文件（与美化码至少填一项）' : '上传文件（必填）'}<span class="ir-file-picker"><input name="files" type="file" multiple ${screen === 'beauty' ? '' : 'required'} accept="${screen === 'beauty' ? '.css,.js,.json,.txt,.png,.jpg,.jpeg,.webp' : '.docx,.txt,.json,.png,.jpg,.jpeg,.webp'}"><span class="ir-file-icon" aria-hidden="true">↑</span><span class="ir-file-copy"><b>点击选择文件</b><small data-ir-file-summary>支持拖入文件，最多 3 个</small></span><span class="ir-file-action">浏览</span></span></label><small>每帖最多 3 个文件，单个不超过 8 MB</small><label>标签（选填）<input name="tags" maxlength="130" placeholder="用逗号分隔，例如：浅色、日常"></label><p class="ir-upload-error" role="alert">${escapeHTML(uploadError)}</p><footer><button type="button" data-ir-upload-close>取消</button><button type="submit" ${uploadBusy ? 'disabled' : ''}>${uploadBusy ? '发布中…' : '发布帖子'}</button></footer></form></div>`;
+  const renderRemotePostList = () => `<p class="ir-forum-hint">${escapeHTML(remoteStatus || '理想机仓库 · 来自大家的作品')}</p>${remotePosts.map(post => `<article class="ir-post-card"><button type="button" class="ir-post-open" data-ir-post="${post.id}"><div class="ir-post-meta">${postAvatar(post)}<strong>${escapeHTML(post.authorName)}</strong><span>${timeText(post.createdAt)}</span></div><h2>${escapeHTML(post.title)}</h2>${remoteCover(post)}<div class="ir-post-tags">${post.tags.map(tag => `<span>${escapeHTML(tag)}</span>`).join('')}</div></button><footer><button type="button" data-ir-like="${post.id}" aria-pressed="${post.liked}">${post.liked ? '♥' : '♡'} ${post.likeCount}</button></footer></article>`).join('') || (remoteStatus ? '' : '<p class="ir-reply-empty">这里还没有帖子，发布第一篇吧。</p>')}${remoteHasMore ? '<button type="button" class="ir-load-more" data-ir-load-more>加载更多帖子</button>' : ''}`;
+  function refreshPostList() {
+    const list = root.querySelector('[data-ir-post-list]');
+    if (!list) return false;
+    list.innerHTML = renderRemotePostList();
+    if (apiBase()) hydrateImages();
+    return true;
+  }
+  const beautyCodeMarkup = post => post.codeText
+    ? `<div class="ir-beauty-code"><small>美化码</small><code>${escapeHTML(post.codeText)}</code><button type="button" data-ir-copy-code>复制美化码</button></div>`
+    : post.hasCode && !post.liked && !post.mine ? '<p class="ir-post-locked">点赞后可查看并保存美化码。</p>' : '';
+  function syncLikeUI(id, liked, likeCount) {
+    for (const button of root.querySelectorAll('[data-ir-like]')) {
+      if (button.dataset.irLike !== id) continue;
+      button.disabled = false;
+      button.setAttribute('aria-pressed', String(liked));
+      button.textContent = button.closest('.ir-post-card') ? `${liked ? '♥' : '♡'} ${likeCount}` : `${liked ? '♥ 已喜欢' : '♡ 喜欢'} · ${likeCount}`;
+    }
+    if (remoteDetail?.id !== id) return;
+    const save = root.querySelector('[data-ir-save]');
+    if (save) {
+      save.disabled = saveBusy || (!liked && !remoteDetail.saved);
+      save.textContent = saveBusy ? '保存中…' : !liked && !remoteDetail.saved ? '先点赞，再保存' : remoteDetail.saved ? '✓ 已保存 · 点击取消' : remoteDetail.channel === 'beauty' ? '＋ 保存到我的美化' : remoteDetail.channel === 'world' ? '＋ 保存并导入世界书' : '＋ 保存并导入联系人';
+    }
+    const oldCode = root.querySelector('.ir-post-detail .ir-beauty-code, .ir-post-detail .ir-post-locked');
+    const markup = beautyCodeMarkup(remoteDetail);
+    if (oldCode && markup) oldCode.outerHTML = markup;
+    else if (oldCode) oldCode.remove();
+    else if (markup) root.querySelector('.ir-post-detail .ir-post-prose')?.insertAdjacentHTML('afterend', markup);
+  }
+  const uploadForm = () => `<div class="ir-upload-mask"><form class="ir-upload-form"><header><h2>发布到 # ${channels[screen].name}</h2><button type="button" data-ir-upload-close aria-label="关闭发布窗口">×</button></header><label>标题<input name="title" maxlength="120" required placeholder="给作品起个名字"></label><label>介绍（选填）<textarea name="body" maxlength="30000" rows="5" placeholder="介绍作品、用法或设定…"></textarea></label>${screen === 'beauty' ? '<label>美化码（可与文件一起发布）<input name="codeText" maxlength="120" spellcheck="false" placeholder="例如 IDEAL-CHA-123456"></label><label>帖子预览图（选填）<span class="ir-file-picker"><input name="preview" type="file" accept="image/png,image/jpeg,image/webp"><span class="ir-file-icon" aria-hidden="true">▧</span><span class="ir-file-copy"><b>选择帖子预览图</b><small data-ir-file-summary>PNG、JPG 或 WebP 图片</small></span><span class="ir-file-action">浏览</span></span></label>' : ''}<label>${screen === 'beauty' ? '美化文件（与美化码至少填一项）' : '上传文件（必填）'}<span class="ir-file-picker"><input name="files" type="file" multiple ${screen === 'beauty' ? '' : 'required'} accept="${screen === 'beauty' ? '.css,.js,.json,.txt,.png,.jpg,.jpeg,.webp' : '.docx,.txt,.json,.png,.jpg,.jpeg,.webp'}"><span class="ir-file-icon" aria-hidden="true">↑</span><span class="ir-file-copy"><b>点击选择文件</b><small data-ir-file-summary>支持拖入文件</small></span><span class="ir-file-action">浏览</span></span></label><small>每帖最多 3 个文件（含预览图），单个不超过 8 MB</small><label>标签（选填）<input name="tags" maxlength="130" placeholder="用逗号分隔，例如：浅色、日常"></label><p class="ir-upload-error" role="alert">${escapeHTML(uploadError)}</p><footer><button type="button" data-ir-upload-close>取消</button><button type="submit" ${uploadBusy ? 'disabled' : ''}>${uploadBusy ? '发布中…' : '发布帖子'}</button></footer></form></div>`;
   const renderRemoteForum = () => {
     const post = remoteDetail;
     const header = `<header class="ir-forum-header"><button type="button" data-ir-forum-back aria-label="返回">←</button><div><strong>${activePost && post ? escapeHTML(post.title) : '# ' + channels[screen].name + ' ›'}</strong></div><button type="button" data-ir-post-search aria-label="搜索帖子">${searchIcon}</button></header>`;
@@ -813,7 +846,7 @@
       return `${header}<div class="ir-forum-scroll" data-ir-post-body><article class="ir-post-detail"><div class="ir-topic-icon">●</div><h2>${escapeHTML(post.title)}</h2><div class="ir-post-tags">${post.tags.map(tag => `<span>${escapeHTML(tag)}</span>`).join('')}</div><div class="ir-post-author">${postAvatar(post)}<div><strong>${escapeHTML(post.authorName)}</strong><small>作者 · ${timeText(post.createdAt)}</small></div></div><div class="ir-post-prose">${post.body.split('\n\n').map(part => `<p>${escapeHTML(part)}</p>`).join('')}</div>${post.codeText ? `<div class="ir-beauty-code"><small>美化码</small><code>${escapeHTML(post.codeText)}</code><button type="button" data-ir-copy-code ${!post.liked ? 'disabled' : ''}>${post.liked ? '复制美化码' : '点赞后可复制'}</button></div>` : post.hasCode ? '<p class="ir-post-locked">点赞后可查看并保存美化码。</p>' : ''}${remoteCover(post)}${post.attachments.map(file => `<button type="button" class="ir-post-file" data-ir-download="${file.id}" ${!post.liked ? 'disabled' : ''}><span>▤</span><span><strong>${escapeHTML(file.name)}</strong><small>${Math.round(file.size / 1024)} KB · ${post.liked ? '点击下载' : '点赞后可下载'}</small></span></button>`).join('')}<div class="ir-post-actions"><button type="button" class="ir-post-save" data-ir-save ${saveBusy || (!post.liked && !post.saved) ? 'disabled' : ''}>${saveBusy ? '保存中…' : !post.liked && !post.saved ? '先点赞，再保存' : post.saved ? '✓ 已保存 · 点击取消' : post.channel === 'beauty' ? '＋ 保存到我的美化' : post.channel === 'world' ? '＋ 保存并导入世界书' : '＋ 保存并导入联系人'}</button><button type="button" class="ir-post-like" data-ir-like="${post.id}" aria-pressed="${post.liked}">${post.liked ? '♥ 已喜欢' : '♡ 喜欢'} · ${post.likeCount}</button>${post.mine ? '<button type="button" class="ir-post-delete" data-ir-delete-post>删除帖子</button>' : ''}</div></article></div>`;
     }
     const tags = [...new Set(remotePosts.flatMap(post => post.tags))];
-    return `${header}<div class="ir-forum-tools"><button type="button" data-ir-sort>⇅ ${oldestFirst ? '最早发布' : '最新发布'}</button><label>◇ 标签<select data-ir-tag aria-label="筛选标签"><option value="">全部</option>${tags.map(tag => `<option ${tag === postTag ? 'selected' : ''}>${escapeHTML(tag)}</option>`).join('')}</select></label></div><label class="ir-post-search"><span>${searchIcon}</span><input type="search" data-ir-filter placeholder="搜索帖子" value="${escapeHTML(postQuery)}"></label><div class="ir-forum-scroll" data-ir-post-list><p class="ir-forum-hint">${escapeHTML(remoteStatus || '理想机仓库 · 来自大家的作品')}</p>${remotePosts.map(post => `<article class="ir-post-card"><button type="button" class="ir-post-open" data-ir-post="${post.id}"><div class="ir-post-meta">${postAvatar(post)}<strong>${escapeHTML(post.authorName)}</strong><span>${timeText(post.createdAt)}</span></div><h2>${escapeHTML(post.title)}</h2>${remoteCover(post)}<div class="ir-post-tags">${post.tags.map(tag => `<span>${escapeHTML(tag)}</span>`).join('')}</div></button><footer><button type="button" data-ir-like="${post.id}" aria-pressed="${post.liked}">${post.liked ? '♥' : '♡'} ${post.likeCount}</button></footer></article>`).join('') || (remoteStatus ? '' : '<p class="ir-reply-empty">这里还没有帖子，发布第一篇吧。</p>')}${remoteHasMore ? '<button type="button" class="ir-load-more" data-ir-load-more>加载更多帖子</button>' : ''}</div><button class="ir-post-create" type="button" data-ir-upload aria-label="发布帖子">＋</button>`;
+    return `${header}<div class="ir-forum-tools"><button type="button" data-ir-sort>⇅ ${oldestFirst ? '最早发布' : '最新发布'}</button><label>◇ 标签<select data-ir-tag aria-label="筛选标签"><option value="">全部</option>${tags.map(tag => `<option ${tag === postTag ? 'selected' : ''}>${escapeHTML(tag)}</option>`).join('')}</select></label></div><label class="ir-post-search"><span>${searchIcon}</span><input type="search" data-ir-filter placeholder="搜索帖子" value="${escapeHTML(postQuery)}"></label><div class="ir-forum-scroll" data-ir-post-list>${renderRemotePostList()}</div><button class="ir-post-create" type="button" data-ir-upload aria-label="发布帖子">＋</button>`;
   };
   const searchIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg>';
   const userName = () => {
@@ -874,7 +907,7 @@
     screen = next; activePost = null; postQuery = '';
     if (next !== 'friends') ++friendSearchSerial; postTag = ''; listScroll = 0; uploadOpen = false;
     profileOrigin = false;
-    remotePosts = []; remoteDetail = null; remoteStatus = '';
+    remotePosts = []; remoteDetail = null; remoteStatus = channels[next] ? (apiBase() ? '正在加载帖子…' : '仓库服务尚未配置，暂无帖子。') : '';
     ++requestSerial; render();
     if (channels[screen]) loadPosts();
     if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
@@ -989,17 +1022,46 @@
     if (button.dataset.irLike) {
       const id = button.dataset.irLike;
       if (apiBase()) {
-        button.disabled = true;
+        if (pendingLikeIds.has(id)) return;
+        pendingLikeIds.add(id);
+        const item = remotePosts.find(post => post.id === id);
+        const detail = remoteDetail?.id === id ? remoteDetail : null;
+        const previousLiked = detail?.liked ?? item?.liked ?? button.getAttribute('aria-pressed') === 'true';
+        const previousCount = detail?.likeCount ?? item?.likeCount ?? 0;
+        const previousCode = detail?.codeText || '';
+        const nextLiked = !previousLiked;
+        if (item) { item.liked = nextLiked; item.likeCount = Math.max(0, previousCount + (nextLiked ? 1 : -1)); }
+        if (detail) {
+          detail.liked = nextLiked; detail.likeCount = Math.max(0, previousCount + (nextLiked ? 1 : -1));
+          if (!nextLiked && !detail.mine) detail.codeText = '';
+        }
+        const optimisticCount = Math.max(0, previousCount + (nextLiked ? 1 : -1));
+        syncLikeUI(id, nextLiked, optimisticCount);
         requestApi(`/api/posts/${encodeURIComponent(id)}/like`, { method:'POST' }).then(result => {
-          const item = remotePosts.find(post => post.id === id);
+          pendingLikeIds.delete(id);
           if (item) { item.liked = result.liked; item.likeCount = result.likeCount; }
-          if (remoteDetail?.id === id) {
-            remoteDetail.liked = result.liked; remoteDetail.likeCount = result.likeCount;
-            if (result.liked) return loadPost(id);
-            remoteDetail.codeText = '';
+          if (detail && remoteDetail === detail) {
+            detail.liked = result.liked; detail.likeCount = result.likeCount;
+            if (result.liked && detail.hasCode && !detail.mine) {
+              root.querySelector('.ir-post-detail .ir-post-locked')?.replaceChildren(document.createTextNode('美化码已解锁，正在加载…'));
+              requestApi(`/api/posts/${encodeURIComponent(id)}`).then(payload => {
+                if (remoteDetail !== detail || !detail.liked) return;
+                detail.codeText = payload.post?.codeText || '';
+                syncLikeUI(id, detail.liked, detail.likeCount);
+              }).catch(() => {});
+            }
           }
-          render();
-        }).catch(error => { button.disabled = false; window.alert(error.message); });
+          syncLikeUI(id, result.liked, result.likeCount);
+        }).catch(error => {
+          pendingLikeIds.delete(id);
+          if (item) { item.liked = previousLiked; item.likeCount = previousCount; }
+          if (detail && remoteDetail === detail) {
+            detail.liked = previousLiked; detail.likeCount = previousCount;
+            detail.codeText = previousCode;
+          }
+          syncLikeUI(id, previousLiked, previousCount);
+          window.alert(error.message);
+        });
         return;
       }
       window.alert('仓库服务尚未配置。');
@@ -1103,12 +1165,12 @@
     root.querySelector('[data-ir-filter]').focus();
   });
   root.addEventListener('change', event => {
-    if (event.target.matches('.ir-upload-form input[name="files"]')) {
+    if (event.target.matches('.ir-upload-form input[type="file"]')) {
       const files = [...(event.target.files || [])];
-      const summary = root.querySelector('[data-ir-file-summary]');
+      const summary = event.target.closest('.ir-file-picker')?.querySelector('[data-ir-file-summary]');
       if (summary) summary.textContent = files.length
         ? files.map(file => `${file.name} · ${file.size < 1024 * 1024 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`}`).join('、')
-        : '支持拖入文件，最多 3 个';
+        : (event.target.name === 'preview' ? 'PNG、JPG 或 WebP 图片' : '支持拖入文件');
       const picker = event.target.closest('.ir-file-picker');
       picker?.classList.toggle('has-files', files.length > 0);
       return;
@@ -1147,14 +1209,18 @@
         } catch { uploadError = '头像快照读取失败，请重新选择头像。'; form.querySelector('.ir-upload-error').textContent = uploadError; return; }
       }
       for (const file of data.getAll('files')) if (!(file instanceof File) || !file.name) data.delete('files');
+      const selectedPreview = data.get('preview');
+      if (!(selectedPreview instanceof File) || !selectedPreview.name) data.delete('preview');
       const files = data.getAll('files');
+      const previewFile = data.get('preview');
       const code = String(data.get('codeText') || '').trim();
       if (screen === 'beauty' && !files.length && !code) { uploadError = '请填写美化码或上传美化文件。'; form.querySelector('.ir-upload-error').textContent = uploadError; return; }
       if (screen !== 'beauty' && !files.length) { uploadError = '请先上传文件。'; form.querySelector('.ir-upload-error').textContent = uploadError; return; }
       const importable = { beauty:/\.(css|json)$/i, world:/\.(txt|docx|json)$/i, character:/\.(png|txt|docx|json)$/i }[screen];
       if (!code && !files.some(file => importable.test(file.name))) { uploadError = '请上传可导入的主文件，图片可以作为附加预览。'; form.querySelector('.ir-upload-error').textContent = uploadError; return; }
       if (code && !/^IDEAL-[A-Z0-9-]{3,100}$/i.test(code)) { uploadError = '请输入已有的 IDEAL- 美化码。'; form.querySelector('.ir-upload-error').textContent = uploadError; return; }
-      if (data.getAll('files').length > 3) { uploadError = '每篇帖子最多上传 3 个文件。'; form.querySelector('.ir-upload-error').textContent = uploadError; return; }
+      if (previewFile instanceof File && previewFile.name && (!/^image\/(png|jpeg|webp)$/.test(previewFile.type) || previewFile.size > 8 * 1024 * 1024)) { uploadError = '预览图仅支持不超过 8 MB 的 PNG、JPG 或 WebP。'; form.querySelector('.ir-upload-error').textContent = uploadError; return; }
+      if (files.length + Number(previewFile instanceof File && Boolean(previewFile.name)) > 3) { uploadError = '每篇帖子最多上传 3 个文件（含预览图）。'; form.querySelector('.ir-upload-error').textContent = uploadError; return; }
       uploadBusy = true;
       form.querySelector('button[type=submit]').disabled = true;
       form.querySelector('button[type=submit]').textContent = '发布中…';

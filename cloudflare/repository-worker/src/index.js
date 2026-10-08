@@ -174,9 +174,9 @@ function fromRow(row, userId) {
 async function addAttachments(db, postIds, posts) {
   if (!postIds.length) return posts;
   const placeholders = postIds.map(() => '?').join(',');
-  const rows = await db.prepare(`SELECT id, post_id, file_name, mime_type, size FROM attachments WHERE post_id IN (${placeholders}) ORDER BY created_at`).bind(...postIds).all();
+  const rows = await db.prepare(`SELECT id, post_id, file_name, mime_type, size, is_preview FROM attachments WHERE post_id IN (${placeholders}) ORDER BY created_at`).bind(...postIds).all();
   const byPost = new Map(postIds.map(id => [id, []]));
-  for (const file of rows.results || []) byPost.get(file.post_id)?.push({ id:file.id, name:file.file_name, type:file.mime_type, size:file.size });
+  for (const file of rows.results || []) byPost.get(file.post_id)?.push({ id:file.id, name:file.file_name, type:file.mime_type, size:file.size, isPreview:Boolean(file.is_preview) });
   return posts.map(post => ({ ...post, attachments:byPost.get(post.id) || [] }));
 }
 async function listPosts(request, env, user, url) {
@@ -215,13 +215,16 @@ async function createPost(request, env, user) {
   const body = clean(form.get('body'), 30001);
   const codeText = clean(form.get('codeText'), 121).toUpperCase();
   const avatar = form.get('avatar');
+  const preview = form.get('preview');
   if (!channels.has(channel) || !title || title.length > 120 || body.length > 30000) return json(request, env, { error:'INVALID_POST' }, 400);
-  const files = form.getAll('files');
+  const files = form.getAll('files').filter(file => file instanceof File && file.name);
+  const hasPreview = preview instanceof File && preview.name && preview.size > 0;
+  if (hasPreview && channel !== 'beauty') return json(request, env, { error:'PREVIEW_NOT_ALLOWED' }, 400);
   if (channel === 'beauty' && !codeText && !files.length) return json(request, env, { error:'BEAUTY_CODE_OR_FILE_REQUIRED' }, 400);
   if (channel !== 'beauty' && !files.length) return json(request, env, { error:'FILE_REQUIRED' }, 400);
   if (channel !== 'beauty' && codeText) return json(request, env, { error:'CODE_NOT_ALLOWED' }, 400);
   if (codeText && !/^IDEAL-[A-Z0-9-]{3,100}$/.test(codeText)) return json(request, env, { error:'INVALID_BEAUTY_CODE' }, 400);
-  if (files.length > 3) return json(request, env, { error:'TOO_MANY_FILES' }, 400);
+  if (files.length + Number(Boolean(hasPreview)) > 3) return json(request, env, { error:'TOO_MANY_FILES' }, 400);
   const prepared = [];
   let total = 0;
   let avatarType = '';
@@ -233,7 +236,7 @@ async function createPost(request, env, user) {
     if (!valid) return json(request, env, { error:'INVALID_AVATAR' }, 400);
     total += avatar.size;
   }
-  for (const file of files) {
+  for (const file of [...files, ...(hasPreview ? [preview] : [])]) {
     if (!(file instanceof File)) return json(request, env, { error:'INVALID_FILE' }, 400);
     const name = clean(file.name, 150).replace(/[\\/\r\n\0]/g, '_');
     const extension = name.split('.').pop().toLowerCase();
@@ -245,10 +248,12 @@ async function createPost(request, env, user) {
     if (['jpg','jpeg'].includes(extension) && !(bytes[0] === 0xff && bytes[1] === 0xd8)) return json(request, env, { error:'INVALID_IMAGE' }, 400);
     if (extension === 'webp' && !(String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP')) return json(request, env, { error:'INVALID_IMAGE' }, 400);
     if (extension === 'docx' && !(bytes[0] === 0x50 && bytes[1] === 0x4b)) return json(request, env, { error:'INVALID_DOCX' }, 400);
-    prepared.push({ file, name, type:mime[extension] });
+    const isPreview = Boolean(hasPreview && file === preview);
+    if (isPreview && !['png','jpg','jpeg','webp'].includes(extension)) return json(request, env, { error:'INVALID_PREVIEW_IMAGE' }, 400);
+    prepared.push({ file, name, type:mime[extension], isPreview });
   }
   const importable = { beauty:/\.(css|json)$/i, world:/\.(txt|docx|json)$/i, character:/\.(png|txt|docx|json)$/i }[channel];
-  if (!codeText && !prepared.some(item => importable.test(item.name))) return json(request, env, { error:'IMPORTABLE_FILE_REQUIRED' }, 400);
+  if (!codeText && !prepared.some(item => !item.isPreview && importable.test(item.name))) return json(request, env, { error:'IMPORTABLE_FILE_REQUIRED' }, 400);
   const recent = await env.DB.prepare('SELECT COUNT(*) AS n FROM posts WHERE author_id = ? AND created_at > ?').bind(user.id, now() - 3600000).first();
   if (Number(recent?.n || 0) >= 10) return json(request, env, { error:'POST_RATE_LIMIT' }, 429);
   const id = uuid();
@@ -270,7 +275,7 @@ async function createPost(request, env, user) {
     }
     const statements = [env.DB.prepare('INSERT INTO posts (id, channel, author_id, author_name, title, body, code_text, tags_json, created_at, updated_at, avatar_key, avatar_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(id, channel, user.id, clean(user.username || '理想机用户', 60), title, body, codeText, JSON.stringify(listTags(form.get('tags'))), createdAt, createdAt, stored.find(item => !item.id)?.key || '', avatarType)];
-    for (const item of stored.filter(item => item.id)) statements.push(env.DB.prepare('INSERT INTO attachments (id, post_id, object_key, file_name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(item.id, id, item.key, item.name, item.type, item.file.size, createdAt));
+    for (const item of stored.filter(item => item.id)) statements.push(env.DB.prepare('INSERT INTO attachments (id, post_id, object_key, file_name, mime_type, size, created_at, is_preview) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(item.id, id, item.key, item.name, item.type, item.file.size, createdAt, Number(Boolean(item.isPreview))));
     await env.DB.batch(statements);
   } catch (error) {
     await Promise.allSettled(stored.map(item => driveDelete(token, item.key)));
