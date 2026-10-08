@@ -199,7 +199,9 @@
 .ir-message-toolbar button:active{transform:scale(.98)}
 .ir-inbox-heading{display:flex;align-items:center;gap:14px;margin:4px 0 30px}
 .ir-inbox-heading>button{display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:50%;background:#ebebed;color:#333;font-size:30px}
-.ideal-repository .ir-inbox-heading>div{flex:1;min-width:0}
+.ideal-repository .ir-inbox-heading>div{position:relative;display:flex;flex:1;align-items:center;min-width:0;height:40px}
+.ideal-repository .ir-inbox-heading span{position:absolute;top:-7px;left:0}
+.ideal-repository .ir-inbox-heading h1{margin:0;font-size:26px;line-height:40px}
 .ideal-repository .ir-inbox-heading>.ir-page-close{width:40px;height:40px;flex:none;margin-left:auto}
 .ir-inbox-heading span{font-size:10px;letter-spacing:.18em;color:#888}.ir-inbox-heading h1{margin:5px 0;font-size:26px}
 .ir-inbox-empty{display:grid;justify-items:center;gap:10px;padding:70px 16px;color:#777;text-align:center}
