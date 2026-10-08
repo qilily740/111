@@ -16,13 +16,15 @@ OAuth 客户端 JSON 不需要提交到仓库。下载桌面客户端 JSON 后�
 
 ## 个人资料（2026-10-08）
 
-个人页使用 `GET/POST /api/me/profile` 保存昵称、自我介绍与仅本人可读的备注；写入仅允许 nickname、bio、note，不接受账号或注册日期。注册日期通过 auth-worker 的 publicUser.createdAt 返回。点赞记录通过 `GET /api/me/likes?offset=0` 分页读取，每页 30 条。好友目前仅有入口与未开放状态，尚未实现搜索、申请或关系管理。
+个人页使用 `GET/POST /api/me/profile` 保存昵称、自我介绍与仅本人可读的备注；写入仅允许 nickname、bio、note，不接受账号或注册日期。注册日期通过 auth-worker 的 publicUser.createdAt 返回。点赞记录通过 `GET /api/me/likes?offset=0` 分页读取，每页 30 条。好友通过 Ideal ID 精确搜索并申请、接受、拒绝、撤回或移除；私聊只允许已互为好友的账号。
 
-上线顺序：对 repository D1 应用全部待执行迁移，部署 auth-worker 和 repository-worker，最后发布前端。资料、点赞和好友功能都需要这些接口与迁移；页面不会伪造注册时间或保存成功。个人头像在本机保留一份，并上传到私有 Drive 供好友查看，不会同步到系统相册。
+上线顺序：对 repository D1 应用全部待执行迁移，部署 auth-worker 和 repository-worker，最后发布前端。资料、点赞、好友和私聊功能都需要这些接口与迁移；页面不会伪造注册时间或保存成功。个人头像在本机保留一份，并上传到私有 Drive 供好友查看，不会同步到系统相册。
 
-回归：`node --test test/profile.test.mjs test/friends.test.mjs`（Node 22.13+，使用内存 SQLite，覆盖账号隔离、资料白名单、点赞分页、Ideal ID 精确搜索、好友申请和头像上传/读取）。
+回归：`node --test test/profile.test.mjs test/friends.test.mjs test/chat.test.mjs`（Node 22.13+，使用内存 SQLite，覆盖资料白名单、点赞分页、Ideal ID 精确搜索、好友申请、头像上传/读取、私聊权限和七天过期）。
 
 
 ## 好友
 
-左侧第一个入口是好友页。好友通过固定 Ideal ID（账号名）精确搜索；auth-worker 的 `GET /auth/users/search?q=` 只返回匹配账号的内部 ID 和 Ideal ID；好友关系及待处理申请保存在 repository D1。部署前先应用 `0004_friends.sql` 与 `0005_profile_avatar.sql`，然后部署 auth-worker、repository-worker，最后发布前端。申请支持接受、拒绝、撤回和移除好友。个人昵称与好友可见头像会随资料接口一并显示；头像通过 `/api/me/avatar` 上传，好友身份图像通过登录态 `GET /api/users/:userId/avatar` 读取。头像更新会删除旧 Drive 文件。
+左侧第一个入口是好友页。好友通过固定 Ideal ID（账号名）精确搜索；auth-worker 的 `GET /auth/users/search?q=` 只返回匹配账号的内部 ID 和 Ideal ID；好友关系及待处理申请保存在 repository D1。申请支持接受、拒绝、撤回和移除好友。个人昵称与好友可见头像会随资料接口一并显示；头像通过 `/api/me/avatar` 上传，好友身份图像通过登录态 `GET /api/users/:userId/avatar` 读取。头像更新会删除旧 Drive 文件，前端会缓存访问过的好友头像，切换好友分类时直接复用，缓存约 5 分钟。
+
+好友私聊接口为 `GET /api/me/chats`、`GET/POST /api/me/chats/:friendUserId/messages`。服务端验证已接受的好友关系，纯文字消息最多 2000 字；打开会话时标记未读消息，客户端每 8 秒轮询新消息。每条消息从发送时间起保留 7 天；查询时隐藏并清理已到期消息，Worker Cron 每小时清除到期记录。新增迁移为 `0006_direct_messages.sql`。

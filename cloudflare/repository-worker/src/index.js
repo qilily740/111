@@ -400,6 +400,67 @@ async function removeFriend(request, env, user, friendId) {
   return result.meta?.changes ? json(request, env, { ok:true }) : json(request, env, { error:'NOT_FOUND' }, 404);
 }
 
+const chatRetentionMs = 7 * 24 * 60 * 60 * 1000;
+async function purgeExpiredMessages(env, at = now()) {
+  await env.DB.prepare('DELETE FROM direct_messages WHERE expires_at <= ?').bind(at).run();
+}
+async function acceptedFriend(env, userId, friendId) {
+  if (!friendId || friendId === userId) return false;
+  return Boolean(await env.DB.prepare("SELECT 1 AS ok FROM friend_requests WHERE status = 'accepted' AND ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?)) LIMIT 1").bind(userId,friendId,friendId,userId).first());
+}
+async function listChats(request, env, user) {
+  const at = now();
+  await purgeExpiredMessages(env, at);
+  const [friends, messages] = await Promise.all([
+    env.DB.prepare(`SELECT r.id, CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END AS userId,
+      CASE WHEN r.from_user_id = ? THEN r.to_username ELSE r.from_username END AS username,
+      COALESCE(NULLIF(p.nickname,''), CASE WHEN r.from_user_id = ? THEN r.to_username ELSE r.from_username END) AS nickname,
+      p.avatar_key AS avatarKey
+      FROM friend_requests r LEFT JOIN repository_profiles p ON p.user_id = CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END
+      WHERE r.status = 'accepted' AND (r.from_user_id = ? OR r.to_user_id = ?)`).bind(user.id,user.id,user.id,user.id,user.id,user.id).all(),
+    env.DB.prepare(`SELECT id, sender_id, recipient_id, body, created_at, read_at FROM direct_messages
+      WHERE (sender_id = ? OR recipient_id = ?) AND expires_at > ? ORDER BY created_at DESC LIMIT 5000`).bind(user.id,user.id,at).all()
+  ]);
+  const byFriend = new Map();
+  for (const message of messages.results || []) {
+    const friendId = message.sender_id === user.id ? message.recipient_id : message.sender_id;
+    let item = byFriend.get(friendId);
+    if (!item) {
+      item = { lastMessage:message.body, lastMessageAt:message.created_at, unreadCount:0 };
+      byFriend.set(friendId, item);
+    }
+    if (message.recipient_id === user.id && message.read_at === null) item.unreadCount++;
+  }
+  const chats = (friends.results || []).filter(friend => byFriend.has(friend.userId)).map(({avatarKey, ...friend}) => ({
+    ...friend, ...byFriend.get(friend.userId), avatarUrl:avatarKey ? `/api/users/${encodeURIComponent(friend.userId)}/avatar` : ''
+  })).sort((a,b) => b.lastMessageAt - a.lastMessageAt);
+  return json(request, env, { chats });
+}
+async function readChatMessages(request, env, user, friendId) {
+  if (!await acceptedFriend(env, user.id, friendId)) return json(request, env, { error:'FRIENDSHIP_REQUIRED' }, 403);
+  const at = now();
+  await purgeExpiredMessages(env, at);
+  await env.DB.prepare('UPDATE direct_messages SET read_at = ? WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL AND expires_at > ?').bind(at,friendId,user.id,at).run();
+  const result = await env.DB.prepare(`SELECT id, sender_id AS senderId, recipient_id AS recipientId, body, created_at AS createdAt
+    FROM direct_messages WHERE ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)) AND expires_at > ?
+    ORDER BY created_at DESC LIMIT 100`).bind(user.id,friendId,friendId,user.id,at).all();
+  return json(request, env, { messages:(result.results || []).reverse() });
+}
+async function sendChatMessage(request, env, user, friendId) {
+  if (!await acceptedFriend(env, user.id, friendId)) return json(request, env, { error:'FRIENDSHIP_REQUIRED' }, 403);
+  if (Number(request.headers.get('Content-Length') || 0) > 5000) return json(request, env, { error:'INVALID_MESSAGE' }, 400);
+  let body;
+  try { body = await request.json(); } catch { return json(request, env, { error:'INVALID_MESSAGE' }, 400); }
+  const text = typeof body?.text === 'string' ? body.text.trim() : '';
+  if (!text || text.length > 2000 || Object.keys(body || {}).some(key => key !== 'text')) return json(request, env, { error:'INVALID_MESSAGE' }, 400);
+  const at = now();
+  const recent = await env.DB.prepare('SELECT COUNT(*) AS count FROM direct_messages WHERE sender_id = ? AND created_at > ?').bind(user.id,at - 60_000).first();
+  if (Number(recent?.count || 0) >= 30) return json(request, env, { error:'CHAT_RATE_LIMIT' }, 429);
+  const message = { id:uuid(), senderId:user.id, recipientId:friendId, body:text, createdAt:at };
+  await env.DB.prepare('INSERT INTO direct_messages (id,sender_id,recipient_id,body,created_at,expires_at) VALUES (?,?,?,?,?,?)').bind(message.id,user.id,friendId,text,at,at + chatRetentionMs).run();
+  return json(request, env, { message }, 201);
+}
+
 async function uploadProfileAvatar(request, env, user) {
   if (Number(request.headers.get('Content-Length') || 0) > 600 * 1024) return json(request, env, { error:'INVALID_AVATAR' }, 400);
   let form;
@@ -496,6 +557,10 @@ export default {
     try {
       if (url.pathname === '/api/users/search' && request.method === 'GET') return await searchAccounts(request, env, auth.user, url);
       if (url.pathname === '/api/me/friends' && request.method === 'GET') return await listFriends(request, env, auth.user);
+      if (url.pathname === '/api/me/chats' && request.method === 'GET') return await listChats(request, env, auth.user);
+      const chatMessages = url.pathname.match(/^\/api\/me\/chats\/([^/]{1,128})\/messages$/);
+      if (chatMessages && request.method === 'GET') return await readChatMessages(request, env, auth.user, decodeURIComponent(chatMessages[1]));
+      if (chatMessages && request.method === 'POST') return await sendChatMessage(request, env, auth.user, decodeURIComponent(chatMessages[1]));
       if (url.pathname === '/api/me/friends/requests' && request.method === 'POST') return await createFriendRequest(request, env, auth.user);
       const friendRequest = url.pathname.match(/^\/api\/me\/friends\/requests\/([a-f0-9-]{36})\/(accept|decline|cancel)$/);
       if (friendRequest && request.method === 'POST') return await updateFriendRequest(request, env, auth.user, friendRequest[1], friendRequest[2]);
@@ -526,5 +591,8 @@ export default {
       if (error instanceof RepositoryError) return json(request, env, { error:error.code }, error.status);
       return json(request, env, { error:error instanceof TypeError ? 'INVALID_REQUEST' : 'SERVER_ERROR' }, error instanceof TypeError ? 400 : 500);
     }
+  },
+  async scheduled(controller, env) {
+    if (env.DB) await purgeExpiredMessages(env, now());
   }
 };

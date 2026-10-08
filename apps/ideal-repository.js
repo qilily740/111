@@ -60,6 +60,15 @@
   let friendStatus = '';
   let friendBusy = false;
   let friendSearchSerial = 0;
+  let chatList = [];
+  let chatFriend = null;
+  let chatMessages = [];
+  let chatDraft = '';
+  let chatStatus = '';
+  let chatBusy = false;
+  let chatSending = false;
+  let chatPollTimer = 0;
+  let chatRequestSerial = 0;
   let profileOrigin = false;
   let avatarUrl = '';
   let coverUrl = '';
@@ -74,6 +83,7 @@
   let requestSerial = 0;
   let searchTimer = 0;
   const imageUrls = new Set();
+  const friendAvatarObjectUrls = new Map();
   const accountStorageId = () => { const user = window.IdealMachineAuth?.getUser?.(); return String(user?.id || user?.username || 'guest'); };
   const avatarStorageKey = () => `ideal-repository-avatar-v1:${accountStorageId()}`;
   const personalStorageKey = () => `ideal-repository-profile-v1:${accountStorageId()}`;
@@ -81,7 +91,7 @@
   function readLocalProfile() { try { const value = JSON.parse(localStorage.getItem(personalStorageKey()) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; } }
   function writeLocalProfile(value) { localStorage.setItem(personalStorageKey(), JSON.stringify({ nickname:value.nickname || '', bio:value.bio || '', note:value.note || '' })); }
   const apiBase = () => String(window.IdealMachineConfig?.repositoryApiBase || '').replace(/\/+$/, '');
-  const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', STORAGE_UNAVAILABLE:'头像存储服务暂时不可用', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试' };
+  const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', STORAGE_UNAVAILABLE:'头像存储服务暂时不可用', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试', FRIENDSHIP_REQUIRED:'只有已添加的好友之间可以私聊', INVALID_MESSAGE:'消息不能为空，且不能超过 2000 字', CHAT_RATE_LIMIT:'发送太频繁，请稍后再试' };
   async function requestApi(path, options = {}) {
     if (!apiBase()) throw new Error('仓库后端尚未部署或配置。请先设置 repositoryApiBase。');
     const token = window.IdealMachineAuth?.getToken?.();
@@ -166,6 +176,75 @@
     catch (error) { friendStatus = error.message; }
     finally { friendBusy = false; if (screen === 'friends') render(); }
   }
+  async function loadChats(silent = false) {
+    try {
+      const result = await requestApi('/api/me/chats');
+      const changed = JSON.stringify(chatList) !== JSON.stringify(result.chats || []);
+      chatList = result.chats || [];
+      if (changed && screen === 'friends' && friendPanel === 'inbox') {
+        const scroller = root.querySelector('.ir-chat-list'); const top = scroller?.scrollTop || 0;
+        render(); root.querySelector('.ir-chat-list')?.scrollTo(0, top);
+      }
+    } catch (error) {
+      if (!silent) chatStatus = error.message;
+      if (!silent && screen === 'friends' && friendPanel === 'inbox') render();
+    }
+  }
+  function stopChatPolling() { clearInterval(chatPollTimer); chatPollTimer = 0; }
+  function startChatPolling() {
+    stopChatPolling();
+    chatPollTimer = setInterval(() => {
+      if (screen !== 'friends') return;
+      if (friendPanel === 'chat') loadChatMessages(true);
+      else if (friendPanel === 'inbox') loadChats(true);
+    }, 8000);
+  }
+  async function loadChatMessages(silent = false) {
+    if (!chatFriend || chatBusy) return;
+    const friendId = chatFriend.userId || chatFriend.id;
+    const serial = ++chatRequestSerial;
+    if (!silent) { chatBusy = true; chatStatus = ''; render(); }
+    try {
+      const result = await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`);
+      if (serial !== chatRequestSerial || screen !== 'friends' || friendPanel !== 'chat' || (chatFriend.userId || chatFriend.id) !== friendId) return;
+      const next = result.messages || [];
+      const changed = JSON.stringify(chatMessages) !== JSON.stringify(next);
+      chatMessages = next;
+      chatStatus = '';
+      if (!silent) chatBusy = false;
+      if (!silent || changed) {
+        const input = root.querySelector('[data-ir-chat-input]');
+        const focused = input === document.activeElement; const start = input?.selectionStart; const end = input?.selectionEnd;
+        render();
+        const nextInput = root.querySelector('[data-ir-chat-input]');
+        if (focused && nextInput) { nextInput.focus(); nextInput.setSelectionRange(start, end); }
+        const messages = root.querySelector('[data-ir-chat-messages]');
+        if (messages) messages.scrollTop = messages.scrollHeight;
+      }
+    } catch (error) {
+      if (serial === chatRequestSerial) { chatStatus = error.message; if (!silent) { chatBusy = false; render(); } }
+    } finally { if (!silent && serial === chatRequestSerial) chatBusy = false; }
+  }
+  async function openChat(friend) {
+    if (!friend) return;
+    stopChatPolling();
+    chatFriend = friend; chatMessages = []; chatDraft = ''; chatStatus = ''; chatBusy = false;
+    friendPanel = 'chat'; ++chatRequestSerial; render();
+    await loadChatMessages();
+    startChatPolling();
+  }
+  async function sendChatMessage(event) {
+    event.preventDefault();
+    const text = chatDraft.trim();
+    if (!text || chatSending || !chatFriend) return;
+    const friendId = chatFriend.userId || chatFriend.id;
+    chatSending = true; chatStatus = ''; render();
+    try {
+      await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text}) });
+      chatDraft = ''; await loadChatMessages(); await loadChats(true);
+    } catch (error) { chatStatus = error.message; }
+    finally { chatSending = false; if (screen === 'friends' && friendPanel === 'chat') render(); }
+  }
   async function searchFriends() {
     const query = friendQuery.trim();
     friendResults = [];
@@ -180,11 +259,24 @@
     if (serial === friendSearchSerial && screen === 'friends') render();
   }
   const friendIdentity = item => { const id = item.userId || item.id; const initial = escapeHTML((item.nickname || item.username || '?').slice(0,1).toUpperCase()); const image = item.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''; return `<span class="ir-friend-avatar">${initial}${image}</span><span class="ir-friend-copy"><strong>${escapeHTML(item.nickname || item.username)}</strong><small>ID · ${escapeHTML(item.username)}</small></span>`; };
+  const chatTime = value => value ? new Date(value).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) : '';
+  function renderChat() {
+    const friend = chatFriend || {};
+    const id = friend.userId || friend.id || '';
+    const initial = escapeHTML((friend.nickname || friend.username || '?').slice(0,1).toUpperCase());
+    const avatar = `<span class="ir-chat-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span>`;
+    const bubbles = chatMessages.map(message => `<article class="ir-chat-message ${message.senderId === accountStorageId() ? 'is-mine' : ''}"><p>${escapeHTML(message.body)}</p><time>${chatTime(message.createdAt)}</time></article>`).join('');
+    return `<div class="ir-friends-page ir-chat-page"><header class="ir-chat-header"><button type="button" data-ir-chat-back aria-label="返回会话列表">‹</button>${avatar}<div><strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><small>ID · ${escapeHTML(friend.username || '')}</small></div><button class="ir-close ir-chat-close" type="button" data-ir-close aria-label="关闭">×</button></header><section class="ir-chat-messages" data-ir-chat-messages>${chatBusy ? '<p class="ir-chat-empty">正在加载聊天记录…</p>' : bubbles || '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>'}</section>${chatStatus ? `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}<form class="ir-chat-composer"><textarea data-ir-chat-input name="text" rows="1" maxlength="2000" placeholder="发送消息…">${escapeHTML(chatDraft)}</textarea><button type="submit" ${chatSending || !chatDraft.trim() ? 'disabled' : ''}>${chatSending ? '发送中…' : '发送'}</button></form><small class="ir-chat-retention">每条消息发送 7 天后自动删除</small></div>`;
+  }
   function renderFriends() {
-    if (friendPanel === 'inbox') return `<div class="ir-friends-page"><header class="ir-inbox-heading"><button type="button" data-ir-inbox-back aria-label="返回消息">‹</button><div><span>IDEAL / INBOX</span><h1>私信提醒</h1></div></header><div class="ir-inbox-empty"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><path d="m3 6 9 7 9-7"/></svg></span><strong>暂时没有私信提醒</strong><small>收到的私信提醒会显示在这里。</small></div></div>`;
+    if (friendPanel === 'chat') return renderChat();
+    if (friendPanel === 'inbox') {
+      const rows = chatList.map(item => `<button type="button" class="ir-chat-list-item" data-ir-open-chat="${escapeHTML(item.userId)}">${friendIdentity(item)}<span class="ir-chat-preview">${escapeHTML(item.lastMessage || '')}</span><time>${chatTime(item.lastMessageAt)}</time>${item.unreadCount ? `<b class="ir-chat-unread">${item.unreadCount > 99 ? '99+' : item.unreadCount}</b>` : ''}</button>`).join('');
+      return `<div class="ir-friends-page"><header class="ir-inbox-heading"><button type="button" data-ir-inbox-back aria-label="返回好友">‹</button><div><span>IDEAL / INBOX</span><h1>私聊</h1></div><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><p class="ir-chat-retention">每条消息发送 7 天后自动删除</p>${chatStatus ? `<p class="ir-friends-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}<section class="ir-chat-list">${rows || '<div class="ir-inbox-empty"><span aria-hidden="true">♡</span><strong>还没有私聊</strong><small>从好友列表选择一位好友，开始聊天。</small></div>'}</section></div>`;
+    }
     const tabs = [['friends','我的好友',friendData.friends.length],['incoming','好友申请',friendData.incoming.length],['outgoing','已发送',friendData.outgoing.length]];
     const users = friendsTab === 'friends' ? friendData.friends : friendsTab === 'incoming' ? friendData.incoming : friendData.outgoing;
-    const list = users.map(item => `<article class="ir-friend-item">${friendIdentity(item)}${friendsTab === 'incoming' ? `<button type="button" data-ir-friend-accept="${escapeHTML(item.id)}">接受</button><button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">拒绝</button>` : friendsTab === 'outgoing' ? `<button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">撤回</button>` : `<button type="button" class="is-muted" data-ir-friend-remove="${escapeHTML(item.id)}">移除</button>`}</article>`).join('');
+    const list = users.map(item => `<article class="ir-friend-item">${friendIdentity(item)}${friendsTab === 'incoming' ? `<button type="button" data-ir-friend-accept="${escapeHTML(item.id)}">接受</button><button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">拒绝</button>` : friendsTab === 'outgoing' ? `<button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">撤回</button>` : `<button type="button" data-ir-open-chat="${escapeHTML(item.userId)}">私聊</button><button type="button" class="is-muted" data-ir-friend-remove="${escapeHTML(item.id)}">移除</button>`}</article>`).join('');
     const resultList = friendResults.map(item => `<article class="ir-friend-item">${friendIdentity(item)}<button type="button" ${item.relation ? 'disabled' : ''} data-ir-friend-add="${escapeHTML(item.username)}">${item.relation === 'friend' ? '已添加' : item.relation === 'outgoing' ? '已申请' : item.relation === 'incoming' ? '待处理' : '添加好友'}</button></article>`).join('');
     const search = friendSearchOpen ? `<form class="ir-friends-search"><input name="account" type="search" maxlength="32" autocomplete="off" placeholder="输入 Ideal ID" value="${escapeHTML(friendQuery)}"><button type="submit">搜索</button></form>` : '';
     return `<div class="ir-friends-page"><header class="ir-friends-heading ir-page-heading"><h1>消息</h1><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><nav class="ir-message-toolbar" aria-label="消息操作"><button type="button" class="ir-message-icon" data-ir-search-toggle aria-label="搜索好友">${profileIcon('search')}</button><button type="button" class="ir-message-inbox" data-ir-friend-inbox aria-label="私信提醒"><span>${profileIcon('mail')}</span></button><button type="button" class="ir-message-add" data-ir-add-friend><span>${profileIcon('addPerson')}</span><b>添加好友</b></button><button type="button" class="ir-message-plus" data-ir-plus aria-label="添加好友">＋</button></nav>${search}${friendStatus ? `<p class="ir-friends-status" role="status">${escapeHTML(friendStatus)}</p>` : ''}${resultList ? `<section class="ir-friends-results"><h2>搜索结果</h2>${resultList}</section>` : friendQuery.length >= 3 && !friendStatus && !friendResults.length ? '<p class="ir-friends-empty">没有找到匹配的账号。</p>' : ''}<nav class="ir-friends-tabs" aria-label="好友分类">${tabs.map(([id,label,count]) => `<button type="button" data-ir-friend-tab="${id}" class="${friendsTab === id ? 'is-selected' : ''}">${label}<span>${count}</span></button>`).join('')}</nav><section class="ir-friends-list">${friendBusy ? '<p class="ir-friends-empty">正在加载好友…</p>' : list || `<div class="ir-friends-empty"><span>${friendsTab === 'friends' ? '♧' : '♡'}</span><strong>${friendsTab === 'friends' ? '还没有好友' : friendsTab === 'incoming' ? '暂时没有新的好友申请' : '还没有发出好友申请'}</strong><small>${friendsTab === 'friends' ? '搜索 Ideal 账号，添加你的第一位好友。' : '新的动态会显示在这里。'}</small></div>`}</section></div>`;
@@ -444,12 +536,24 @@
     if (!apiBase() || !image.isConnected || image.dataset.irLoading === '1' || image.dataset.irLoaded === '1') return;
     image.dataset.irLoading = '1';
     const id = image.dataset.irImage || image.dataset.irPostAvatar || image.dataset.irFriendAvatar;
+    const cachedAvatar = image.dataset.irFriendAvatar ? friendAvatarObjectUrls.get(id) : null;
+    if (cachedAvatar && cachedAvatar.expiresAt > Date.now()) {
+      image.src = cachedAvatar.url; image.dataset.irLoaded = '1'; delete image.dataset.irLoading; return;
+    }
+    if (cachedAvatar) { friendAvatarObjectUrls.delete(id); URL.revokeObjectURL(cachedAvatar.url); }
     const path = image.dataset.irImage ? `/api/attachments/${encodeURIComponent(id)}` : image.dataset.irPostAvatar ? `/api/posts/${encodeURIComponent(id)}/avatar` : `/api/users/${encodeURIComponent(id)}/avatar`;
     try {
       const response = await requestApi(path, { raw:true });
       if (!image.isConnected) return;
       const url = URL.createObjectURL(await response.blob());
-      imageUrls.add(url); image.src = url; image.dataset.irLoaded = '1';
+      if (image.dataset.irFriendAvatar) {
+        friendAvatarObjectUrls.set(id, {url, expiresAt:Date.now() + 5 * 60 * 1000});
+        while (friendAvatarObjectUrls.size > 100) {
+          const [oldId, oldAvatar] = friendAvatarObjectUrls.entries().next().value;
+          friendAvatarObjectUrls.delete(oldId); URL.revokeObjectURL(oldAvatar.url);
+        }
+      } else imageUrls.add(url);
+      image.src = url; image.dataset.irLoaded = '1';
     } catch {} finally { delete image.dataset.irLoading; }
   }
   const remoteImageObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
@@ -531,6 +635,7 @@
     }
   };
   const show = next => {
+    if (next !== 'friends') stopChatPolling();
     screen = next; activePost = null; postQuery = '';
     if (next !== 'friends') ++friendSearchSerial; postTag = ''; listScroll = 0; uploadOpen = false;
     profileOrigin = false;
@@ -542,6 +647,7 @@
   };
   const open = () => { personal = readLocalProfile(); show('welcome'); root.classList.add('is-open'); syncViewport(); loadAvatar(); syncAvatarWithServer(); };
   const close = () => {
+    stopChatPolling();
     if (root.contains(document.activeElement)) document.activeElement.blur();
     root.classList.remove('is-open');
     root.style.removeProperty('height'); root.style.removeProperty('top');
@@ -630,8 +736,13 @@
     if (button.hasAttribute('data-ir-close')) return close();
     if (button.hasAttribute('data-ir-home')) return show('welcome');
     if (button.hasAttribute('data-ir-friends-open') || button.hasAttribute('data-ir-friends')) { profilePanel = ''; friendsTab = 'friends'; friendPanel = ''; friendSearchOpen = false; friendQuery = ''; friendResults = []; friendStatus = ''; return show('friends'); }
-    if (button.hasAttribute('data-ir-inbox-back')) { friendPanel = ''; return render(); }
-    if (button.hasAttribute('data-ir-friend-inbox')) { friendPanel = 'inbox'; return render(); }
+    if (button.hasAttribute('data-ir-inbox-back')) { friendPanel = ''; chatStatus = ''; return render(); }
+    if (button.hasAttribute('data-ir-chat-back')) { chatFriend = null; friendPanel = 'inbox'; chatDraft = ''; render(); startChatPolling(); loadChats(); return; }
+    if (button.hasAttribute('data-ir-friend-inbox')) { friendPanel = 'inbox'; chatStatus = ''; render(); startChatPolling(); loadChats(); return; }
+    if (button.dataset.irOpenChat) {
+      const friend = [...friendData.friends, ...chatList].find(item => item.userId === button.dataset.irOpenChat);
+      return openChat(friend);
+    }
     if (button.hasAttribute('data-ir-search-toggle')) { friendSearchOpen = !friendSearchOpen; render(); if (friendSearchOpen) root.querySelector('.ir-friends-search input')?.focus(); return; }
     if (button.hasAttribute('data-ir-add-friend') || button.hasAttribute('data-ir-plus')) { friendPanel = ''; friendSearchOpen = true; render(); root.querySelector('.ir-friends-search input')?.focus(); return; }
     if (button.dataset.irFriendTab) { friendsTab = button.dataset.irFriendTab; return render(); }
@@ -660,6 +771,12 @@
     root.querySelector('.ir-empty-search').hidden = visible > 0;
   });
   root.addEventListener('input', event => {
+    if (event.target.matches('[data-ir-chat-input]')) {
+      chatDraft = event.target.value;
+      const send = root.querySelector('.ir-chat-composer button[type="submit"]');
+      if (send) send.disabled = chatSending || !chatDraft.trim();
+      return;
+    }
     if (!event.target.matches('[data-ir-filter]')) return;
     if (event.isComposing) return;
     postQuery = event.target.value;
@@ -694,6 +811,7 @@
     postTag = event.target.value; loadPosts();
   });
   root.addEventListener('submit', async event => {
+    if (event.target.matches('.ir-chat-composer')) { await sendChatMessage(event); return; }
     if (event.target.matches('.ir-friends-search')) { event.preventDefault(); friendQuery = String(new FormData(event.target).get('account') || '').trim(); searchFriends(); return; }
     if (event.target.matches('.ir-upload-form')) {
       event.preventDefault();
@@ -755,6 +873,8 @@
   });
   window.addEventListener('ideal-machine-auth-changed', () => {
     ++profileSerial; personal = {}; profilePanel = ''; likedPosts = []; friendData = { friends:[], incoming:[], outgoing:[] }; friendResults = [];
+    stopChatPolling(); chatList = []; chatFriend = null; chatMessages = []; chatDraft = ''; chatStatus = ''; ++chatRequestSerial;
+    friendAvatarObjectUrls.forEach(avatar => URL.revokeObjectURL(avatar.url)); friendAvatarObjectUrls.clear();
     root.querySelector('dialog')?.close();
     savedPosts = [];
     avatarUrl = '';
