@@ -7,6 +7,11 @@ const allowedFiles = {
 };
 const maxFile = 8 * 1024 * 1024;
 const maxRequest = 26 * 1024 * 1024;
+const maxChatStickers = 100;
+const maxChatStickerGroups = 20;
+const maxChatStickerBytes = 20 * 1024 * 1024;
+const chatStickerUnusedMs = 90 * 24 * 60 * 60 * 1000;
+const maxChatStickerFileBytes = maxChatStickerBytes;
 const driveUploadEndpoint = 'https://www.googleapis.com/upload/drive/v3/files';
 const driveFilesEndpoint = 'https://www.googleapis.com/drive/v3/files';
 const driveFolderMime = 'application/vnd.google-apps.folder';
@@ -22,7 +27,7 @@ const header = (request, env) => {
   const allowed = String(env.ALLOWED_ORIGINS || '').split(',').map(item => item.trim());
   return {
     ...(allowed.includes(origin) ? { 'Access-Control-Allow-Origin':origin, Vary:'Origin' } : {}),
-    'Access-Control-Allow-Methods':'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods':'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers':'Authorization, Content-Type, X-Ideal-Authorization, X-Ideal-Target-URL',
     'Cache-Control':'no-store',
     'X-Content-Type-Options':'nosniff'
@@ -147,8 +152,11 @@ async function driveFolderId(env, token) {
   return saved?.value || created;
 }
 async function driveDelete(token, fileId) {
-  if (!fileId) return;
-  await fetch(`${driveFilesEndpoint}/${encodeURIComponent(fileId)}`, { method:'DELETE', headers:{ Authorization:`Bearer ${token}` } }).catch(() => {});
+  if (!fileId) return true;
+  try {
+    const response = await fetch(`${driveFilesEndpoint}/${encodeURIComponent(fileId)}`, { method:'DELETE', headers:{ Authorization:`Bearer ${token}` } });
+    return response.ok || response.status === 404;
+  } catch { return false; }
 }
 async function driveDownload(token, fileId) {
   return driveFetch(token, `${driveFilesEndpoint}/${encodeURIComponent(fileId)}?alt=media`);
@@ -465,11 +473,14 @@ async function readChatMessages(request, env, user, friendId) {
   if (!await acceptedFriend(env, user.id, friendId)) return json(request, env, { error:'FRIENDSHIP_REQUIRED' }, 403);
   const at = now();
   const blockState = await chatBlockState(env,user.id,friendId);
-  await purgeExpiredMessages(env, at);
   await env.DB.prepare('UPDATE direct_messages SET read_at = ? WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL AND expires_at > ?').bind(at,friendId,user.id,at).run();
-  const result = await env.DB.prepare(`SELECT m.id, m.sender_id AS senderId, m.recipient_id AS recipientId, m.body, m.created_at AS createdAt,
+  const result = await env.DB.prepare(`SELECT m.id, m.sender_id AS senderId, m.recipient_id AS recipientId, m.body, m.message_type AS type,
+      m.sticker_id AS stickerId,
+      CASE WHEN sticker.object_key != '' THEN '/api/chat-stickers/' || sticker.id || '/image' ELSE sticker.source_url END AS stickerUrl,
+      sticker.size_bytes AS stickerSizeBytes, m.created_at AS createdAt,
       m.reply_to_id AS replyToId, reply.body AS replyBody, reply.sender_id AS replySenderId, reply.created_at AS replyCreatedAt
     FROM direct_messages m LEFT JOIN direct_messages reply ON reply.id = m.reply_to_id AND reply.expires_at > ?
+    LEFT JOIN chat_stickers sticker ON sticker.id = m.sticker_id
     WHERE ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?)) AND m.expires_at > ?
     ORDER BY m.created_at DESC, m.id DESC LIMIT 100`).bind(at,user.id,friendId,friendId,user.id,at).all();
   return json(request, env, { ...blockState, messages:(result.results || []).reverse() });
@@ -482,18 +493,152 @@ async function sendChatMessage(request, env, user, friendId) {
   let body;
   try { body = await request.json(); } catch { return json(request, env, { error:'INVALID_MESSAGE' }, 400); }
   const text = typeof body?.text === 'string' ? body.text.trim() : '';
+  const stickerId = typeof body?.stickerId === 'string' ? body.stickerId : null;
   const replyToId = typeof body?.replyToId === 'string' && body.replyToId ? body.replyToId : null;
-  if (!text || text.length > 2000 || Object.keys(body || {}).some(key => !['text','replyToId'].includes(key)) || (body?.replyToId != null && replyToId == null)) return json(request, env, { error:'INVALID_MESSAGE' }, 400);
+  if ((stickerId ? text.length > 0 || !/^[a-f0-9-]{36}$/i.test(stickerId) : !text || text.length > 2000) || Object.keys(body || {}).some(key => !['text','replyToId','stickerId'].includes(key)) || (body?.replyToId != null && replyToId == null)) return json(request, env, { error:'INVALID_MESSAGE' }, 400);
   const at = now();
+  let sticker = null;
+  if (stickerId) {
+    sticker = await env.DB.prepare('SELECT id, label, source_url AS stickerUrl, object_key AS objectKey FROM chat_stickers WHERE id = ? AND user_id = ? AND deleted_at IS NULL').bind(stickerId,user.id).first();
+    if (!sticker) return json(request, env, { error:'CHAT_STICKER_NOT_FOUND' }, 404);
+    await env.DB.prepare('UPDATE chat_stickers SET last_used_at = ? WHERE id = ? AND deleted_at IS NULL').bind(at,stickerId).run();
+  }
   if (replyToId) {
     const replied = await env.DB.prepare(`SELECT id FROM direct_messages WHERE id = ? AND expires_at > ? AND ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?))`).bind(replyToId,at,user.id,friendId,friendId,user.id).first();
     if (!replied) return json(request, env, { error:'INVALID_REPLY' }, 400);
   }
   const recent = await env.DB.prepare('SELECT COUNT(*) AS count FROM direct_messages WHERE sender_id = ? AND created_at > ?').bind(user.id,at - 60_000).first();
   if (Number(recent?.count || 0) >= 30) return json(request, env, { error:'CHAT_RATE_LIMIT' }, 429);
-  const message = { id:uuid(), senderId:user.id, recipientId:friendId, body:text, createdAt:at, replyToId };
-  await env.DB.prepare('INSERT INTO direct_messages (id,sender_id,recipient_id,body,created_at,expires_at,reply_to_id) VALUES (?,?,?,?,?,?,?)').bind(message.id,user.id,friendId,text,at,at + chatRetentionMs,replyToId).run();
+  const messageBody = sticker ? `[表情包] ${sticker.label}` : text;
+  const message = { id:uuid(), senderId:user.id, recipientId:friendId, body:messageBody, type:sticker ? 'sticker' : 'text', stickerId, stickerUrl:sticker?.objectKey ? `/api/chat-stickers/${stickerId}/image` : sticker?.stickerUrl || '', createdAt:at, replyToId };
+  await env.DB.prepare('INSERT INTO direct_messages (id,sender_id,recipient_id,body,created_at,expires_at,reply_to_id,message_type,sticker_id) VALUES (?,?,?,?,?,?,?,?,?)').bind(message.id,user.id,friendId,messageBody,at,at + chatRetentionMs,replyToId,message.type,stickerId).run();
   return json(request, env, { message }, 201);
+}
+
+async function listChatStickers(request, env, user) {
+  const [result, usage] = await Promise.all([
+    env.DB.prepare(`SELECT id, label, group_name AS groupName, source_url AS sourceUrl,
+      CASE WHEN object_key != '' THEN 1 ELSE 0 END AS stored,
+      size_bytes AS sizeBytes, created_at AS createdAt, last_used_at AS lastUsedAt
+      FROM chat_stickers WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`).bind(user.id).all(),
+    env.DB.prepare('SELECT COALESCE(SUM(size_bytes),0) AS usedBytes FROM chat_stickers WHERE user_id = ?').bind(user.id).first()
+  ]);
+  return json(request, env, { stickers:result.results || [], maxCount:maxChatStickers, maxGroups:maxChatStickerGroups, usedBytes:Number(usage?.usedBytes || 0), maxBytes:maxChatStickerBytes, unusedDays:90 });
+}
+async function fetchChatStickerImage(sourceUrl) {
+  let parsed;
+  try { parsed = new URL(sourceUrl); } catch {}
+  const host = String(parsed?.hostname || '').toLowerCase();
+  const ipLiteral = /^\[?[0-9a-f:.]+\]?$/i.test(host);
+  if (!parsed || parsed.protocol !== 'https:' || (parsed.port && parsed.port !== '443') || parsed.username || parsed.password || ipLiteral || /(?:^|\.)(?:localhost|local|internal|lan|test|onion)$/i.test(host)) throw new RepositoryError('INVALID_CHAT_STICKER', 400);
+  let response;
+  try { response = await fetch(parsed.href, { method:'GET', redirect:'manual', headers:{ Accept:'image/avif,image/webp,image/png,image/jpeg,image/gif' } }); }
+  catch { throw new RepositoryError('CHAT_STICKER_SOURCE_UNAVAILABLE', 400); }
+  if (response.status >= 300 && response.status < 400) throw new RepositoryError('CHAT_STICKER_REDIRECT_NOT_ALLOWED', 400);
+  if (!response.ok) throw new RepositoryError('CHAT_STICKER_SOURCE_NOT_FOUND', 400);
+  const type = String(response.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+  const extensions = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', 'image/gif':'gif', 'image/avif':'avif' };
+  if (!extensions[type]) throw new RepositoryError('INVALID_CHAT_STICKER_IMAGE', 400);
+  const declaredSize = Number(response.headers.get('Content-Length') || 0);
+  if (declaredSize > maxChatStickerFileBytes) throw new RepositoryError('CHAT_STICKER_FILE_TOO_LARGE', 413);
+  const reader = response.body?.getReader();
+  if (!reader) throw new RepositoryError('INVALID_CHAT_STICKER_IMAGE', 400);
+  const chunks = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > maxChatStickerFileBytes) {
+      await reader.cancel();
+      throw new RepositoryError('CHAT_STICKER_FILE_TOO_LARGE', 413);
+    }
+    chunks.push(value);
+  }
+  if (!totalBytes) throw new RepositoryError('INVALID_CHAT_STICKER_IMAGE', 400);
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk,offset); offset += chunk.byteLength; }
+  const starts = (...values) => values.every((value,index) => bytes[index] === value);
+  const signatureValid = type === 'image/jpeg' ? starts(0xff,0xd8,0xff)
+    : type === 'image/png' ? starts(0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a)
+    : type === 'image/gif' ? String.fromCharCode(...bytes.slice(0,6)).startsWith('GIF8')
+    : type === 'image/webp' ? String.fromCharCode(...bytes.slice(0,4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8,12)) === 'WEBP'
+    : String.fromCharCode(...bytes.slice(4,12)).includes('ftyp') && /avif|avis/.test(String.fromCharCode(...bytes.slice(8,16)));
+  if (!signatureValid) throw new RepositoryError('INVALID_CHAT_STICKER_IMAGE', 400);
+  return { bytes, type, extension:extensions[type] };
+}
+async function readChatStickerImage(request, env, user, stickerId) {
+  const at = now();
+  const sticker = await env.DB.prepare('SELECT id,user_id,object_key,mime_type,deleted_at FROM chat_stickers WHERE id = ? AND object_key != ?').bind(stickerId,'').first();
+  if (!sticker) return json(request, env, { error:'CHAT_STICKER_NOT_FOUND' }, 404);
+  const owner = sticker.user_id === user.id && !sticker.deleted_at;
+  const inChat = await env.DB.prepare(`SELECT 1 AS found FROM direct_messages WHERE sticker_id = ? AND expires_at > ? AND (sender_id = ? OR recipient_id = ?) LIMIT 1`).bind(stickerId,at,user.id,user.id).first();
+  if (!owner && !inChat) return json(request, env, { error:'CHAT_STICKER_NOT_FOUND' }, 404);
+  await env.DB.prepare('UPDATE chat_stickers SET last_used_at = ? WHERE id = ? AND deleted_at IS NULL').bind(at,stickerId).run();
+  const object = await driveDownload(await driveAccessToken(env), sticker.object_key);
+  return new Response(object.body, { headers:{ ...header(request, env), 'Content-Type':sticker.mime_type || 'application/octet-stream', 'Cache-Control':'private, max-age=3600', 'X-Content-Type-Options':'nosniff' } });
+}
+async function uploadChatSticker(request, env, user) {
+  if (Number(request.headers.get('Content-Length') || 0) > 64 * 1024) return json(request, env, { error:'INVALID_CHAT_STICKER' }, 400);
+  let body;
+  try { body = await request.json(); } catch { return json(request, env, { error:'INVALID_CHAT_STICKER' }, 400); }
+  const label = clean(body?.label, 40);
+  const groupName = clean(body?.groupName || '默认', 24);
+  const sourceUrl = typeof body?.url === 'string' ? body.url.trim() : '';
+  let parsed;
+  try { parsed = new URL(sourceUrl); } catch {}
+  if (!label || !groupName || !parsed || parsed.protocol !== 'https:' || sourceUrl.length > 2048 || parsed.username || parsed.password || Object.keys(body || {}).some(key => !['label','url','groupName'].includes(key))) return json(request, env, { error:'INVALID_CHAT_STICKER' }, 400);
+  const duplicate = await env.DB.prepare('SELECT id FROM chat_stickers WHERE user_id = ? AND source_url = ? AND deleted_at IS NULL').bind(user.id,sourceUrl).first();
+  if (duplicate) return json(request, env, { error:'CHAT_STICKER_EXISTS' }, 409);
+  const image = await fetchChatStickerImage(sourceUrl);
+  const at = now(), id = uuid();
+  const total = await env.DB.prepare('SELECT COALESCE(SUM(size_bytes),0) AS usedBytes FROM chat_stickers WHERE user_id = ?').bind(user.id).first();
+  if (Number(total?.usedBytes || 0) + image.bytes.byteLength > maxChatStickerBytes) return json(request, env, { error:'CHAT_STICKER_STORAGE_LIMIT' }, 409);
+  const token = await driveAccessToken(env);
+  const file = new File([image.bytes], `sticker-${id}.${image.extension}`, { type:image.type });
+  const objectKey = await driveUpload(token,file,`chat-sticker-${id}.${image.extension}`,image.type,await driveFolderId(env,token));
+  const inserted = await env.DB.prepare(`INSERT INTO chat_stickers (id,user_id,label,group_name,source_url,created_at,object_key,mime_type,size_bytes,last_used_at)
+    SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM chat_stickers WHERE user_id = ? AND deleted_at IS NULL) < ?
+    AND ((SELECT COUNT(*) FROM chat_stickers WHERE user_id = ? AND deleted_at IS NULL AND group_name = ?) > 0 OR (SELECT COUNT(DISTINCT group_name) FROM chat_stickers WHERE user_id = ? AND deleted_at IS NULL) < ?)
+    AND (SELECT COALESCE(SUM(size_bytes),0) FROM chat_stickers WHERE user_id = ?) + ? <= ?
+    AND NOT EXISTS (SELECT 1 FROM chat_stickers WHERE user_id = ? AND source_url = ? AND deleted_at IS NULL)`)
+    .bind(id,user.id,label,groupName,sourceUrl,at,objectKey,image.type,image.bytes.byteLength,at,user.id,maxChatStickers,user.id,groupName,user.id,maxChatStickerGroups,user.id,image.bytes.byteLength,maxChatStickerBytes,user.id,sourceUrl).run();
+  if (!inserted.meta?.changes) {
+    await driveDelete(token,objectKey);
+    const [exists, usage, groups, count] = await Promise.all([
+      env.DB.prepare('SELECT 1 AS found FROM chat_stickers WHERE user_id = ? AND source_url = ? AND deleted_at IS NULL').bind(user.id,sourceUrl).first(),
+      env.DB.prepare('SELECT COALESCE(SUM(size_bytes),0) AS usedBytes FROM chat_stickers WHERE user_id = ?').bind(user.id).first(),
+      env.DB.prepare('SELECT COUNT(DISTINCT group_name) AS count FROM chat_stickers WHERE user_id = ? AND deleted_at IS NULL').bind(user.id).first(),
+      env.DB.prepare('SELECT COUNT(*) AS count FROM chat_stickers WHERE user_id = ? AND deleted_at IS NULL').bind(user.id).first()
+    ]);
+    const error = exists ? 'CHAT_STICKER_EXISTS' : Number(usage?.usedBytes || 0) + image.bytes.byteLength > maxChatStickerBytes ? 'CHAT_STICKER_STORAGE_LIMIT' : Number(count?.count || 0) >= maxChatStickers ? 'CHAT_STICKER_LIMIT' : Number(groups?.count || 0) >= maxChatStickerGroups ? 'CHAT_STICKER_GROUP_LIMIT' : 'CHAT_STICKER_STORAGE_LIMIT';
+    return json(request, env, { error }, 409);
+  }
+  return json(request, env, { ok:true, sticker:{ id, label, groupName, sourceUrl, stored:true, sizeBytes:image.bytes.byteLength, createdAt:at, lastUsedAt:at } }, 201);
+}
+async function renameChatStickerGroup(request, env, user, oldName) {
+  let body; try { body = await request.json(); } catch { return json(request, env, { error:'INVALID_CHAT_STICKER' }, 400); }
+  const groupName = clean(body?.groupName, 24);
+  if (!groupName || Object.keys(body || {}).some(key => key !== 'groupName')) return json(request, env, { error:'INVALID_CHAT_STICKER' }, 400);
+  const present = await env.DB.prepare('SELECT 1 AS found FROM chat_stickers WHERE user_id = ? AND group_name = ? AND deleted_at IS NULL LIMIT 1').bind(user.id,oldName).first();
+  if (!present) return json(request, env, { error:'CHAT_STICKER_GROUP_NOT_FOUND' }, 404);
+  const exists = await env.DB.prepare('SELECT 1 AS found FROM chat_stickers WHERE user_id = ? AND group_name = ? AND deleted_at IS NULL LIMIT 1').bind(user.id,groupName).first();
+  const groups = await env.DB.prepare('SELECT COUNT(DISTINCT group_name) AS count FROM chat_stickers WHERE user_id = ? AND deleted_at IS NULL').bind(user.id).first();
+  if (!exists && Number(groups?.count || 0) >= maxChatStickerGroups) return json(request, env, { error:'CHAT_STICKER_GROUP_LIMIT' }, 409);
+  await env.DB.prepare('UPDATE chat_stickers SET group_name = ? WHERE user_id = ? AND group_name = ? AND deleted_at IS NULL').bind(groupName,user.id,oldName).run();
+  return json(request, env, { ok:true, groupName });
+}
+async function deleteChatStickerGroup(request, env, user, groupName) {
+  const result = await env.DB.prepare('UPDATE chat_stickers SET deleted_at = ? WHERE user_id = ? AND group_name = ? AND deleted_at IS NULL').bind(now(),user.id,groupName).run();
+  if (!result.meta?.changes) return json(request, env, { error:'CHAT_STICKER_GROUP_NOT_FOUND' }, 404);
+  return json(request, env, { ok:true });
+}
+async function deleteChatSticker(request, env, user, stickerId) {
+  const sticker = await env.DB.prepare('SELECT id FROM chat_stickers WHERE id = ? AND user_id = ? AND deleted_at IS NULL').bind(stickerId,user.id).first();
+  if (!sticker) return json(request, env, { error:'CHAT_STICKER_NOT_FOUND' }, 404);
+  await env.DB.prepare('UPDATE chat_stickers SET deleted_at = ? WHERE id = ? AND user_id = ?').bind(now(),stickerId,user.id).run();
+  return json(request, env, { ok:true });
 }
 
 async function uploadProfileAvatar(request, env, user) {
@@ -598,6 +743,15 @@ export default {
       const chatMessages = url.pathname.match(/^\/api\/me\/chats\/([^/]{1,128})\/messages$/);
       if (chatMessages && request.method === 'GET') return await readChatMessages(request, env, auth.user, decodeURIComponent(chatMessages[1]));
       if (chatMessages && request.method === 'POST') return await sendChatMessage(request, env, auth.user, decodeURIComponent(chatMessages[1]));
+      const chatStickerImage = url.pathname.match(/^\/api\/chat-stickers\/([a-f0-9-]{36})\/image$/i);
+      if (chatStickerImage && request.method === 'GET') return await readChatStickerImage(request, env, auth.user, chatStickerImage[1]);
+      if (url.pathname === '/api/me/chat-stickers' && request.method === 'GET') return await listChatStickers(request, env, auth.user);
+      if (url.pathname === '/api/me/chat-stickers' && request.method === 'POST') return await uploadChatSticker(request, env, auth.user);
+      const chatStickerGroup = url.pathname.match(/^\/api\/me\/chat-sticker-groups\/([^/]{1,72})$/);
+      if (chatStickerGroup && request.method === 'PATCH') return await renameChatStickerGroup(request, env, auth.user, decodeURIComponent(chatStickerGroup[1]));
+      if (chatStickerGroup && request.method === 'DELETE') return await deleteChatStickerGroup(request, env, auth.user, decodeURIComponent(chatStickerGroup[1]));
+      const chatSticker = url.pathname.match(/^\/api\/me\/chat-stickers\/([a-f0-9-]{36})$/i);
+      if (chatSticker && request.method === 'DELETE') return await deleteChatSticker(request, env, auth.user, chatSticker[1]);
       if (url.pathname === '/api/me/friends/requests' && request.method === 'POST') return await createFriendRequest(request, env, auth.user);
       const friendRequest = url.pathname.match(/^\/api\/me\/friends\/requests\/([a-f0-9-]{36})\/(accept|decline|cancel)$/);
       if (friendRequest && request.method === 'POST') return await updateFriendRequest(request, env, auth.user, friendRequest[1], friendRequest[2]);
@@ -630,6 +784,24 @@ export default {
     }
   },
   async scheduled(controller, env) {
-    if (env.DB) await purgeExpiredMessages(env, now());
+    if (env.DB) {
+      const at = now();
+      await purgeExpiredMessages(env, at);
+      const cutoff = at - chatStickerUnusedMs;
+      const candidates = await env.DB.prepare(`SELECT id,object_key FROM chat_stickers
+        WHERE ((deleted_at IS NOT NULL) OR (deleted_at IS NULL AND last_used_at < ?))
+        AND NOT EXISTS (SELECT 1 FROM direct_messages WHERE sticker_id = chat_stickers.id AND expires_at > ?)
+        ORDER BY COALESCE(deleted_at,last_used_at) LIMIT 100`).bind(cutoff,at).all();
+      const rows = candidates.results || [];
+      if (rows.length) {
+        const token = await driveAccessToken(env);
+        for (const sticker of rows) {
+          if (sticker.object_key && !await driveDelete(token,sticker.object_key)) continue;
+          await env.DB.prepare(`DELETE FROM chat_stickers WHERE id = ? AND NOT EXISTS
+            (SELECT 1 FROM direct_messages WHERE sticker_id = ? AND expires_at > ?)`)
+            .bind(sticker.id,sticker.id,at).run();
+        }
+      }
+    }
   }
 };

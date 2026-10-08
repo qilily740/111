@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import worker from '../src/index.js';
 
 const db = new DatabaseSync(':memory:');
-for (const file of ['0001_repository.sql','0002_profile_saved.sql','0003_google_drive.sql','0003_personal_profile.sql','0004_friends.sql','0005_profile_avatar.sql','0006_direct_messages.sql','0007_chat_replies_blocks.sql']) {
+for (const file of ['0001_repository.sql','0002_profile_saved.sql','0003_google_drive.sql','0003_personal_profile.sql','0004_friends.sql','0005_profile_avatar.sql','0006_direct_messages.sql','0007_chat_replies_blocks.sql','0008_chat_stickers.sql','0009_chat_sticker_storage.sql']) {
   db.exec(readFileSync(new URL('../migrations/' + file, import.meta.url), 'utf8'));
 }
 const accounts = [{id:'user-alice',username:'alice'},{id:'user-bob',username:'bob_ideal'},{id:'user-stranger',username:'stranger'}];
@@ -75,10 +75,33 @@ test('chat supports replies and blocking prevents new messages until unblocked',
   assert.equal((await request('user-alice','/api/me/chats/user-bob/messages',{text:'恢复聊天'})).status,201);
 });
 
-test('scheduled cleanup and read endpoints delete expired messages', async () => {
+test('scheduled cleanup deletes expired messages', async () => {
   makeFriends();
   db.prepare(`INSERT INTO direct_messages (id,sender_id,recipient_id,body,created_at,expires_at)
     VALUES ('expired-message','user-alice','user-bob','过期消息',?,?)`).run(Date.now()-8*24*60*60*1000,Date.now()-1);
   await worker.scheduled({},env);
   assert.equal(db.prepare('SELECT id FROM direct_messages WHERE id=?').get('expired-message'),undefined);
+});
+
+
+test('inbox summarizes more than 5000 messages and reads hide expiry without deleting', async () => {
+  makeFriends();
+  const at = Date.now();
+  const insert = db.prepare('INSERT INTO direct_messages (id,sender_id,recipient_id,body,created_at,expires_at) VALUES (?,?,?,?,?,?)');
+  db.exec('BEGIN');
+  for (let i = 0; i < 5001; i++) insert.run(`bulk-${i}`, 'user-bob', 'user-alice', `bulk ${i}`, at + i, at + 86400000);
+  insert.run('expired-read', 'user-bob', 'user-alice', 'expired', at - 8 * 86400000, at - 1);
+  db.exec('COMMIT');
+  try {
+    const inbox = await (await request('user-alice', '/api/me/chats')).json();
+    const chat = inbox.chats.find(item => item.userId === 'user-bob');
+    assert.equal(chat.lastMessage, 'bulk 5000');
+    assert.equal(chat.unreadCount, 5001);
+    const messages = await (await request('user-alice', '/api/me/chats/user-bob/messages')).json();
+    assert.equal(messages.messages.length, 100);
+    assert.equal(messages.messages.some(item => item.id === 'expired-read'), false);
+    assert.ok(db.prepare('SELECT id FROM direct_messages WHERE id=?').get('expired-read'));
+  } finally {
+    db.prepare("DELETE FROM direct_messages WHERE id LIKE 'bulk-%' OR id = 'expired-read'").run();
+  }
 });

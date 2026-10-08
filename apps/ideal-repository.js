@@ -77,6 +77,7 @@
   let chatBlockedByMe = false;
   let chatReplyTo = null;
   let chatStickers = [];
+  let chatStickerStorageBytes = 0;
   let chatStickersLoaded = false;
   let chatStickersBusy = false;
   let chatStickerRequestSerial = 0;
@@ -112,7 +113,7 @@
   function writeLocalProfile(value) { localStorage.setItem(personalStorageKey(), JSON.stringify({ nickname:value.nickname || '', bio:value.bio || '', note:value.note || '' })); }
   const apiBase = () => String(window.IdealMachineConfig?.repositoryApiBase || '').replace(/\/+$/, '');
   const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', STORAGE_UNAVAILABLE:'头像存储服务暂时不可用', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试', FRIENDSHIP_REQUIRED:'只有已添加的好友之间可以私聊', INVALID_MESSAGE:'消息不能为空，且不能超过 2000 字', INVALID_REPLY:'引用的消息已不存在或不属于此会话', ACCOUNT_BLOCKED:'此会话已被屏蔽，暂时不能发送消息', CHAT_RATE_LIMIT:'发送太频繁，请稍后再试' };
-  Object.assign(apiError, { INVALID_CHAT_STICKER:'请输入有效的 HTTPS 图片 URL，并填写表情描述', CHAT_STICKER_LIMIT:'每个账号最多添加 100 个表情包', CHAT_STICKER_EXISTS:'这个 URL 已经添加过了', CHAT_STICKER_NOT_FOUND:'这个表情包已不存在', CHAT_STICKER_GROUP_LIMIT:'每个账号最多创建 20 个分组', CHAT_STICKER_GROUP_NOT_FOUND:'这个分组已不存在' });
+  Object.assign(apiError, { INVALID_CHAT_STICKER:'请输入有效的 HTTPS 图片 URL，并填写表情描述', INVALID_CHAT_STICKER_IMAGE:'链接返回的不是支持的图片（PNG、JPG、WebP、GIF、AVIF）', CHAT_STICKER_FILE_TOO_LARGE:'单张表情图片不能超过 20 MB', CHAT_STICKER_STORAGE_LIMIT:'表情包存储空间已达 20 MB，请删除旧表情或等长期未用的表情自动清理', CHAT_STICKER_SOURCE_UNAVAILABLE:'无法读取这个图片链接，请确认链接可公开访问', CHAT_STICKER_SOURCE_NOT_FOUND:'这个图片链接返回了 404，请换一个有效的图片 URL', CHAT_STICKER_REDIRECT_NOT_ALLOWED:'图片链接发生跳转，请使用跳转后的 HTTPS 图片直链', CHAT_STICKER_LIMIT:'每个账号最多添加 100 个表情包', CHAT_STICKER_EXISTS:'这个 URL 已经添加过了', CHAT_STICKER_NOT_FOUND:'这个表情包已不存在', CHAT_STICKER_GROUP_LIMIT:'每个账号最多创建 20 个分组', CHAT_STICKER_GROUP_NOT_FOUND:'这个分组已不存在' });
   async function requestApi(path, options = {}) {
     if (!apiBase()) throw new Error('仓库后端尚未部署或配置。请先设置 repositoryApiBase。');
     const token = window.IdealMachineAuth?.getToken?.();
@@ -220,6 +221,7 @@
       const result = await requestApi('/api/me/chat-stickers');
       if (serial !== chatStickerRequestSerial || account !== accountStorageId()) return;
       chatStickers = result.stickers || [];
+      chatStickerStorageBytes = Number(result.usedBytes || 0);
       const groups = [...new Set(chatStickers.map(item => item.groupName || '默认'))];
       if (!groups.includes(activeChatStickerGroup)) activeChatStickerGroup = groups[0] || '默认';
       chatStickersLoaded = true;
@@ -238,25 +240,33 @@
       return null;
     }).filter(Boolean).slice(0,100);
   }
+  function chatStickerBytesLabel(value) {
+    const bytes = Math.max(0, Number(value) || 0);
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
   async function addChatStickerUrls() {
     const input = root.querySelector('[data-ir-chat-sticker-urls]');
     const items = parseChatStickerUrls(input?.value || '');
     const groupName = root.querySelector('[data-ir-chat-sticker-group-name]')?.value.trim() || activeChatStickerGroup || '默认';
     if (!items.length) { chatStatus = '请按“描述 + HTTPS 图片 URL”格式添加。'; render(); return; }
     const account = accountStorageId();
+    if (input) input.value = '';
     chatStickersBusy = true; chatStatus = ''; render();
     try {
-      const results = await Promise.allSettled(items.map(item => requestApi('/api/me/chat-stickers', {
-        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...item,groupName})
-      })));
+      const results = [];
+      for (const item of items) {
+        results.push(...await Promise.allSettled([requestApi('/api/me/chat-stickers', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...item,groupName})
+        })]));
+      }
       if (account !== accountStorageId()) return;
       const added = results.filter(result => result.status === 'fulfilled').map(result => result.value.sticker).filter(Boolean);
       chatStickers = [...added, ...chatStickers];
+      chatStickerStorageBytes += added.reduce((sum,item) => sum + (Number(item.sizeBytes) || 0), 0);
       if (added.length) activeChatStickerGroup = added[0].groupName || groupName;
       chatStickersLoaded = true;
       const errors = results.filter(result => result.status === 'rejected').map(result => result.reason.message);
       chatStatus = errors.length ? `${added.length ? `已添加 ${added.length} 个；` : ''}${errors[0]}` : '';
-      if (input) input.value = '';
     } catch (error) { if (account === accountStorageId()) chatStatus = error.message; }
     finally { if (account === accountStorageId()) { chatStickersBusy = false; if (screen === 'friends' && friendPanel === 'chat') render(); } }
   }
@@ -267,7 +277,7 @@
     if (!groups.includes(activeChatStickerGroup)) activeChatStickerGroup = groups[0];
     const visible = chatStickers.filter(item => (item.groupName || '默认') === activeChatStickerGroup);
     const safeGroup = escapeHTML(activeChatStickerGroup);
-    return `<section class="ir-chat-sticker-panel" aria-label="我的表情包"><header><strong>我的表情包 <small>${chatStickers.length}/100</small></strong><button type="button" data-ir-chat-sticker-editor-toggle aria-label="添加表情包" title="添加表情包">＋</button><button type="button" data-ir-chat-sticker-manage-toggle>${chatStickerManageOpen ? '完成' : '管理'}</button><button type="button" data-ir-chat-sticker-close aria-label="关闭">×</button></header><nav class="ir-chat-sticker-groups" aria-label="表情包分组">${groups.map(name => `<button type="button" data-ir-chat-sticker-group="${escapeHTML(name)}" class="${name === activeChatStickerGroup ? 'is-active' : ''}">${escapeHTML(name)}</button>`).join('')}</nav>${chatStickerEditorOpen ? `<form class="ir-chat-sticker-import"><label>添加到分组<input data-ir-chat-sticker-group-name maxlength="24" value="${safeGroup}" placeholder="分组名称"></label><textarea data-ir-chat-sticker-urls rows="2" maxlength="6000" placeholder="每行一个：开心 https://example.com/happy.gif"></textarea><button type="button" data-ir-chat-sticker-add ${chatStickersBusy ? 'disabled' : ''}>${chatStickersBusy ? '添加中…' : '添加 URL'}</button></form>` : ''}${chatStickerManageOpen ? `<div class="ir-chat-sticker-manage"><button type="button" data-ir-rename-sticker-group>重命名分组</button><button type="button" data-ir-delete-sticker-group>删除分组</button><small>删除分组会同时从面板移除其中的表情包，已发送的聊天图片仍会保留至过期。</small></div>` : ''}${chatStickersBusy && !chatStickers.length ? '<p>正在加载…</p>' : visible.length ? `<div class="ir-chat-sticker-grid">${visible.map(item => `<div><button type="button" data-ir-send-sticker="${escapeHTML(item.id)}" aria-label="发送${escapeHTML(item.label)}"><img src="${escapeHTML(item.sourceUrl)}" alt="" loading="lazy"><span>${escapeHTML(item.label)}</span></button>${chatStickerManageOpen ? `<button type="button" data-ir-delete-sticker="${escapeHTML(item.id)}" aria-label="删除${escapeHTML(item.label)}">×</button>` : ''}</div>`).join('')}</div>` : '<p>这个分组还没有表情包，点右上角「＋」添加。</p>'}<small>每个账号最多 100 个表情包、20 个分组。支持 HTTPS 图片链接和 GIF。</small></section>`;
+    return `<section class="ir-chat-sticker-panel" aria-label="我的表情包"><header><strong>我的表情包 <small>${chatStickers.length}/100 · ${chatStickerBytesLabel(chatStickerStorageBytes)}/20 MB</small></strong><button type="button" data-ir-chat-sticker-editor-toggle aria-label="添加表情包" title="添加表情包">＋</button><button type="button" data-ir-chat-sticker-manage-toggle>${chatStickerManageOpen ? '完成' : '管理'}</button><button type="button" data-ir-chat-sticker-close aria-label="关闭">×</button></header><nav class="ir-chat-sticker-groups" aria-label="表情包分组">${groups.map(name => `<button type="button" data-ir-chat-sticker-group="${escapeHTML(name)}" class="${name === activeChatStickerGroup ? 'is-active' : ''}">${escapeHTML(name)}</button>`).join('')}</nav>${chatStickerEditorOpen ? `<form class="ir-chat-sticker-import"><label>添加到分组<input data-ir-chat-sticker-group-name maxlength="24" value="${safeGroup}" placeholder="分组名称"></label><textarea data-ir-chat-sticker-urls rows="2" maxlength="6000" placeholder="每行一个：开心 https://example.com/happy.gif"></textarea><button type="button" data-ir-chat-sticker-add ${chatStickersBusy ? 'disabled' : ''}>${chatStickersBusy ? '添加中…' : '添加 URL'}</button></form>` : ''}${chatStickerManageOpen ? `<div class="ir-chat-sticker-manage"><button type="button" data-ir-rename-sticker-group>重命名分组</button><button type="button" data-ir-delete-sticker-group>删除分组</button><small>删除分组会同时从面板移除其中的表情包，已发送的聊天图片仍会保留至过期。</small></div>` : ''}${chatStickersBusy && !chatStickers.length ? '<p>正在加载…</p>' : visible.length ? `<div class="ir-chat-sticker-grid">${visible.map(item => `<div><button type="button" data-ir-send-sticker="${escapeHTML(item.id)}" aria-label="发送${escapeHTML(item.label)}"><img ${item.stored ? `data-ir-sticker-image="${escapeHTML(item.id)}"` : `src="${escapeHTML(item.sourceUrl)}"`} alt="" loading="lazy"><span>${escapeHTML(item.label)} · ${chatStickerBytesLabel(item.sizeBytes)}</span></button>${chatStickerManageOpen ? `<button type="button" data-ir-delete-sticker="${escapeHTML(item.id)}" aria-label="删除${escapeHTML(item.label)}">×</button>` : ''}</div>`).join('')}</div>` : '<p>这个分组还没有表情包，点右上角「＋」添加。</p>'}<small>每人最多 20 MB、100 个表情包；90 天未使用自动清理。URL 图片会复制保存到仓库，支持 PNG、JPG、WebP、GIF、AVIF。</small></section>`;
   }
   function loadChats(silent = false, force = false) {
     if (chatListPromise) return chatListPromise;
@@ -457,7 +467,7 @@
       const quoted = message.replyToId ? `<div class="ir-chat-quoted">${messageAvatar({senderId:replySenderId}, 'ir-chat-quoted-avatar')}<span class="ir-chat-quoted-copy"><strong>@${escapeHTML(replySenderName)}</strong> <span>${escapeHTML(replyBody)}</span></span></div>` : '';
       const classes = `ir-chat-message${grouped ? ' is-continuation' : ''}${hasContinuation ? ' has-continuation' : ''}${message.replyToId ? ' has-reply' : ''}`;
       const body = message.type === 'sticker' && message.stickerId && message.stickerUrl
-        ? `<img class="ir-chat-sticker-image" src="${escapeHTML(message.stickerUrl)}" alt="${escapeHTML(message.body || '表情包')}" loading="lazy">`
+        ? `<img class="ir-chat-sticker-image" ${message.stickerUrl.startsWith('/api/chat-stickers/') ? `data-ir-sticker-image="${escapeHTML(message.stickerId)}"` : `src="${escapeHTML(message.stickerUrl)}"`} alt="${escapeHTML(message.body || '表情包')}" loading="lazy">`
         : `<p>${escapeHTML(message.body)}</p>`;
       return `${chatDivider(message,previous)}<article class="${classes}${message.type === 'sticker' ? ' is-sticker' : ''}" data-ir-message-id="${escapeHTML(message.id)}">${grouped ? '' : messageAvatar(message)}${quoted}<div class="ir-chat-message-body">${grouped ? '' : `<div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>`}${body}</div></article>`;
     }).join('');
@@ -752,13 +762,13 @@
   async function loadRemoteImage(image) {
     if (!apiBase() || !image.isConnected || image.dataset.irLoading === '1' || image.dataset.irLoaded === '1') return;
     image.dataset.irLoading = '1';
-    const id = image.dataset.irImage || image.dataset.irPostAvatar || image.dataset.irFriendAvatar;
+    const id = image.dataset.irImage || image.dataset.irPostAvatar || image.dataset.irFriendAvatar || image.dataset.irStickerImage;
     const cachedAvatar = image.dataset.irFriendAvatar ? friendAvatarObjectUrls.get(id) : null;
     if (cachedAvatar && cachedAvatar.expiresAt > Date.now()) {
       image.src = cachedAvatar.url; image.dataset.irLoaded = '1'; delete image.dataset.irLoading; return;
     }
     if (cachedAvatar) { friendAvatarObjectUrls.delete(id); URL.revokeObjectURL(cachedAvatar.url); }
-    const path = image.dataset.irImage ? `/api/attachments/${encodeURIComponent(id)}` : image.dataset.irPostAvatar ? `/api/posts/${encodeURIComponent(id)}/avatar` : `/api/users/${encodeURIComponent(id)}/avatar`;
+    const path = image.dataset.irImage ? `/api/attachments/${encodeURIComponent(id)}` : image.dataset.irPostAvatar ? `/api/posts/${encodeURIComponent(id)}/avatar` : image.dataset.irFriendAvatar ? `/api/users/${encodeURIComponent(id)}/avatar` : `/api/chat-stickers/${encodeURIComponent(id)}/image`;
     try {
       const response = await requestApi(path, { raw:true });
       if (!image.isConnected) return;
@@ -782,7 +792,7 @@
   }, { rootMargin:'160px' }) : null;
   function hydrateImages() {
     if (!apiBase()) return;
-    for (const image of root.querySelectorAll('[data-ir-image], [data-ir-post-avatar], [data-ir-friend-avatar]')) {
+    for (const image of root.querySelectorAll('[data-ir-image], [data-ir-post-avatar], [data-ir-friend-avatar], [data-ir-sticker-image]')) {
       if (image.dataset.irLoading === '1' || image.dataset.irLoaded === '1') continue;
       if (remoteImageObserver) remoteImageObserver.observe(image);
       else loadRemoteImage(image);
@@ -882,7 +892,7 @@
     if (!button) return;
     if (button.hasAttribute('data-ir-chat-sticker-toggle')) {
       chatStickerPanelOpen = !chatStickerPanelOpen;
-      if (chatStickerPanelOpen) void loadChatStickers();
+      if (chatStickerPanelOpen) void loadChatStickers(true);
       render();
       if (chatStickerPanelOpen) requestAnimationFrame(() => requestAnimationFrame(() => { const scroll = root.querySelector('[data-ir-chat-scroll]'); if (scroll) scroll.scrollTop = scroll.scrollHeight; }));
       return;
@@ -907,6 +917,7 @@
         await requestApi(`/api/me/chat-sticker-groups/${encodeURIComponent(name)}`, {method:'DELETE'});
         chatStickers = chatStickers.filter(item => (item.groupName || '默认') !== name);
         activeChatStickerGroup = [...new Set(chatStickers.map(item => item.groupName || '默认'))][0] || '默认';
+        chatStickersLoaded = false; void loadChatStickers(true);
       } catch (error) { chatStatus = error.message; }
       render(); return;
     }
@@ -916,6 +927,7 @@
       try {
         await requestApi(`/api/me/chat-stickers/${encodeURIComponent(button.dataset.irDeleteSticker)}`, {method:'DELETE'});
         chatStickers = chatStickers.filter(item => item.id !== button.dataset.irDeleteSticker);
+        chatStickersLoaded = false; void loadChatStickers(true);
         render();
       } catch (error) { chatStatus = error.message; render(); }
       return;
@@ -1208,7 +1220,7 @@
   });
   window.addEventListener('ideal-machine-auth-changed', () => {
     ++profileSerial; personal = {}; profilePanel = ''; likedPosts = []; friendData = { friends:[], incoming:[], outgoing:[] }; friendResults = [];
-    stopChatPolling(); ++chatListSerial; chatListBusy = false; chatListLoaded = false; chatListLoadedAt = 0; chatListPromise = null; chatBusy = false; friendPanel = ''; chatList = []; chatFriend = null; chatMessages = []; chatNeedsInitialScroll = false; chatDraft = ''; chatStatus = ''; chatStickers = []; chatStickersLoaded = false; chatStickersBusy = false; ++chatStickerRequestSerial; chatStickerPanelOpen = false; activeChatStickerGroup = '默认'; chatStickerManageOpen = false; chatStickerEditorOpen = false; ++chatRequestSerial;
+    stopChatPolling(); ++chatListSerial; chatListBusy = false; chatListLoaded = false; chatListLoadedAt = 0; chatListPromise = null; chatBusy = false; friendPanel = ''; chatList = []; chatFriend = null; chatMessages = []; chatNeedsInitialScroll = false; chatDraft = ''; chatStatus = ''; chatStickers = []; chatStickerStorageBytes = 0; chatStickersLoaded = false; chatStickersBusy = false; ++chatStickerRequestSerial; chatStickerPanelOpen = false; activeChatStickerGroup = '默认'; chatStickerManageOpen = false; chatStickerEditorOpen = false; ++chatRequestSerial;
     friendAvatarObjectUrls.forEach(avatar => URL.revokeObjectURL(avatar.url)); friendAvatarObjectUrls.clear();
     root.querySelector('dialog')?.close();
     savedPosts = [];
