@@ -804,7 +804,7 @@
     const image = post.attachments?.find(file => /^image\/(png|jpeg|webp)$/.test(file.type));
     return image ? `<div class="ir-remote-cover"><img data-ir-image="${image.id}" alt="${escapeHTML(image.name)}"></div>` : `<div class="ir-remote-cover ir-remote-cover-text"><span>IDEAL / ${channels[screen].name}</span><strong>${escapeHTML(post.title)}</strong></div>`;
   };
-  const uploadForm = () => `<div class="ir-upload-mask"><form class="ir-upload-form"><header><h2>发布到 # ${channels[screen].name}</h2><button type="button" data-ir-upload-close aria-label="关闭发布窗口">×</button></header><label>标题<input name="title" maxlength="120" required placeholder="给作品起个名字"></label><label>介绍（选填）<textarea name="body" maxlength="30000" rows="5" placeholder="介绍作品、用法或设定…"></textarea></label>${screen === 'beauty' ? '<label>美化码（可与文件一起发布）<input name="codeText" maxlength="120" spellcheck="false" placeholder="例如 IDEAL-CHA-123456"></label>' : ''}<label>${screen === 'beauty' ? '美化文件（与美化码至少填一项）' : '上传文件（必填）'}<input name="files" type="file" multiple ${screen === 'beauty' ? '' : 'required'} accept="${screen === 'beauty' ? '.css,.js,.json,.txt,.png,.jpg,.jpeg,.webp' : '.docx,.txt,.json,.png,.jpg,.jpeg,.webp'}"></label><small>每帖最多 3 个文件，单个不超过 8 MB</small><label>标签（选填）<input name="tags" maxlength="130" placeholder="用逗号分隔，例如：浅色、日常"></label><p class="ir-upload-error" role="alert">${escapeHTML(uploadError)}</p><footer><button type="button" data-ir-upload-close>取消</button><button type="submit" ${uploadBusy ? 'disabled' : ''}>${uploadBusy ? '发布中…' : '发布帖子'}</button></footer></form></div>`;
+  const uploadForm = () => `<div class="ir-upload-mask"><form class="ir-upload-form"><header><h2>发布到 # ${channels[screen].name}</h2><button type="button" data-ir-upload-close aria-label="关闭发布窗口">×</button></header><label>标题<input name="title" maxlength="120" required placeholder="给作品起个名字"></label><label>介绍（选填）<textarea name="body" maxlength="30000" rows="5" placeholder="介绍作品、用法或设定…"></textarea></label>${screen === 'beauty' ? '<label>美化码（可与文件一起发布）<input name="codeText" maxlength="120" spellcheck="false" placeholder="例如 IDEAL-CHA-123456"></label>' : ''}<label>${screen === 'beauty' ? '美化文件（与美化码至少填一项）' : '上传文件（必填）'}<span class="ir-file-picker"><input name="files" type="file" multiple ${screen === 'beauty' ? '' : 'required'} accept="${screen === 'beauty' ? '.css,.js,.json,.txt,.png,.jpg,.jpeg,.webp' : '.docx,.txt,.json,.png,.jpg,.jpeg,.webp'}"><span class="ir-file-icon" aria-hidden="true">↑</span><span class="ir-file-copy"><b>点击选择文件</b><small data-ir-file-summary>支持拖入文件，最多 3 个</small></span><span class="ir-file-action">浏览</span></span></label><small>每帖最多 3 个文件，单个不超过 8 MB</small><label>标签（选填）<input name="tags" maxlength="130" placeholder="用逗号分隔，例如：浅色、日常"></label><p class="ir-upload-error" role="alert">${escapeHTML(uploadError)}</p><footer><button type="button" data-ir-upload-close>取消</button><button type="submit" ${uploadBusy ? 'disabled' : ''}>${uploadBusy ? '发布中…' : '发布帖子'}</button></footer></form></div>`;
   const renderRemoteForum = () => {
     const post = remoteDetail;
     const header = `<header class="ir-forum-header"><button type="button" data-ir-forum-back aria-label="返回">←</button><div><strong>${activePost && post ? escapeHTML(post.title) : '# ' + channels[screen].name + ' ›'}</strong></div><button type="button" data-ir-post-search aria-label="搜索帖子">${searchIcon}</button></header>`;
@@ -1103,6 +1103,16 @@
     root.querySelector('[data-ir-filter]').focus();
   });
   root.addEventListener('change', event => {
+    if (event.target.matches('.ir-upload-form input[name="files"]')) {
+      const files = [...(event.target.files || [])];
+      const summary = root.querySelector('[data-ir-file-summary]');
+      if (summary) summary.textContent = files.length
+        ? files.map(file => `${file.name} · ${file.size < 1024 * 1024 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`}`).join('、')
+        : '支持拖入文件，最多 3 个';
+      const picker = event.target.closest('.ir-file-picker');
+      picker?.classList.toggle('has-files', files.length > 0);
+      return;
+    }
     if (event.target.matches('[data-ir-cover-input]')) {
       const file = event.target.files?.[0];
       if (!file) return;
