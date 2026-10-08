@@ -109,17 +109,20 @@
   </div>
   <script>
     window.IdealMachineConfig = window.IdealMachineConfig || {};
+    const isIdealCloudflareApp = location.hostname === 'app.ideal-laedi.cc.cd';
+    const idealCloudflareApiOrigin = isIdealCloudflareApp ? location.origin : 'https://app.ideal-laedi.cc.cd';
+    const idealCloudflareApi = path => `${idealCloudflareApiOrigin}/api/${path}`;
     if (!window.IdealMachineConfig.imageHostProvider) window.IdealMachineConfig.imageHostProvider = 'catbox';
-    if (!window.IdealMachineConfig.imageApiBase) window.IdealMachineConfig.imageApiBase = 'https://images.ideal-laedi.cc.cd';
-    if (!window.IdealMachineConfig.neteaseApiBase) window.IdealMachineConfig.neteaseApiBase = 'https://music.ideal-laedi.cc.cd/api';
-    if (!window.IdealMachineConfig.pushApiBase) window.IdealMachineConfig.pushApiBase = 'https://ideal-machine-push.ideal-machine.workers.dev';
-    if (!window.IdealMachineConfig.authApiBase) window.IdealMachineConfig.authApiBase = 'https://auth.ideal-laedi.cc.cd';
+    if (!window.IdealMachineConfig.imageApiBase) window.IdealMachineConfig.imageApiBase = idealCloudflareApi('images');
+    if (!window.IdealMachineConfig.neteaseApiBase) window.IdealMachineConfig.neteaseApiBase = idealCloudflareApi('music/api');
+    if (!window.IdealMachineConfig.pushApiBase) window.IdealMachineConfig.pushApiBase = idealCloudflareApi('push');
+    if (!window.IdealMachineConfig.authApiBase) window.IdealMachineConfig.authApiBase = idealCloudflareApi('auth');
     if (!window.IdealMachineConfig.beautyApiBase) {
-      window.IdealMachineConfig.beautyApiBase = 'https://beauty.ideal-laedi.cc.cd';
-      window.IdealMachineConfig.beautyApiFallbackBase = 'https://ideal-machine-beauty.ideal-machine.workers.dev';
+      window.IdealMachineConfig.beautyApiBase = idealCloudflareApi('beauty');
+      window.IdealMachineConfig.beautyApiFallbackBase = idealCloudflareApi('beauty');
     }
-    if (!window.IdealMachineConfig.activationApiBase) window.IdealMachineConfig.activationApiBase = 'https://activation.ideal-laedi.cc.cd';
-    if (!window.IdealMachineConfig.repositoryApiBase) window.IdealMachineConfig.repositoryApiBase = 'https://ideal-machine-repository.ideal-machine.workers.dev';
+    if (!window.IdealMachineConfig.activationApiBase) window.IdealMachineConfig.activationApiBase = idealCloudflareApi('activation');
+    if (!window.IdealMachineConfig.repositoryApiBase) window.IdealMachineConfig.repositoryApiBase = idealCloudflareApi('repository');
     window.IdealMachineConfig.neteaseAuthApiBase = window.IdealMachineConfig.neteaseApiBase;
   </script>
 <script src="apps/ideal-storage.js?v=20260924-ideal-storage-1"></script>

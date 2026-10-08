@@ -1,6 +1,6 @@
 (() => {
   const storageKey = 'ideal-machine-album-v1';
-  const currentRelayUrl = 'https://images.ideal-laedi.cc.cd';
+  const currentRelayUrl = `${location.hostname === 'app.ideal-laedi.cc.cd' ? location.origin : 'https://app.ideal-laedi.cc.cd'}/api/images`;
   const imageHostProvider = 'catbox';
   const imageApiBase = currentRelayUrl;
   const imageUploadToken = '';
