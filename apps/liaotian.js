@@ -4538,7 +4538,7 @@ ${rerollRule}
   function syncChatPanelDOM() { const wasEmojiOpen = app.classList.contains('is-emoji-open'); const wrap = document.querySelector('.chat-compose-wrap'); if (!wrap) return; const previousTools = wrap.querySelector('.chat-tools'); if (previousTools) chatToolsScrollLeft = previousTools.scrollLeft; wrap.querySelectorAll('.chat-tools, .chat-emoji-panel').forEach(panel => panel.remove()); if (menuOpen) wrap.insertAdjacentHTML('afterbegin', toolMenu()); else if (emojiOpen) wrap.insertAdjacentHTML('afterbegin', emojiPanel()); const tools = wrap.querySelector('.chat-tools'); if (tools) { tools.scrollLeft = chatToolsScrollLeft; tools.addEventListener('scroll', () => { chatToolsScrollLeft = tools.scrollLeft; }, { passive: true }); positionChatTools(); requestAnimationFrame(() => { tools.scrollLeft = chatToolsScrollLeft; positionChatTools(); }); } else wrap.style.removeProperty('--chat-tools-bottom'); const plus = wrap.querySelector('[data-chat-plus]'); if (plus) { plus.setAttribute('aria-label', menuOpen ? '重roll' : '打开更多功能'); plus.setAttribute('title', menuOpen ? '重roll' : '更多功能'); } app.classList.toggle('is-emoji-open', emojiOpen); app.classList.toggle('is-menu-open', menuOpen); if (emojiOpen && !wasEmojiOpen) scrollChatLatestAboveEmojiPanel(); }
   window.addEventListener('resize', positionChatTools, { passive:true });
   window.visualViewport?.addEventListener('resize', positionChatTools, { passive:true });
-  function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const body = message.recalled ? '<span class="chat-recalled">' + (message.role === 'user' ? '你' : '角色') + '撤回了一条消息</span>' : message.type === 'voice' ? voiceMessageBody(message) : message.type === 'image' ? '<img src="' + esc(message.text) + '" alt="图片">' : message.type === 'image-desc' ? '<div class="chat-image-description"><strong>文字图片</strong><p>' + esc(message.text) + '</p></div>' : message.type === 'transfer' ? '<div class="chat-transfer-message"><strong>转账</strong><b>¥ ' + esc(message.amount || message.text) + '</b><p>' + esc(message.note || '无备注') + '</p><small>' + (message.status === 'accepted' ? (message.role === 'user' ? '已被接收' : '已接收') : message.status === 'returned' ? (message.role === 'user' ? '已被退回' : '已退回') : '待处理') + '</small></div>' : message.type === 'music' ? '<div class="chat-music-message" data-chat-music-listen="' + esc(message.id) + '" role="button" tabindex="0" title="点击一起听">' + (message.musicCover ? '<img src="' + esc(message.musicCover) + '" alt="">' : '<span class="chat-music-mark">♫</span>') + '<div><b>' + esc(message.musicTitle || message.text || '未知歌曲') + '</b><small>' + esc(message.musicArtist || '未知歌手') + (message.musicAlbum ? ' · ' + esc(message.musicAlbum) : '') + '</small></div></div>' : message.type === 'video' ? '▣ ' + esc(message.text) : message.type === 'location' ? '<div class="chat-location-message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.2"/></svg><div class="chat-location-copy"><b>' + esc(message.locationName || message.text || '定位') + '</b><p>' + esc(message.locationDetail || '具体地点未填写') + '</p></div><strong class="chat-location-distance">' + esc(message.distance || '未知') + '</strong></div>' : message.type === 'together' ? '▤ ' + esc(message.text) : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp || message.recalled ? '' : '<small>' + esc(message.time || '') + '</small>'; const typeClass = (message.type || '') + (message.status === 'accepted' ? ' is-settled is-accepted' : message.status === 'returned' ? ' is-settled is-returned' : '') + (message.sticker ? ' sticker' : ''); return '<div class="chat-message ' + (message.role === 'user' ? 'is-user' : 'is-character') + '" data-chat-message-id="' + esc(message.id) + '"><div class="chat-message-line">' + avatar + '<div class="chat-bubble ' + typeClass + '">' + body + '</div>' + stamp + '</div></div>'; }
+  function messageHtml(message) { const chat = currentChat(); const contact = state.contacts.find(item => item.id === activeContact); const profile = state.profiles.find(item => item.id === chat?.profileId); const settings = chatSettingsFor(chat); const body = message.recalled ? '<span class="chat-recalled">' + (message.role === 'user' ? '你' : '角色') + '撤回了一条消息</span>' : message.type === 'voice' ? voiceMessageBody(message) : message.type === 'image' ? '<img src="' + esc(message.text) + '" alt="图片">' : message.type === 'image-desc' ? '<div class="chat-image-description"><strong>文字图片</strong><p>' + esc(message.text) + '</p></div>' : message.type === 'transfer' ? '<div class="chat-transfer-message"><strong>转账</strong><b>¥ ' + esc(message.amount || message.text) + '</b><p>' + esc(message.note || '无备注') + '</p><small>' + (message.status === 'accepted' ? (message.role === 'user' ? '已被接收' : '已接收') : message.status === 'returned' ? (message.role === 'user' ? '已被退回' : '已退回') : '待处理') + '</small></div>' : message.type === 'music' ? '<div class="chat-music-message" data-chat-music-listen="' + esc(message.id) + '" role="button" tabindex="0" title="点击一起听">' + (message.musicCover ? '<img src="' + esc(message.musicCover) + '" alt="">' : '<span class="chat-music-mark">♫</span>') + '<div><b>' + esc(message.musicTitle || message.text || '未知歌曲') + '</b><small>' + esc(message.musicArtist || '未知歌手') + (message.musicAlbum ? ' · ' + esc(message.musicAlbum) : '') + '</small></div></div>' : message.type === 'video' ? '▣ ' + esc(message.text) : message.type === 'location' ? '<div class="chat-location-message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.2"/></svg><div class="chat-location-copy"><b>' + esc(message.locationName || message.text || '定位') + '</b><p>' + esc(message.locationDetail || '具体地点未填写') + '</p></div><strong class="chat-location-distance">' + esc(message.distance || '未知') + '</strong></div>' : message.type === 'together' ? '▤ ' + esc(message.text) : esc(message.text); const avatar = settings.hideAvatar ? '' : chatMessageAvatar(message, contact, profile); const stamp = settings.hideTimestamp || message.recalled ? '' : '<small>' + esc(message.time || '') + '</small>'; const typeClass = (message.type || '') + (message.status === 'accepted' ? ' is-settled is-accepted' : message.status === 'returned' ? ' is-settled is-returned' : '') + (message.sticker ? ' sticker' : '') + (message.generated ? ' generated-image' : ''); return '<div class="chat-message ' + (message.role === 'user' ? 'is-user' : 'is-character') + '" data-chat-message-id="' + esc(message.id) + '"><div class="chat-message-line">' + avatar + '<div class="chat-bubble ' + typeClass + '">' + body + '</div>' + stamp + '</div></div>'; }
   const baseAssetAwareMessageHtml = messageHtml;
   messageHtml = function(message) {
     const html = baseAssetAwareMessageHtml(message);
@@ -5991,6 +5991,10 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       return true;
     } catch (error) {
       console.warn('角色生图失败，已保留文字回复：', error);
+      const failureMessage = { id:uid('message'), text:`图片没有成功显示：${String(error?.message || '生图或图片下载失败').slice(0, 220)}`, role:'character', type:'image-error', time:time() };
+      targetChat.messages.push(failureMessage);
+      save();
+      if (currentChat() === targetChat) render();
       window.alert(`角色发图失败：${error?.message || '生图接口请求失败'}`);
       return false;
     }
@@ -6390,6 +6394,21 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     });
   }
 
+  function showGeneratedImageUnavailable(image, message = '图片暂时无法读取') {
+    const bubble = image?.closest('.chat-bubble.image');
+    if (!bubble) return;
+    bubble.classList.add('generated-image-unavailable');
+    image.hidden = true;
+    let notice = bubble.querySelector(':scope > .chat-generated-image-error');
+    if (!notice) {
+      notice = document.createElement('span');
+      notice.className = 'chat-generated-image-error';
+      notice.innerHTML = '<b></b><button type="button" data-chat-generated-image-retry>重试</button>';
+      bubble.appendChild(notice);
+    }
+    notice.querySelector('b').textContent = message;
+  }
+
   function hydrateGeneratedImages() {
     const resolveAsset = window.IdealMachineGetImage || window.IdealMachineImageAPI?.resolveAsset;
     if (!resolveAsset) return;
@@ -6408,17 +6427,57 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         }
         if (!image.isConnected) return;
         if (source) {
+          image.onerror = () => showGeneratedImageUnavailable(image, '图片已生成，但加载失败');
+          image.onload = () => {
+            image.hidden = false;
+            image.closest('.chat-bubble.image')?.classList.remove('generated-image-unavailable');
+            image.closest('.chat-bubble.image')?.querySelector(':scope > .chat-generated-image-error')?.remove();
+          };
+          image.hidden = false;
           image.src = source;
           delete image.dataset.chatImageAsset;
         } else {
           // 保留 IndexedDB key；之后重绘/重新进入聊天时可以再次尝试读取，
           // 不要把一次暂时性读取失败变成永久丢失图片。
-          image.alt = '图片读取失败，稍后重试';
+          showGeneratedImageUnavailable(image, '图片请求成功，但本地图片文件无法读取');
         }
         delete image.dataset.generatedImageLoading;
       })();
     });
   }
+
+  app.addEventListener('error', event => {
+    const image = event.target;
+    if (image instanceof HTMLImageElement && image.closest('.chat-bubble.image.generated-image')) {
+      showGeneratedImageUnavailable(image, '图片已生成，但加载失败');
+    }
+  }, true);
+  document.addEventListener('click', async event => {
+    const button = event.target.closest?.('[data-chat-generated-image-retry]');
+    if (!button) return;
+    const image = button.closest('.chat-bubble.image')?.querySelector('img');
+    const sourceKey = image?.dataset.chatImageAsset || image?.getAttribute('src') || '';
+    const resolveAsset = window.IdealMachineGetImage || window.IdealMachineImageAPI?.resolveAsset;
+    if (!image || !sourceKey || !resolveAsset) return;
+    button.disabled = true;
+    button.textContent = '重试中…';
+    try {
+      const source = await resolveAsset(sourceKey);
+      if (!source) throw new Error('本地图片数据不存在');
+      image.hidden = false;
+      image.removeAttribute('src');
+      image.onload = () => {
+        image.closest('.chat-bubble.image')?.classList.remove('generated-image-unavailable');
+        image.closest('.chat-bubble.image')?.querySelector(':scope > .chat-generated-image-error')?.remove();
+      };
+      image.onerror = () => showGeneratedImageUnavailable(image, '图片已生成，但加载失败');
+      image.src = source;
+    } catch {
+      showGeneratedImageUnavailable(image, '本地图片数据不存在，请重新生成');
+    } finally {
+      if (button.isConnected) { button.disabled = false; button.textContent = '重试'; }
+    }
+  });
 
   function retryHydrateGeneratedImages() {
     hydrateGeneratedImages();
