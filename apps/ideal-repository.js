@@ -88,7 +88,7 @@
     if (!token) throw new Error('请先登录理想机账号。');
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${token}`);
-    const response = await fetch(`${apiBase()}${path}`, { ...options, headers, credentials:'omit', cache:'no-store' });
+    const response = await fetch(`${apiBase()}${path}`, { ...options, headers, credentials:'omit', cache:options.raw ? 'default' : 'no-store' });
     if (options.raw) {
       if (!response.ok) throw new Error(`文件读取失败（${response.status}）`);
       return response;
@@ -296,6 +296,14 @@
       // Nicknames created before profile sync was deployed only lived in this
       // browser. Publish that existing value so other users can see it in search.
       const localProfile = readLocalProfile();
+      personal = {
+        ...personal,
+        nickname:profile?.nickname || localProfile.nickname || personal.nickname || '',
+        bio:profile?.bio ?? localProfile.bio ?? personal.bio ?? '',
+        note:profile?.note ?? localProfile.note ?? personal.note ?? ''
+      };
+      try { writeLocalProfile(personal); } catch {}
+      syncProfile();
       if (!profile?.nickname && typeof localProfile.nickname === 'string' && localProfile.nickname.trim()) {
         await requestApi('/api/me/profile', {
           method:'POST',
@@ -429,19 +437,34 @@
     finally { saveBusy = false; }
   }
   function clearImages() {
+    remoteImageObserver?.disconnect();
     imageUrls.forEach(url => URL.revokeObjectURL(url)); imageUrls.clear();
   }
-  async function hydrateImages() {
+  async function loadRemoteImage(image) {
+    if (!apiBase() || !image.isConnected || image.dataset.irLoading === '1' || image.dataset.irLoaded === '1') return;
+    image.dataset.irLoading = '1';
+    const id = image.dataset.irImage || image.dataset.irPostAvatar || image.dataset.irFriendAvatar;
+    const path = image.dataset.irImage ? `/api/attachments/${encodeURIComponent(id)}` : image.dataset.irPostAvatar ? `/api/posts/${encodeURIComponent(id)}/avatar` : `/api/users/${encodeURIComponent(id)}/avatar`;
+    try {
+      const response = await requestApi(path, { raw:true });
+      if (!image.isConnected) return;
+      const url = URL.createObjectURL(await response.blob());
+      imageUrls.add(url); image.src = url; image.dataset.irLoaded = '1';
+    } catch {} finally { delete image.dataset.irLoading; }
+  }
+  const remoteImageObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      remoteImageObserver.unobserve(entry.target);
+      loadRemoteImage(entry.target);
+    }
+  }, { rootMargin:'160px' }) : null;
+  function hydrateImages() {
     if (!apiBase()) return;
     for (const image of root.querySelectorAll('[data-ir-image], [data-ir-post-avatar], [data-ir-friend-avatar]')) {
-      const id = image.dataset.irImage || image.dataset.irPostAvatar || image.dataset.irFriendAvatar;
-      const path = image.dataset.irImage ? `/api/attachments/${encodeURIComponent(id)}` : image.dataset.irPostAvatar ? `/api/posts/${encodeURIComponent(id)}/avatar` : `/api/users/${encodeURIComponent(id)}/avatar`;
-      try {
-        const response = await requestApi(path, { raw:true });
-        if (!image.isConnected) continue;
-        const url = URL.createObjectURL(await response.blob());
-        imageUrls.add(url); image.src = url;
-      } catch {}
+      if (image.dataset.irLoading === '1' || image.dataset.irLoaded === '1') continue;
+      if (remoteImageObserver) remoteImageObserver.observe(image);
+      else loadRemoteImage(image);
     }
   }
   const timeText = value => value ? new Date(value).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
@@ -517,7 +540,7 @@
     if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
     if (screen === 'friends') loadFriends();
   };
-  const open = () => { show('welcome'); root.classList.add('is-open'); syncViewport(); loadAvatar(); syncAvatarWithServer(); };
+  const open = () => { personal = readLocalProfile(); show('welcome'); root.classList.add('is-open'); syncViewport(); loadAvatar(); syncAvatarWithServer(); };
   const close = () => {
     if (root.contains(document.activeElement)) document.activeElement.blur();
     root.classList.remove('is-open');
@@ -738,6 +761,7 @@
     syncProfile();
     if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
     if (screen === 'friends') loadFriends();
+    personal = readLocalProfile();
     loadAvatar();
     syncAvatarWithServer();
   });
