@@ -222,8 +222,8 @@
       chatStatus = '';
       if (!silent) chatBusy = false;
       if (!silent || changed || stateChanged) {
-        const messages = root.querySelector('[data-ir-chat-messages]');
-        const nearBottom = !silent || !messages || messages.scrollHeight - messages.scrollTop - messages.clientHeight < 48;
+        const page = root.querySelector('.ir-chat-mode .ir-main');
+        const nearBottom = silent && (!page || page.scrollHeight - page.scrollTop - page.clientHeight < 48);
         updateChatMessageList(nearBottom);
         const input = root.querySelector('[data-ir-chat-input]');
         if (input) { input.disabled = !chatCanSend; input.placeholder = chatCanSend ? '发送消息…' : '此会话已屏蔽'; }
@@ -315,8 +315,11 @@
     const rows = chatMessages.map((message,index) => {
       const previous = chatMessages[index - 1];
       const grouped = Boolean(previous && previous.senderId === message.senderId && Number(message.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
+      const next = chatMessages[index + 1];
+      const hasContinuation = Boolean(next && next.senderId === message.senderId && Number(next.createdAt) - Number(message.createdAt) <= 3 * 60 * 1000);
       const quoted = message.replyToId ? `<div class="ir-chat-quoted">${messageAvatar({senderId:message.replySenderId || ''}, 'ir-chat-quoted-avatar')}<span class="ir-chat-quoted-copy"><strong>${escapeHTML(message.replySenderId === accountStorageId() ? (personal.nickname || userName()) : (chatFriend?.nickname || chatFriend?.username || '好友'))}</strong><time>${chatTime(message.replyCreatedAt || chatMessages.find(item => item.id === message.replyToId)?.createdAt)}</time><span>${escapeHTML(message.replyBody || '引用的消息已过期')}</span></span></div>` : '';
-      return `${chatDivider(message,previous)}<article class="ir-chat-message${grouped ? ' is-continuation' : ''}" data-ir-message-id="${escapeHTML(message.id)}">${grouped ? '' : messageAvatar(message)}<div class="ir-chat-message-body">${quoted}${grouped ? '' : `<div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>`}<p>${escapeHTML(message.body)}</p></div></article>`;
+      const classes = `ir-chat-message${grouped ? ' is-continuation' : ''}${hasContinuation ? ' has-continuation' : ''}`;
+      return `${chatDivider(message,previous)}<article class="${classes}" data-ir-message-id="${escapeHTML(message.id)}">${grouped ? '' : messageAvatar(message)}<div class="ir-chat-message-body">${quoted}${grouped ? '' : `<div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>`}<p>${escapeHTML(message.body)}</p></div></article>`;
     }).join('');
     return rows;
   }
@@ -324,7 +327,10 @@
     const messages = root.querySelector('[data-ir-chat-messages]');
     if (!messages) return;
     messages.innerHTML = chatMessages.length ? chatMessageRows() : '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>';
-    if (scrollToBottom) messages.scrollTop = messages.scrollHeight;
+    if (scrollToBottom) {
+      const page = root.querySelector('.ir-chat-mode .ir-main');
+      if (page) page.scrollTop = page.scrollHeight;
+    }
     if (apiBase()) hydrateImages();
   }
   function renderChat() {
