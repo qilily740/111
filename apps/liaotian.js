@@ -2405,6 +2405,47 @@ ${rerollRule}
       } else if (source && !image.getAttribute('src')) image.src = emojiDisplaySource(normalizeEmojiImageSource(source));
     });
   }
+  async function preloadEmojiImage(source) {
+    const normalized = emojiDisplaySource(normalizeEmojiImageSource(source));
+    if (!normalized) return;
+    let displaySource = normalized;
+    if (normalized.startsWith('idb:image:')) {
+      displaySource = await resolveEmojiImage(normalized);
+      if (!displaySource) return;
+    }
+    const image = new Image();
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    image.src = displaySource;
+    let timeout = 0;
+    try {
+      await Promise.race([
+        typeof image.decode === 'function' ? image.decode() : new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; }),
+        new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('emoji preload timeout')), 10000); })
+      ]);
+      rememberEmojiImage(normalized, { src:displaySource, width:image.naturalWidth || 0, height:image.naturalHeight || 0 });
+    } catch {} finally { clearTimeout(timeout); }
+  }
+  function warmEmojiImagesAtStartup() {
+    const preferredGroup = state.emojis?.groups?.find(group => group.id === activeEmojiGroup) || state.emojis?.groups?.[0];
+    const chat = state.chats?.[activeContact];
+    const selectedGroupIds = new Set(chatSettingsFor(chat).characterEmojiGroupIds || []);
+    const roleGroups = (state.emojis?.groups || []).filter(group => selectedGroupIds.has(group.id) && group.id !== preferredGroup?.id);
+    const sources = [
+      ...(preferredGroup?.items || []).slice(0, 36).map(item => item.url),
+      ...roleGroups.flatMap(group => group.items || []).slice(0, 12).map(item => item.url)
+    ].map(value => emojiDisplaySource(normalizeEmojiImageSource(value))).filter(Boolean);
+    const unique = [...new Set(sources)].slice(0, 48);
+    if (!unique.length) return;
+    const start = async () => {
+      try { await window.IdealMachineStorageReady; } catch {}
+      for (let index = 0; index < unique.length; index += 4) {
+        await Promise.allSettled(unique.slice(index, index + 4).map(preloadEmojiImage));
+      }
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(() => { void start(); }, { timeout:900 });
+    else setTimeout(() => { void start(); }, 80);
+  }
   const emojiImageObserver = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => { if (node.nodeType === 1) hydrateEmojiImages(node); })));
   emojiImageObserver.observe(app, { childList:true, subtree:true });
   app.addEventListener('error', event => {
@@ -10698,5 +10739,6 @@ ${recentConversation}
     });
     hydrateEmojiImages();
   };
+  warmEmojiImagesAtStartup();
   startActiveMessageAutomation();
 })();
