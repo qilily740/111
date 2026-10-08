@@ -323,7 +323,7 @@
       const replySenderName = replySenderId === accountStorageId() ? (personal.nickname || userName()) : (chatFriend?.nickname || chatFriend?.username || '好友');
       const quoted = message.replyToId ? `<div class="ir-chat-quoted">${messageAvatar({senderId:replySenderId}, 'ir-chat-quoted-avatar')}<span class="ir-chat-quoted-copy"><strong>${escapeHTML(replySenderName)}</strong><span>${escapeHTML(replyBody)}</span></span></div>` : '';
       const classes = `ir-chat-message${grouped ? ' is-continuation' : ''}${hasContinuation ? ' has-continuation' : ''}${message.replyToId ? ' has-reply' : ''}`;
-      return `${chatDivider(message,previous)}<article class="${classes}" data-ir-message-id="${escapeHTML(message.id)}">${grouped ? '' : messageAvatar(message)}<div class="ir-chat-message-body">${quoted}${grouped ? '' : `<div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>`}<p>${escapeHTML(message.body)}</p></div></article>`;
+      return `${chatDivider(message,previous)}<article class="${classes}" data-ir-message-id="${escapeHTML(message.id)}">${grouped ? '' : messageAvatar(message)}${quoted}<div class="ir-chat-message-body">${grouped ? '' : `<div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>`}<p>${escapeHTML(message.body)}</p></div></article>`;
     }).join('');
     return rows;
   }

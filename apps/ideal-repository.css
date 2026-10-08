@@ -292,8 +292,9 @@
 .ir-chat-message.has-continuation{padding-bottom:0}
 .ir-chat-message.is-continuation .ir-chat-message-body{grid-column:2}
 .ir-chat-message.is-continuation .ir-chat-message-body p{margin-top:0;line-height:1.35}
-.ir-chat-message.has-reply>.ir-chat-message-avatar{margin-top:32px}
-.ir-chat-message.has-reply>.ir-chat-message-body{position:relative;padding-top:40px}
+.ir-chat-message.has-reply{row-gap:0}
+.ir-chat-message.has-reply>.ir-chat-message-avatar{grid-column:1;grid-row:2;margin-top:0}
+.ir-chat-message.has-reply>.ir-chat-message-body{position:relative;grid-column:2;grid-row:2;padding-top:8px}
 .ir-chat-message.is-mine{align-self:stretch;justify-items:stretch}
 .ir-chat-message-avatar{position:relative;display:grid;place-items:center;width:48px;height:48px;overflow:hidden;border-radius:50%;background:#e5e5e7;color:#555;font-size:18px;font-weight:650}
 .ir-chat-message-body{min-width:0}
@@ -304,13 +305,13 @@
 .ir-chat-message p strong{color:#55555b;font-weight:650}
 .ir-chat-message-meta{justify-content:flex-start;min-height:18px;margin:0}
 .ir-chat-message.is-mine p{border-radius:0;background:transparent;color:#29292c}
-.ir-chat-quoted{position:relative;display:flex;align-items:center;gap:7px;max-width:100%;min-width:0;overflow:visible;margin:4px 0 5px;padding-left:0;color:#85858b;font-size:11px}
-.ir-chat-message.has-reply .ir-chat-quoted{position:absolute;top:0;left:0;width:100%;margin:0}
-.ir-chat-quoted::before{position:absolute;top:14px;left:-38px;width:38px;height:18px;border-top:2px solid #d0d0d4;border-left:2px solid #d0d0d4;border-radius:8px 0 0;content:""}
+.ir-chat-quoted{position:relative;display:flex;align-items:flex-start;gap:7px;max-width:100%;min-width:0;overflow:visible;margin:4px 0 5px;padding-left:0;color:#85858b;font-size:11px}
+.ir-chat-message.has-reply .ir-chat-quoted{grid-column:2;grid-row:1;width:100%;margin:0}
+.ir-chat-quoted::before{position:absolute;top:14px;bottom:0;left:-38px;width:38px;border-top:2px solid #d0d0d4;border-left:2px solid #d0d0d4;border-radius:8px 0 0;content:""}
 .ir-chat-quoted-avatar{position:relative;display:grid;place-items:center;flex:none;width:28px;height:28px;overflow:hidden;border-radius:50%;background:#e5e5e7;color:#555;font-size:11px;font-weight:650}
-.ir-chat-quoted-copy{display:flex;align-items:baseline;gap:6px;min-width:0;overflow:hidden;white-space:nowrap}
+.ir-chat-quoted-copy{display:flex;flex:1;align-items:baseline;gap:6px;min-width:0;overflow:visible;white-space:normal}
 .ir-chat-quoted-copy strong{flex:none;color:#85858b;font-size:11px;font-weight:650}
-.ir-chat-quoted-copy>span{min-width:0;overflow:hidden;color:#77777d;text-overflow:ellipsis}
+.ir-chat-quoted-copy>span{flex:1 1 0%;min-width:0;overflow:visible;color:#77777d;text-overflow:clip;white-space:pre-wrap;overflow-wrap:anywhere}
 .ir-chat-status{margin:0 0 6px;text-align:center}
 .ir-chat-replying{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;padding:7px 10px;border-left:2px solid #79797f;border-radius:7px;background:#f3f3f4;color:#727278;font-size:11px}
 .ir-chat-replying span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
