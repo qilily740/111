@@ -828,7 +828,7 @@
     if (button.hasAttribute('data-ir-home')) return show('welcome');
     if (button.hasAttribute('data-ir-friends-open') || button.hasAttribute('data-ir-friends')) { profilePanel = ''; friendsTab = 'friends'; friendPanel = ''; friendSearchOpen = false; friendQuery = ''; friendResults = []; friendStatus = ''; return show('friends'); }
     if (button.hasAttribute('data-ir-inbox-back')) { friendPanel = ''; friendsTab = 'friends'; chatStatus = ''; stopChatPolling(); return render(); }
-    if (button.hasAttribute('data-ir-chat-back')) { chatFriend = null; friendPanel = ''; friendsTab = 'inbox'; chatDraft = ''; render(); startChatPolling(); loadChats(); return; }
+    if (button.hasAttribute('data-ir-chat-back')) { chatFriend = null; friendPanel = ''; friendsTab = 'inbox'; chatDraft = ''; render(); startChatPolling(); loadChats(false,true); return; }
     if (button.hasAttribute('data-ir-chat-reply-cancel')) { chatReplyTo = null; render(); root.querySelector('[data-ir-chat-input]')?.focus(); return; }
     if (button.hasAttribute('data-ir-chat-remove')) {
       if (!chatFriend || !window.confirm(`确定删除好友「${chatFriend.nickname || chatFriend.username}」吗？`)) return;
