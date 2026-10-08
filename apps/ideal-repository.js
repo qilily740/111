@@ -67,6 +67,10 @@
   let chatStatus = '';
   let chatBusy = false;
   let chatSending = false;
+  let chatCanSend = true;
+  let chatBlockedByMe = false;
+  let chatReplyTo = null;
+  let chatSwipeStart = null;
   let chatPollTimer = 0;
   let chatRequestSerial = 0;
   let profileOrigin = false;
@@ -93,7 +97,7 @@
   function readLocalProfile() { try { const value = JSON.parse(localStorage.getItem(personalStorageKey()) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; } }
   function writeLocalProfile(value) { localStorage.setItem(personalStorageKey(), JSON.stringify({ nickname:value.nickname || '', bio:value.bio || '', note:value.note || '' })); }
   const apiBase = () => String(window.IdealMachineConfig?.repositoryApiBase || '').replace(/\/+$/, '');
-  const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', STORAGE_UNAVAILABLE:'头像存储服务暂时不可用', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试', FRIENDSHIP_REQUIRED:'只有已添加的好友之间可以私聊', INVALID_MESSAGE:'消息不能为空，且不能超过 2000 字', CHAT_RATE_LIMIT:'发送太频繁，请稍后再试' };
+  const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', STORAGE_UNAVAILABLE:'头像存储服务暂时不可用', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试', FRIENDSHIP_REQUIRED:'只有已添加的好友之间可以私聊', INVALID_MESSAGE:'消息不能为空，且不能超过 2000 字', INVALID_REPLY:'引用的消息已不存在或不属于此会话', ACCOUNT_BLOCKED:'此会话已被屏蔽，暂时不能发送消息', CHAT_RATE_LIMIT:'发送太频繁，请稍后再试' };
   async function requestApi(path, options = {}) {
     if (!apiBase()) throw new Error('仓库后端尚未部署或配置。请先设置 repositoryApiBase。');
     const token = window.IdealMachineAuth?.getToken?.();
@@ -211,10 +215,13 @@
       if (serial !== chatRequestSerial || screen !== 'friends' || friendPanel !== 'chat' || (chatFriend.userId || chatFriend.id) !== friendId) return;
       const next = result.messages || [];
       const changed = JSON.stringify(chatMessages) !== JSON.stringify(next);
+      const stateChanged = chatCanSend !== (result.canSend !== false) || chatBlockedByMe !== Boolean(result.blockedByMe);
       chatMessages = next;
+      chatCanSend = result.canSend !== false;
+      chatBlockedByMe = Boolean(result.blockedByMe);
       chatStatus = '';
       if (!silent) chatBusy = false;
-      if (!silent || changed) {
+      if (!silent || changed || stateChanged) {
         const input = root.querySelector('[data-ir-chat-input]');
         const focused = input === document.activeElement; const start = input?.selectionStart; const end = input?.selectionEnd;
         render();
@@ -230,7 +237,7 @@
   async function openChat(friend) {
     if (!friend) return;
     stopChatPolling();
-    chatFriend = friend; chatMessages = []; chatDraft = ''; chatStatus = ''; chatBusy = false;
+    chatFriend = friend; chatMessages = []; chatDraft = ''; chatStatus = ''; chatBusy = false; chatCanSend = true; chatBlockedByMe = false; chatReplyTo = null;
     friendPanel = 'chat'; ++chatRequestSerial; render();
     await loadChatMessages();
     startChatPolling();
@@ -242,8 +249,8 @@
     const friendId = chatFriend.userId || chatFriend.id;
     chatSending = true; chatStatus = ''; render();
     try {
-      await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text}) });
-      chatDraft = ''; await loadChatMessages(); await loadChats(true);
+      await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text, ...(chatReplyTo ? {replyToId:chatReplyTo.id} : {})}) });
+      chatDraft = ''; chatReplyTo = null; await loadChatMessages(); await loadChats(true);
     } catch (error) { chatStatus = error.message; }
     finally { chatSending = false; if (screen === 'friends' && friendPanel === 'chat') render(); }
   }
@@ -262,13 +269,31 @@
   }
   const friendIdentity = item => { const id = item.userId || item.id; const initial = escapeHTML((item.nickname || item.username || '?').slice(0,1).toUpperCase()); const image = item.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''; return `<span class="ir-friend-avatar">${initial}${image}</span><span class="ir-friend-copy"><strong>${escapeHTML(item.nickname || item.username)}</strong><small>ID · ${escapeHTML(item.username)}</small></span>`; };
   const chatTime = value => value ? new Date(value).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) : '';
+  const chatDay = value => value ? new Date(value).toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric'}) : '';
+  const messageSenderName = message => message.senderId === accountStorageId() ? (personal.nickname || window.IdealMachineAuth?.getUser?.()?.username || '我') : (chatFriend?.nickname || chatFriend?.username || '好友');
+  function messageAvatar(message) {
+    const mine = message.senderId === accountStorageId();
+    const name = mine ? (personal.nickname || window.IdealMachineAuth?.getUser?.()?.username || '我') : (chatFriend?.nickname || chatFriend?.username || '好友');
+    const image = mine && avatarUrl ? `<img src="${escapeHTML(avatarUrl)}" alt="" loading="lazy">` : !mine && chatFriend?.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(chatFriend.userId || chatFriend.id || '')}" alt="" loading="lazy">` : '';
+    return `<span class="ir-chat-message-avatar">${escapeHTML(name.slice(0,1).toUpperCase())}${image}</span>`;
+  }
+  function chatDivider(message, previous) {
+    if (!previous || Number(message.createdAt) - Number(previous.createdAt) >= 5 * 60 * 1000) return `<div class="ir-chat-divider"><span>${escapeHTML(chatDay(message.createdAt))} · ${escapeHTML(chatTime(message.createdAt))}</span></div>`;
+    return '';
+  }
   function renderChat() {
     const friend = chatFriend || {};
     const id = friend.userId || friend.id || '';
     const initial = escapeHTML((friend.nickname || friend.username || '?').slice(0,1).toUpperCase());
     const avatar = `<span class="ir-chat-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span>`;
-    const bubbles = chatMessages.map(message => `<article class="ir-chat-message ${message.senderId === accountStorageId() ? 'is-mine' : ''}"><p>${escapeHTML(message.body)}</p><time>${chatTime(message.createdAt)}</time></article>`).join('');
-    return `<div class="ir-friends-page ir-chat-page"><header class="ir-chat-header"><button type="button" data-ir-chat-back aria-label="返回会话列表">‹</button>${avatar}<div><strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><small>ID · ${escapeHTML(friend.username || '')}</small></div><button class="ir-close ir-chat-close" type="button" data-ir-close aria-label="关闭">×</button></header><section class="ir-chat-messages" data-ir-chat-messages>${chatBusy ? '<p class="ir-chat-empty">正在加载聊天记录…</p>' : bubbles || '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>'}</section>${chatStatus ? `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}<form class="ir-chat-composer"><textarea data-ir-chat-input name="text" rows="1" maxlength="2000" placeholder="发送消息…">${escapeHTML(chatDraft)}</textarea><button type="submit" ${chatSending || !chatDraft.trim() ? 'disabled' : ''}>${chatSending ? '发送中…' : '发送'}</button></form><small class="ir-chat-retention">每条消息发送 7 天后自动删除</small></div>`;
+    const rows = chatMessages.map((message,index) => {
+      const previous = chatMessages[index - 1];
+      const quoted = message.replyToId ? `<div class="ir-chat-quoted">${escapeHTML(message.replySenderId === accountStorageId() ? (personal.nickname || '我') : (friend.nickname || friend.username || '好友'))}：${escapeHTML(message.replyBody || '引用的消息已过期')}</div>` : '';
+      return `${chatDivider(message,previous)}<article class="ir-chat-message" data-ir-message-id="${escapeHTML(message.id)}">${messageAvatar(message)}<div class="ir-chat-message-body"><div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>${quoted}<p>${escapeHTML(message.body)}</p></div></article>`;
+    }).join('');
+    const profile = `<section class="ir-chat-profile">${avatar}<strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><span>ID · ${escapeHTML(friend.username || '')}</span><div><button type="button" data-ir-chat-remove>删除好友</button><button type="button" data-ir-chat-block>${chatBlockedByMe ? '取消屏蔽' : '屏蔽'}</button></div></section>`;
+    const reply = chatReplyTo ? `<div class="ir-chat-replying"><span>回复 ${escapeHTML(chatReplyTo.senderName)}：${escapeHTML(chatReplyTo.body.slice(0,80))}</span><button type="button" data-ir-chat-reply-cancel aria-label="取消引用">×</button></div>` : '';
+    return `<div class="ir-friends-page ir-chat-page"><header class="ir-chat-header"><button type="button" data-ir-chat-back aria-label="返回会话列表">‹</button><span class="ir-chat-header-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span><div><strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><small>ID · ${escapeHTML(friend.username || '')}</small></div><button class="ir-close ir-chat-close" type="button" data-ir-close aria-label="关闭">×</button></header>${profile}<section class="ir-chat-messages" data-ir-chat-messages>${chatBusy ? '<p class="ir-chat-empty">正在加载聊天记录…</p>' : rows || '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>'}</section>${chatStatus ? `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}${reply}<form class="ir-chat-composer"><button class="ir-chat-plus" type="button" aria-label="添加内容" disabled>＋</button><textarea data-ir-chat-input name="text" rows="1" maxlength="2000" placeholder="${chatCanSend ? '发送消息…' : '此会话已屏蔽'}" ${chatCanSend ? '' : 'disabled'}>${escapeHTML(chatDraft)}</textarea><button class="ir-chat-send" type="submit" aria-label="发送" ${chatSending || !chatDraft.trim() || !chatCanSend ? 'disabled' : ''}>${chatSending ? '…' : '↑'}</button></form><small class="ir-chat-retention">每条消息发送 7 天后自动删除</small></div>`;
   }
   function renderFriends() {
     if (friendPanel === 'chat') return renderChat();
@@ -654,7 +679,7 @@
     root.classList.remove('is-open');
     root.style.removeProperty('height'); root.style.removeProperty('top'); root.style.removeProperty('--ir-profile-keyboard-offset');
   };
-  root.addEventListener('click', event => {
+  root.addEventListener('click', async event => {
     const button = event.target.closest('button');
     if (!button) return;
     if (button.hasAttribute('data-ir-change-cover')) { root.querySelector('[data-ir-cover-input]')?.click(); return; }
@@ -740,6 +765,29 @@
     if (button.hasAttribute('data-ir-friends-open') || button.hasAttribute('data-ir-friends')) { profilePanel = ''; friendsTab = 'friends'; friendPanel = ''; friendSearchOpen = false; friendQuery = ''; friendResults = []; friendStatus = ''; return show('friends'); }
     if (button.hasAttribute('data-ir-inbox-back')) { friendPanel = ''; chatStatus = ''; return render(); }
     if (button.hasAttribute('data-ir-chat-back')) { chatFriend = null; friendPanel = 'inbox'; chatDraft = ''; render(); startChatPolling(); loadChats(); return; }
+    if (button.hasAttribute('data-ir-chat-reply-cancel')) { chatReplyTo = null; render(); root.querySelector('[data-ir-chat-input]')?.focus(); return; }
+    if (button.hasAttribute('data-ir-chat-remove')) {
+      if (!chatFriend || !window.confirm(`确定删除好友「${chatFriend.nickname || chatFriend.username}」吗？`)) return;
+      try {
+        await requestApi(`/api/me/friends/${encodeURIComponent(chatFriend.id)}`, {method:'DELETE'});
+        chatFriend = null; chatMessages = []; chatDraft = ''; chatReplyTo = null; friendPanel = ''; chatStatus = '';
+        await Promise.all([loadFriends(),loadChats(true)]); render();
+      } catch (error) { chatStatus = error.message; render(); }
+      return;
+    }
+    if (button.hasAttribute('data-ir-chat-block')) {
+      if (!chatFriend) return;
+      const friendId = chatFriend.userId || chatFriend.id;
+      const block = !chatBlockedByMe;
+      if (block && !window.confirm(`屏蔽「${chatFriend.nickname || chatFriend.username}」后，双方将无法继续发送私聊消息。`)) return;
+      button.disabled = true;
+      try {
+        await requestApi(`/api/me/blocks/${encodeURIComponent(friendId)}`, {method:block ? 'POST' : 'DELETE'});
+        chatBlockedByMe = block; chatCanSend = !block; chatStatus = block ? '已屏蔽此好友。' : '已取消屏蔽。';
+        await loadChats(true); render();
+      } catch (error) { chatStatus = error.message; render(); }
+      return;
+    }
     if (button.hasAttribute('data-ir-friend-inbox')) { friendPanel = 'inbox'; chatStatus = ''; render(); startChatPolling(); loadChats(); return; }
     if (button.dataset.irOpenChat) {
       const friend = [...friendData.friends, ...chatList].find(item => item.userId === button.dataset.irOpenChat);
@@ -776,7 +824,7 @@
     if (event.target.matches('[data-ir-chat-input]')) {
       chatDraft = event.target.value;
       const send = root.querySelector('.ir-chat-composer button[type="submit"]');
-      if (send) send.disabled = chatSending || !chatDraft.trim();
+      if (send) send.disabled = chatSending || !chatDraft.trim() || !chatCanSend;
       return;
     }
     if (!event.target.matches('[data-ir-filter]')) return;
@@ -851,6 +899,22 @@
       return;
     }
   });
+  root.addEventListener('pointerdown', event => {
+    const message = event.target.closest?.('[data-ir-message-id]');
+    if (!message || event.button !== 0) return;
+    chatSwipeStart = { id:message.dataset.irMessageId, x:event.clientX, y:event.clientY };
+  });
+  root.addEventListener('pointerup', event => {
+    if (!chatSwipeStart) return;
+    const start = chatSwipeStart; chatSwipeStart = null;
+    const dx = event.clientX - start.x, dy = event.clientY - start.y;
+    if (dx < 64 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    const message = chatMessages.find(item => item.id === start.id);
+    if (!message) return;
+    chatReplyTo = {id:message.id,senderName:messageSenderName(message),body:message.body};
+    render(); root.querySelector('[data-ir-chat-input]')?.focus();
+  });
+  root.addEventListener('pointercancel', () => { chatSwipeStart = null; });
   const syncViewport = () => {
     const viewport = window.visualViewport;
     if (!viewport || !root.classList.contains('is-open')) return;

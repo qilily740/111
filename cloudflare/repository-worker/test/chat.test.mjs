@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import worker from '../src/index.js';
 
 const db = new DatabaseSync(':memory:');
-for (const file of ['0001_repository.sql','0002_profile_saved.sql','0003_google_drive.sql','0003_personal_profile.sql','0004_friends.sql','0005_profile_avatar.sql','0006_direct_messages.sql']) {
+for (const file of ['0001_repository.sql','0002_profile_saved.sql','0003_google_drive.sql','0003_personal_profile.sql','0004_friends.sql','0005_profile_avatar.sql','0006_direct_messages.sql','0007_chat_replies_blocks.sql']) {
   db.exec(readFileSync(new URL('../migrations/' + file, import.meta.url), 'utf8'));
 }
 const accounts = [{id:'user-alice',username:'alice'},{id:'user-bob',username:'bob_ideal'},{id:'user-stranger',username:'stranger'}];
@@ -54,6 +54,23 @@ test('chat rejects non-friends, blank messages, and unsupported message fields',
   assert.equal((await request('user-alice','/api/me/chats/user-bob/messages',{text:'  '})).status,400);
   assert.equal((await request('user-alice','/api/me/chats/user-bob/messages',{text:'hi',attachment:'x'})).status,400);
   assert.equal((await request('user-alice','/api/me/chats/user-stranger/messages')).status,403);
+});
+
+test('chat supports replies and blocking prevents new messages until unblocked', async () => {
+  makeFriends();
+  const original = await (await request('user-alice','/api/me/chats/user-bob/messages',{text:'原消息'})).json();
+  const replyResponse = await request('user-bob','/api/me/chats/user-alice/messages',{text:'回复',replyToId:original.message.id});
+  assert.equal(replyResponse.status,201);
+  const conversation = await (await request('user-alice','/api/me/chats/user-bob/messages')).json();
+  const reply = conversation.messages.find(message => message.body === '回复');
+  assert.equal(reply.replyToId,original.message.id);
+  assert.equal(reply.replyBody,'原消息');
+
+  assert.equal((await request('user-alice','/api/me/blocks/user-bob',{},'POST')).status,200);
+  assert.equal((await request('user-alice','/api/me/chats/user-bob/messages',{text:'不该发送'})).status,403);
+  assert.equal((await (await request('user-alice','/api/me/chats')).json()).chats.length,0);
+  assert.equal((await request('user-alice','/api/me/blocks/user-bob',null,'DELETE')).status,200);
+  assert.equal((await request('user-alice','/api/me/chats/user-bob/messages',{text:'恢复聊天'})).status,201);
 });
 
 test('scheduled cleanup and read endpoints delete expired messages', async () => {

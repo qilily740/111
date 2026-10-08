@@ -408,6 +408,18 @@ async function acceptedFriend(env, userId, friendId) {
   if (!friendId || friendId === userId) return false;
   return Boolean(await env.DB.prepare("SELECT 1 AS ok FROM friend_requests WHERE status = 'accepted' AND ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?)) LIMIT 1").bind(userId,friendId,friendId,userId).first());
 }
+async function chatBlockState(env, userId, friendId) {
+  const rows = await env.DB.prepare('SELECT blocker_id FROM blocked_users WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)').bind(userId,friendId,friendId,userId).all();
+  const blockedByMe = (rows.results || []).some(row => row.blocker_id === userId);
+  const blockedByFriend = (rows.results || []).some(row => row.blocker_id === friendId);
+  return { blockedByMe, blockedByFriend, canSend:!blockedByMe && !blockedByFriend };
+}
+async function updateChatBlock(request, env, user, friendId, block) {
+  if (!await acceptedFriend(env, user.id, friendId)) return json(request, env, { error:'FRIENDSHIP_REQUIRED' }, 403);
+  if (block) await env.DB.prepare('INSERT OR IGNORE INTO blocked_users (blocker_id,blocked_id,created_at) VALUES (?,?,?)').bind(user.id,friendId,now()).run();
+  else await env.DB.prepare('DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?').bind(user.id,friendId).run();
+  return json(request, env, { blocked:block });
+}
 async function listChats(request, env, user) {
   const at = now();
   await purgeExpiredMessages(env, at);
@@ -415,9 +427,11 @@ async function listChats(request, env, user) {
     env.DB.prepare(`SELECT r.id, CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END AS userId,
       CASE WHEN r.from_user_id = ? THEN r.to_username ELSE r.from_username END AS username,
       COALESCE(NULLIF(p.nickname,''), CASE WHEN r.from_user_id = ? THEN r.to_username ELSE r.from_username END) AS nickname,
-      p.avatar_key AS avatarKey
+      p.avatar_key AS avatarKey,
+      EXISTS(SELECT 1 FROM blocked_users b WHERE b.blocker_id = ? AND b.blocked_id = CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END) AS blockedByMe,
+      EXISTS(SELECT 1 FROM blocked_users b WHERE b.blocker_id = CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END AND b.blocked_id = ?) AS blockedByFriend
       FROM friend_requests r LEFT JOIN repository_profiles p ON p.user_id = CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END
-      WHERE r.status = 'accepted' AND (r.from_user_id = ? OR r.to_user_id = ?)`).bind(user.id,user.id,user.id,user.id,user.id,user.id).all(),
+      WHERE r.status = 'accepted' AND (r.from_user_id = ? OR r.to_user_id = ?)`).bind(user.id,user.id,user.id,user.id,user.id,user.id,user.id,user.id,user.id,user.id).all(),
     env.DB.prepare(`SELECT id, sender_id, recipient_id, body, created_at, read_at FROM direct_messages
       WHERE (sender_id = ? OR recipient_id = ?) AND expires_at > ? ORDER BY created_at DESC LIMIT 5000`).bind(user.id,user.id,at).all()
   ]);
@@ -431,7 +445,7 @@ async function listChats(request, env, user) {
     }
     if (message.recipient_id === user.id && message.read_at === null) item.unreadCount++;
   }
-  const chats = (friends.results || []).filter(friend => byFriend.has(friend.userId)).map(({avatarKey, ...friend}) => ({
+  const chats = (friends.results || []).filter(friend => byFriend.has(friend.userId) && !friend.blockedByMe && !friend.blockedByFriend).map(({avatarKey, ...friend}) => ({
     ...friend, ...byFriend.get(friend.userId), avatarUrl:avatarKey ? `/api/users/${encodeURIComponent(friend.userId)}/avatar` : ''
   })).sort((a,b) => b.lastMessageAt - a.lastMessageAt);
   return json(request, env, { chats });
@@ -439,25 +453,35 @@ async function listChats(request, env, user) {
 async function readChatMessages(request, env, user, friendId) {
   if (!await acceptedFriend(env, user.id, friendId)) return json(request, env, { error:'FRIENDSHIP_REQUIRED' }, 403);
   const at = now();
+  const blockState = await chatBlockState(env,user.id,friendId);
   await purgeExpiredMessages(env, at);
   await env.DB.prepare('UPDATE direct_messages SET read_at = ? WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL AND expires_at > ?').bind(at,friendId,user.id,at).run();
-  const result = await env.DB.prepare(`SELECT id, sender_id AS senderId, recipient_id AS recipientId, body, created_at AS createdAt
-    FROM direct_messages WHERE ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)) AND expires_at > ?
-    ORDER BY created_at DESC LIMIT 100`).bind(user.id,friendId,friendId,user.id,at).all();
-  return json(request, env, { messages:(result.results || []).reverse() });
+  const result = await env.DB.prepare(`SELECT m.id, m.sender_id AS senderId, m.recipient_id AS recipientId, m.body, m.created_at AS createdAt,
+      m.reply_to_id AS replyToId, reply.body AS replyBody, reply.sender_id AS replySenderId
+    FROM direct_messages m LEFT JOIN direct_messages reply ON reply.id = m.reply_to_id AND reply.expires_at > ?
+    WHERE ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?)) AND m.expires_at > ?
+    ORDER BY m.created_at DESC, m.id DESC LIMIT 100`).bind(at,user.id,friendId,friendId,user.id,at).all();
+  return json(request, env, { ...blockState, messages:(result.results || []).reverse() });
 }
 async function sendChatMessage(request, env, user, friendId) {
   if (!await acceptedFriend(env, user.id, friendId)) return json(request, env, { error:'FRIENDSHIP_REQUIRED' }, 403);
+  const blockState = await chatBlockState(env,user.id,friendId);
+  if (!blockState.canSend) return json(request, env, { error:'ACCOUNT_BLOCKED' }, 403);
   if (Number(request.headers.get('Content-Length') || 0) > 5000) return json(request, env, { error:'INVALID_MESSAGE' }, 400);
   let body;
   try { body = await request.json(); } catch { return json(request, env, { error:'INVALID_MESSAGE' }, 400); }
   const text = typeof body?.text === 'string' ? body.text.trim() : '';
-  if (!text || text.length > 2000 || Object.keys(body || {}).some(key => key !== 'text')) return json(request, env, { error:'INVALID_MESSAGE' }, 400);
+  const replyToId = typeof body?.replyToId === 'string' && body.replyToId ? body.replyToId : null;
+  if (!text || text.length > 2000 || Object.keys(body || {}).some(key => !['text','replyToId'].includes(key)) || (body?.replyToId != null && replyToId == null)) return json(request, env, { error:'INVALID_MESSAGE' }, 400);
   const at = now();
+  if (replyToId) {
+    const replied = await env.DB.prepare(`SELECT id FROM direct_messages WHERE id = ? AND expires_at > ? AND ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?))`).bind(replyToId,at,user.id,friendId,friendId,user.id).first();
+    if (!replied) return json(request, env, { error:'INVALID_REPLY' }, 400);
+  }
   const recent = await env.DB.prepare('SELECT COUNT(*) AS count FROM direct_messages WHERE sender_id = ? AND created_at > ?').bind(user.id,at - 60_000).first();
   if (Number(recent?.count || 0) >= 30) return json(request, env, { error:'CHAT_RATE_LIMIT' }, 429);
-  const message = { id:uuid(), senderId:user.id, recipientId:friendId, body:text, createdAt:at };
-  await env.DB.prepare('INSERT INTO direct_messages (id,sender_id,recipient_id,body,created_at,expires_at) VALUES (?,?,?,?,?,?)').bind(message.id,user.id,friendId,text,at,at + chatRetentionMs).run();
+  const message = { id:uuid(), senderId:user.id, recipientId:friendId, body:text, createdAt:at, replyToId };
+  await env.DB.prepare('INSERT INTO direct_messages (id,sender_id,recipient_id,body,created_at,expires_at,reply_to_id) VALUES (?,?,?,?,?,?,?)').bind(message.id,user.id,friendId,text,at,at + chatRetentionMs,replyToId).run();
   return json(request, env, { message }, 201);
 }
 
@@ -558,6 +582,8 @@ export default {
       if (url.pathname === '/api/users/search' && request.method === 'GET') return await searchAccounts(request, env, auth.user, url);
       if (url.pathname === '/api/me/friends' && request.method === 'GET') return await listFriends(request, env, auth.user);
       if (url.pathname === '/api/me/chats' && request.method === 'GET') return await listChats(request, env, auth.user);
+      const chatBlock = url.pathname.match(/^\/api\/me\/blocks\/([^/]{1,128})$/);
+      if (chatBlock && ['POST','DELETE'].includes(request.method)) return await updateChatBlock(request, env, auth.user, decodeURIComponent(chatBlock[1]), request.method === 'POST');
       const chatMessages = url.pathname.match(/^\/api\/me\/chats\/([^/]{1,128})\/messages$/);
       if (chatMessages && request.method === 'GET') return await readChatMessages(request, env, auth.user, decodeURIComponent(chatMessages[1]));
       if (chatMessages && request.method === 'POST') return await sendChatMessage(request, env, auth.user, decodeURIComponent(chatMessages[1]));

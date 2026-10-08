@@ -266,3 +266,46 @@
 .ir-chat-composer button:disabled{background:#c9c9cc;color:#fff}
 .ir-chat-retention{display:block;margin:8px 2px 0;color:#999;font-size:10px;text-align:center}
 @media(max-width:760px){.ir-chat-page{min-height:calc(100dvh - 105px);padding:14px 14px calc(env(safe-area-inset-bottom) + 20px)}.ir-chat-messages{max-height:none}.ir-chat-message{max-width:86%}.ir-friend-item{gap:6px}.ir-friend-item>button{min-height:32px;padding:0 8px;font-size:11px}}
+
+/* Direct messages follow the plain-text conversation style from the reference. */
+.ir-chat-page{min-height:min(78vh,820px);padding:14px 18px 12px}
+.ir-chat-header{min-height:58px;padding:0 0 12px;gap:12px}
+.ir-chat-header>button:first-child{width:38px;height:38px;flex:none;font-size:26px;line-height:1}
+.ir-chat-header-avatar{position:relative;display:grid;place-items:center;flex:none;width:38px;height:38px;overflow:hidden;border-radius:50%;background:#dedee1;color:#444;font-size:15px;font-weight:650}
+.ir-chat-header-avatar img,.ir-chat-profile .ir-chat-avatar img,.ir-chat-message-avatar img{position:absolute;inset:0;width:100%;height:100%;border-radius:inherit;object-fit:cover}
+.ir-chat-header>div{display:grid;gap:0;flex:1;min-width:0}
+.ir-chat-header>div strong{font-size:16px;line-height:1.15}
+.ir-chat-header>div small{font-size:10px;line-height:1.2;letter-spacing:.16em}
+.ir-chat-header .ir-chat-close{width:36px;height:36px;flex:none;margin-left:auto}
+.ir-chat-profile{display:flex;flex:none;flex-direction:column;align-items:center;padding:42px 12px 24px;text-align:center}
+.ir-chat-profile .ir-chat-avatar{width:72px;height:72px;margin-bottom:12px;font-size:25px}
+.ir-chat-profile>strong{max-width:100%;overflow:hidden;color:#29292c;font-size:20px;line-height:1.3;text-overflow:ellipsis;white-space:nowrap}
+.ir-chat-profile>span:not(.ir-chat-avatar){margin-top:3px;color:#85858b;font-size:13px}
+.ir-chat-profile>div{display:flex;gap:9px;margin-top:14px}
+.ir-chat-profile>div button{min-height:32px;padding:0 12px;border:1px solid #dedee1;border-radius:9px;background:#f2f2f3;color:#38383d;font-size:12px}
+.ir-chat-messages{display:flex;flex:1;flex-direction:column;gap:0;min-height:140px;max-height:calc(100vh - 440px);overflow:auto;padding:10px 2px 18px;overscroll-behavior:contain}
+.ir-chat-divider{display:flex;align-items:center;gap:12px;margin:14px 0;color:#929297;font-size:10px;white-space:nowrap}
+.ir-chat-divider::before,.ir-chat-divider::after{height:1px;flex:1;background:#e5e5e7;content:""}
+.ir-chat-message{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:start;gap:9px;width:100%;max-width:none;padding:8px 4px;border-radius:8px;touch-action:pan-y}
+.ir-chat-message.is-mine{align-self:stretch;justify-items:stretch}
+.ir-chat-message-avatar{position:relative;display:grid;place-items:center;width:30px;height:30px;overflow:hidden;border-radius:50%;background:#e5e5e7;color:#555;font-size:12px;font-weight:650}
+.ir-chat-message-body{min-width:0}
+.ir-chat-message-meta{display:flex;align-items:baseline;gap:8px;min-height:18px}
+.ir-chat-message-meta strong{overflow:hidden;color:#77777d;font-size:12px;font-weight:600;text-overflow:ellipsis;white-space:nowrap}
+.ir-chat-message-meta time{color:#99999e;font-size:10px;white-space:nowrap}
+.ir-chat-message p{margin:2px 0 0;padding:0;border-radius:0;background:transparent;color:#29292c;font-size:14px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.ir-chat-message.is-mine p{border-radius:0;background:transparent;color:#29292c}
+.ir-chat-quoted{max-width:100%;overflow:hidden;margin:3px 0 1px;padding:4px 8px;border-left:2px solid #c6c6ca;background:#f3f3f4;color:#85858b;font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.ir-chat-status{margin:0 0 6px;text-align:center}
+.ir-chat-replying{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;padding:7px 10px;border-left:2px solid #79797f;border-radius:7px;background:#f3f3f4;color:#727278;font-size:11px}
+.ir-chat-replying span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ir-chat-replying button{flex:none;border:0;background:transparent;color:#555;font-size:18px}
+.ir-chat-composer{align-items:center;gap:7px;min-height:48px;padding:5px 8px;border-radius:15px;background:#f2f2f3}
+.ir-chat-composer textarea{max-height:110px;min-height:28px;resize:none;padding:5px 2px;font-size:13px}
+.ir-chat-composer .ir-chat-plus,.ir-chat-composer .ir-chat-send{display:grid;place-items:center;flex:none;width:30px;min-height:30px;padding:0;border-radius:50%;font-size:21px;line-height:1}
+.ir-chat-composer .ir-chat-plus{background:transparent;color:#77777d}
+.ir-chat-composer .ir-chat-plus:disabled{background:transparent;color:#77777d;opacity:1}
+.ir-chat-composer .ir-chat-send{background:#3b3b40;color:#fff;font-size:18px}
+.ir-chat-composer .ir-chat-send:disabled{background:#c8c8cb;color:white}
+.ir-chat-retention{margin:5px 2px 0;font-size:9px}
+@media(max-width:760px){.ir-chat-page{min-height:calc(100dvh - 90px);padding:10px 12px calc(env(safe-area-inset-bottom) + 10px)}.ir-chat-profile{padding-top:28px;padding-bottom:18px}.ir-chat-messages{max-height:none}.ir-chat-message{max-width:none}.ir-chat-composer textarea{font-size:16px}}
