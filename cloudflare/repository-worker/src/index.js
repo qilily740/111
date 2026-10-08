@@ -270,7 +270,7 @@ async function createPost(request, env, user) {
     }
     const statements = [env.DB.prepare('INSERT INTO posts (id, channel, author_id, author_name, title, body, code_text, tags_json, created_at, updated_at, avatar_key, avatar_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(id, channel, user.id, clean(user.username || '理想机用户', 60), title, body, codeText, JSON.stringify(listTags(form.get('tags'))), createdAt, createdAt, stored.find(item => !item.id)?.key || '', avatarType)];
-    for (const item of stored.filter(item => item.id)) statements.push(env.DB.prepare('INSERT INTO attachments (id, post_id, object_key, file_name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(item.id, id, item.driveKey, item.name, item.type, item.file.size, createdAt));
+    for (const item of stored.filter(item => item.id)) statements.push(env.DB.prepare('INSERT INTO attachments (id, post_id, object_key, file_name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(item.id, id, item.key, item.name, item.type, item.file.size, createdAt));
     await env.DB.batch(statements);
   } catch (error) {
     await Promise.allSettled(stored.map(item => driveDelete(token, item.key)));
