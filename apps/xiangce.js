@@ -130,6 +130,72 @@
     });
   }
 
+  function blobAsDataUrl(blob) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function resolveAlbumImageSource(stored) {
+    const value = String(stored || '');
+    if (!value.startsWith('idb:image:')) return value;
+    try { await Promise.race([Promise.resolve(window.IdealMachineStorageReady).catch(() => {}), new Promise(resolve => setTimeout(resolve, 1800))]); } catch {}
+    let source = '';
+    try { source = String(await window.IdealMachineGetImage?.(value) || ''); } catch {}
+    if (!source) {
+      try {
+        const fallback = await window.IdealMachineStorage?.getImage?.(value);
+        if (fallback instanceof Blob) source = await blobAsDataUrl(fallback);
+        else source = String(fallback || '');
+      } catch {}
+    }
+    return source;
+  }
+
+  function showImageUnavailable(image, message = '图片暂时无法显示') {
+    if (!image) return;
+    image.hidden = true;
+    const holder = image.parentElement;
+    if (!holder) return;
+    let fallback = holder.querySelector(':scope > .album-image-fallback');
+    if (!fallback) {
+      fallback = document.createElement('span');
+      fallback.className = 'album-image-fallback';
+      holder.appendChild(fallback);
+    }
+    fallback.textContent = message;
+    fallback.hidden = false;
+    holder.classList.add('has-image-error');
+  }
+
+  async function loadAlbumImage(image, stored = image?.dataset.albumSrc || image?.dataset.albumPickerSrc || '') {
+    if (!image?.isConnected) return;
+    image.parentElement?.classList.remove('has-image-error');
+    const fallback = image.parentElement?.querySelector(':scope > .album-image-fallback');
+    if (fallback) fallback.hidden = true;
+    const source = await resolveAlbumImageSource(stored);
+    if (!image.isConnected) return;
+    if (!source) {
+      showImageUnavailable(image, String(stored).startsWith('idb:image:') ? '本地图片数据缺失' : '图片链接不可用');
+      return;
+    }
+    image.hidden = false;
+    image.removeAttribute('src');
+    image.referrerPolicy = 'no-referrer';
+    image.onload = () => {
+      image.hidden = false;
+      image.parentElement?.classList.remove('has-image-error');
+      const fallback = image.parentElement?.querySelector(':scope > .album-image-fallback');
+      if (fallback) fallback.hidden = true;
+    };
+    image.onerror = () => showImageUnavailable(image, String(stored).startsWith('idb:image:') ? '本地图片数据损坏' : '图片链接失效或被屏蔽');
+    image.src = source;
+    return source;
+  }
+
   async function uploadToImageHost(file) {
     if (!hasImageHost) throw new Error('尚未配置图床地址');
     const request = window.IdealMachineFetch || window.fetch.bind(window);
@@ -254,7 +320,7 @@
   function photoMarkup(item) {
     const selected = selecting && selectedIds.has(item.id);
     const check = selecting ? `<span class="album-photo-check" aria-hidden="true">${selected ? '✓' : ''}</span>` : '';
-    return `<button class="album-photo${selected ? ' is-selected' : ''}" type="button" data-album-open="${esc(item.id)}" aria-label="${selecting ? '选择' : '查看'}${esc(item.name)}" aria-pressed="${selected}"><span class="album-photo-image"><img data-album-src="${esc(item.url)}" alt="${esc(item.name)}">${check}</span><span class="album-photo-meta"><b>${esc(item.name)}</b><small>${esc(item.source)} · ${esc(formatDate(item.createdAt))}</small></span></button>`;
+    return `<button class="album-photo${selected ? ' is-selected' : ''}" type="button" data-album-open="${esc(item.id)}" aria-label="${selecting ? '选择' : '查看'}${esc(item.name)}" aria-pressed="${selected}"><span class="album-photo-image"><img data-album-src="${esc(item.url)}" alt="">${check}<span class="album-image-fallback" hidden></span></span><span class="album-photo-meta"><b>${esc(item.name)}</b><small>${esc(item.source)} · ${esc(formatDate(item.createdAt))}</small></span></button>`;
   }
 
   function detailMarkup(item) {
@@ -262,7 +328,7 @@
     const resolution = item.width && item.height ? `${item.width} × ${item.height}` : '读取中';
     const publicUrl = isPublicImageUrl(item.url);
     const hostButton = publicUrl ? '' : `<button data-album-host="${esc(item.id)}" type="button" ${hasImageHost ? '' : 'disabled'}>${hasImageHost ? '上传至图床' : '图床未配置'}</button>`;
-    return `<aside class="album-detail" data-album-detail aria-label="图片详情"><button class="album-detail-backdrop" data-album-detail-close type="button" aria-label="关闭图片详情"></button><section><header><div><span>PHOTO DETAILS</span><h2>图片详情</h2></div><button data-album-detail-close type="button" aria-label="关闭">×</button></header><div class="album-detail-preview"><img data-album-src="${esc(item.url)}" alt="${esc(item.name)}"></div><div class="album-detail-copy"><h3>${esc(item.name)}</h3><p>${esc(item.source)} · ${esc(formatDate(item.createdAt))}</p><dl><div><dt>尺寸</dt><dd data-album-resolution="${esc(item.id)}">${esc(resolution)}</dd></div><div><dt>文件</dt><dd>${esc(formatSize(item.size))}</dd></div></dl><label><span>${publicUrl ? '公开图片 URL' : '本地图片地址'}</span><input readonly value="${esc(item.url)}" aria-label="图片地址"></label><small>${publicUrl ? '这是可直接显示的 http(s) 图片 URL；从相册删除记录不会删除这个链接。' : (hasImageHost ? '点击“上传至图床”后会得到可公开显示的 http(s) 图片 URL。' : '请先配置图床，才能生成删除后仍可显示的 http(s) 图片 URL。')}</small></div><footer><button data-album-delete="${esc(item.id)}" type="button">删除</button>${hostButton}<button class="is-primary" data-album-copy="${esc(item.id)}" type="button">复制 URL</button></footer></section></aside>`;
+    return `<aside class="album-detail" data-album-detail aria-label="图片详情"><button class="album-detail-backdrop" data-album-detail-close type="button" aria-label="关闭图片详情"></button><section><header><div><span>PHOTO DETAILS</span><h2>图片详情</h2></div><button data-album-detail-close type="button" aria-label="关闭">×</button></header><div class="album-detail-preview"><img data-album-src="${esc(item.url)}" alt=""><span class="album-image-fallback" hidden></span></div><div class="album-detail-copy"><h3>${esc(item.name)}</h3><p>${esc(item.source)} · ${esc(formatDate(item.createdAt))}</p><dl><div><dt>尺寸</dt><dd data-album-resolution="${esc(item.id)}">${esc(resolution)}</dd></div><div><dt>文件</dt><dd>${esc(formatSize(item.size))}</dd></div></dl><label><span>${publicUrl ? '公开图片 URL' : '本地图片地址'}</span><input readonly value="${esc(item.url)}" aria-label="图片地址"></label><small>${publicUrl ? '这是可直接显示的 http(s) 图片 URL；从相册删除记录不会删除这个链接。' : (hasImageHost ? '点击“上传至图床”后会得到可公开显示的 http(s) 图片 URL。' : '请先配置图床，才能生成删除后仍可显示的 http(s) 图片 URL。')}</small></div><footer><button data-album-delete="${esc(item.id)}" type="button">删除</button><button data-album-retry="${esc(item.id)}" type="button">重新加载</button>${hostButton}<button class="is-primary" data-album-copy="${esc(item.id)}" type="button">复制 URL</button></footer></section></aside>`;
   }
 
   function render() {
@@ -302,7 +368,7 @@
   }
 
   function pickerPhotoMarkup(item) {
-    return `<button class="album-picker-photo" data-album-picker-item="${esc(item.id)}" type="button"><span><img data-album-picker-src="${esc(item.url)}" alt="${esc(item.name)}"></span><b>${esc(item.name)}</b><small>${esc(item.source)}</small></button>`;
+    return `<button class="album-picker-photo" data-album-picker-item="${esc(item.id)}" type="button"><span><img data-album-picker-src="${esc(item.url)}" alt=""><span class="album-image-fallback" hidden></span></span><b>${esc(item.name)}</b><small>${esc(item.source)}</small></button>`;
   }
 
   function renderPickerSheet() {
@@ -310,18 +376,14 @@
     pickerSheet.innerHTML = `<button class="album-picker-backdrop" data-album-picker-close type="button" aria-label="关闭相册选择"></button><section class="album-picker-panel" role="dialog" aria-modal="true" aria-labelledby="albumPickerTitle"><header><div><span>PHOTO LIBRARY</span><h2 id="albumPickerTitle">从相册选择</h2></div><button type="button" data-album-picker-close aria-label="关闭">×</button></header><p class="album-picker-hint">点击一张图片，应用到当前小组件</p><main class="album-picker-grid">${items.length ? items.map(pickerPhotoMarkup).join('') : '<div class="album-picker-empty"><b>相册还是空的</b><span>请先在相册 App 中导入图片</span><button type="button" data-album-picker-open-library>打开相册</button></div>'}</main></section>`;
     pickerSheet.classList.add('is-open');
     pickerSheet.setAttribute('aria-hidden', 'false');
-    pickerSheet.querySelectorAll('[data-album-picker-src]').forEach(async image => {
-      const stored = image.dataset.albumPickerSrc || '';
-      const source = stored.startsWith('idb:image:') && window.IdealMachineGetImage ? await window.IdealMachineGetImage(stored) : stored;
-      if (source) image.src = source;
-    });
+    hydratePickerImages();
   }
 
   function renderMultiPickerSheet() {
     const items = state.items;
     const grid = pickerSheet.querySelector('.album-picker-multi-panel > .album-picker-grid');
     const scrollTop = grid?.scrollTop || 0;
-    pickerSheet.innerHTML = `<button class="album-picker-backdrop" data-album-picker-close type="button" aria-label="关闭相册选择"></button><section class="album-picker-panel album-picker-multi-panel ${pickerChatMode ? 'album-chat-picker-panel' : ''}" role="dialog" aria-modal="true" aria-labelledby="albumPickerMultiTitle"><header><div><span>PHOTO LIBRARY</span><h2 id="albumPickerMultiTitle">${pickerChatMode ? '从理想机相册选择' : '批量选择图标'}</h2></div><button type="button" data-album-picker-close aria-label="关闭">×</button></header><p class="album-picker-hint">${pickerChatMode ? '可多选图片，勾选后点击发送。' : `最多选择 ${pickerMultiMax} 张图片，按选择顺序替换 App 图标。`}</p><main class="album-picker-grid">${items.length ? items.map(item => { const selected = pickerMultiSelected.has(item.id); const order = [...pickerMultiSelected].indexOf(item.id) + 1; return `<button class="album-picker-photo ${selected ? 'is-selected' : ''}" data-album-picker-multi-item="${esc(item.id)}" type="button" aria-pressed="${selected}"><span><img data-album-picker-src="${esc(item.url)}" alt="${esc(item.name)}">${selected ? `<i aria-hidden="true">${order}</i>` : ''}</span><b>${esc(item.name)}</b><small>${esc(item.source)}</small></button>`; }).join('') : '<div class="album-picker-empty"><b>相册还是空的</b><span>请先在相册 App 中导入图片</span></div>'}</main><footer><button type="button" data-album-picker-close>取消</button><button class="is-primary" type="button" data-album-picker-multi-done ${pickerMultiSelected.size ? '' : 'disabled'}>${pickerChatMode ? '发送' : '完成'}${pickerMultiSelected.size ? `（${pickerMultiSelected.size}）` : ''}</button></footer></section>`;
+    pickerSheet.innerHTML = `<button class="album-picker-backdrop" data-album-picker-close type="button" aria-label="关闭相册选择"></button><section class="album-picker-panel album-picker-multi-panel ${pickerChatMode ? 'album-chat-picker-panel' : ''}" role="dialog" aria-modal="true" aria-labelledby="albumPickerMultiTitle"><header><div><span>PHOTO LIBRARY</span><h2 id="albumPickerMultiTitle">${pickerChatMode ? '从理想机相册选择' : '批量选择图标'}</h2></div><button type="button" data-album-picker-close aria-label="关闭">×</button></header><p class="album-picker-hint">${pickerChatMode ? '可多选图片，勾选后点击发送。' : `最多选择 ${pickerMultiMax} 张图片，按选择顺序替换 App 图标。`}</p><main class="album-picker-grid">${items.length ? items.map(item => { const selected = pickerMultiSelected.has(item.id); const order = [...pickerMultiSelected].indexOf(item.id) + 1; return `<button class="album-picker-photo ${selected ? 'is-selected' : ''}" data-album-picker-multi-item="${esc(item.id)}" type="button" aria-pressed="${selected}"><span><img data-album-picker-src="${esc(item.url)}" alt=""><span class="album-image-fallback" hidden></span>${selected ? `<i class="album-picker-order" aria-hidden="true">${order}</i>` : ''}</span><b>${esc(item.name)}</b><small>${esc(item.source)}</small></button>`; }).join('') : '<div class="album-picker-empty"><b>相册还是空的</b><span>请先在相册 App 中导入图片</span></div>'}</main><footer><button type="button" data-album-picker-close>取消</button><button class="is-primary" type="button" data-album-picker-multi-done ${pickerMultiSelected.size ? '' : 'disabled'}>${pickerChatMode ? '发送' : '完成'}${pickerMultiSelected.size ? `（${pickerMultiSelected.size}）` : ''}</button></footer></section>`;
     pickerSheet.classList.add('is-open');
     pickerSheet.setAttribute('aria-hidden', 'false');
     const nextGrid = pickerSheet.querySelector('.album-picker-multi-panel > .album-picker-grid');
@@ -329,11 +391,7 @@
       nextGrid.scrollTop = scrollTop;
       requestAnimationFrame(() => { nextGrid.scrollTop = scrollTop; });
     }
-    pickerSheet.querySelectorAll('[data-album-picker-src]').forEach(async image => {
-      const stored = image.dataset.albumPickerSrc || '';
-      if (stored.startsWith('idb:image:') && window.IdealMachineGetImage) { const source = await window.IdealMachineGetImage(stored); if (source) image.src = source; }
-      else image.src = stored;
-    });
+    hydratePickerImages();
   }
 
   function closePickerSheet() {
@@ -349,8 +407,7 @@
     const images = [...app.querySelectorAll('[data-album-src]')];
     await Promise.all(images.map(async image => {
       const stored = image.dataset.albumSrc || '';
-      const source = stored.startsWith('idb:image:') && window.IdealMachineGetImage ? await window.IdealMachineGetImage(stored) : stored;
-      if (source) image.src = source;
+      const source = await loadAlbumImage(image, stored);
       if (activeId && image.closest('.album-detail-preview') && source) {
         const dimensions = await imageDimensions(source);
         const item = state.items.find(entry => entry.id === activeId);
@@ -370,6 +427,10 @@
     toast.classList.add('is-visible');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
+  }
+
+  function hydratePickerImages() {
+    pickerSheet.querySelectorAll('[data-album-picker-src]').forEach(image => { void loadAlbumImage(image, image.dataset.albumPickerSrc || ''); });
   }
 
   async function copyText(value) {
@@ -585,6 +646,20 @@
       return;
     }
     if (event.target.closest('[data-album-detail-close]')) { activeId = ''; render(); return; }
+    const retry = event.target.closest('[data-album-retry]');
+    if (retry) {
+      const item = state.items.find(entry => entry.id === retry.dataset.albumRetry);
+      const image = app.querySelector('.album-detail-preview img[data-album-src]');
+      if (item && image) {
+        retry.disabled = true;
+        retry.textContent = '正在重试…';
+        loadAlbumImage(image, item.url).finally(() => {
+          retry.disabled = false;
+          retry.textContent = '重新加载';
+        });
+      }
+      return;
+    }
     const copy = event.target.closest('[data-album-copy]');
     if (copy) { copyUrl(copy.dataset.albumCopy); return; }
     const host = event.target.closest('[data-album-host]');
