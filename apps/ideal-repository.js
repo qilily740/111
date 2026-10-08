@@ -81,7 +81,7 @@
   function readLocalProfile() { try { const value = JSON.parse(localStorage.getItem(personalStorageKey()) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; } }
   function writeLocalProfile(value) { localStorage.setItem(personalStorageKey(), JSON.stringify({ nickname:value.nickname || '', bio:value.bio || '', note:value.note || '' })); }
   const apiBase = () => String(window.IdealMachineConfig?.repositoryApiBase || '').replace(/\/+$/, '');
-  const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试' };
+  const apiError = { INVALID_PROFILE:'资料格式不正确，请检查字数；账号与注册时间不可修改', UNAUTHORIZED:'请先登录理想机账号', AUTH_SERVICE_UNAVAILABLE:'账号服务暂时不可用', INVALID_POST:'请填写标题并检查字数', BEAUTY_CODE_OR_FILE_REQUIRED:'美化帖需要美化码或文件', FILE_REQUIRED:'世界书和角色卡必须上传文件', IMPORTABLE_FILE_REQUIRED:'请上传可导入的主文件，图片可以作为附加预览', CODE_NOT_ALLOWED:'这个频道只能上传文件', INVALID_BEAUTY_CODE:'请输入已有的 IDEAL- 美化码', INVALID_AVATAR:'请选择不超过 512 KB 的 PNG、JPEG 或 WebP 头像', STORAGE_UNAVAILABLE:'头像存储服务暂时不可用', LIKE_REQUIRED:'请先点赞，再保存文件或美化码', FORBIDDEN:'你只能删除自己发布的帖子', TOO_MANY_FILES:'每篇帖子最多上传 3 个文件', INVALID_FILE_TYPE_OR_SIZE:'文件格式不支持，或单个文件超过 8 MB', REQUEST_TOO_LARGE:'附件总大小超过限制', POST_RATE_LIMIT:'发布太频繁，请稍后再试', INVALID_ACCOUNT_QUERY:'请输入有效的 Ideal 账号（3 至 32 位）', ACCOUNT_NOT_FOUND:'没有找到这个账号', ALREADY_FRIENDS:'你们已经是好友了', REQUEST_ALREADY_SENT:'好友申请已经发送', REQUEST_RECEIVED:'对方已向你发送申请，请在申请列表中处理', ACCOUNT_SEARCH_UNAVAILABLE:'账号搜索暂时不可用，请稍后再试' };
   async function requestApi(path, options = {}) {
     if (!apiBase()) throw new Error('仓库后端尚未部署或配置。请先设置 repositoryApiBase。');
     const token = window.IdealMachineAuth?.getToken?.();
@@ -179,7 +179,7 @@
     } catch (error) { if (serial === friendSearchSerial) friendStatus = error.message; }
     if (serial === friendSearchSerial && screen === 'friends') render();
   }
-  const friendIdentity = item => `<span class="ir-friend-avatar">${escapeHTML((item.nickname || item.username || '?').slice(0,1).toUpperCase())}</span><span class="ir-friend-copy"><strong>${escapeHTML(item.nickname || item.username)}</strong><small>ID · ${escapeHTML(item.username)}</small></span>`;
+  const friendIdentity = item => { const id = item.userId || item.id; const initial = escapeHTML((item.nickname || item.username || '?').slice(0,1).toUpperCase()); const image = item.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''; return `<span class="ir-friend-avatar">${initial}${image}</span><span class="ir-friend-copy"><strong>${escapeHTML(item.nickname || item.username)}</strong><small>ID · ${escapeHTML(item.username)}</small></span>`; };
   function renderFriends() {
     if (friendPanel === 'inbox') return `<div class="ir-friends-page"><header class="ir-inbox-heading"><button type="button" data-ir-inbox-back aria-label="返回消息">‹</button><div><span>IDEAL / INBOX</span><h1>私信提醒</h1></div></header><div class="ir-inbox-empty"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><path d="m3 6 9 7 9-7"/></svg></span><strong>暂时没有私信提醒</strong><small>收到的私信提醒会显示在这里。</small></div></div>`;
     const tabs = [['friends','我的好友',friendData.friends.length],['incoming','好友申请',friendData.incoming.length],['outgoing','已发送',friendData.outgoing.length]];
@@ -283,6 +283,27 @@
     try { coverUrl = localStorage.getItem(coverStorageKey()) || ''; } catch { coverUrl = ''; }
     syncProfile();
   }
+  async function uploadAvatarData(data) {
+    const blob = await fetch(data).then(response => response.blob());
+    const form = new FormData();
+    form.set('avatar', new File([blob], 'profile-avatar.jpg', { type:blob.type || 'image/jpeg' }));
+    return requestApi('/api/me/avatar', { method:'POST', body:form });
+  }
+  async function syncAvatarWithServer() {
+    if (!apiBase() || !window.IdealMachineAuth?.getToken?.()) return;
+    try {
+      const { profile } = await requestApi('/api/me/profile');
+      if (profile?.avatarUrl && !avatarUrl) {
+        const response = await requestApi(profile.avatarUrl, { raw:true });
+        const reader = new FileReader();
+        const blob = await response.blob();
+        const data = await new Promise((resolve, reject) => { reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
+        avatarUrl = String(data || '');
+        try { localStorage.setItem(avatarStorageKey(), avatarUrl); } catch {}
+        syncProfile();
+      } else if (!profile?.avatarUrl && avatarUrl) await uploadAvatarData(avatarUrl);
+    } catch {}
+  }
   async function saveLocalAvatar(file) {
     const url = URL.createObjectURL(file);
     try {
@@ -296,6 +317,9 @@
       const data = canvas.toDataURL('image/jpeg', .78);
       localStorage.setItem(avatarStorageKey(), data);
       avatarUrl = data; syncProfile();
+      if (apiBase() && window.IdealMachineAuth?.getToken?.()) {
+        try { await uploadAvatarData(data); } catch (error) { throw new Error(`头像已保存在本机，但暂未同步给其他用户：${error.message}`); }
+      }
     } finally { URL.revokeObjectURL(url); }
   }
   async function saveLocalCover(file) {
@@ -399,9 +423,9 @@
   }
   async function hydrateImages() {
     if (!apiBase()) return;
-    for (const image of root.querySelectorAll('[data-ir-image], [data-ir-post-avatar]')) {
-      const id = image.dataset.irImage || image.dataset.irPostAvatar;
-      const path = image.dataset.irImage ? `/api/attachments/${encodeURIComponent(id)}` : `/api/posts/${encodeURIComponent(id)}/avatar`;
+    for (const image of root.querySelectorAll('[data-ir-image], [data-ir-post-avatar], [data-ir-friend-avatar]')) {
+      const id = image.dataset.irImage || image.dataset.irPostAvatar || image.dataset.irFriendAvatar;
+      const path = image.dataset.irImage ? `/api/attachments/${encodeURIComponent(id)}` : image.dataset.irPostAvatar ? `/api/posts/${encodeURIComponent(id)}/avatar` : `/api/users/${encodeURIComponent(id)}/avatar`;
       try {
         const response = await requestApi(path, { raw:true });
         if (!image.isConnected) continue;
@@ -461,7 +485,9 @@
     } else if (screen === 'activity') {
       main.innerHTML = `<div class="ir-content"><header class="ir-page-heading ir-content-heading"><h2>最近动态</h2><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><p class="ir-preview-note">暂时没有动态。仓库上线后，可以在这里查看新的作品与互动。</p></div>`;
     } else if (screen === 'friends') {
+      clearImages();
       main.innerHTML = renderFriends();
+      if (apiBase()) hydrateImages();
     } else if (screen === 'profile') {
       main.innerHTML = profileMarkup();
       syncProfile();
@@ -481,7 +507,7 @@
     if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
     if (screen === 'friends') loadFriends();
   };
-  const open = () => { show('welcome'); root.classList.add('is-open'); syncViewport(); loadAvatar(); };
+  const open = () => { show('welcome'); root.classList.add('is-open'); syncViewport(); loadAvatar(); syncAvatarWithServer(); };
   const close = () => {
     if (root.contains(document.activeElement)) document.activeElement.blur();
     root.classList.remove('is-open');
@@ -703,6 +729,7 @@
     if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
     if (screen === 'friends') loadFriends();
     loadAvatar();
+    syncAvatarWithServer();
   });
   window.IdealMachineRepository = { open, close };
 })();

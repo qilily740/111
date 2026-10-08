@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import worker from '../src/index.js';
 const db = new DatabaseSync(':memory:');
-for(const file of ['0001_repository.sql','0002_profile_saved.sql','0003_personal_profile.sql'])db.exec(readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));
+for(const file of ['0001_repository.sql','0002_profile_saved.sql','0003_personal_profile.sql','0005_profile_avatar.sql'])db.exec(readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));
 const env={DB:{prepare(sql){const stmt=db.prepare(sql);return {bind(...args){return {first:async()=>stmt.get(...args),all:async()=>({results:stmt.all(...args)}),run:async()=>stmt.run(...args)}}}}},AUTH:{fetch:async(_url,options)=>Response.json({user:{id:options.headers.Authorization.split(' ')[1],username:'immutable',createdAt:1743217200000}})}};
 const request=(user,path,body)=>worker.fetch(new Request('https://test.local'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+user,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),env);
 test('profile saves privately per authenticated user and preserves registration date',async()=>{

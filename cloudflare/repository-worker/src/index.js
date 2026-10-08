@@ -330,25 +330,32 @@ async function searchAccounts(request, env, user, url) {
   const ids = users.map(item => item.id);
   const pending = ids.length ? await env.DB.prepare(`SELECT from_user_id, to_user_id, status FROM friend_requests WHERE (from_user_id = ? AND to_user_id IN (${ids.map(() => '?').join(',')})) OR (to_user_id = ? AND from_user_id IN (${ids.map(() => '?').join(',')}))`).bind(user.id, ...ids, user.id, ...ids).all() : { results:[] };
   const relations = new Map((pending.results || []).map(row => [row.from_user_id === user.id ? row.to_user_id : row.from_user_id, row]));
-  return json(request, env, { users:users.map(item => ({ ...item, relation:relations.get(item.id)?.status === 'accepted' ? 'friend' : relations.get(item.id) ? (relations.get(item.id).from_user_id === user.id ? 'outgoing' : 'incoming') : '' })) });
+  const profiles = ids.length ? await env.DB.prepare(`SELECT user_id, nickname, avatar_key FROM repository_profiles WHERE user_id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all() : { results:[] };
+  const profileByUser = new Map((profiles.results || []).map(row => [row.user_id, row]));
+  return json(request, env, { users:users.map(item => {
+    const profile = profileByUser.get(item.id);
+    const relation = relations.get(item.id);
+    return { ...item, userId:item.id, nickname:profile?.nickname || '', avatarUrl:profile?.avatar_key ? `/api/users/${encodeURIComponent(item.id)}/avatar` : '', relation:relation?.status === 'accepted' ? 'friend' : relation ? (relation.from_user_id === user.id ? 'outgoing' : 'incoming') : '' };
+  }) });
 }
 async function listFriends(request, env, user) {
   const [friends, incoming, outgoing] = await Promise.all([
     env.DB.prepare(`SELECT r.id, CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END AS userId,
       CASE WHEN r.from_user_id = ? THEN r.to_username ELSE r.from_username END AS username,
-      COALESCE(NULLIF(p.nickname,''), CASE WHEN r.from_user_id = ? THEN r.to_username ELSE r.from_username END) AS nickname
+      COALESCE(NULLIF(p.nickname,''), CASE WHEN r.from_user_id = ? THEN r.to_username ELSE r.from_username END) AS nickname, p.avatar_key AS avatarKey
       FROM friend_requests r LEFT JOIN repository_profiles p ON p.user_id = CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END
       WHERE r.status = 'accepted' AND (r.from_user_id = ? OR r.to_user_id = ?) ORDER BY r.updated_at DESC LIMIT 500`).bind(user.id,user.id,user.id,user.id,user.id,user.id).all(),
     env.DB.prepare(`SELECT r.id, r.from_user_id AS userId, r.from_username AS username,
-      COALESCE(NULLIF(p.nickname,''), r.from_username) AS nickname FROM friend_requests r
+      COALESCE(NULLIF(p.nickname,''), r.from_username) AS nickname, p.avatar_key AS avatarKey FROM friend_requests r
       LEFT JOIN repository_profiles p ON p.user_id = r.from_user_id
       WHERE r.to_user_id = ? AND r.status = 'pending' ORDER BY r.created_at DESC LIMIT 200`).bind(user.id).all(),
     env.DB.prepare(`SELECT r.id, r.to_user_id AS userId, r.to_username AS username,
-      COALESCE(NULLIF(p.nickname,''), r.to_username) AS nickname FROM friend_requests r
+      COALESCE(NULLIF(p.nickname,''), r.to_username) AS nickname, p.avatar_key AS avatarKey FROM friend_requests r
       LEFT JOIN repository_profiles p ON p.user_id = r.to_user_id
       WHERE r.from_user_id = ? AND r.status = 'pending' ORDER BY r.created_at DESC LIMIT 200`).bind(user.id).all()
   ]);
-  return json(request, env, { friends:friends.results || [], incoming:incoming.results || [], outgoing:outgoing.results || [] });
+  const publicProfiles = rows => (rows || []).map(({avatarKey, ...row}) => ({ ...row, avatarUrl:avatarKey ? `/api/users/${encodeURIComponent(row.userId)}/avatar` : '' }));
+  return json(request, env, { friends:publicProfiles(friends.results), incoming:publicProfiles(incoming.results), outgoing:publicProfiles(outgoing.results) });
 }
 async function createFriendRequest(request, env, user) {
   let body;
@@ -393,6 +400,37 @@ async function removeFriend(request, env, user, friendId) {
   return result.meta?.changes ? json(request, env, { ok:true }) : json(request, env, { error:'NOT_FOUND' }, 404);
 }
 
+async function uploadProfileAvatar(request, env, user) {
+  if (Number(request.headers.get('Content-Length') || 0) > 600 * 1024) return json(request, env, { error:'INVALID_AVATAR' }, 400);
+  let form;
+  try { form = await request.formData(); } catch { return json(request, env, { error:'INVALID_AVATAR' }, 400); }
+  const avatar = form.get('avatar');
+  const type = avatar instanceof File ? String(avatar.type || '') : '';
+  if (!(avatar instanceof File) || !avatar.size || avatar.size > 512 * 1024 || !['image/png','image/jpeg','image/webp'].includes(type)) return json(request, env, { error:'INVALID_AVATAR' }, 400);
+  const bytes = new Uint8Array(await avatar.slice(0, 12).arrayBuffer());
+  const valid = type === 'image/png' ? bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 : type === 'image/jpeg' ? bytes[0] === 0xff && bytes[1] === 0xd8 : String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP';
+  if (!valid) return json(request, env, { error:'INVALID_AVATAR' }, 400);
+  const token = await driveAccessToken(env);
+  const folderId = await driveFolderId(env, token);
+  const extension = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
+  const uploaded = await driveUpload(token, avatar, `profile-${uuid()}.${extension}`, type, folderId);
+  const previous = await env.DB.prepare('SELECT avatar_key FROM repository_profiles WHERE user_id = ?').bind(user.id).first();
+  try {
+    await env.DB.prepare('INSERT OR IGNORE INTO repository_profiles (user_id) VALUES (?)').bind(user.id).run();
+    await env.DB.prepare('UPDATE repository_profiles SET avatar_key = ?, avatar_type = ? WHERE user_id = ?').bind(uploaded, type, user.id).run();
+  } catch (error) {
+    await driveDelete(token, uploaded);
+    throw error;
+  }
+  if (previous?.avatar_key && previous.avatar_key !== uploaded) await driveDelete(token, previous.avatar_key);
+  return json(request, env, { ok:true, avatarUrl:`/api/users/${encodeURIComponent(user.id)}/avatar` });
+}
+async function readUserAvatar(request, env, userId) {
+  const row = await env.DB.prepare('SELECT avatar_key, avatar_type FROM repository_profiles WHERE user_id = ?').bind(userId).first();
+  if (!row?.avatar_key) return json(request, env, { error:'NOT_FOUND' }, 404);
+  const object = await driveDownload(await driveAccessToken(env), row.avatar_key);
+  return new Response(object.body, { headers:{ ...header(request, env), 'Content-Type':row.avatar_type, 'Cache-Control':'private, max-age=300' } });
+}
 async function personalProfile(request, env, user) {
   if (request.method === 'POST') {
     if (Number(request.headers.get('Content-Length') || 0) > 16000) return json(request, env, { error:'INVALID_PROFILE' }, 400);
@@ -406,8 +444,8 @@ async function personalProfile(request, env, user) {
     const fields = Object.keys(body);
     if (fields.length) await env.DB.prepare(`UPDATE repository_profiles SET ${fields.map(key => `${key} = ?`).join(', ')} WHERE user_id = ?`).bind(...fields.map(key => body[key].trim()), user.id).run();
   }
-  const profile = await env.DB.prepare('SELECT nickname, bio, note FROM repository_profiles WHERE user_id = ?').bind(user.id).first();
-  return json(request, env, { profile:{ nickname:profile?.nickname || '', bio:profile?.bio || '', note:profile?.note || '', createdAt:user.createdAt || null } });
+  const profile = await env.DB.prepare('SELECT nickname, bio, note, avatar_key FROM repository_profiles WHERE user_id = ?').bind(user.id).first();
+  return json(request, env, { profile:{ nickname:profile?.nickname || '', bio:profile?.bio || '', note:profile?.note || '', avatarUrl:profile?.avatar_key ? `/api/users/${encodeURIComponent(user.id)}/avatar` : '', createdAt:user.createdAt || null } });
 }
 async function likedPosts(request, env, user, url) {
   const offset = Math.max(0, Math.min(1000000, Number.parseInt(url.searchParams.get('offset'), 10) || 0));
@@ -464,6 +502,9 @@ export default {
       const friend = url.pathname.match(/^\/api\/me\/friends\/([a-f0-9-]{36})$/);
       if (friend && request.method === 'DELETE') return await removeFriend(request, env, auth.user, friend[1]);
       if (url.pathname === '/api/me/profile' && ['GET','POST'].includes(request.method)) return await personalProfile(request, env, auth.user);
+      if (url.pathname === '/api/me/avatar' && request.method === 'POST') return await uploadProfileAvatar(request, env, auth.user);
+      const userAvatar = url.pathname.match(/^\/api\/users\/([^/]{1,128})\/avatar$/);
+      if (userAvatar && request.method === 'GET') return await readUserAvatar(request, env, decodeURIComponent(userAvatar[1]));
       if (url.pathname === '/api/me/likes' && request.method === 'GET') return await likedPosts(request, env, auth.user, url);
       if (url.pathname === '/api/me/saved' && request.method === 'GET') return await savedPosts(request, env, auth.user);
       if (url.pathname === '/api/posts' && request.method === 'GET') return await listPosts(request, env, auth.user, url);

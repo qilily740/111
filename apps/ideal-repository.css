@@ -228,3 +228,5 @@
 .ideal-repository .ir-friends-page>.ir-page-heading h1{margin:12px 0 3px}
 .ideal-repository .ir-content-heading h2{margin:0;font-size:23px;line-height:1.2;letter-spacing:-.035em}
 .ideal-repository .ir-page-heading .ir-page-close{width:35px;height:35px}
+.ir-friend-avatar{position:relative;overflow:hidden}
+.ir-friend-avatar img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
