@@ -237,9 +237,26 @@
   async function openChat(friend) {
     if (!friend) return;
     stopChatPolling();
-    chatFriend = friend; chatMessages = []; chatDraft = ''; chatStatus = ''; chatBusy = false; chatCanSend = true; chatBlockedByMe = false; chatReplyTo = null;
-    friendPanel = 'chat'; ++chatRequestSerial; render();
-    await loadChatMessages();
+    chatFriend = friend; chatMessages = []; chatDraft = ''; chatStatus = ''; chatBusy = true; chatCanSend = true; chatBlockedByMe = false; chatReplyTo = null;
+    const friendId = friend.userId || friend.id;
+    const serial = ++chatRequestSerial;
+    try {
+      const result = await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`);
+      if (serial !== chatRequestSerial || screen !== 'friends' || (chatFriend?.userId || chatFriend?.id) !== friendId) return;
+      chatMessages = result.messages || [];
+      chatCanSend = result.canSend !== false;
+      chatBlockedByMe = Boolean(result.blockedByMe);
+    } catch (error) {
+      if (serial !== chatRequestSerial) return;
+      chatStatus = error.message;
+    } finally {
+      if (serial === chatRequestSerial) chatBusy = false;
+    }
+    if (serial !== chatRequestSerial || screen !== 'friends') return;
+    friendPanel = 'chat';
+    render();
+    const messages = root.querySelector('[data-ir-chat-messages]');
+    if (messages) messages.scrollTop = messages.scrollHeight;
     startChatPolling();
   }
   async function sendChatMessage(event) {
@@ -294,7 +311,7 @@
     }).join('');
     const profile = `<section class="ir-chat-profile">${avatar}<strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><span>ID · ${escapeHTML(friend.username || '')}</span><div><button type="button" data-ir-chat-remove>删除好友</button><button type="button" data-ir-chat-block>${chatBlockedByMe ? '取消屏蔽' : '屏蔽'}</button></div></section>`;
     const reply = chatReplyTo ? `<div class="ir-chat-replying"><span>回复 ${escapeHTML(chatReplyTo.senderName)}：${escapeHTML(chatReplyTo.body.slice(0,80))}</span><button type="button" data-ir-chat-reply-cancel aria-label="取消引用">×</button></div>` : '';
-    return `<div class="ir-friends-page ir-chat-page"><header class="ir-chat-header"><button type="button" data-ir-chat-back aria-label="返回会话列表">‹</button><span class="ir-chat-header-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span><div><strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><small>ID · ${escapeHTML(friend.username || '')}</small></div><button class="ir-close ir-chat-close" type="button" data-ir-close aria-label="关闭">×</button></header>${profile}<section class="ir-chat-messages" data-ir-chat-messages>${chatBusy ? '<p class="ir-chat-empty">正在加载聊天记录…</p>' : rows || '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>'}</section>${chatStatus ? `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}${reply}<form class="ir-chat-composer"><button class="ir-chat-plus" type="button" aria-label="添加内容" disabled>＋</button><textarea data-ir-chat-input name="text" rows="1" maxlength="2000" placeholder="${chatCanSend ? '发送消息…' : '此会话已屏蔽'}" ${chatCanSend ? '' : 'disabled'}>${escapeHTML(chatDraft)}</textarea><button class="ir-chat-send" type="submit" aria-label="发送" ${chatSending || !chatDraft.trim() || !chatCanSend ? 'disabled' : ''}>${chatSending ? '…' : '↑'}</button></form><small class="ir-chat-retention">每条消息发送 7 天后自动删除</small></div>`;
+    return `<div class="ir-friends-page ir-chat-page"><header class="ir-chat-header"><button type="button" data-ir-chat-back aria-label="返回会话列表">‹</button><span class="ir-chat-header-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span><div><strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong></div><button class="ir-close ir-chat-close" type="button" data-ir-close aria-label="关闭">×</button></header>${profile}<section class="ir-chat-messages" data-ir-chat-messages>${chatBusy ? '<p class="ir-chat-empty">正在加载聊天记录…</p>' : rows || '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>'}</section>${chatStatus ? `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}${reply}<form class="ir-chat-composer"><button class="ir-chat-plus" type="button" aria-label="添加内容" disabled>＋</button><textarea data-ir-chat-input name="text" rows="1" maxlength="2000" placeholder="${chatCanSend ? '发送消息…' : '此会话已屏蔽'}" ${chatCanSend ? '' : 'disabled'}>${escapeHTML(chatDraft)}</textarea><button class="ir-chat-send" type="submit" aria-label="发送" ${chatSending || !chatDraft.trim() || !chatCanSend ? 'disabled' : ''}>${chatSending ? '…' : '↑'}</button></form><small class="ir-chat-retention">每条消息发送 7 天后自动删除</small></div>`;
   }
   function renderFriends() {
     if (friendPanel === 'chat') return renderChat();
