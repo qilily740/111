@@ -7,11 +7,11 @@ const allowedFiles = {
 };
 const maxFile = 8 * 1024 * 1024;
 const maxRequest = 26 * 1024 * 1024;
-const maxChatStickers = 100;
+const maxChatStickers = 20;
 const maxChatStickerGroups = 20;
-const maxChatStickerBytes = 20 * 1024 * 1024;
+const maxChatStickerBytes = 5 * 1024 * 1024;
 const chatStickerUnusedMs = 90 * 24 * 60 * 60 * 1000;
-const maxChatStickerFileBytes = maxChatStickerBytes;
+const maxChatStickerFileBytes = 512 * 1024;
 const driveUploadEndpoint = 'https://www.googleapis.com/upload/drive/v3/files';
 const driveFilesEndpoint = 'https://www.googleapis.com/drive/v3/files';
 const driveFolderMime = 'application/vnd.google-apps.folder';
@@ -523,7 +523,7 @@ async function listChatStickers(request, env, user) {
       FROM chat_stickers WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`).bind(user.id).all(),
     env.DB.prepare('SELECT COALESCE(SUM(size_bytes),0) AS usedBytes FROM chat_stickers WHERE user_id = ?').bind(user.id).first()
   ]);
-  return json(request, env, { stickers:result.results || [], maxCount:maxChatStickers, maxGroups:maxChatStickerGroups, usedBytes:Number(usage?.usedBytes || 0), maxBytes:maxChatStickerBytes, unusedDays:90 });
+  return json(request, env, { stickers:result.results || [], maxCount:maxChatStickers, maxGroups:maxChatStickerGroups, usedBytes:Number(usage?.usedBytes || 0), maxBytes:maxChatStickerBytes, maxFileBytes:maxChatStickerFileBytes, unusedDays:90 });
 }
 async function fetchChatStickerImage(sourceUrl) {
   let parsed;
