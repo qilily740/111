@@ -268,12 +268,13 @@
     if (serial === friendSearchSerial && screen === 'friends') render();
   }
   const friendIdentity = item => { const id = item.userId || item.id; const initial = escapeHTML((item.nickname || item.username || '?').slice(0,1).toUpperCase()); const image = item.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''; return `<span class="ir-friend-avatar">${initial}${image}</span><span class="ir-friend-copy"><strong>${escapeHTML(item.nickname || item.username)}</strong><small>ID · ${escapeHTML(item.username)}</small></span>`; };
+  const chatListIdentity = item => { const id = item.userId || item.id; const initial = escapeHTML((item.nickname || item.username || '?').slice(0,1).toUpperCase()); const image = item.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''; return `<span class="ir-friend-avatar">${initial}${image}</span><span class="ir-friend-copy"><strong>${escapeHTML(item.nickname || item.username)}</strong></span>`; };
   const chatTime = value => value ? new Date(value).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) : '';
   const chatDay = value => value ? new Date(value).toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric'}) : '';
-  const messageSenderName = message => message.senderId === accountStorageId() ? (personal.nickname || window.IdealMachineAuth?.getUser?.()?.username || '我') : (chatFriend?.nickname || chatFriend?.username || '好友');
+  const messageSenderName = message => message.senderId === accountStorageId() ? '您' : (chatFriend?.nickname || chatFriend?.username || '好友');
   function messageAvatar(message) {
     const mine = message.senderId === accountStorageId();
-    const name = mine ? (personal.nickname || window.IdealMachineAuth?.getUser?.()?.username || '我') : (chatFriend?.nickname || chatFriend?.username || '好友');
+    const name = mine ? '您' : (chatFriend?.nickname || chatFriend?.username || '好友');
     const image = mine && avatarUrl ? `<img src="${escapeHTML(avatarUrl)}" alt="" loading="lazy">` : !mine && chatFriend?.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(chatFriend.userId || chatFriend.id || '')}" alt="" loading="lazy">` : '';
     return `<span class="ir-chat-message-avatar">${escapeHTML(name.slice(0,1).toUpperCase())}${image}</span>`;
   }
@@ -288,8 +289,8 @@
     const avatar = `<span class="ir-chat-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span>`;
     const rows = chatMessages.map((message,index) => {
       const previous = chatMessages[index - 1];
-      const quoted = message.replyToId ? `<div class="ir-chat-quoted">${escapeHTML(message.replySenderId === accountStorageId() ? (personal.nickname || '我') : (friend.nickname || friend.username || '好友'))}：${escapeHTML(message.replyBody || '引用的消息已过期')}</div>` : '';
-      return `${chatDivider(message,previous)}<article class="ir-chat-message" data-ir-message-id="${escapeHTML(message.id)}">${messageAvatar(message)}<div class="ir-chat-message-body"><div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>${quoted}<p>${escapeHTML(message.body)}</p></div></article>`;
+      const quoted = message.replyToId ? `<div class="ir-chat-quoted">${escapeHTML(message.replySenderId === accountStorageId() ? '您' : (friend.nickname || friend.username || '好友'))}：${escapeHTML(message.replyBody || '引用的消息已过期')}</div>` : '';
+      return `${chatDivider(message,previous)}<article class="ir-chat-message" data-ir-message-id="${escapeHTML(message.id)}">${messageAvatar(message)}<div class="ir-chat-message-body">${quoted}<p><strong>${escapeHTML(messageSenderName(message))}：</strong>${escapeHTML(message.body)}</p><div class="ir-chat-message-meta"><time>${chatTime(message.createdAt)}</time></div></div></article>`;
     }).join('');
     const profile = `<section class="ir-chat-profile">${avatar}<strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><span>ID · ${escapeHTML(friend.username || '')}</span><div><button type="button" data-ir-chat-remove>删除好友</button><button type="button" data-ir-chat-block>${chatBlockedByMe ? '取消屏蔽' : '屏蔽'}</button></div></section>`;
     const reply = chatReplyTo ? `<div class="ir-chat-replying"><span>回复 ${escapeHTML(chatReplyTo.senderName)}：${escapeHTML(chatReplyTo.body.slice(0,80))}</span><button type="button" data-ir-chat-reply-cancel aria-label="取消引用">×</button></div>` : '';
@@ -298,7 +299,7 @@
   function renderFriends() {
     if (friendPanel === 'chat') return renderChat();
     if (friendPanel === 'inbox') {
-      const rows = chatList.map(item => `<button type="button" class="ir-chat-list-item" data-ir-open-chat="${escapeHTML(item.userId)}">${friendIdentity(item)}<span class="ir-chat-preview">${escapeHTML(item.lastMessage || '')}</span><time>${chatTime(item.lastMessageAt)}</time>${item.unreadCount ? `<b class="ir-chat-unread">${item.unreadCount > 99 ? '99+' : item.unreadCount}</b>` : ''}</button>`).join('');
+      const rows = chatList.map(item => `<button type="button" class="ir-chat-list-item" data-ir-open-chat="${escapeHTML(item.userId)}">${chatListIdentity(item)}<span class="ir-chat-preview">${escapeHTML(item.lastMessage || '')}</span><time>${chatTime(item.lastMessageAt)}</time>${item.unreadCount ? `<b class="ir-chat-unread">${item.unreadCount > 99 ? '99+' : item.unreadCount}</b>` : ''}</button>`).join('');
       return `<div class="ir-friends-page"><header class="ir-inbox-heading"><button type="button" data-ir-inbox-back aria-label="返回好友">‹</button><div><span>IDEAL / INBOX</span><h1>私聊</h1></div><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><p class="ir-chat-retention">每条消息发送 7 天后自动删除</p>${chatStatus ? `<p class="ir-friends-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}<section class="ir-chat-list">${rows || '<div class="ir-inbox-empty"><span aria-hidden="true">♡</span><strong>还没有私聊</strong><small>从好友列表选择一位好友，开始聊天。</small></div>'}</section></div>`;
     }
     const tabs = [['friends','我的好友',friendData.friends.length],['incoming','好友申请',friendData.incoming.length],['outgoing','已发送',friendData.outgoing.length]];
