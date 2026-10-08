@@ -422,7 +422,6 @@ async function updateChatBlock(request, env, user, friendId, block) {
 }
 async function listChats(request, env, user) {
   const at = now();
-  await purgeExpiredMessages(env, at);
   const [friends, messages] = await Promise.all([
     env.DB.prepare(`SELECT r.id, CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END AS userId,
       CASE WHEN r.from_user_id = ? THEN r.to_username ELSE r.from_username END AS username,
@@ -432,18 +431,30 @@ async function listChats(request, env, user) {
       EXISTS(SELECT 1 FROM blocked_users b WHERE b.blocker_id = CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END AND b.blocked_id = ?) AS blockedByFriend
       FROM friend_requests r LEFT JOIN repository_profiles p ON p.user_id = CASE WHEN r.from_user_id = ? THEN r.to_user_id ELSE r.from_user_id END
       WHERE r.status = 'accepted' AND (r.from_user_id = ? OR r.to_user_id = ?)`).bind(user.id,user.id,user.id,user.id,user.id,user.id,user.id,user.id,user.id,user.id).all(),
-    env.DB.prepare(`SELECT id, sender_id, recipient_id, body, created_at, read_at FROM direct_messages
-      WHERE (sender_id = ? OR recipient_id = ?) AND expires_at > ? ORDER BY created_at DESC LIMIT 5000`).bind(user.id,user.id,at).all()
+    env.DB.prepare(`WITH user_messages AS (
+      SELECT recipient_id AS friend_id, id, sender_id, recipient_id, body, created_at, read_at
+        FROM direct_messages WHERE sender_id = ? AND expires_at > ?
+      UNION ALL
+      SELECT sender_id AS friend_id, id, sender_id, recipient_id, body, created_at, read_at
+        FROM direct_messages WHERE recipient_id = ? AND expires_at > ?
+    ), ranked_messages AS (
+      SELECT friend_id, id, sender_id, body, created_at,
+        SUM(CASE WHEN recipient_id = ? AND read_at IS NULL THEN 1 ELSE 0 END)
+          OVER (PARTITION BY friend_id) AS unread_count,
+        ROW_NUMBER() OVER (PARTITION BY friend_id ORDER BY created_at DESC, id DESC) AS row_number
+      FROM user_messages
+    )
+    SELECT friend_id, sender_id, body, created_at, unread_count
+      FROM ranked_messages WHERE row_number = 1`).bind(user.id,at,user.id,at,user.id).all()
   ]);
   const byFriend = new Map();
   for (const message of messages.results || []) {
-    const friendId = message.sender_id === user.id ? message.recipient_id : message.sender_id;
-    let item = byFriend.get(friendId);
-    if (!item) {
-      item = { lastMessage:message.body, lastMessageAt:message.created_at, lastMessageSenderId:message.sender_id, unreadCount:0 };
-      byFriend.set(friendId, item);
-    }
-    if (message.recipient_id === user.id && message.read_at === null) item.unreadCount++;
+    byFriend.set(message.friend_id, {
+      lastMessage:message.body,
+      lastMessageAt:message.created_at,
+      lastMessageSenderId:message.sender_id,
+      unreadCount:message.unread_count
+    });
   }
   const chats = (friends.results || []).filter(friend => byFriend.has(friend.userId) && !friend.blockedByMe && !friend.blockedByFriend).map(({avatarKey, ...friend}) => ({
     ...friend, ...byFriend.get(friend.userId), avatarUrl:avatarKey ? `/api/users/${encodeURIComponent(friend.userId)}/avatar` : ''

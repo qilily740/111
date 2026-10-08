@@ -61,6 +61,8 @@
   let friendBusy = false;
   let friendSearchSerial = 0;
   let chatList = [];
+  let chatListLoadedAt = 0;
+  let chatListPromise = null;
   let chatFriend = null;
   let chatMessages = [];
   let chatDraft = '';
@@ -182,19 +184,26 @@
     catch (error) { friendStatus = error.message; }
     finally { friendBusy = false; if (screen === 'friends') render(); }
   }
-  async function loadChats(silent = false) {
-    try {
-      const result = await requestApi('/api/me/chats');
-      const changed = JSON.stringify(chatList) !== JSON.stringify(result.chats || []);
-      chatList = result.chats || [];
-      if (changed && screen === 'friends' && friendPanel !== 'chat' && friendsTab === 'inbox') {
-        const scroller = root.querySelector('.ir-chat-list'); const top = scroller?.scrollTop || 0;
-        render(); root.querySelector('.ir-chat-list')?.scrollTo(0, top);
+  function loadChats(silent = false, force = false) {
+    if (chatListPromise) return chatListPromise;
+    if (!force && chatListLoadedAt && Date.now() - chatListLoadedAt < 5000) return Promise.resolve();
+    const pending = (async () => {
+      try {
+        const result = await requestApi('/api/me/chats');
+        const changed = JSON.stringify(chatList) !== JSON.stringify(result.chats || []);
+        chatList = result.chats || [];
+        chatListLoadedAt = Date.now();
+        if (changed && screen === 'friends' && friendPanel !== 'chat' && friendsTab === 'inbox') {
+          const scroller = root.querySelector('.ir-chat-list'); const top = scroller?.scrollTop || 0;
+          render(); root.querySelector('.ir-chat-list')?.scrollTo(0, top);
+        }
+      } catch (error) {
+        if (!silent) chatStatus = error.message;
+        if (!silent && screen === 'friends' && friendPanel !== 'chat' && friendsTab === 'inbox') render();
       }
-    } catch (error) {
-      if (!silent) chatStatus = error.message;
-      if (!silent && screen === 'friends' && friendPanel !== 'chat' && friendsTab === 'inbox') render();
-    }
+    })();
+    chatListPromise = pending;
+    return pending.finally(() => { if (chatListPromise === pending) chatListPromise = null; });
   }
   function stopChatPolling() { clearInterval(chatPollTimer); chatPollTimer = 0; }
   function startChatPolling() {
@@ -271,7 +280,7 @@
       if (input) input.value = '';
       root.querySelector('.ir-chat-replying')?.remove();
       updateChatMessageList(true);
-      await loadChats(true);
+      await loadChats(true, true);
     } catch (error) {
       chatStatus = error.message;
       const status = root.querySelector('.ir-chat-status');
@@ -348,7 +357,7 @@
     const avatar = `<span class="ir-chat-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span>`;
     const profile = `<section class="ir-chat-profile">${avatar}<strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><span>ID · ${escapeHTML(friend.username || '')}</span><div><button type="button" data-ir-chat-remove>删除好友</button><button type="button" data-ir-chat-block>${chatBlockedByMe ? '取消屏蔽' : '屏蔽'}</button></div></section>`;
     const reply = chatReplyTo ? `<div class="ir-chat-replying"><span>回复 ${escapeHTML(chatReplyTo.senderName)}：${escapeHTML(chatReplyTo.body.slice(0,80))}</span><button type="button" data-ir-chat-reply-cancel aria-label="取消引用">×</button></div>` : '';
-    return `<div class="ir-friends-page ir-chat-page"><header class="ir-chat-header"><button type="button" data-ir-chat-back aria-label="返回会话列表">‹</button><span class="ir-chat-header-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span><div><strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong></div><button class="ir-close ir-chat-close" type="button" data-ir-close aria-label="关闭">×</button></header><div class="ir-chat-scroll" data-ir-chat-scroll>${profile}<section class="ir-chat-messages" data-ir-chat-messages>${chatBusy ? '<p class="ir-chat-empty">正在加载聊天记录…</p>' : chatMessageRows() || '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>'}</section>${chatStatus ? `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}</div>${reply}<form class="ir-chat-composer"><button class="ir-chat-plus" type="button" aria-label="添加内容" disabled>＋</button><textarea data-ir-chat-input name="text" rows="1" maxlength="2000" placeholder="${chatCanSend ? '发送消息…' : '此会话已屏蔽'}" ${chatCanSend ? '' : 'disabled'}>${escapeHTML(chatDraft)}</textarea><button class="ir-chat-send" type="submit" aria-label="发送" ${chatSending || !chatDraft.trim() || !chatCanSend ? 'disabled' : ''}>${chatSending ? '…' : '↑'}</button></form><small class="ir-chat-retention">每条消息发送 7 天后自动删除</small></div>`;
+    return `<div class="ir-friends-page ir-chat-page"><header class="ir-chat-header"><button type="button" data-ir-chat-back aria-label="返回会话列表">‹</button><span class="ir-chat-header-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span><div><strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong></div><button class="ir-close ir-chat-close" type="button" data-ir-close aria-label="关闭">×</button></header><small class="ir-chat-retention">每条消息发送 7 天后自动删除</small><div class="ir-chat-scroll" data-ir-chat-scroll>${profile}<section class="ir-chat-messages" data-ir-chat-messages>${chatBusy ? '<p class="ir-chat-empty">正在加载聊天记录…</p>' : chatMessageRows() || '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>'}</section>${chatStatus ? `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}</div>${reply}<form class="ir-chat-composer"><button class="ir-chat-plus" type="button" aria-label="添加内容" disabled>＋</button><textarea data-ir-chat-input name="text" rows="1" maxlength="2000" placeholder="${chatCanSend ? '发送消息…' : '此会话已屏蔽'}" ${chatCanSend ? '' : 'disabled'}>${escapeHTML(chatDraft)}</textarea><button class="ir-chat-send" type="submit" aria-label="发送" ${chatSending || !chatDraft.trim() || !chatCanSend ? 'disabled' : ''}>${chatSending ? '…' : '↑'}</button></form></div>`;
   }
   function renderFriends() {
     if (friendPanel === 'chat') return renderChat();
@@ -725,7 +734,7 @@
     ++requestSerial; render();
     if (channels[screen]) loadPosts();
     if (screen === 'profile') { loadProfile().then(() => { if (profilePanel === 'likes') loadLikes(); }); }
-    if (screen === 'friends') loadFriends();
+    if (screen === 'friends') { loadFriends(); loadChats(true); }
   };
   const open = () => { personal = readLocalProfile(); show('welcome'); root.classList.add('is-open'); syncViewport(); loadAvatar(); syncAvatarWithServer(); };
   const close = () => {
@@ -826,7 +835,7 @@
       try {
         await requestApi(`/api/me/friends/${encodeURIComponent(chatFriend.id)}`, {method:'DELETE'});
         chatFriend = null; chatMessages = []; chatDraft = ''; chatReplyTo = null; friendPanel = ''; chatStatus = '';
-        await Promise.all([loadFriends(),loadChats(true)]); render();
+        await Promise.all([loadFriends(),loadChats(true,true)]); render();
       } catch (error) { chatStatus = error.message; render(); }
       return;
     }
@@ -839,7 +848,7 @@
       try {
         await requestApi(`/api/me/blocks/${encodeURIComponent(friendId)}`, {method:block ? 'POST' : 'DELETE'});
         chatBlockedByMe = block; chatCanSend = !block; chatStatus = block ? '已屏蔽此好友。' : '已取消屏蔽。';
-        await loadChats(true); render();
+        await loadChats(true,true); render();
       } catch (error) { chatStatus = error.message; render(); }
       return;
     }
@@ -1025,7 +1034,7 @@
   });
   window.addEventListener('ideal-machine-auth-changed', () => {
     ++profileSerial; personal = {}; profilePanel = ''; likedPosts = []; friendData = { friends:[], incoming:[], outgoing:[] }; friendResults = [];
-    stopChatPolling(); chatList = []; chatFriend = null; chatMessages = []; chatDraft = ''; chatStatus = ''; ++chatRequestSerial;
+    stopChatPolling(); chatList = []; chatListLoadedAt = 0; chatListPromise = null; chatFriend = null; chatMessages = []; chatDraft = ''; chatStatus = ''; ++chatRequestSerial;
     friendAvatarObjectUrls.forEach(avatar => URL.revokeObjectURL(avatar.url)); friendAvatarObjectUrls.clear();
     root.querySelector('dialog')?.close();
     savedPosts = [];
