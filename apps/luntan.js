@@ -696,5 +696,6 @@
     appId:'luntan', appName:'论坛',
     sections:() => forumBeautyKeys.map(id => ({ id, name:forumBeautyLabels[id], getCss:() => String(forumBeautyState()[id] || ''), setCss:value => { const next = forumBeautyState(); next[id] = String(value ?? ''); save(forumBeautyKey, next); forumBeautyDraft = null; applyForumBeautyCSS(); }, resetCss:() => { const next = forumBeautyState(); next[id] = ''; save(forumBeautyKey, next); forumBeautyDraft = null; applyForumBeautyCSS(); }, runtimeApply:applyForumBeautyCSS }))
   };
+  window.IdealMachineBeauty?.register?.(window.IdealMachineBeautyAdapters.luntan);
   applyForumSettings();
 })();

@@ -31,6 +31,36 @@
     link.href = url; link.download = `${String(asset.name || '美化').replace(/[\\/:*?"<>|]/g, '-')}.json`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  function beautyTags(assets) {
+    const tags = new Set();
+    for (const asset of assets) {
+      const value = `${asset.appId || ''} ${asset.sectionId || ''} ${asset.appName || ''} ${asset.name || ''}`.toLowerCase();
+      if (asset.appId === 'luntan' || /论坛|forum/.test(value)) tags.add('论坛');
+      else if (/线下|offline/.test(value)) tags.add('线下');
+      else if (/线上|online/.test(value)) tags.add('线上');
+      else if (asset.appId === 'liaotian' || /聊天|chat/.test(value)) tags.add('聊天');
+    }
+    return [...tags];
+  }
+  async function publishBeautyAssets(assets) {
+    const repository = window.IdealMachineRepository;
+    if (!repository?.publishBeauty) throw new Error('理想机仓库尚未加载，请刷新页面后重试。');
+    const user = window.IdealMachineAuth?.getUser?.() || {};
+    const author = String(user.username || user.name || user.nickname || '').trim();
+    const created = [];
+    for (const asset of assets) {
+      const result = await api('/api/beauty/codes', { method:'POST', body:JSON.stringify({ appId:asset.appId, sectionId:asset.sectionId, name:asset.name || '未命名美化', author:asset.author || author, css:String(asset.css), previewImage:asset.previewImage || '' }) });
+      const item = { ...asset, ...(result.item || {}), code:result.item?.code || result.code };
+      if (!item.code) throw new Error(`“${asset.name || asset.sectionId}”没有生成美化码。`);
+      created.push(item);
+      if (!readLibrary().some(entry => entry.code && entry.code === item.code)) {
+        try { addAsset({ ...item, source:'generated' }); } catch {}
+      }
+    }
+    const bundle = { format:'ideal-machine-beauty-bundle', version:1, items:created.map(item => ({ ...toJSON(item), code:item.code })) };
+    const file = new File([JSON.stringify(bundle, null, 2)], 'Ideal美化导入文件.json', { type:'application/json' });
+    repository.publishBeauty({ codeText:created[0]?.code || '', file, tags:beautyTags(assets), body:`包含 ${created.length} 个美化接口，文件中附有完整配置与对应美化码。` });
+  }
   function exportWithChoice({ jsonExport, codeAssets = [], blocked = false }) {
     const overlay = document.createElement('div');
     overlay.setAttribute('role', 'presentation');
@@ -49,14 +79,31 @@
     }
     const exportableAssets = codeAssets.filter(asset => String(asset.css || '').trim());
     const nameFields = exportableAssets.map((asset, index) => `<label style="display:grid;gap:6px;color:#696b70;font-size:12px">${exportableAssets.length > 1 ? `<span>${esc(asset.name || `第 ${index + 1} 个美化`)}</span>` : '<span>美化名称</span>'}<input data-export-name-index="${index}" type="text" maxlength="60" value="${esc(asset.name || '')}" placeholder="例如：紫色聊天主题" style="box-sizing:border-box;width:100%;min-height:40px;border:1px solid #dedfe3;border-radius:10px;padding:9px 11px;background:#fff;color:#202124;font:inherit"></label>`).join('');
-    panel.innerHTML = `<h2 id="idealExportTitle" style="margin:0 0 8px;font-size:20px">选择导出方式</h2><p style="margin:0 0 18px;color:#696b70">导出为 JSON 文件，或生成可分享的美化码。</p><div data-export-name-fields style="display:grid;gap:10px;margin:0 0 16px">${nameFields}</div><label style="display:grid;gap:6px;margin:0 0 16px;color:#696b70;font-size:12px">作者（选填，仅生成美化码时保存）<input data-export-author type="text" maxlength="60" placeholder="例如：你的昵称" style="box-sizing:border-box;width:100%;min-height:40px;border:1px solid #dedfe3;border-radius:10px;padding:9px 11px;background:#fff;color:#202124;font:inherit"></label><div data-export-message style="display:none;margin:0 0 16px;padding:12px;border-radius:12px;background:#f4f5f7;overflow-wrap:anywhere"></div><div data-export-actions style="display:grid;gap:10px"><button type="button" data-export-json>导出 JSON</button><button type="button" data-export-code>生成美化码</button><button type="button" data-export-cancel>取消</button></div>`;
+    panel.innerHTML = `<h2 id="idealExportTitle" style="margin:0 0 8px;font-size:20px">选择导出方式</h2><p style="margin:0 0 18px;color:#696b70">导出为 JSON 文件，生成可分享的美化码，或直接发布到 Ideal。</p><div data-export-name-fields style="display:grid;gap:10px;margin:0 0 16px">${nameFields}</div><label style="display:grid;gap:6px;margin:0 0 16px;color:#696b70;font-size:12px">作者（选填，仅生成美化码时保存）<input data-export-author type="text" maxlength="60" placeholder="例如：你的昵称" style="box-sizing:border-box;width:100%;min-height:40px;border:1px solid #dedfe3;border-radius:10px;padding:9px 11px;background:#fff;color:#202124;font:inherit"></label><div data-export-message style="display:none;margin:0 0 16px;padding:12px;border-radius:12px;background:#f4f5f7;overflow-wrap:anywhere"></div><div data-export-actions style="display:grid;gap:10px"><button type="button" data-export-json>导出 JSON</button><button type="button" data-export-code>生成美化码</button><button type="button" data-export-publish>发布到 Ideal</button><button type="button" data-export-cancel>取消</button></div>`;
     panel.querySelectorAll('button').forEach(button => { button.style.cssText = 'min-height:42px;padding:10px 14px;border:1px solid #dedfe3;border-radius:12px;background:#fff;color:inherit;font:inherit;font-weight:600;cursor:pointer'; });
     panel.querySelector('[data-export-code]').style.background = '#202124'; panel.querySelector('[data-export-code]').style.color = '#fff';
+    panel.querySelector('[data-export-publish]').style.background = '#edf3ee'; panel.querySelector('[data-export-publish]').style.borderColor = '#cbd9ce';
     overlay.appendChild(panel); document.body.appendChild(overlay);
     const close = () => overlay.remove();
     overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
     panel.querySelector('[data-export-cancel]').addEventListener('click', close);
     panel.querySelector('[data-export-json]').addEventListener('click', () => { close(); jsonExport?.(); });
+    panel.querySelector('[data-export-publish]').addEventListener('click', async event => {
+      const button = event.currentTarget; const message = panel.querySelector('[data-export-message]');
+      const author = panel.querySelector('[data-export-author]')?.value.trim() || '';
+      const assets = exportableAssets.map((asset, index) => ({ ...asset, name:panel.querySelector(`[data-export-name-index="${index}"]`)?.value.trim() || asset.name || '未命名美化', author }));
+      if (!assets.length) { message.textContent = '当前没有可发布的 CSS 美化。'; message.style.display = 'block'; return; }
+      button.disabled = true; button.textContent = '正在准备美化码…';
+      panel.querySelectorAll('[data-export-json], [data-export-code], [data-export-cancel]').forEach(item => { item.disabled = true; });
+      try {
+        await publishBeautyAssets(assets);
+        close();
+      } catch (error) {
+        message.textContent = error.message || '准备发布失败'; message.style.display = 'block';
+        button.disabled = false; button.textContent = '重试发布';
+        panel.querySelectorAll('[data-export-json], [data-export-code], [data-export-cancel]').forEach(item => { item.disabled = false; });
+      }
+    });
     panel.querySelector('[data-export-code]').addEventListener('click', async event => {
       const button = event.currentTarget; const message = panel.querySelector('[data-export-message]');
       const author = panel.querySelector('[data-export-author]')?.value.trim() || '';

@@ -10665,6 +10665,7 @@ ${recentConversation}
       return sections;
     }
   };
+  window.IdealMachineBeauty?.register?.(window.IdealMachineBeautyAdapters.chat);
   const messageHtmlBeforeMusicPlaylistAction = messageHtml;
   messageHtml = function(message) {
     const html = messageHtmlBeforeMusicPlaylistAction(message);

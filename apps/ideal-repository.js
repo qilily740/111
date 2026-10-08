@@ -100,6 +100,7 @@
   let uploadOpen = false;
   let uploadBusy = false;
   let uploadError = '';
+  let beautyPublishDraft = null;
   let requestSerial = 0;
   let searchTimer = 0;
   let profileViewportBaselineHeight = 0;
@@ -730,14 +731,14 @@
       const result = await beauty.api(`/api/beauty/codes/${encodeURIComponent(post.codeText)}`);
       const item = result.item || result.asset || result;
       assets.push({ ...item, code:post.codeText, source:'imported-code' });
-    } else {
-      const file = post.attachments.find(item => /\.(json|css)$/i.test(item.name));
-      if (!file) throw new Error('这篇美化帖缺少可导入的美化码、JSON 或 CSS 文件；仍可单独下载附件。');
+    }
+    const file = post.attachments.find(item => /\.(json|css)$/i.test(item.name));
+    if (file) {
       const source = await attachmentFile(file);
       if (/\.json$/i.test(file.name)) {
         const parsed = JSON.parse(await source.text());
         assets = (Array.isArray(parsed) ? parsed : Array.isArray(parsed.items) ? parsed.items : [parsed]).map(item => ({ ...item, source:'json' }));
-      } else {
+      } else if (!assets.length) {
         const sections = beauty.listSections();
         const choice = window.prompt(`请选择 CSS 要存入的位置：\n${sections.map((item, index) => `${index + 1}. ${item.appName} / ${item.name}`).join('\n')}`, '1');
         if (choice === null) throw new Error('已取消保存。');
@@ -745,6 +746,12 @@
         if (!section) throw new Error('请选择有效的美化位置。');
         assets = [{ name:post.title, author:post.authorName, appId:section.appId, sectionId:section.id, css:await source.text(), source:'json' }];
       }
+    }
+    if (!assets.length) throw new Error('这篇美化帖缺少可导入的美化码、JSON 或 CSS 文件；仍可单独下载附件。');
+    assets = [...new Map(assets.filter(item => item?.appId && item?.sectionId).map(item => [`${item.appId}:${item.sectionId}`, item])).values()];
+    for (const appId of new Set(assets.map(item => item.appId))) {
+      if (appId === 'liaotian') await window.IdealMachineEnsureAppLoaded?.('liaotian');
+      if (appId === 'luntan') await window.IdealMachineEnsureAppLoaded?.('luntan');
     }
     if (!assets.length || assets.some(item => !beauty.find(item.appId, item.sectionId) || !String(item.css || '').trim())) throw new Error('美化文件缺少可识别的应用、位置或 CSS。');
     for (const item of assets) {
@@ -875,7 +882,7 @@
     else if (oldCode) oldCode.remove();
     else if (markup) root.querySelector('.ir-post-detail .ir-post-prose')?.insertAdjacentHTML('afterend', markup);
   }
-  const uploadForm = () => `<div class="ir-upload-mask"><form class="ir-upload-form"><header><h2>发布到 # ${channels[screen].name}</h2><button type="button" data-ir-upload-close aria-label="关闭发布窗口">×</button></header><label>标题<input name="title" maxlength="120" required placeholder="给作品起个名字"></label><label>介绍（选填）<textarea name="body" maxlength="30000" rows="5" placeholder="介绍作品、用法或设定…"></textarea></label>${screen === 'beauty' ? '<label>美化码（可与文件一起发布）<input name="codeText" maxlength="120" spellcheck="false" placeholder="例如 IDEAL-CHA-123456"></label><label>帖子预览图（选填）<span class="ir-file-picker"><input name="preview" type="file" accept="image/png,image/jpeg,image/webp"><span class="ir-file-icon" aria-hidden="true">▧</span><span class="ir-file-copy"><b>选择帖子预览图</b><small data-ir-file-summary>PNG、JPG 或 WebP 图片</small></span><span class="ir-file-action">浏览</span></span></label>' : ''}<label>${screen === 'beauty' ? '美化文件（与美化码至少填一项）' : '上传文件（必填）'}<span class="ir-file-picker"><input name="files" type="file" multiple ${screen === 'beauty' ? '' : 'required'} accept="${screen === 'beauty' ? '.css,.js,.json,.txt,.png,.jpg,.jpeg,.webp' : '.docx,.txt,.json,.png,.jpg,.jpeg,.webp'}"><span class="ir-file-icon" aria-hidden="true">↑</span><span class="ir-file-copy"><b>点击选择文件</b><small data-ir-file-summary>支持拖入文件</small></span><span class="ir-file-action">浏览</span></span></label><small>每帖最多 3 个文件（含预览图），单个不超过 8 MB</small><label>标签（选填）<input name="tags" maxlength="130" placeholder="用逗号分隔，例如：浅色、日常"></label><p class="ir-upload-error" role="alert">${escapeHTML(uploadError)}</p><footer><button type="button" data-ir-upload-close>取消</button><button type="submit" ${uploadBusy ? 'disabled' : ''}>${uploadBusy ? '发布中…' : '发布帖子'}</button></footer></form></div>`;
+  const uploadForm = () => `<div class="ir-upload-mask"><form class="ir-upload-form"><header><h2>发布到 # ${channels[screen].name}</h2><button type="button" data-ir-upload-close aria-label="关闭发布窗口">×</button></header><label>标题<input name="title" maxlength="120" required placeholder="给作品起个名字"></label><label>介绍（选填）<textarea name="body" maxlength="30000" rows="5" placeholder="介绍作品、用法或设定…">${escapeHTML(beautyPublishDraft?.body || '')}</textarea></label>${screen === 'beauty' ? `<label>美化码（可与文件一起发布）<input name="codeText" maxlength="120" spellcheck="false" placeholder="例如 IDEAL-CHA-123456" value="${escapeHTML(beautyPublishDraft?.codeText || '')}"></label><label>帖子预览图（选填）<span class="ir-file-picker"><input name="preview" type="file" accept="image/png,image/jpeg,image/webp"><span class="ir-file-icon" aria-hidden="true">▧</span><span class="ir-file-copy"><b>选择帖子预览图</b><small data-ir-file-summary>PNG、JPG 或 WebP 图片</small></span><span class="ir-file-action">浏览</span></span></label>` : ''}<label>${screen === 'beauty' ? '美化文件（与美化码至少填一项）' : '上传文件（必填）'}<span class="ir-file-picker"><input name="files" type="file" multiple ${screen === 'beauty' ? '' : 'required'} accept="${screen === 'beauty' ? '.css,.js,.json,.txt,.png,.jpg,.jpeg,.webp' : '.docx,.txt,.json,.png,.jpg,.jpeg,.webp'}"><span class="ir-file-icon" aria-hidden="true">↑</span><span class="ir-file-copy"><b>点击选择文件</b><small data-ir-file-summary>${escapeHTML(beautyPublishDraft?.file?.name || '支持拖入文件')}</small></span><span class="ir-file-action">浏览</span></span></label><small>每帖最多 3 个文件（含预览图），单个不超过 8 MB</small><label>标签（选填）<input name="tags" maxlength="130" placeholder="用逗号分隔，例如：浅色、日常" value="${escapeHTML(beautyPublishDraft?.tags?.join(', ') || '')}"></label><p class="ir-upload-error" role="alert">${escapeHTML(uploadError)}</p><footer><button type="button" data-ir-upload-close>取消</button><button type="submit" ${uploadBusy ? 'disabled' : ''}>${uploadBusy ? '发布中…' : '发布帖子'}</button></footer></form></div>`;
   const renderRemoteForum = () => {
     const post = remoteDetail;
     const header = `<header class="ir-forum-header"><button type="button" data-ir-forum-back aria-label="返回">←</button><div><strong>${activePost && post ? escapeHTML(post.title) : '# ' + channels[screen].name + ' ›'}</strong></div><button type="button" data-ir-post-search aria-label="搜索帖子">${searchIcon}</button></header>`;
@@ -943,7 +950,7 @@
   const show = next => {
     if (next !== 'friends') stopChatPolling();
     screen = next; activePost = null; postQuery = '';
-    if (next !== 'friends') ++friendSearchSerial; postTag = ''; listScroll = 0; uploadOpen = false;
+    if (next !== 'friends') ++friendSearchSerial; postTag = ''; listScroll = 0; uploadOpen = false; beautyPublishDraft = null;
     profileOrigin = false;
     remotePosts = []; remoteDetail = null; remoteStatus = channels[next] ? (apiBase() ? '正在加载帖子…' : '仓库服务尚未配置，暂无帖子。') : '';
     ++requestSerial; render();
@@ -952,6 +959,21 @@
     if (screen === 'friends') { loadFriends(); void loadChats(true); }
   };
   const open = () => { personal = readLocalProfile(); show('welcome'); root.classList.add('is-open'); syncViewport(); loadAvatar(); syncAvatarWithServer(); };
+  const publishBeauty = draft => {
+    if (!(draft?.file instanceof File) && !draft?.codeText) throw new Error('没有可发布的美化文件或美化码。');
+    personal = readLocalProfile();
+    screen = 'beauty'; activePost = null; postQuery = ''; postTag = ''; listScroll = 0;
+    remotePosts = []; remoteDetail = null; remoteStatus = apiBase() ? '正在加载帖子…' : '仓库服务尚未配置，暂无帖子。';
+    uploadError = ''; uploadBusy = false; uploadOpen = true;
+    beautyPublishDraft = { file:draft.file || null, codeText:String(draft.codeText || ''), tags:Array.isArray(draft.tags) ? draft.tags : [], body:String(draft.body || '') };
+    ++requestSerial;
+    root.classList.add('is-open'); syncViewport(); render(); loadAvatar(); syncAvatarWithServer();
+    const input = root.querySelector('.ir-upload-form input[name="files"]');
+    if (draft.file && input && typeof DataTransfer === 'function') {
+      try { const transfer = new DataTransfer(); transfer.items.add(draft.file); input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles:true })); } catch {}
+    }
+    loadPosts();
+  };
   const close = () => {
     stopChatPolling();
     if (root.contains(document.activeElement)) document.activeElement.blur();
@@ -1009,7 +1031,7 @@
     if (button.hasAttribute('data-ir-panel-back')) { profilePanel = ''; render(); return; }
     if (button.hasAttribute('data-ir-likes')) { profilePanel = 'likes'; likedPosts = []; loadLikes(); return; }
     if (button.hasAttribute('data-ir-more-likes')) { loadLikes(true); return; }
-    if (button.hasAttribute('data-ir-upload-close')) { uploadOpen = false; uploadError = ''; render(); return; }
+    if (button.hasAttribute('data-ir-upload-close')) { uploadOpen = false; uploadError = ''; beautyPublishDraft = null; render(); return; }
     if (button.hasAttribute('data-ir-copy-code')) {
       if (!remoteDetail?.liked) return;
       const code = remoteDetail?.codeText || '';
@@ -1239,6 +1261,7 @@
       const form = event.target;
       const data = new FormData(form);
       data.set('channel', screen);
+      if (screen === 'beauty' && !data.getAll('files').some(file => file instanceof File && file.name) && beautyPublishDraft?.file instanceof File) data.append('files', beautyPublishDraft.file);
       if (avatarUrl) {
         try {
           const blob = await fetch(avatarUrl).then(response => response.blob());
@@ -1262,7 +1285,7 @@
       form.querySelector('button[type=submit]').disabled = true;
       form.querySelector('button[type=submit]').textContent = '发布中…';
       requestApi('/api/posts', { method:'POST', body:data }).then(async result => {
-        uploadOpen = false; uploadError = ''; uploadBusy = false;
+        uploadOpen = false; uploadError = ''; uploadBusy = false; beautyPublishDraft = null;
         await loadPosts(); activePost = result.id; await loadPost(result.id);
       }).catch(error => {
         uploadBusy = false; uploadError = error.message;
@@ -1345,5 +1368,5 @@
     loadAvatar();
     syncAvatarWithServer();
   });
-  window.IdealMachineRepository = { open, close };
+  window.IdealMachineRepository = { open, close, publishBeauty };
 })();
