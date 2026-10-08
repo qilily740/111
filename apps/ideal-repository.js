@@ -82,6 +82,8 @@
   let uploadError = '';
   let requestSerial = 0;
   let searchTimer = 0;
+  let profileViewportBaselineHeight = 0;
+  let profileViewportBaselineWidth = 0;
   const imageUrls = new Set();
   const friendAvatarObjectUrls = new Map();
   const accountStorageId = () => { const user = window.IdealMachineAuth?.getUser?.(); return String(user?.id || user?.username || 'guest'); };
@@ -650,7 +652,7 @@
     stopChatPolling();
     if (root.contains(document.activeElement)) document.activeElement.blur();
     root.classList.remove('is-open');
-    root.style.removeProperty('height'); root.style.removeProperty('top');
+    root.style.removeProperty('height'); root.style.removeProperty('top'); root.style.removeProperty('--ir-profile-keyboard-offset');
   };
   root.addEventListener('click', event => {
     const button = event.target.closest('button');
@@ -852,6 +854,16 @@
   const syncViewport = () => {
     const viewport = window.visualViewport;
     if (!viewport || !root.classList.contains('is-open')) return;
+    const width = window.innerWidth || document.documentElement.clientWidth;
+    const visibleBottom = viewport.height + viewport.offsetTop;
+    if (!profileViewportBaselineHeight || Math.abs(width - profileViewportBaselineWidth) > 40) {
+      profileViewportBaselineHeight = Math.max(window.innerHeight || 0, visibleBottom);
+      profileViewportBaselineWidth = width;
+    } else if (visibleBottom > profileViewportBaselineHeight) profileViewportBaselineHeight = visibleBottom;
+    const focusedEditable = root.contains(document.activeElement) && document.activeElement.matches('textarea,input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"])');
+    const keyboardHeight = Math.max(0, profileViewportBaselineHeight - visibleBottom);
+    const keyboardOpen = focusedEditable && (document.body.classList.contains('ideal-keyboard-open') || keyboardHeight > 100);
+    root.style.setProperty('--ir-profile-keyboard-offset', `${keyboardOpen ? keyboardHeight : 0}px`);
     root.style.height = `${viewport.height}px`;
     root.style.top = `${viewport.offsetTop}px`;
   };
