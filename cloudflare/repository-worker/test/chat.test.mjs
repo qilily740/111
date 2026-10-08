@@ -66,6 +66,7 @@ test('chat supports replies and blocking prevents new messages until unblocked',
   const reply = conversation.messages.find(message => message.body === '回复');
   assert.equal(reply.replyToId,original.message.id);
   assert.equal(reply.replyBody,'原消息');
+  assert.equal(reply.replyCreatedAt,original.message.createdAt);
 
   assert.equal((await request('user-alice','/api/me/blocks/user-bob',{},'POST')).status,200);
   assert.equal((await request('user-alice','/api/me/chats/user-bob/messages',{text:'不该发送'})).status,403);

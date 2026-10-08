@@ -457,7 +457,7 @@ async function readChatMessages(request, env, user, friendId) {
   await purgeExpiredMessages(env, at);
   await env.DB.prepare('UPDATE direct_messages SET read_at = ? WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL AND expires_at > ?').bind(at,friendId,user.id,at).run();
   const result = await env.DB.prepare(`SELECT m.id, m.sender_id AS senderId, m.recipient_id AS recipientId, m.body, m.created_at AS createdAt,
-      m.reply_to_id AS replyToId, reply.body AS replyBody, reply.sender_id AS replySenderId
+      m.reply_to_id AS replyToId, reply.body AS replyBody, reply.sender_id AS replySenderId, reply.created_at AS replyCreatedAt
     FROM direct_messages m LEFT JOIN direct_messages reply ON reply.id = m.reply_to_id AND reply.expires_at > ?
     WHERE ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?)) AND m.expires_at > ?
     ORDER BY m.created_at DESC, m.id DESC LIMIT 100`).bind(at,user.id,friendId,friendId,user.id,at).all();

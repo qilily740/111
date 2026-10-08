@@ -201,7 +201,7 @@
     stopChatPolling();
     chatPollTimer = setInterval(() => {
       if (screen !== 'friends') return;
-      if (friendPanel === 'chat') loadChatMessages(true);
+      if (friendPanel === 'chat' && !chatSending) loadChatMessages(true);
       else if (friendsTab === 'inbox' && friendPanel !== 'chat') loadChats(true);
     }, 8000);
   }
@@ -222,16 +222,25 @@
       chatStatus = '';
       if (!silent) chatBusy = false;
       if (!silent || changed || stateChanged) {
-        const input = root.querySelector('[data-ir-chat-input]');
-        const focused = input === document.activeElement; const start = input?.selectionStart; const end = input?.selectionEnd;
-        render();
-        const nextInput = root.querySelector('[data-ir-chat-input]');
-        if (focused && nextInput) { nextInput.focus(); nextInput.setSelectionRange(start, end); }
         const messages = root.querySelector('[data-ir-chat-messages]');
-        if (messages) messages.scrollTop = messages.scrollHeight;
+        const nearBottom = !silent || !messages || messages.scrollHeight - messages.scrollTop - messages.clientHeight < 48;
+        updateChatMessageList(nearBottom);
+        const input = root.querySelector('[data-ir-chat-input]');
+        if (input) { input.disabled = !chatCanSend; input.placeholder = chatCanSend ? '发送消息…' : '此会话已屏蔽'; }
+        const button = root.querySelector('.ir-chat-composer button[type="submit"]');
+        if (button) button.disabled = chatSending || !chatDraft.trim() || !chatCanSend;
+        root.querySelector('.ir-chat-status')?.remove();
       }
     } catch (error) {
-      if (serial === chatRequestSerial) { chatStatus = error.message; if (!silent) { chatBusy = false; render(); } }
+      if (serial === chatRequestSerial) {
+        chatStatus = error.message;
+        if (!silent) {
+          chatBusy = false;
+          const status = root.querySelector('.ir-chat-status');
+          if (status) status.textContent = chatStatus;
+          else render();
+        }
+      }
     } finally { if (!silent && serial === chatRequestSerial) chatBusy = false; }
   }
   function openChat(friend) {
@@ -249,12 +258,30 @@
     const text = chatDraft.trim();
     if (!text || chatSending || !chatFriend) return;
     const friendId = chatFriend.userId || chatFriend.id;
-    chatSending = true; chatStatus = ''; render();
+    chatSending = true; chatStatus = '';
+    const sendButton = root.querySelector('.ir-chat-composer button[type="submit"]');
+    if (sendButton) { sendButton.disabled = true; sendButton.textContent = '…'; }
     try {
-      await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text, ...(chatReplyTo ? {replyToId:chatReplyTo.id} : {})}) });
-      chatDraft = ''; chatReplyTo = null; await loadChatMessages(); await loadChats(true);
-    } catch (error) { chatStatus = error.message; }
-    finally { chatSending = false; if (screen === 'friends' && friendPanel === 'chat') render(); }
+      const result = await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text, ...(chatReplyTo ? {replyToId:chatReplyTo.id} : {})}) });
+      if (screen !== 'friends' || friendPanel !== 'chat' || (chatFriend?.userId || chatFriend?.id) !== friendId) return;
+      const sent = result.message;
+      if (sent) chatMessages.push({ ...sent, replyBody:chatReplyTo?.body || '', replySenderId:chatReplyTo?.senderId || '', replyCreatedAt:chatReplyTo?.createdAt || null });
+      chatDraft = ''; chatReplyTo = null;
+      const input = root.querySelector('[data-ir-chat-input]');
+      if (input) input.value = '';
+      root.querySelector('.ir-chat-replying')?.remove();
+      updateChatMessageList(true);
+      await loadChats(true);
+    } catch (error) {
+      chatStatus = error.message;
+      const status = root.querySelector('.ir-chat-status');
+      if (status) status.textContent = chatStatus;
+      else render();
+    } finally {
+      chatSending = false;
+      const button = root.querySelector('.ir-chat-composer button[type="submit"]');
+      if (button) { button.disabled = !chatDraft.trim() || !chatCanSend; button.textContent = '↑'; }
+    }
   }
   async function searchFriends() {
     const query = friendQuery.trim();
@@ -274,29 +301,39 @@
   const chatTime = value => value ? new Date(value).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) : '';
   const chatDay = value => value ? new Date(value).toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric'}) : '';
   const messageSenderName = message => message.senderId === accountStorageId() ? (personal.nickname || userName()) : (chatFriend?.nickname || chatFriend?.username || '好友');
-  function messageAvatar(message) {
+  function messageAvatar(message, className = 'ir-chat-message-avatar') {
     const mine = message.senderId === accountStorageId();
     const name = mine ? '您' : (chatFriend?.nickname || chatFriend?.username || '好友');
     const image = mine && avatarUrl ? `<img src="${escapeHTML(avatarUrl)}" alt="" loading="lazy">` : !mine && chatFriend?.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(chatFriend.userId || chatFriend.id || '')}" alt="" loading="lazy">` : '';
-    return `<span class="ir-chat-message-avatar">${escapeHTML(name.slice(0,1).toUpperCase())}${image}</span>`;
+    return `<span class="${className}">${escapeHTML(name.slice(0,1).toUpperCase())}${image}</span>`;
   }
   function chatDivider(message, previous) {
     if (!previous || Number(message.createdAt) - Number(previous.createdAt) >= 5 * 60 * 1000) return `<div class="ir-chat-divider"><span>${escapeHTML(chatDay(message.createdAt))} · ${escapeHTML(chatTime(message.createdAt))}</span></div>`;
     return '';
+  }
+  function chatMessageRows() {
+    const rows = chatMessages.map((message,index) => {
+      const previous = chatMessages[index - 1];
+      const quoted = message.replyToId ? `<div class="ir-chat-quoted">${messageAvatar({senderId:message.replySenderId || ''}, 'ir-chat-quoted-avatar')}<span class="ir-chat-quoted-copy"><strong>${escapeHTML(message.replySenderId === accountStorageId() ? (personal.nickname || userName()) : (chatFriend?.nickname || chatFriend?.username || '好友'))}</strong><time>${chatTime(message.replyCreatedAt || chatMessages.find(item => item.id === message.replyToId)?.createdAt)}</time><span>${escapeHTML(message.replyBody || '引用的消息已过期')}</span></span></div>` : '';
+      return `${chatDivider(message,previous)}<article class="ir-chat-message" data-ir-message-id="${escapeHTML(message.id)}">${messageAvatar(message)}<div class="ir-chat-message-body"><div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>${quoted}<p>${escapeHTML(message.body)}</p></div></article>`;
+    }).join('');
+    return rows;
+  }
+  function updateChatMessageList(scrollToBottom = false) {
+    const messages = root.querySelector('[data-ir-chat-messages]');
+    if (!messages) return;
+    messages.innerHTML = chatMessages.length ? chatMessageRows() : '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>';
+    if (scrollToBottom) messages.scrollTop = messages.scrollHeight;
+    if (apiBase()) hydrateImages();
   }
   function renderChat() {
     const friend = chatFriend || {};
     const id = friend.userId || friend.id || '';
     const initial = escapeHTML((friend.nickname || friend.username || '?').slice(0,1).toUpperCase());
     const avatar = `<span class="ir-chat-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span>`;
-    const rows = chatMessages.map((message,index) => {
-      const previous = chatMessages[index - 1];
-      const quoted = message.replyToId ? `<div class="ir-chat-quoted">${escapeHTML(message.replySenderId === accountStorageId() ? '您' : (friend.nickname || friend.username || '好友'))}：${escapeHTML(message.replyBody || '引用的消息已过期')}</div>` : '';
-      return `${chatDivider(message,previous)}<article class="ir-chat-message" data-ir-message-id="${escapeHTML(message.id)}">${messageAvatar(message)}<div class="ir-chat-message-body"><div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>${quoted}<p>${escapeHTML(message.body)}</p></div></article>`;
-    }).join('');
     const profile = `<section class="ir-chat-profile">${avatar}<strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><span>ID · ${escapeHTML(friend.username || '')}</span><div><button type="button" data-ir-chat-remove>删除好友</button><button type="button" data-ir-chat-block>${chatBlockedByMe ? '取消屏蔽' : '屏蔽'}</button></div></section>`;
     const reply = chatReplyTo ? `<div class="ir-chat-replying"><span>回复 ${escapeHTML(chatReplyTo.senderName)}：${escapeHTML(chatReplyTo.body.slice(0,80))}</span><button type="button" data-ir-chat-reply-cancel aria-label="取消引用">×</button></div>` : '';
-    return `<div class="ir-friends-page ir-chat-page"><header class="ir-chat-header"><button type="button" data-ir-chat-back aria-label="返回会话列表">‹</button><span class="ir-chat-header-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span><div><strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong></div><button class="ir-close ir-chat-close" type="button" data-ir-close aria-label="关闭">×</button></header>${profile}<section class="ir-chat-messages" data-ir-chat-messages>${chatBusy ? '<p class="ir-chat-empty">正在加载聊天记录…</p>' : rows || '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>'}</section>${chatStatus ? `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}${reply}<form class="ir-chat-composer"><button class="ir-chat-plus" type="button" aria-label="添加内容" disabled>＋</button><textarea data-ir-chat-input name="text" rows="1" maxlength="2000" placeholder="${chatCanSend ? '发送消息…' : '此会话已屏蔽'}" ${chatCanSend ? '' : 'disabled'}>${escapeHTML(chatDraft)}</textarea><button class="ir-chat-send" type="submit" aria-label="发送" ${chatSending || !chatDraft.trim() || !chatCanSend ? 'disabled' : ''}>${chatSending ? '…' : '↑'}</button></form><small class="ir-chat-retention">每条消息发送 7 天后自动删除</small></div>`;
+    return `<div class="ir-friends-page ir-chat-page"><header class="ir-chat-header"><button type="button" data-ir-chat-back aria-label="返回会话列表">‹</button><span class="ir-chat-header-avatar">${initial}${friend.avatarUrl ? `<img data-ir-friend-avatar="${escapeHTML(id)}" alt="" loading="lazy">` : ''}</span><div><strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong></div><button class="ir-close ir-chat-close" type="button" data-ir-close aria-label="关闭">×</button></header>${profile}<section class="ir-chat-messages" data-ir-chat-messages>${chatBusy ? '<p class="ir-chat-empty">正在加载聊天记录…</p>' : chatMessageRows() || '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>'}</section>${chatStatus ? `<p class="ir-chat-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}${reply}<form class="ir-chat-composer"><button class="ir-chat-plus" type="button" aria-label="添加内容" disabled>＋</button><textarea data-ir-chat-input name="text" rows="1" maxlength="2000" placeholder="${chatCanSend ? '发送消息…' : '此会话已屏蔽'}" ${chatCanSend ? '' : 'disabled'}>${escapeHTML(chatDraft)}</textarea><button class="ir-chat-send" type="submit" aria-label="发送" ${chatSending || !chatDraft.trim() || !chatCanSend ? 'disabled' : ''}>${chatSending ? '…' : '↑'}</button></form><small class="ir-chat-retention">每条消息发送 7 天后自动删除</small></div>`;
   }
   function renderFriends() {
     if (friendPanel === 'chat') return renderChat();
@@ -920,7 +957,7 @@
     if (dx < 64 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
     const message = chatMessages.find(item => item.id === start.id);
     if (!message) return;
-    chatReplyTo = {id:message.id,senderName:messageSenderName(message),body:message.body};
+    chatReplyTo = {id:message.id,senderId:message.senderId,senderName:messageSenderName(message),body:message.body,createdAt:message.createdAt};
     render(); root.querySelector('[data-ir-chat-input]')?.focus();
   });
   root.addEventListener('pointercancel', () => { chatSwipeStart = null; });
