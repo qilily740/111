@@ -234,29 +234,14 @@
       if (serial === chatRequestSerial) { chatStatus = error.message; if (!silent) { chatBusy = false; render(); } }
     } finally { if (!silent && serial === chatRequestSerial) chatBusy = false; }
   }
-  async function openChat(friend) {
+  function openChat(friend) {
     if (!friend) return;
     stopChatPolling();
-    chatFriend = friend; chatMessages = []; chatDraft = ''; chatStatus = ''; chatBusy = true; chatCanSend = true; chatBlockedByMe = false; chatReplyTo = null;
-    const friendId = friend.userId || friend.id;
-    const serial = ++chatRequestSerial;
-    try {
-      const result = await requestApi(`/api/me/chats/${encodeURIComponent(friendId)}/messages`);
-      if (serial !== chatRequestSerial || screen !== 'friends' || (chatFriend?.userId || chatFriend?.id) !== friendId) return;
-      chatMessages = result.messages || [];
-      chatCanSend = result.canSend !== false;
-      chatBlockedByMe = Boolean(result.blockedByMe);
-    } catch (error) {
-      if (serial !== chatRequestSerial) return;
-      chatStatus = error.message;
-    } finally {
-      if (serial === chatRequestSerial) chatBusy = false;
-    }
-    if (serial !== chatRequestSerial || screen !== 'friends') return;
+    chatFriend = friend; chatMessages = []; chatDraft = ''; chatStatus = ''; chatBusy = false; chatCanSend = true; chatBlockedByMe = false; chatReplyTo = null;
+    ++chatRequestSerial;
     friendPanel = 'chat';
     render();
-    const messages = root.querySelector('[data-ir-chat-messages]');
-    if (messages) messages.scrollTop = messages.scrollHeight;
+    void loadChatMessages();
     startChatPolling();
   }
   async function sendChatMessage(event) {
