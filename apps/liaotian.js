@@ -614,14 +614,14 @@
     try {
       const payload = JSON.parse(init.body);
       const system = payload.messages?.find(item => item.role === 'system');
-      const contactId = currentContactId();
+      const contactId = init.idealContactId || currentContactId();
       const contact = state.contacts.find(item => item.id === contactId) || {};
       const chat = state.chats?.[contactId] || {};
       const profile = state.profiles.find(item => item.id === chat.profileId) || {};
       const isChatGeneration = ['chat', 'chat-background', 'chat-thought'].includes(init.idealScope) || String(system?.content || '').includes('理想机角色扮演协议');
       if (system && isChatGeneration) next = { ...init, body: JSON.stringify(payload) };
       const identityContext = window.IdealMachineContext?.identity?.(contact, profile) || window.IdealMachineRoleUserContext?.(contact, profile);
-      if (system && identityContext && !String(system.content || '').includes('【第一优先：角色本人')) {
+      if (system && identityContext && init.idealSkipIdentity !== true && !String(system.content || '').includes('【第一优先：角色本人')) {
         system.content = `${identityContext}\n\n${system.content}`;
         next = { ...init, body: JSON.stringify(payload) };
       }
@@ -2427,9 +2427,10 @@ ${rerollRule}
   function momentActorIsDeceased(actor) {
     if (!actor) return false;
     if (actor.deceased === true || actor.isDeceased === true || actor.dead === true || actor.alive === false || actor.isAlive === false) return true;
-    const text = [actor.status, actor.lifeStatus, actor.deathStatus, actor.identity, actor.details, actor.signature, actor.description, actor.background, actor.personality, actor.reason, actor.relationDescription].filter(Boolean).join(' ');
-    const alive = /(仍然?健在|还活着|仍活着|存活|在世|生存|未去世|没有去世|并未去世|尚未死亡)/i.test(text);
-    return !alive && /(已故|已死|去世|逝世|死去|死亡|身亡|亡故|阵亡|牺牲|亡者|死者|故人|死于|遗体|葬礼)/i.test(text);
+    // 背景、性格和关系设定可能提到别人的死亡，不能据此判定角色本人已去世。
+    const status = [actor.lifeStatus, actor.deathStatus, actor.status].filter(Boolean).join(' ');
+    if (/(仍然?健在|还活着|仍活着|存活|在世|生存|未去世|没有去世|并未去世|尚未死亡)/i.test(status)) return false;
+    return /^(?:本人|该角色|角色)?\s*(?:已故|已死|已去世|已经去世|已逝世|已死亡|去世|逝世|死去|死亡|身亡|亡故|阵亡|牺牲)(?:$|[\s，。；、])/i.test(status.trim());
   }
   function momentPostAuthorIsDeceased(post) {
     if (!post || post.authorType !== 'character') return false;
@@ -2492,7 +2493,16 @@ ${rerollRule}
   }
   generateRoleMoment = generateRoleMomentWithVisibility;
   const singleRoleMomentGenerator = generateRoleMoment;
-  generateRoleMoment = async (contactId, targetPost = null) => { if (targetPost) return singleRoleMomentGenerator(contactId, targetPost); const eligibleContacts = state.contacts.filter(contact => !momentActorIsDeceased(contact)); const selectedContacts = roleMomentTargets.map(id => eligibleContacts.find(contact => String(contact.id) === String(id))).filter(Boolean); const selectedIds = [...new Map(selectedContacts.map(contact => [String(contact.id), contact.id])).values()]; const shuffled = eligibleContacts.slice().sort(() => Math.random() - .5); const ids = roleMomentMode === 'select' ? selectedIds : shuffled.slice(0, Math.min(roleMomentCount, shuffled.length)).map(contact => contact.id); if (!ids.length) return window.alert('当前没有仍在世的角色可以参与朋友圈。'); for (const id of ids) await singleRoleMomentGenerator(id); };
+  generateRoleMoment = async (contactId, targetPost = null) => {
+    if (targetPost) return singleRoleMomentGenerator(contactId, targetPost);
+    const eligibleContacts = state.contacts.filter(contact => !isGroupChatContact(contact) && !momentActorIsDeceased(contact));
+    const selectedContacts = roleMomentTargets.map(id => eligibleContacts.find(contact => String(contact.id) === String(id))).filter(Boolean);
+    const selectedIds = [...new Map(selectedContacts.map(contact => [String(contact.id), contact.id])).values()];
+    const shuffled = eligibleContacts.slice().sort(() => Math.random() - .5);
+    const ids = roleMomentMode === 'select' ? selectedIds : shuffled.slice(0, Math.min(roleMomentCount, shuffled.length)).map(contact => contact.id);
+    if (!ids.length) return window.alert(roleMomentMode === 'select' && !roleMomentTargets.length ? '请先选择要发动态的角色。' : '当前没有可发布朋友圈的角色。');
+    for (const id of ids) await singleRoleMomentGenerator(id);
+  };
   function boundWorldbookContext(contact) { try { const data = JSON.parse(localStorage.getItem('ideal-machine-worldbooks') || '{}'); const book = (data.local || []).find(item => item.id === contact?.worldbook); if (!book) return '未绑定局部世界书。'; const entries = (book.entries || []).filter(entry => entry.enabled !== false); return entries.length ? `绑定局部世界书：${book.name}\n${entries.map(entry => `${entry.name}：${entry.content}`).join('\n')}` : `绑定局部世界书：${book.name}\n当前没有启用的世界书条目。`; } catch { return '未绑定局部世界书。'; } }
   // 语言输出只由每段聊天的显式双语设置控制，不再根据角色资料自动猜测。
   const offlineWritingStyleKey = 'ideal-machine-if-writing-styles';
@@ -2588,7 +2598,7 @@ ${rerollRule}
     const background = [world.title && `世界名称：${world.title}`, world.summary && `世界背景：${world.summary}`, world.era && `时代：${world.era}`, world.location && `主要地点：${world.location}`, world.atmosphere && `氛围：${world.atmosphere}`, Array.isArray(world.rules) && world.rules.length ? `世界规则：${world.rules.join('；')}` : ''].filter(Boolean).join('\n');
     return { background: background || '', raw: boundWorldbookContext(contact) || '当前没有绑定世界书。', hasAnalysis: Boolean(background) };
   }
-  async function generateRoleMoment(contactId, targetPost = null) { const contact = state.contacts.find(item => item.id === contactId) || state.contacts[Math.floor(Math.random() * state.contacts.length)]; if (!contact) return window.alert('请先添加角色。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。'); momentBusy = true; render(); const chat = state.chats[contact.id] || {}; const recent = (chat.messages || []).slice(-12).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name}：${item.text || `[${item.type || '消息'}]`}`).join('\n') || '最近没有聊天记录。'; const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }); const prompt = targetPost ? `请让角色“${contact.nickname || contact.name}”评论这条朋友圈，只输出评论正文，控制在1—2句。朋友圈内容：${targetPost.text || '[图片动态]'}\n角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：${recent}\n${boundWorldbookContext(contact)}\n请结合以上信息，不要提及你看到了世界书。` : `请为角色“${contact.nickname || contact.name}”生成一条自然的朋友圈动态，只输出正文，控制在1—3句。角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：\n${recent}\n${boundWorldbookContext(contact)}\n请结合角色绑定的局部世界书创作，不要提及世界书。`; try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .85, messages: [{ role: 'system', content: '你是角色朋友圈互动助手。' }, { role: 'user', content: prompt }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const text = requireCharacterReplyText(data).replace(/^['“”"\s]+|['“”"\s]+$/g, '').trim(); if (targetPost) { targetPost.comments ||= []; targetPost.comments.push({ id: uid('comment'), author: contact.nickname || contact.name, text, authorType: 'character', authorId: contact.id, time: time() }); } else state.moments.unshift({ id: uid('moment'), author: contact.nickname || contact.name, realName: contact.name, authorType: 'character', authorId: contact.id, avatar: contact.avatar || '', text, visibility: 'character', time: time(), likes: 0, comments: [] }); save(); } catch (error) { window.alert(`角色互动生成失败：${error.message}`); } finally { if (!momentGenerationDepth) { momentBusy = false; render(); } } }
+  async function generateRoleMoment(contactId, targetPost = null) { const contact = contactId ? state.contacts.find(item => String(item.id) === String(contactId)) : state.contacts[Math.floor(Math.random() * state.contacts.length)]; if (!contact) return window.alert('请先添加角色。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return window.alert('请先在设置中配置聊天 API。'); momentBusy = true; render(); const chat = state.chats[contact.id] || {}; const recent = (chat.messages || []).slice(-12).map(item => `${item.role === 'user' ? '用户' : contact.nickname || contact.name}：${item.text || `[${item.type || '消息'}]`}`).join('\n') || '最近没有聊天记录。'; const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }); const prompt = targetPost ? `请让角色“${contact.nickname || contact.name}”评论这条朋友圈，只输出评论正文，控制在1—2句。朋友圈内容：${targetPost.text || '[图片动态]'}\n角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：${recent}\n${boundWorldbookContext(contact)}\n请结合以上信息，不要提及你看到了世界书。` : `你就是角色“${contact.nickname || contact.name}”，只能以这个角色本人的身份和口吻发朋友圈，不要模仿其他正在聊天的角色。请生成一条自然的朋友圈动态，只输出正文，控制在1—3句。角色设定：${contact.details || contact.signature || '暂无'}\n当天状态：${today}\n最近聊天：\n${recent}\n${boundWorldbookContext(contact)}\n请结合角色绑定的局部世界书创作，不要提及世界书。`; try { const response = await fetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', idealContactId:contact.id, idealScope:'chat-moments', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .85, messages: [{ role: 'system', content: `你是角色“${contact.nickname || contact.name}”的朋友圈文案助手。只使用该角色的设定和最近聊天，不得借用其他角色的身份、称呼或说话方式。` }, { role: 'user', content: prompt }] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const text = requireCharacterReplyText(data).replace(/^['“”"\s]+|['“”"\s]+$/g, '').trim(); if (targetPost) { targetPost.comments ||= []; targetPost.comments.push({ id: uid('comment'), author: contact.nickname || contact.name, text, authorType: 'character', authorId: contact.id, time: time() }); } else state.moments.unshift({ id: uid('moment'), author: contact.nickname || contact.name, realName: contact.name, authorType: 'character', authorId: contact.id, avatar: contact.avatar || '', text, visibility: 'character', time: time(), likes: 0, comments: [] }); save(); } catch (error) { window.alert(`角色互动生成失败：${error.message}`); } finally { if (!momentGenerationDepth) { momentBusy = false; render(); } } }
 
   function renderProfileEditor() { const panel = document.querySelector('#chatProfileEditor'); if (!panel) return; panel.classList.toggle('is-open', profileEditorOpen); panel.setAttribute('aria-hidden', String(!profileEditorOpen)); if (!profileEditorOpen) { panel.innerHTML = ''; return; } const moments = profileEditorPurpose === 'moments'; const profile = moments ? (state.momentsProfile || {}) : (state.profiles.find(item => item.id === profileEditId) || {}); const source = { ...profile, ...(profileDraft || {}) }; const identityFields = moments ? `<label>网名<input id="profileNickname" value="${esc(source.nickname)}" placeholder="填写朋友圈网名"></label><label>性别<select id="profileGender"><option value="">未设置</option><option ${source.gender === '男' ? 'selected' : ''}>男</option><option ${source.gender === '女' ? 'selected' : ''}>女</option><option ${source.gender === '其他' ? 'selected' : ''}>其他</option></select></label>` : `<label>真实姓名<input id="profileRealName" value="${esc(source.realName)}" placeholder="填写真实姓名"></label><label>网名<input id="profileNickname" value="${esc(source.nickname)}" placeholder="填写网名"></label><label>生日<input id="profileBirthday" type="date" value="${esc(source.birthday)}"></label><label>性别<select id="profileGender"><option value="">未设置</option><option ${source.gender === '男' ? 'selected' : ''}>男</option><option ${source.gender === '女' ? 'selected' : ''}>女</option><option ${source.gender === '其他' ? 'selected' : ''}>其他</option></select></label>`; const extra = moments ? '<p class="chat-moment-profile-reminder">这是所有角色共用的朋友圈用户身份，只设置头像、网名和性别。</p>' : '<label class="chat-editor-wide">具体设定<textarea id="profilePersona" placeholder="填写身份、性格、经历和说话方式">' + esc(source.persona) + '</textarea></label>'; panel.innerHTML = `<section class="chat-editor-sheet"><header><div><span class="chat-kicker">USER IDENTITY</span><h2>${moments ? '朋友圈用户' : (profileEditId ? '编辑用户设定' : '新建用户设定')}</h2></div><button data-profile-editor-close type="button">×</button></header><div class="chat-editor-body"><div class="chat-avatar-picker"><span class="chat-editor-avatar">${profileAvatar ? `<img src="${esc(profileAvatar)}" alt="用户头像">` : esc((source.realName || source.nickname || '我').slice(0, 1))}</span><div><div class="chat-avatar-actions"><label class="chat-file-button">上传头像<input id="profileAvatarFile" type="file" accept="image/*"></label><button class="chat-file-button" data-profile-album-avatar type="button">从相册选择</button></div><input class="chat-avatar-url" id="profileAvatarUrl" type="url" value="${esc(profileDraft?.avatarUrl ?? (profileAvatar.startsWith('data:') ? '' : profileAvatar))}" placeholder="或粘贴头像 URL"></div></div><div class="chat-editor-grid">${identityFields}</div>${extra}</div><footer><button data-profile-editor-close type="button">取消</button><button data-profile-editor-save type="button">保存设定</button></footer></section>`; }
   function openProfileEditor(profile) { profileEditorOpen = true; profileEditId = profile?.id || null; profileAvatar = profileEditorPurpose === 'moments' ? (state.momentsProfile?.avatar || '') : (profile?.avatar || ''); profileDraft = null; renderProfileEditor(); }
@@ -6062,8 +6072,14 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     return /自拍|对镜自拍|拍我|给我拍|我的背影|我出镜|我入镜|我穿着|我站在|我坐在|我走在|我跑在|我和.{0,10}合照|我们.{0,8}合照/.test(String(text || ''));
   }
 
+  function momentVisualText(value) {
+    // 昵称、撒娇称呼属于人际语境，不能被配图模型画成真实动物。
+    return String(value || '').replace(/(?:一只|这个|那个|我的|你这?|抓住|捉住|抱住|逮住)?(?:赖床|贪睡|爱睡|懒)?小懒猪/g, '赖床的人')
+      .replace(/(?:我的|你这?|一只|这个|那个)?小猪(?:猪)?(?:崽)?/g, '被亲昵称呼的人');
+  }
+
   async function planMomentImage(post) {
-    const text = String(post?.text || '').trim().slice(0, 600);
+    const text = momentVisualText(post?.text).trim().slice(0, 600);
     if (!text) return null;
     const textConfig = window.IdealMachineAPI?.getConfig?.();
     const model = window.IdealMachineAPI?.getModel?.('chat');
@@ -6072,11 +6088,11 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     if (textConfig.key) headers.Authorization = `Bearer ${textConfig.key}`;
     try {
       const response = await fetch(`${textConfig.endpoint.replace(/\/$/, '')}/chat/completions`, {
-        method: 'POST', headers,
+        method: 'POST', idealContactId: post?.authorId, idealSkipIdentity:true, idealScope:'chat-moments-image-plan', headers,
         body: JSON.stringify({
           model, temperature: .35, max_tokens: 400, stream: false,
           messages: [
-            { role: 'system', content: '你是朋友圈配图策划。只根据动态正文决定照片拍什么，不要默认拍发帖者。优先抓住正文中具体可见的食物、物品、宠物、地点、风景或事件；正文没有具体对象时，选择贴合情绪的普通环境或静物，不编造新的故事。只有正文明确表示自拍、合照或发帖者本人出镜时，characterVisible 才能为 true。只返回 JSON：{"subjectType":"character|people|food|object|animal|scenery|event 中的一种","characterVisible":false,"imagePrompt":"具体的中文画面描述，包含主体、场景、构图和光线"}。不要写角色外貌，不要 Markdown。' },
+            { role: 'system', content: '你是朋友圈配图策划。只根据动态正文决定照片拍什么，不要默认拍发帖者。先判断词语是字面事实还是对人的昵称、比喻；“小懒猪”“小猪”等用于称呼人的词绝对不代表真的猪或宠物。优先抓住正文中具体可见的食物、物品、真实宠物、地点、风景或事件；正文没有具体对象时，选择贴合情绪的普通环境或静物，不编造新的故事。只有正文明确表示自拍、合照或发帖者本人出镜时，characterVisible 才能为 true。只返回 JSON：{"subjectType":"character|people|food|object|animal|scenery|event 中的一种","characterVisible":false,"imagePrompt":"具体的中文画面描述，包含主体、场景、构图和光线"}。不要写角色外貌，不要 Markdown。' },
             { role: 'user', content: `朋友圈动态正文：${text}` }
           ]
         })
@@ -6088,6 +6104,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       const imagePrompt = String(plan?.imagePrompt || '').trim().slice(0, 800);
       const subjectType = String(plan?.subjectType || '').toLowerCase();
       const characterVisible = plan?.characterVisible === true && !['food', 'object', 'animal', 'scenery'].includes(subjectType);
+      if (/小懒猪|小猪/.test(String(post?.text || '')) && (subjectType === 'animal' || /(?:真实的?|一头|一只)?(?:小)?猪/.test(imagePrompt))) return null;
       if (subjectType === 'character' && !characterVisible) return null;
       if (characterVisible && !momentTextShowsCharacter(text)) return null;
       return imagePrompt ? { subjectType, characterVisible, imagePrompt } : null;
@@ -6098,12 +6115,12 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
   }
 
   function safeMomentImagePrompt(post, contact, plan = null) {
-    const text = String(post?.text || '').trim().slice(0, 600);
+    const text = momentVisualText(post?.text).trim().slice(0, 600);
     const characterVisible = /自拍|对镜自拍/.test(text) || (momentTextShowsCharacter(text) && (plan ? plan.characterVisible === true : true));
     const appearance = characterVisible ? getChatImageAppearance(state.chats[contact?.id], contact).slice(0, 1200) : '';
     if (!text) throw new Error('朋友圈正文为空，无法根据动态生成配图。');
     return [
-      '请根据这条朋友圈的画面方案生成一张自然的照片。正文是事实依据，画面方案负责选择主体和构图；不要添入文案之外的角色或无关事件。只有正文明确提到自拍、合照或发帖者本人出镜时才画发帖者。不要把食物、物品、宠物或风景改成自拍。',
+      '请根据这条朋友圈的画面方案生成一张自然的照片。正文是事实依据，画面方案负责选择主体和构图；不要添入文案之外的角色或无关事件。昵称和比喻不是实体，小懒猪指人时绝对不要画真实的猪。只有正文明确提到自拍、合照或发帖者本人出镜时才画发帖者。不要把食物、物品、宠物或风景改成自拍。',
       `朋友圈正文：${text}`,
       plan?.imagePrompt ? `先阅读正文后确定的画面方案：${plan.imagePrompt}` : '请从正文中选择最具体、最值得拍摄的主体，安排自然的生活场景、构图与光线。',
       characterVisible ? '' : '发帖角色不出镜；画面中不要出现角色本人。',

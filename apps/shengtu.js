@@ -242,12 +242,18 @@
     let response;
     let payload;
     let retriedWithoutResponseFormat = false;
+    let retriedTransport = false;
     while (true) {
       requestOptions.body = JSON.stringify(body);
       try {
         response = await fetch(endpoint, requestOptions);
       } catch (error) {
         if (error instanceof TypeError || error?.message === 'Failed to fetch') {
+          if (!retriedTransport && navigator.onLine !== false) {
+            retriedTransport = true;
+            await new Promise(resolve => setTimeout(resolve, 800));
+            continue;
+          }
           const localFileHint = location.protocol === 'file:'
             ? ' 当前页面是 file:// 本地文件，请改用 HTTPS/localhost 地址打开。'
             : '';
