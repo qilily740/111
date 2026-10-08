@@ -224,7 +224,7 @@
       if (!silent || changed || stateChanged) {
         const scroll = root.querySelector('[data-ir-chat-scroll]');
         const nearBottom = silent && (!scroll || scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 48);
-        updateChatMessageList(nearBottom);
+        updateChatMessageList(!silent || nearBottom);
         const input = root.querySelector('[data-ir-chat-input]');
         if (input) { input.disabled = !chatCanSend; input.placeholder = chatCanSend ? '发送消息…' : '此会话已屏蔽'; }
         const button = root.querySelector('.ir-chat-composer button[type="submit"]');
@@ -329,7 +329,11 @@
     messages.innerHTML = chatMessages.length ? chatMessageRows() : '<p class="ir-chat-empty">发送第一条消息，开始和好友聊天。</p>';
     if (scrollToBottom) {
       const scroll = root.querySelector('[data-ir-chat-scroll]');
-      if (scroll) scroll.scrollTop = scroll.scrollHeight;
+      if (scroll) {
+        const setLatest = () => { scroll.scrollTop = scroll.scrollHeight; };
+        setLatest();
+        requestAnimationFrame(setLatest);
+      }
     }
     if (apiBase()) hydrateImages();
   }
@@ -992,6 +996,12 @@
     root.style.setProperty('--ir-profile-keyboard-offset', `${keyboardOpen ? keyboardHeight : 0}px`);
     root.style.height = `${viewport.height}px`;
     root.style.top = `${viewport.offsetTop}px`;
+    if (keyboardOpen && root.classList.contains('ir-chat-mode')) {
+      requestAnimationFrame(() => {
+        const scroll = root.querySelector('[data-ir-chat-scroll]');
+        if (scroll) scroll.scrollTop = scroll.scrollHeight;
+      });
+    }
   };
   window.visualViewport?.addEventListener('resize', syncViewport);
   window.visualViewport?.addEventListener('scroll', syncViewport);
