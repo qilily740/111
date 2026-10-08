@@ -187,13 +187,13 @@
       const result = await requestApi('/api/me/chats');
       const changed = JSON.stringify(chatList) !== JSON.stringify(result.chats || []);
       chatList = result.chats || [];
-      if (changed && screen === 'friends' && friendPanel === 'inbox') {
+      if (changed && screen === 'friends' && friendPanel !== 'chat' && friendsTab === 'inbox') {
         const scroller = root.querySelector('.ir-chat-list'); const top = scroller?.scrollTop || 0;
         render(); root.querySelector('.ir-chat-list')?.scrollTo(0, top);
       }
     } catch (error) {
       if (!silent) chatStatus = error.message;
-      if (!silent && screen === 'friends' && friendPanel === 'inbox') render();
+      if (!silent && screen === 'friends' && friendPanel !== 'chat' && friendsTab === 'inbox') render();
     }
   }
   function stopChatPolling() { clearInterval(chatPollTimer); chatPollTimer = 0; }
@@ -202,7 +202,7 @@
     chatPollTimer = setInterval(() => {
       if (screen !== 'friends') return;
       if (friendPanel === 'chat') loadChatMessages(true);
-      else if (friendPanel === 'inbox') loadChats(true);
+      else if (friendsTab === 'inbox' && friendPanel !== 'chat') loadChats(true);
     }, 8000);
   }
   async function loadChatMessages(silent = false) {
@@ -298,16 +298,15 @@
   }
   function renderFriends() {
     if (friendPanel === 'chat') return renderChat();
-    if (friendPanel === 'inbox') {
-      const rows = chatList.map(item => `<button type="button" class="ir-chat-list-item" data-ir-open-chat="${escapeHTML(item.userId)}">${chatListIdentity(item)}<span class="ir-chat-preview">${escapeHTML(item.lastMessage || '')}</span><time>${chatTime(item.lastMessageAt)}</time>${item.unreadCount ? `<b class="ir-chat-unread">${item.unreadCount > 99 ? '99+' : item.unreadCount}</b>` : ''}</button>`).join('');
-      return `<div class="ir-friends-page"><header class="ir-inbox-heading"><button type="button" data-ir-inbox-back aria-label="返回好友">‹</button><div><span>IDEAL / INBOX</span><h1>私聊</h1></div><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><p class="ir-chat-retention">每条消息发送 7 天后自动删除</p>${chatStatus ? `<p class="ir-friends-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}<section class="ir-chat-list">${rows || '<div class="ir-inbox-empty"><span aria-hidden="true">♡</span><strong>还没有私聊</strong><small>从好友列表选择一位好友，开始聊天。</small></div>'}</section></div>`;
-    }
-    const tabs = [['friends','我的好友',friendData.friends.length],['incoming','好友申请',friendData.incoming.length],['outgoing','已发送',friendData.outgoing.length]];
+    const tabs = [['inbox','私聊',chatList.length],['friends','我的好友',friendData.friends.length],['incoming','好友申请',friendData.incoming.length],['outgoing','已发送',friendData.outgoing.length]];
     const users = friendsTab === 'friends' ? friendData.friends : friendsTab === 'incoming' ? friendData.incoming : friendData.outgoing;
-    const list = users.map(item => `<article class="ir-friend-item">${friendIdentity(item)}${friendsTab === 'incoming' ? `<button type="button" data-ir-friend-accept="${escapeHTML(item.id)}">接受</button><button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">拒绝</button>` : friendsTab === 'outgoing' ? `<button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">撤回</button>` : `<button type="button" data-ir-open-chat="${escapeHTML(item.userId)}">私聊</button><button type="button" class="is-muted" data-ir-friend-remove="${escapeHTML(item.id)}">移除</button>`}</article>`).join('');
+    const chatRows = chatList.map(item => `<button type="button" class="ir-chat-list-item" data-ir-open-chat="${escapeHTML(item.userId)}">${chatListIdentity(item)}<span class="ir-chat-preview">${escapeHTML(item.lastMessage || '')}</span><time>${chatTime(item.lastMessageAt)}</time>${item.unreadCount ? `<b class="ir-chat-unread">${item.unreadCount > 99 ? '99+' : item.unreadCount}</b>` : ''}</button>`).join('');
+    const list = friendsTab === 'inbox' ? chatRows : users.map(item => `<article class="ir-friend-item">${friendIdentity(item)}${friendsTab === 'incoming' ? `<button type="button" data-ir-friend-accept="${escapeHTML(item.id)}">接受</button><button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">拒绝</button>` : friendsTab === 'outgoing' ? `<button type="button" class="is-muted" data-ir-friend-decline="${escapeHTML(item.id)}">撤回</button>` : `<button type="button" data-ir-open-chat="${escapeHTML(item.userId)}">私聊</button><button type="button" class="is-muted" data-ir-friend-remove="${escapeHTML(item.id)}">移除</button>`}</article>`).join('');
     const resultList = friendResults.map(item => `<article class="ir-friend-item">${friendIdentity(item)}<button type="button" ${item.relation ? 'disabled' : ''} data-ir-friend-add="${escapeHTML(item.username)}">${item.relation === 'friend' ? '已添加' : item.relation === 'outgoing' ? '已申请' : item.relation === 'incoming' ? '待处理' : '添加好友'}</button></article>`).join('');
     const search = friendSearchOpen ? `<form class="ir-friends-search"><input name="account" type="search" maxlength="32" autocomplete="off" placeholder="输入 Ideal ID" value="${escapeHTML(friendQuery)}"><button type="submit">搜索</button></form>` : '';
-    return `<div class="ir-friends-page"><header class="ir-friends-heading ir-page-heading"><h1>消息</h1><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><nav class="ir-message-toolbar" aria-label="消息操作"><button type="button" class="ir-message-icon" data-ir-search-toggle aria-label="搜索好友">${profileIcon('search')}</button><button type="button" class="ir-message-inbox" data-ir-friend-inbox aria-label="私信提醒"><span>${profileIcon('mail')}</span></button><button type="button" class="ir-message-add" data-ir-add-friend><span>${profileIcon('addPerson')}</span><b>添加好友</b></button><button type="button" class="ir-message-plus" data-ir-plus aria-label="添加好友">＋</button></nav>${search}${friendStatus ? `<p class="ir-friends-status" role="status">${escapeHTML(friendStatus)}</p>` : ''}${resultList ? `<section class="ir-friends-results"><h2>搜索结果</h2>${resultList}</section>` : friendQuery.length >= 3 && !friendStatus && !friendResults.length ? '<p class="ir-friends-empty">没有找到匹配的账号。</p>' : ''}<nav class="ir-friends-tabs" aria-label="好友分类">${tabs.map(([id,label,count]) => `<button type="button" data-ir-friend-tab="${id}" class="${friendsTab === id ? 'is-selected' : ''}">${label}<span>${count}</span></button>`).join('')}</nav><section class="ir-friends-list">${friendBusy ? '<p class="ir-friends-empty">正在加载好友…</p>' : list || `<div class="ir-friends-empty"><span>${friendsTab === 'friends' ? '♧' : '♡'}</span><strong>${friendsTab === 'friends' ? '还没有好友' : friendsTab === 'incoming' ? '暂时没有新的好友申请' : '还没有发出好友申请'}</strong><small>${friendsTab === 'friends' ? '搜索 Ideal 账号，添加你的第一位好友。' : '新的动态会显示在这里。'}</small></div>`}</section></div>`;
+    const empty = friendsTab === 'inbox' ? '<div class="ir-inbox-empty"><span aria-hidden="true">♡</span><strong>还没有私聊</strong><small>从“我的好友”选择一位好友，开始聊天。</small></div>' : `<div class="ir-friends-empty"><span>${friendsTab === 'friends' ? '♧' : '♡'}</span><strong>${friendsTab === 'friends' ? '还没有好友' : friendsTab === 'incoming' ? '暂时没有新的好友申请' : '还没有发出好友申请'}</strong><small>${friendsTab === 'friends' ? '搜索 Ideal 账号，添加你的第一位好友。' : '新的动态会显示在这里。'}</small></div>`;
+    const listContent = friendBusy && friendsTab !== 'inbox' ? '<p class="ir-friends-empty">正在加载好友…</p>' : list || empty;
+    return `<div class="ir-friends-page"><header class="ir-friends-heading ir-page-heading"><h1>消息</h1><button class="ir-close ir-page-close" type="button" data-ir-close aria-label="返回桌面">×</button></header><nav class="ir-message-toolbar" aria-label="消息操作"><button type="button" class="ir-message-icon" data-ir-search-toggle aria-label="搜索好友">${profileIcon('search')}</button><button type="button" class="ir-message-inbox" data-ir-friend-inbox aria-label="私信提醒"><span>${profileIcon('mail')}</span></button><button type="button" class="ir-message-add" data-ir-add-friend><span>${profileIcon('addPerson')}</span><b>添加好友</b></button><button type="button" class="ir-message-plus" data-ir-plus aria-label="添加好友">＋</button></nav>${search}${friendStatus ? `<p class="ir-friends-status" role="status">${escapeHTML(friendStatus)}</p>` : ''}${resultList ? `<section class="ir-friends-results"><h2>搜索结果</h2>${resultList}</section>` : friendQuery.length >= 3 && !friendStatus && !friendResults.length ? '<p class="ir-friends-empty">没有找到匹配的账号。</p>' : ''}<nav class="ir-friends-tabs" aria-label="好友分类">${tabs.map(([id,label,count]) => `<button type="button" data-ir-friend-tab="${id}" class="${friendsTab === id ? 'is-selected' : ''}">${label}<span>${count}</span></button>`).join('')}</nav><section class="ir-friends-list ${friendsTab === 'inbox' ? 'is-chat-list' : ''}">${chatStatus && friendsTab === 'inbox' ? `<p class="ir-friends-status" role="status">${escapeHTML(chatStatus)}</p>` : ''}${listContent}</section></div>`;
   }
   async function sendFriendRequest(username) {
     friendBusy = true; friendStatus = ''; render();
@@ -765,8 +764,8 @@
     if (button.hasAttribute('data-ir-close')) return close();
     if (button.hasAttribute('data-ir-home')) return show('welcome');
     if (button.hasAttribute('data-ir-friends-open') || button.hasAttribute('data-ir-friends')) { profilePanel = ''; friendsTab = 'friends'; friendPanel = ''; friendSearchOpen = false; friendQuery = ''; friendResults = []; friendStatus = ''; return show('friends'); }
-    if (button.hasAttribute('data-ir-inbox-back')) { friendPanel = ''; chatStatus = ''; return render(); }
-    if (button.hasAttribute('data-ir-chat-back')) { chatFriend = null; friendPanel = 'inbox'; chatDraft = ''; render(); startChatPolling(); loadChats(); return; }
+    if (button.hasAttribute('data-ir-inbox-back')) { friendPanel = ''; friendsTab = 'friends'; chatStatus = ''; stopChatPolling(); return render(); }
+    if (button.hasAttribute('data-ir-chat-back')) { chatFriend = null; friendPanel = ''; friendsTab = 'inbox'; chatDraft = ''; render(); startChatPolling(); loadChats(); return; }
     if (button.hasAttribute('data-ir-chat-reply-cancel')) { chatReplyTo = null; render(); root.querySelector('[data-ir-chat-input]')?.focus(); return; }
     if (button.hasAttribute('data-ir-chat-remove')) {
       if (!chatFriend || !window.confirm(`确定删除好友「${chatFriend.nickname || chatFriend.username}」吗？`)) return;
@@ -790,14 +789,20 @@
       } catch (error) { chatStatus = error.message; render(); }
       return;
     }
-    if (button.hasAttribute('data-ir-friend-inbox')) { friendPanel = 'inbox'; chatStatus = ''; render(); startChatPolling(); loadChats(); return; }
+    if (button.hasAttribute('data-ir-friend-inbox')) { friendPanel = ''; friendsTab = 'inbox'; chatStatus = ''; render(); startChatPolling(); loadChats(); return; }
     if (button.dataset.irOpenChat) {
       const friend = [...friendData.friends, ...chatList].find(item => item.userId === button.dataset.irOpenChat);
       return openChat(friend);
     }
     if (button.hasAttribute('data-ir-search-toggle')) { friendSearchOpen = !friendSearchOpen; render(); if (friendSearchOpen) root.querySelector('.ir-friends-search input')?.focus(); return; }
-    if (button.hasAttribute('data-ir-add-friend') || button.hasAttribute('data-ir-plus')) { friendPanel = ''; friendSearchOpen = true; render(); root.querySelector('.ir-friends-search input')?.focus(); return; }
-    if (button.dataset.irFriendTab) { friendsTab = button.dataset.irFriendTab; return render(); }
+    if (button.hasAttribute('data-ir-add-friend') || button.hasAttribute('data-ir-plus')) { friendPanel = ''; friendsTab = 'friends'; friendSearchOpen = true; render(); root.querySelector('.ir-friends-search input')?.focus(); return; }
+    if (button.dataset.irFriendTab) {
+      friendPanel = ''; friendsTab = button.dataset.irFriendTab; chatStatus = '';
+      render();
+      if (friendsTab === 'inbox') { startChatPolling(); loadChats(); }
+      else stopChatPolling();
+      return;
+    }
     if (button.dataset.irFriendAdd) return sendFriendRequest(button.dataset.irFriendAdd);
     if (button.dataset.irFriendAccept) return handleFriendRequest(button.dataset.irFriendAccept, 'accept');
     if (button.dataset.irFriendDecline) return handleFriendRequest(button.dataset.irFriendDecline, friendsTab === 'outgoing' ? 'cancel' : 'decline');
