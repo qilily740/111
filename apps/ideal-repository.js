@@ -292,7 +292,7 @@
     const rows = chatMessages.map((message,index) => {
       const previous = chatMessages[index - 1];
       const quoted = message.replyToId ? `<div class="ir-chat-quoted">${escapeHTML(message.replySenderId === accountStorageId() ? '您' : (friend.nickname || friend.username || '好友'))}：${escapeHTML(message.replyBody || '引用的消息已过期')}</div>` : '';
-      return `${chatDivider(message,previous)}<article class="ir-chat-message" data-ir-message-id="${escapeHTML(message.id)}">${messageAvatar(message)}<div class="ir-chat-message-body">${quoted}<p>${escapeHTML(message.body)}</p><div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div></div></article>`;
+      return `${chatDivider(message,previous)}<article class="ir-chat-message" data-ir-message-id="${escapeHTML(message.id)}">${messageAvatar(message)}<div class="ir-chat-message-body"><div class="ir-chat-message-meta"><strong>${escapeHTML(messageSenderName(message))}</strong><time>${chatTime(message.createdAt)}</time></div>${quoted}<p>${escapeHTML(message.body)}</p></div></article>`;
     }).join('');
     const profile = `<section class="ir-chat-profile">${avatar}<strong>${escapeHTML(friend.nickname || friend.username || '好友')}</strong><span>ID · ${escapeHTML(friend.username || '')}</span><div><button type="button" data-ir-chat-remove>删除好友</button><button type="button" data-ir-chat-block>${chatBlockedByMe ? '取消屏蔽' : '屏蔽'}</button></div></section>`;
     const reply = chatReplyTo ? `<div class="ir-chat-replying"><span>回复 ${escapeHTML(chatReplyTo.senderName)}：${escapeHTML(chatReplyTo.body.slice(0,80))}</span><button type="button" data-ir-chat-reply-cancel aria-label="取消引用">×</button></div>` : '';
