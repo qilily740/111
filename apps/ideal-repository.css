@@ -265,6 +265,34 @@
 .ir-chat-composer textarea{flex:1;min-width:0;max-height:120px;resize:vertical;border:0;outline:0;background:transparent;color:#29292c;font:inherit;font-size:14px;line-height:1.5}
 .ir-chat-composer button{min-height:34px;padding:0 14px;border:0;border-radius:10px;background:#38383d;color:#fff;font-size:12px;font-weight:650}
 .ir-chat-composer button:disabled{background:#c9c9cc;color:#fff}
+.ir-chat-sticker-panel{margin:0 0 9px;padding:10px 12px;border:1px solid #e3e3e5;border-radius:14px;background:#fafafa}
+.ir-chat-sticker-panel>header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ir-chat-sticker-panel>header strong{flex:1;font-size:13px}
+.ir-chat-sticker-panel>header strong small,.ir-chat-sticker-panel>small{color:#89898f;font-size:10px;font-weight:400}
+.ir-chat-sticker-panel>header label,.ir-chat-sticker-panel>header button{padding:5px 9px;border:0;border-radius:8px;background:#eeeef0;color:#444;font-size:12px}
+.ir-chat-sticker-panel>header label.is-disabled{opacity:.45}
+.ir-chat-sticker-panel>header>button{padding:5px 9px;border:0;border-radius:8px;background:#eeeef0;color:#444;font-size:12px}
+.ir-chat-sticker-panel>header>button[data-ir-chat-sticker-editor-toggle]{width:28px;padding:4px;font-size:18px;line-height:18px}
+.ir-chat-sticker-groups{display:flex;gap:6px;overflow:auto;margin:0 -2px 8px;padding:2px}
+.ir-chat-sticker-groups button,.ir-chat-sticker-manage button{flex:0 0 auto;padding:5px 10px;border:0;border-radius:999px;background:#eeeef0;color:#555;font-size:11px}
+.ir-chat-sticker-groups button.is-active{background:#444;color:#fff}
+.ir-chat-sticker-manage{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+.ir-chat-sticker-manage small{flex-basis:100%;color:#89898f;font-size:10px}
+.ir-chat-sticker-import{display:flex;gap:7px;margin-bottom:9px}
+.ir-chat-sticker-import label{display:flex;flex:0 0 112px;flex-direction:column;gap:4px;color:#777;font-size:10px}
+.ir-chat-sticker-import input{width:100%;min-width:0;padding:7px;border:1px solid #e3e3e5;border-radius:8px;background:#fff;color:#444;font:inherit;font-size:11px}
+.ir-chat-sticker-import textarea{flex:1;min-width:0;resize:vertical;padding:8px;border:1px solid #e3e3e5;border-radius:9px;background:#fff;color:#444;font:inherit;font-size:11px}
+.ir-chat-sticker-import button{padding:0 10px;border:0;border-radius:9px;background:#444;color:#fff;font-size:11px}
+.ir-chat-sticker-import button:disabled{opacity:.55}
+.ir-chat-sticker-panel>p{margin:12px 0;color:#89898f;font-size:12px}
+.ir-chat-sticker-grid{display:flex;gap:8px;max-height:170px;overflow:auto;padding:2px 0 8px}
+.ir-chat-sticker-grid>div{position:relative;flex:0 0 72px}
+.ir-chat-sticker-grid>div>button:first-child{display:flex;width:72px;min-height:76px;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:5px;border:1px solid #e7e7e9;border-radius:10px;background:#fff;color:#555}
+.ir-chat-sticker-grid img{width:52px;height:52px;object-fit:contain}
+.ir-chat-sticker-grid span{max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px}
+.ir-chat-sticker-grid>div>button:last-child{position:absolute;top:-5px;right:-5px;width:20px;min-height:20px;padding:0;border:0;border-radius:50%;background:#777;color:#fff;font-size:14px}
+.ir-chat-message.is-sticker .ir-chat-message-body{max-width:180px}
+.ir-chat-message .ir-chat-sticker-image{display:block;width:auto;height:auto;max-width:min(150px,55vw);max-height:150px;object-fit:contain;border-radius:8px}
 .ir-chat-retention{display:block;margin:8px 2px 0;color:#999;font-size:10px;text-align:center}
 @media(max-width:760px){.ir-chat-page{min-height:calc(100dvh - 105px);padding:14px 14px calc(env(safe-area-inset-bottom) + 20px)}.ir-chat-messages{max-height:none}.ir-chat-message{max-width:86%}.ir-friend-item{gap:6px}.ir-friend-item>button{min-height:32px;padding:0 8px;font-size:11px}}
 
@@ -339,4 +367,11 @@
 .ideal-repository.ir-chat-mode .ir-chat-messages{min-height:0;max-height:none;flex:none;overflow:visible;background:#fff}
 .ideal-repository.ir-chat-mode .ir-chat-composer{position:absolute;z-index:3;right:20px;bottom:calc(env(safe-area-inset-bottom) + 10px);left:20px;flex:none;margin:0;background:#f2f2f3}
 .ideal-repository.ir-chat-mode .ir-chat-replying{position:absolute;z-index:3;right:20px;bottom:calc(env(safe-area-inset-bottom) + 66px);left:20px;margin:0}
+.ideal-repository.ir-chat-mode .ir-chat-page.is-sticker-open .ir-chat-scroll{padding-bottom:10px}
+.ideal-repository.ir-chat-mode .ir-chat-page.is-sticker-open .ir-chat-replying{position:relative;right:auto;bottom:auto;left:auto;flex:none;margin:0 0 6px}
+.ideal-repository.ir-chat-mode .ir-chat-page.is-sticker-open .ir-chat-composer{position:relative;right:auto;bottom:auto;left:auto;flex:none;margin:8px 0 calc(env(safe-area-inset-bottom) + 10px)}
+.ideal-repository.ir-chat-mode .ir-chat-sticker-panel{display:flex;flex:0 0 300px;flex-direction:column;min-height:300px;max-height:300px;margin:0 -2px;padding:10px 12px;overflow:hidden}
+.ideal-repository.ir-chat-mode .ir-chat-sticker-grid{flex:1;min-height:0;max-height:none;flex-wrap:wrap;align-content:flex-start;overflow:auto}
+.ideal-repository.ir-chat-mode .ir-chat-sticker-panel>small{flex:none;margin-top:5px}
+.ideal-repository.ir-chat-mode .ir-chat-sticker-import textarea{min-height:42px}
 @media(max-width:760px){.ideal-repository.ir-chat-mode .ir-chat-page{padding:0 14px}.ideal-repository.ir-chat-mode .ir-chat-header{min-height:calc(env(safe-area-inset-top) + 58px);padding-bottom:9px}.ideal-repository.ir-chat-mode .ir-chat-profile{padding:clamp(100px,18vh,180px) 10px 20px}.ideal-repository.ir-chat-mode .ir-chat-messages{padding-bottom:10px}.ideal-repository.ir-chat-mode .ir-chat-composer{right:14px;bottom:calc(env(safe-area-inset-bottom) + 10px);left:14px}.ideal-repository.ir-chat-mode .ir-chat-replying{right:14px;bottom:calc(env(safe-area-inset-bottom) + 66px);left:14px}}
