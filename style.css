@@ -13979,3 +13979,6 @@ body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-ch
 .shop-recipient-footer b { color:#222; font-size:19px; }
 .shop-recipient-footer>button { min-height:40px; padding:0 18px; border:0; border-radius:12px; background:#222; color:#fff; font:inherit; font-size:12px; cursor:pointer; }
 .shop-recipient-footer>button:disabled { opacity:.5; }
+
+.shopping-app .shopping-header.has-back { justify-content:flex-start; gap:12px; }
+.shopping-app .shopping-header.has-back .shop-header-back { flex:0 0 30px; margin:0; }
