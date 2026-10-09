@@ -8,6 +8,7 @@
   let emailVerificationTicket = '';
   let verifiedEmail = '';
   let registrationStep = 'email';
+  let activationStep = 'request';
   let mode = 'choose';
   let busy = false;
   let bannedReason = '';
@@ -152,9 +153,12 @@
       DISCORD_CHECK_FAILED: '暂时无法核验 Discord 资格，请稍后再试。',
       DISCORD_ACCESS_REVOKED: 'Discord 服务器资格已失效，账号暂时无法使用。',
       ACCOUNT_BANNED: `账号已被封禁。原因：${error?.details?.reason || '管理员封禁'}`,
-      INVALID_CREDENTIALS: '用户名或密码不正确。',
-      IDENTITY_BLOCKED: '该 Discord 账号或邮箱已被管理员封禁，无法注册。',
-      identity_blocked: '该 Discord 账号或邮箱已被封禁，无法注册。'
+      INVALID_CREDENTIALS: '用户名或密码不正确，待激活账号请先完成邮箱验证并设置密码。',
+      identity_blocked: '该 Discord 账号或邮箱已被封禁，无法注册。',
+      EMAIL_CODE_INVALID: '邮箱验证码不正确。',
+      EMAIL_CODE_EXPIRED: '验证码已过期，请重新发送。',
+      IDENTITY_BLOCKED: '该账号身份已被管理员限制，暂时无法激活。',
+      REGISTRATION_FAILED: '账号激活失败，请确认信息后重试或联系管理员。'
     };
     return errors[error?.code] || '操作失败，请检查信息后重试。';
   }
@@ -188,7 +192,7 @@
     }
     root.querySelector('#idealAuthTitle').textContent = bannedReason ? '账号已封禁' : mode === 'register'
       ? registrationStep === 'email' ? '验证 QQ 邮箱' : '创建账号'
-      : mode === 'login' ? '账号登录' : mode === 'verify' ? '注册资格验证' : '欢迎使用理想机';
+      : mode === 'login' ? '账号登录' : mode === 'activate' ? '激活账号' : mode === 'verify' ? '注册资格验证' : '欢迎使用理想机';
     root.querySelector('.ideal-auth-intro').textContent = bannedReason
       ? '封禁期间可以导出当前设备上保存的数据。'
       : mode === 'register'
@@ -197,6 +201,8 @@
         : '邮箱已验证。设置账号和密码完成注册。'
       : mode === 'login'
         ? '输入账号和密码继续使用理想机。'
+        : mode === 'activate'
+          ? activationStep === 'request' ? '输入管理员分配给你的理想机 ID，验证登记邮箱后即可设置登录密码。' : '输入邮箱验证码并设置你今后登录理想机使用的密码。'
         : mode === 'verify'
           ? '注册前先确认 Discord 账号属于指定社区并拥有指定身份组。'
           : '请选择注册新账号或登录已有账号。';
@@ -210,13 +216,19 @@
       ? ''
       : mode === 'register'
         ? `${registrationStep === 'account' ? '<button type="button" data-action="change-email">更换 QQ 邮箱</button>' : ''}<button type="button" data-mode="login">已有账号？登录</button>`
+        : mode === 'activate'
+          ? '<button type="button" data-mode="login">返回登录</button>'
         : '<button type="button" data-mode="choose">返回上一步</button>';
     switcher.hidden = loggedIn || mode === 'choose';
     const priorValues = form.dataset.mode === mode
       ? Object.fromEntries([...form.elements].filter(input => input.name).map(input => [input.name, input.value]))
       : {};
     form.hidden = Boolean(bannedReason) || mode === 'choose' || mode === 'verify';
-    form.innerHTML = mode === 'register'
+    form.innerHTML = mode === 'activate'
+      ? activationStep === 'request'
+        ? '<label>理想机 ID<input name="username" autocomplete="username" minlength="3" maxlength="32" required></label><button type="button" class="ideal-auth-submit" data-action="send-activation-code">发送激活验证码</button>'
+        : '<label>理想机 ID<input name="username" autocomplete="username" minlength="3" maxlength="32" required></label><label>邮箱验证码<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></label><label>设置密码（至少 8 位）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><label>确认密码<input name="passwordConfirmation" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><button class="ideal-auth-submit" type="submit">激活并登录</button>'
+      : mode === 'register'
       ? registrationStep === 'email' ? emailForm() : accountForm()
       : loginForm();
     form.dataset.mode = mode;
@@ -229,7 +241,7 @@
   }
 
   function loginForm() {
-    return '<label>用户名<input name="username" autocomplete="username" minlength="3" maxlength="32" required></label><label>密码<input name="password" type="password" autocomplete="current-password" required></label><button class="ideal-auth-submit" type="submit">登录</button>';
+    return '<label>理想机 ID<input name="username" autocomplete="username" minlength="3" maxlength="32" required></label><label>密码<input name="password" type="password" autocomplete="current-password" required></label><button class="ideal-auth-submit" type="submit">登录</button><button type="button" data-action="start-activation">激活管理员添加的账号</button>';
   }
 
   function emailForm() {
@@ -283,6 +295,7 @@
     const button = event.target.closest('button');
     if (!button) return;
     if (button.dataset.action === 'back-to-login') { bannedReason = ''; mode = 'login'; message(''); render(); return; }
+    if (button.dataset.action === 'start-activation') { mode = 'activate'; activationStep = 'request'; message(''); render(); return; }
     if (button.dataset.action === 'export-local-data') {
       await run(exportLocalBackup);
       return;
@@ -322,6 +335,12 @@
       await api('/auth/email/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ registrationTicket, email }) });
       message('验证码已发送，请查看 QQ 邮箱。', 'success');
     });
+    if (button.dataset.action === 'send-activation-code') await run(async () => {
+      const username = String(formValues().username || '').trim();
+      await api('/auth/manual-activation/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username }) });
+      activationStep = 'complete';
+      message('如果这是管理员添加的账号，验证码已发送到登记邮箱。', 'success');
+    });
     if (button.dataset.action === 'verify-email') await run(async () => {
       const values = formValues();
       const email = String(values.email || '').trim().toLowerCase();
@@ -345,6 +364,16 @@
         if (!issuedToken) throw Object.assign(new Error('missing token'), { code: 'AUTH_SERVICE_UNAVAILABLE' });
         setToken(issuedToken);
         user = payload?.user || null;
+        publishAuthState();
+      } else if (mode === 'activate') {
+        if (activationStep !== 'complete') throw Object.assign(new Error('activation code required'), { code: 'EMAIL_CODE_INVALID' });
+        const { response, payload } = await api('/auth/manual-activation/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: values.username, code: values.code, password: values.password, passwordConfirmation: values.passwordConfirmation }) });
+        const issuedToken = response.headers.get('set-auth-token');
+        if (!issuedToken) throw Object.assign(new Error('missing token'), { code: 'AUTH_SERVICE_UNAVAILABLE' });
+        setToken(issuedToken);
+        user = payload?.user || null;
+        if (!user) user = (await api('/auth/session')).payload.user || null;
+        if (!user) throw Object.assign(new Error('missing authenticated user'), { code: 'AUTH_SERVICE_UNAVAILABLE' });
         publishAuthState();
       } else {
         if (!registrationTicket || !emailVerificationTicket) throw Object.assign(new Error('registration incomplete'), { code: 'EMAIL_VERIFICATION_TICKET_INVALID' });
