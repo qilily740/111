@@ -13953,3 +13953,29 @@ body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-ch
 .couple-app .couple-tabs > button.is-active { color:#222 !important; }
 .couple-app .couple-tabs > button.is-active .couple-tab-icon { stroke-width:2; }
 .couple-app .couple-tabs > button:focus-visible { outline:2px solid #777; outline-offset:2px; }
+
+/* Shopping account, order status navigation and recipient checkout. */
+.shop-my-orders { max-width:520px; margin:16px auto; padding:17px; border:1px solid #e7e7e9; border-radius:18px; background:#fff; }
+.shop-my-orders header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.shop-my-orders h2 { margin:0; font-size:15px; }
+.shop-my-orders header button { border:0; background:transparent; color:#777; font:inherit; font-size:11px; cursor:pointer; }
+.shop-my-orders>div { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; margin:18px 0 12px; }
+.shop-my-orders>div button { display:grid; justify-items:center; gap:7px; min-height:54px; padding:4px; border:0; border-radius:12px; background:#f6f6f7; color:#333; font:inherit; cursor:pointer; }
+.shop-my-orders>div b { font-size:20px; font-weight:600; }
+.shop-my-orders>div span { font-size:10px; }
+.shop-my-orders>small { color:#999; font-size:10px; }
+.shop-order-filters,.shop-my-collections { display:flex; gap:7px; max-width:520px; margin:0 auto 15px; overflow-x:auto; padding:2px 0; }
+.shop-order-filters button,.shop-my-collections button { flex:0 0 auto; min-height:34px; padding:0 13px; border:1px solid #e5e5e7; border-radius:12px; background:#fff; color:#777; font:inherit; font-size:11px; cursor:pointer; }
+.shop-order-filters button.is-active,.shop-my-collections button.is-active { border-color:#292929; background:#292929; color:#fff; }
+.shop-my-collections button { flex:1; }
+.shop-recipient-sheet { z-index:10; }
+.shop-recipient-summary { margin-top:14px; padding:12px; border-radius:12px; background:#f2f2f4; }
+.shop-recipient-summary p { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:4px 0; color:#444; font-size:12px; }
+.shop-recipient-summary small { flex-shrink:0; color:#888; }
+.shop-recipient-sheet .shop-role-list button.is-selected { border-color:#333; background:#f3f3f4; }
+.shop-recipient-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; bottom:-19px; margin:16px -19px -19px; padding:15px 19px; border-top:1px solid #e7e7e9; background:#fbfbfb; }
+.shop-recipient-footer>div { display:grid; gap:4px; }
+.shop-recipient-footer small { color:#888; font-size:10px; }
+.shop-recipient-footer b { color:#222; font-size:19px; }
+.shop-recipient-footer>button { min-height:40px; padding:0 18px; border:0; border-radius:12px; background:#222; color:#fff; font:inherit; font-size:12px; cursor:pointer; }
+.shop-recipient-footer>button:disabled { opacity:.5; }
