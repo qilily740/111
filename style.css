@@ -13916,3 +13916,17 @@ body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-ch
   -webkit-backdrop-filter:none !important;
   backdrop-filter:none !important;
 }
+
+/* Shopping Dock: a matched set of rounded 24-unit outline icons. */
+.shopping-app .shop-tabs > button .shop-dock-icon {
+  width:27px !important;
+  height:27px !important;
+  stroke-width:1.65;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  fill:none;
+}
+.shopping-app .shop-tabs > button { color:#777 !important; }
+.shopping-app .shop-tabs > button.is-active { color:#222 !important; }
+.shopping-app .shop-tabs > button.is-active .shop-dock-icon { stroke-width:2; }
+.shopping-app .shop-tabs > button:focus-visible { outline:2px solid #777; outline-offset:2px; }
