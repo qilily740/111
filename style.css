@@ -3821,7 +3821,18 @@ body > .desktop-scroll-wrap {
 .shop-hidden-toggle { display:block; max-width:520px; margin:0 auto 11px; background:#fff; color:#555; }
 .shop-order-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
 .shop-order-actions button { min-height:27px; padding:0 8px; background:#fff; color:#555; font-size:9px; }
-@media not all { .shop-flower-stalls { border-color:rgba(255,255,255,.13); background:linear-gradient(135deg,#302a2d,#292529); }.shop-flower-intro>button,.shop-flower-stalls nav button.is-active { background:#eee; color:#111; }.shop-flower-stalls nav button,.shop-flower-set { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.08); color:#ddd; }.shop-flower-set>button,.shop-order-actions button,.shop-hidden-toggle { border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.1); color:#eee; } }
+.shop-flower-companion { display:flex; align-items:center; gap:10px; margin-bottom:13px; padding:10px; border:1px solid rgba(0,0,0,.07); border-radius:13px; background:rgba(255,255,255,.72); }
+.shop-flower-companion-avatar { display:grid; flex:0 0 40px; place-items:center; width:40px; height:40px; overflow:hidden; border-radius:50%; background:#e6e0e3; color:#7b666e; font-size:18px; }
+.shop-flower-companion-avatar img { width:100%; height:100%; object-fit:cover; }
+.shop-flower-companion-avatar.is-empty { font-size:23px; }
+.shop-flower-companion-copy { display:grid; flex:1; gap:3px; min-width:0; }
+.shop-flower-companion-copy span,.shop-flower-companion-copy small,.shop-flower-companion-note>span { color:#999; font-size:9px; }
+.shop-flower-companion-copy b { overflow:hidden; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.shop-flower-companion>button { min-height:29px; padding:0 9px; border:1px solid rgba(0,0,0,.1); border-radius:9px; background:#fff; color:#444; font:inherit; font-size:9px; cursor:pointer; }
+.shop-flower-companion-note { margin:0 0 12px; padding:10px 12px; border-left:2px solid #aaa; border-radius:0 10px 10px 0; background:rgba(255,255,255,.58); }
+.shop-flower-companion-note>span { font-weight:700; }
+.shop-flower-companion-note p { margin-top:5px; color:#555; font-size:11px; line-height:1.6; }
+@media not all { .shop-flower-stalls { border-color:rgba(255,255,255,.13); background:linear-gradient(135deg,#302a2d,#292529); }.shop-flower-intro>button,.shop-flower-stalls nav button.is-active { background:#eee; color:#111; }.shop-flower-stalls nav button,.shop-flower-set,.shop-flower-companion { border-color:rgba(255,255,255,.13); background:rgba(255,255,255,.08); color:#ddd; }.shop-flower-set>button,.shop-order-actions button,.shop-hidden-toggle,.shop-flower-companion>button { border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.1); color:#eee; }.shop-flower-companion-note { background:rgba(255,255,255,.06); }.shop-flower-companion-note p { color:#ddd; } }
 .shop-detail-taobao .shop-detail-price { display:flex; align-items:end; justify-content:space-between; margin-top:15px; }.shop-detail-taobao .shop-detail-price>b { color:#e5533d; font-size:23px; }.shop-detail-taobao .shop-detail-price>span { color:#999; font-size:9px; }
 .shop-sheet:has(.shop-detail-taobao) { align-items:stretch; padding:0; }.shop-sheet:has(.shop-detail-taobao)>.shop-sheet-backdrop { display:none; }.shop-sheet>section.shop-detail-taobao { width:100%; max-height:100%; padding:max(18px,env(safe-area-inset-top)) 18px max(20px,env(safe-area-inset-bottom)); border-radius:0; box-shadow:none; }
 .shop-detail-taobao>h2 { margin-top:8px; font-size:19px; line-height:1.4; }.shop-detail-desc { margin-top:7px; color:#777; font-size:11px; line-height:1.6; }
