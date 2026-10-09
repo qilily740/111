@@ -13930,3 +13930,17 @@ body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-ch
 .shopping-app .shop-tabs > button.is-active { color:#222 !important; }
 .shopping-app .shop-tabs > button.is-active .shop-dock-icon { stroke-width:2; }
 .shopping-app .shop-tabs > button:focus-visible { outline:2px solid #777; outline-offset:2px; }
+
+/* Couple space Dock: rounded outlines matched to the shopping Dock. */
+.couple-app .couple-tabs > button .couple-tab-icon {
+  width:27px !important;
+  height:27px !important;
+  stroke-width:1.65;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  fill:none;
+}
+.couple-app .couple-tabs > button { color:#777 !important; }
+.couple-app .couple-tabs > button.is-active { color:#222 !important; }
+.couple-app .couple-tabs > button.is-active .couple-tab-icon { stroke-width:2; }
+.couple-app .couple-tabs > button:focus-visible { outline:2px solid #777; outline-offset:2px; }
