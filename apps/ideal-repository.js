@@ -482,13 +482,16 @@
     if (!previous || Number(message.createdAt) - Number(previous.createdAt) >= 5 * 60 * 1000) return `<div class="ir-chat-divider"><span>${escapeHTML(chatDay(message.createdAt))} · ${escapeHTML(chatTime(message.createdAt))}</span></div>`;
     return '';
   }
+  function canGroupChatMessages(previous, next) {
+    return Boolean(previous && next && previous.type !== 'sticker' && next.type !== 'sticker' && !next.replyToId && previous.senderId === next.senderId && Number(next.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
+  }
   function chatMessageRows(startIndex = 0) {
     const rows = chatMessages.slice(startIndex).map((message,offset) => {
       const index = startIndex + offset;
       const previous = chatMessages[index - 1];
-      const grouped = Boolean(!message.replyToId && previous && previous.senderId === message.senderId && Number(message.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
+      const grouped = canGroupChatMessages(previous, message);
       const next = chatMessages[index + 1];
-      const hasContinuation = Boolean(next && !next.replyToId && next.senderId === message.senderId && Number(next.createdAt) - Number(message.createdAt) <= 3 * 60 * 1000);
+      const hasContinuation = canGroupChatMessages(message, next);
       const repliedMessage = message.replyToId ? chatMessages.find(item => item.id === message.replyToId) : null;
       const replySenderId = message.replySenderId || repliedMessage?.senderId || '';
       const replyBody = message.replyBody ?? repliedMessage?.body ?? '引用的消息已过期';
@@ -513,7 +516,7 @@
         else if (chatMessages.length > preserveThrough) {
           const previous = chatMessages[preserveThrough - 1];
           const next = chatMessages[preserveThrough];
-          const continues = Boolean(next && !next.replyToId && previous.senderId === next.senderId && Number(next.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
+          const continues = canGroupChatMessages(previous, next);
           if (continues) existingRows[preserveThrough - 1]?.classList.add('has-continuation');
         }
         if (chatMessages.length > preserveThrough) messages.insertAdjacentHTML('beforeend', chatMessageRows(preserveThrough));

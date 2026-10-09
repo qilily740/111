@@ -158,7 +158,7 @@
       (async () => {
         try { await window.IdealMachineStorageReady; } catch {}
         const scripts = [...document.querySelectorAll('script[data-ideal-script]')];
-        const beautySources = ['apps/ideal-beauty-registry.js?v=20261008-export-panel-monochrome-1', 'apps/ideal-repository.js?v=20261008-desktop-beauty-import-1', 'apps/ideal-beauty-center.js?v=20261008-desktop-category-no-fab-1'];
+        const beautySources = ['apps/ideal-beauty-registry.js?v=20261008-export-panel-monochrome-1', 'apps/ideal-repository.js?v=20261009-chat-sticker-message-separation-1', 'apps/ideal-beauty-center.js?v=20261008-desktop-category-no-fab-1'];
         const sourceHref = source => new URL(source, location.href).href;
         const sourceByFile = new Map(scripts.map(source => [source.src.split('?')[0].split('/').pop(), source.src]));
         const loadPromises = new Map();
