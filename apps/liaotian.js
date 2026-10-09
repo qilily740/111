@@ -1325,6 +1325,37 @@
 - 如果当前时间与旧话题冲突，以当前真实时间为准。可以保留未解决的话题，但必须用“后来、昨天、那件事、现在”等符合时间推进的表达。
 - 不要每次机械报时，也不要凭空宣布未知事件已经成功或失败；时间感知应自然体现在反应、措辞、作息和话题选择中。`;
   }
+  function userCalendarContext(now = new Date()) {
+    let events = [];
+    try {
+      const stored = JSON.parse(localStorage.getItem('ideal-machine-calendar-events') || '[]');
+      if (Array.isArray(stored)) events = stored;
+    } catch {}
+    const horizon = now.getTime() + 7 * 24 * 60 * 60 * 1000;
+    const upcoming = events.flatMap(item => {
+      if (!item || (item.author !== 'user' && item.source !== 'user-calendar') || item.deleted) return [];
+      const date = String(item.date || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!date || !String(item.title || '').trim()) return [];
+      const timeText = String(item.time || '');
+      const range = timeText.match(/(\d{1,2}:\d{2})\s*(?:—|–|-|至|~)\s*(\d{1,2}:\d{2})/);
+      const startText = String(item.start || range?.[1] || timeText.match(/\d{1,2}:\d{2}/)?.[0] || '');
+      const endText = String(item.end || range?.[2] || '');
+      const start = new Date(`${date[1]}-${date[2]}-${date[3]}T${startText || '00:00'}:00`);
+      if (!Number.isFinite(start.getTime())) return [];
+      const allDay = !startText;
+      let end = endText ? new Date(`${date[1]}-${date[2]}-${date[3]}T${endText}:00`) : allDay ? new Date(`${date[1]}-${date[2]}-${date[3]}T23:59:59`) : new Date(start.getTime() + 60 * 60 * 1000);
+      if (!Number.isFinite(end.getTime())) end = new Date(start.getTime() + 60 * 60 * 1000);
+      if (end <= start && !allDay) end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+      if (end.getTime() < now.getTime() || start.getTime() > horizon) return [];
+      const day = new Date(`${date[1]}-${date[2]}-${date[3]}T12:00:00`).toLocaleDateString('zh-CN', { month:'long', day:'numeric', weekday:'short' });
+      const time = allDay ? '全天' : `${startText}${endText ? `—${endText}` : ''}`;
+      const note = String(item.note || '').trim().replace(/\s+/g, ' ').slice(0, 160);
+      const near = start.getTime() <= now.getTime() + 24 * 60 * 60 * 1000 && end.getTime() >= now.getTime();
+      return [{ start:start.getTime(), near, line:`- ${near ? '【临近】' : '【之后】'}${day} ${time} · ${String(item.title).trim()}${note ? `；安排：${note}` : ''}` }];
+    }).sort((a, b) => a.start - b.start).slice(0, 8);
+    if (!upcoming.length) return '未来 7 天没有已保存的用户行程。';
+    return `${upcoming.map(item => item.line).join('\n')}\n使用规则：这是用户在日历中自己添加的行程，只作为聊天背景。临近行程时，可以在话题合适时自然关心或轻轻提一句；不要每轮重复提醒，不要打断无关话题，不要假设用户已经完成行程，也不要把行程说成角色自己的安排。较远的行程只在对话相关时提及。`;
+  }
   function buildChatSystemPrompt(contact, profile, chat) {
     const roleName = contact?.name || '角色';
     const roleDisplayName = contact?.nickname || roleName;
@@ -1347,6 +1378,7 @@
     const customPrompt = interpolatePrompt(readCustomChatPrompt(), contact, profile, chat);
     const now = new Date().toLocaleString('zh-CN', { dateStyle: 'full', timeStyle: 'short' });
     const timeAwareness = realTimeAwarenessPrompt(chat);
+    const calendarContext = userCalendarContext();
     return `【理想机内置聊天提示词｜每次回复前必须完整阅读】
 ${builtinPrompt}${momentContext}
 
@@ -1392,6 +1424,9 @@ ${customPrompt || '暂无用户自定义补充规则。'}
 【当前时间】
 ${now}
 ${timeAwareness}
+
+【用户日历中的近期行程】
+${calendarContext}
 
 【绑定的局部世界书】
 ${boundWorldbookContext(contact)}
