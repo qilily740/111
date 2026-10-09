@@ -483,7 +483,7 @@
     return '';
   }
   function canGroupChatMessages(previous, next) {
-    return Boolean(previous && next && previous.type !== 'sticker' && next.type !== 'sticker' && !next.replyToId && previous.senderId === next.senderId && Number(next.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
+    return Boolean(previous && next && !next.replyToId && previous.senderId === next.senderId && Number(next.createdAt) - Number(previous.createdAt) <= 3 * 60 * 1000);
   }
   function chatMessageRows(startIndex = 0) {
     const rows = chatMessages.slice(startIndex).map((message,offset) => {
@@ -492,12 +492,13 @@
       const grouped = canGroupChatMessages(previous, message);
       const next = chatMessages[index + 1];
       const hasContinuation = canGroupChatMessages(message, next);
+      const stickerContinuation = grouped && (previous.type === 'sticker' || message.type === 'sticker');
       const repliedMessage = message.replyToId ? chatMessages.find(item => item.id === message.replyToId) : null;
       const replySenderId = message.replySenderId || repliedMessage?.senderId || '';
       const replyBody = message.replyBody ?? repliedMessage?.body ?? '引用的消息已过期';
       const replySenderName = replySenderId === accountStorageId() ? (personal.nickname || userName()) : (chatFriend?.nickname || chatFriend?.username || '好友');
       const quoted = message.replyToId ? `<div class="ir-chat-quoted">${messageAvatar({senderId:replySenderId}, 'ir-chat-quoted-avatar')}<span class="ir-chat-quoted-copy"><strong>@${escapeHTML(replySenderName)}</strong> <span>${escapeHTML(replyBody)}</span></span></div>` : '';
-      const classes = `ir-chat-message${grouped ? ' is-continuation' : ''}${hasContinuation ? ' has-continuation' : ''}${message.replyToId ? ' has-reply' : ''}`;
+      const classes = `ir-chat-message${grouped ? ' is-continuation' : ''}${stickerContinuation ? ' sticker-continuation' : ''}${hasContinuation ? ' has-continuation' : ''}${message.replyToId ? ' has-reply' : ''}`;
       const body = message.type === 'sticker' && message.stickerId && message.stickerUrl
         ? `<img class="ir-chat-sticker-image" ${message.stickerUrl.startsWith('/api/chat-stickers/') ? `data-ir-sticker-image="${escapeHTML(message.stickerId)}"` : `src="${escapeHTML(message.stickerUrl)}"`} alt="${escapeHTML(message.body || '表情包')}" loading="lazy">`
         : `<p>${escapeHTML(message.body)}</p>`;

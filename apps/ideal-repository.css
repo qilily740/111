@@ -376,3 +376,4 @@
 .ideal-repository.ir-chat-mode .ir-chat-sticker-panel>small{flex:none;margin-top:5px}
 .ideal-repository.ir-chat-mode .ir-chat-sticker-import textarea{min-height:42px}
 @media(max-width:760px){.ideal-repository.ir-chat-mode .ir-chat-page{padding:0 14px}.ideal-repository.ir-chat-mode .ir-chat-header{min-height:calc(env(safe-area-inset-top) + 58px);padding-bottom:9px}.ideal-repository.ir-chat-mode .ir-chat-profile{padding:clamp(100px,18vh,180px) 10px 20px}.ideal-repository.ir-chat-mode .ir-chat-messages{padding-bottom:10px}.ideal-repository.ir-chat-mode .ir-chat-composer{right:14px;bottom:calc(env(safe-area-inset-bottom) + 10px);left:14px}.ideal-repository.ir-chat-mode .ir-chat-replying{right:14px;bottom:calc(env(safe-area-inset-bottom) + 66px);left:14px}}
+.ir-chat-message.is-continuation.sticker-continuation{margin-top:0;padding-top:4px}
