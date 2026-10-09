@@ -13982,3 +13982,6 @@ body:is(.ideal-keyboard-transition,.ideal-keyboard-open) .chat-app.is-open.is-ch
 
 .shopping-app .shopping-header.has-back { justify-content:flex-start; gap:12px; }
 .shopping-app .shopping-header.has-back .shop-header-back { flex:0 0 30px; margin:0; }
+.shopping-app .shopping-header.has-back { align-items:center; }
+.shopping-app .shopping-header.has-back > div > span { display:none; }
+.shopping-app .shopping-header.has-back h1 { margin-top:0; line-height:30px; }
