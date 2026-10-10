@@ -2,6 +2,20 @@
   const storageKey = 'ideal-machine-image-api';
   const activityKey = 'ideal-machine-image-activity';
   const builtInRealismPositivePrompt = 'Authentic real-life atmosphere, natural and believable appearance, realistic proportions, organic details, genuine everyday feeling, natural imperfections, subtle asymmetry, soft natural ambient lighting, realistic light and shadow interaction, balanced exposure, natural color reproduction, subtle tonal variations, authentic textures and materials, believable spatial relationships, natural depth and perspective, relaxed and spontaneous composition, slightly imperfect framing, realistic environmental details, subtle signs of everyday use, visually coherent scene, natural visual hierarchy, lifelike details without excessive refinement, realistic but not overly detailed, candid snapshot aesthetic, genuine unfiltered appearance, understated visual quality, ordinary yet aesthetically pleasing, natural and effortless atmosphere.';
+  const builtInInterpretationPositivePrompt = `Interpret all figurative language, metaphors, nicknames, idioms, and personality descriptions
+according to their intended human meaning,
+not their literal visual meaning.
+
+Translate abstract descriptions into natural,
+observable human expressions, gestures,
+body language, and behavior.
+
+Preserve the original identity, species,
+and physical appearance of the subject.
+
+Only depict objects, animals, or visual elements
+that are explicitly requested as actual
+components of the scene.`;
   const builtInRealismNegativePrompt = 'AI-generated aesthetic, artificial appearance, CGI, 3D render, plastic texture, waxy surfaces, excessive smoothing, overprocessed details, excessive sharpening, oversaturated colors, unnatural color grading, exaggerated contrast, dramatic cinematic lighting, studio lighting, artificial glow, excessive bloom, HDR effect, overly polished surfaces, hyperrealistic rendering, exaggerated details, excessive microtextures, overly intricate patterns, visual clutter, fragmented details, unnatural symmetry, overly perfect composition, staged appearance, artificial posing, unrealistic proportions, distorted perspective, inconsistent lighting, unrealistic shadows, floating objects, unnatural reflections, excessive depth of field, artificial background blur, heavy retouching, beauty filters, airbrushed appearance, excessive stylization, artificial perfection, overly decorative elements, unnecessary visual effects, watermark, text artifacts.';
   const previousBuiltInNegativePrompt = '低清晰度，模糊，畸形手指，多余肢体，重复人物，文字，水印，logo';
   const defaults = {
@@ -165,7 +179,7 @@
 
   function combinedPrompt(prompt, config, promptScope) {
     const scoped = promptScope === 'chat' || promptScope === 'moments';
-    return [scoped ? builtInRealismPositivePrompt : '', config.positivePrompt, prompt].map(item => String(item || '').trim()).filter(Boolean).join('\n');
+    return [scoped ? builtInRealismPositivePrompt : '', scoped ? builtInInterpretationPositivePrompt : '', config.positivePrompt, prompt].map(item => String(item || '').trim()).filter(Boolean).join('\n');
   }
 
   async function fetchImageViaProxy(endpoint, requestOptions) {
