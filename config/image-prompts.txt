@@ -1,0 +1,637 @@
+GPT IMAGE GENERATION — COMPLETE PROMPT LIBRARY
+全类型生图正负面提示词 | English Prompts
+
+USAGE:
+1. Describe the image you want.
+2. Apply AUTOMATIC PROMPT CLASSIFICATION and GLOBAL rules.
+3. Apply only relevant category modules below.
+4. Explicit user requirements override generic enhancement rules.
+
+============================================================
+AUTOMATIC PROMPT CLASSIFICATION
+============================================================
+[AUTOMATIC PROMPT CLASSIFICATION]
+
+Before generating an image, identify the main subject,
+visual medium, and intended artistic style.
+
+Available enhancement categories:
+
+1. Realistic human portraits
+2. Anime and illustrations
+3. Food and desserts
+4. Natural landscapes
+5. Architecture and interiors
+6. Objects and products
+7. Graphic design and collage
+8. 3D and game art
+
+Always apply the global enhancement rules.
+
+Select only the category-specific enhancement
+rules relevant to the requested image.
+
+Multiple categories may be combined
+when the scene genuinely requires them.
+
+Do not apply unrelated enhancement rules.
+
+For example:
+
+A realistic person in a cafe:
+Apply realistic human portrait rules
+and relevant interior environment rules.
+
+An anime character:
+Apply anime and illustration rules,
+not realistic human photography rules.
+
+A decorated cake:
+Apply food and dessert rules,
+not human portrait rules.
+
+A realistic landscape:
+Apply natural landscape rules.
+
+A game environment:
+Apply 3D and game art rules,
+with relevant environmental rules.
+
+Maintain the user's requested visual medium.
+
+Do not introduce additional subjects,
+styling, clothing, objects, or decorations
+based solely on category selection.
+
+When rules conflict, prioritize:
+
+1. Explicit user requirements
+2. Original subject and character identity
+3. Requested visual style and medium
+4. Relevant category-specific enhancements
+5. Global aesthetic enhancements
+
+The purpose of these rules is to improve
+visual quality without changing
+the user's original creative intent.
+
+============================================================
+GLOBAL POSITIVE PROMPT
+============================================================
+[GLOBAL POSITIVE PROMPT]
+
+Accurately understand the user's intended subject,
+visual style, composition, atmosphere, and artistic direction.
+
+Preserve all explicitly specified characteristics,
+including appearance, age, clothing, hairstyle,
+colors, materials, proportions, environment,
+composition, and visual style.
+
+Maintain visual coherence, natural proportions,
+believable structural relationships,
+appropriate lighting, harmonious colors,
+authentic textures, and balanced visual hierarchy.
+
+Prioritize natural beauty, aesthetic appeal,
+visual clarity, cohesive details,
+and convincing material representation.
+
+Maintain appropriate detail density.
+Details should support the subject rather than
+overwhelm the composition.
+
+Preserve the intended level of realism or stylization.
+Do not automatically convert illustrations into photographs
+or photographs into illustrations.
+
+Interpret metaphors, idioms, nicknames,
+and figurative expressions according to their
+intended contextual meaning.
+
+Do not visualize figurative expressions literally
+unless explicitly requested.
+
+Apply only the enhancement rules relevant
+to the current subject and visual style.
+
+The user's original requirements always take priority
+over general aesthetic optimization.
+
+============================================================
+GLOBAL NEGATIVE PROMPT
+============================================================
+[GLOBAL NEGATIVE PROMPT]
+
+Unintended AI-generated aesthetic,
+artificial appearance, excessive processing,
+unnecessary visual complexity,
+fragmented details, excessive microtextures,
+incoherent structures, distorted proportions,
+unrealistic spatial relationships.
+
+Unnatural material appearance,
+inconsistent lighting, physically implausible shadows,
+unintended artificial reflections,
+excessive sharpening, exaggerated contrast,
+unnecessary visual effects.
+
+Excessive decoration, visual clutter,
+unnecessary objects, repetitive patterns,
+artificial perfection, generic visual appearance.
+
+Unrequested changes to the subject,
+unwanted additions, arbitrary modifications,
+unintended alterations to the original design.
+
+Literal visualization of metaphors,
+unrequested symbolic elements,
+unnecessary animal characteristics.
+
+Unwanted text, watermarks, visual artifacts.
+
+Do not suppress intentional artistic styles,
+deliberate asymmetry, stylized proportions,
+or creative visual effects explicitly requested
+by the user.
+
+============================================================
+1. REALISTIC HUMAN PORTRAITS — POSITIVE
+============================================================
+[REALISTIC HUMAN PORTRAIT]
+
+Naturally attractive appearance,
+harmonious facial features,
+realistic facial anatomy,
+balanced facial proportions,
+authentic individual characteristics.
+
+Age-appropriate facial features,
+natural facial maturity,
+healthy and lively appearance,
+expressive eyes with natural vitality.
+
+Realistic skin texture,
+natural complexion, subtle visible pores,
+believable facial contours,
+subtle natural asymmetry.
+
+Natural facial expressions,
+authentic body language,
+realistic posture and gestures.
+
+Preserve individual facial identity,
+personality, age, ethnicity,
+and physical characteristics.
+
+Maintain natural attractiveness
+without imposing standardized beauty features.
+
+Clothing, hairstyle, accessories,
+body type, pose, and environment
+must follow the user's original description.
+
+Authentic photographic appearance,
+natural and flattering lighting,
+realistic colors and skin tones.
+
+============================================================
+1. REALISTIC HUMAN PORTRAITS — NEGATIVE
+============================================================
+[REALISTIC HUMAN NEGATIVE]
+
+Unintended facial distortion,
+unnatural facial proportions,
+malformed anatomy, uncanny valley appearance.
+
+Lifeless eyes, unintended exhausted appearance,
+unhealthy complexion, artificial aging,
+age-inappropriate facial characteristics.
+
+Plastic skin, waxy skin,
+excessive skin smoothing,
+heavy beauty filters, artificial symmetry.
+
+Generic AI-generated faces,
+exaggerated facial perfection,
+unnatural expressions, stiff body language.
+
+Unrequested clothing, accessories,
+hairstyle changes, or appearance modifications.
+
+============================================================
+2. ANIME & ILLUSTRATION — POSITIVE
+============================================================
+[ANIME & ILLUSTRATION]
+
+Preserve the intended illustration style,
+artistic identity, and character design.
+
+Appealing character aesthetics,
+coherent facial features,
+expressive eyes, natural character expressions.
+
+Clean and intentional linework,
+cohesive shapes, consistent anatomy
+within the intended artistic style.
+
+Smooth color transitions when appropriate,
+harmonious color relationships,
+controlled detail density.
+
+Well-defined silhouettes,
+clear visual hierarchy,
+coherent clothing construction,
+natural fabric folds appropriate to the style.
+
+Beautiful and expressive artwork
+without excessive rendering.
+
+Maintain stylistic consistency
+across characters, objects, and backgrounds.
+
+Preserve the original character design,
+outfit, hairstyle, colors, and proportions.
+
+============================================================
+2. ANIME & ILLUSTRATION — NEGATIVE
+============================================================
+[ANIME & ILLUSTRATION NEGATIVE]
+
+Inconsistent art style,
+fragmented linework,
+unnecessary fine details,
+excessive rendering,
+overly complicated textures.
+
+Incoherent anatomy,
+unintentional distortions,
+inconsistent facial structure.
+
+Excessive highlights,
+artificial glossy surfaces,
+unnecessary visual effects.
+
+Overdecorated clothing,
+random accessories,
+fragmented hair strands,
+unnecessary floating elements.
+
+Unintentional photorealism,
+unwanted 3D appearance,
+generic AI illustration aesthetic.
+
+============================================================
+3. FOOD & DESSERT — POSITIVE
+============================================================
+[FOOD & DESSERT]
+
+Appetizing and believable food appearance,
+authentic culinary presentation,
+realistic ingredient textures.
+
+Natural food shapes,
+physically believable structure,
+realistic surface details,
+authentic material properties.
+
+Natural color variations,
+believable moisture and texture,
+realistic cream, frosting,
+chocolate, fruit, and baked surfaces
+when applicable.
+
+Appropriate lighting that enhances
+the appearance of the food
+without creating artificial gloss.
+
+Visually appealing presentation,
+clear and recognizable ingredients,
+coherent food construction.
+
+Preserve the specified recipe,
+ingredients, shape, portion,
+decoration, and presentation style.
+
+============================================================
+3. FOOD & DESSERT — NEGATIVE
+============================================================
+[FOOD & DESSERT NEGATIVE]
+
+Plastic-looking food,
+artificial food models,
+waxy textures,
+unnatural ingredient shapes.
+
+Excessive gloss,
+unrealistic frosting,
+impossible food structures,
+unnatural ingredient placement.
+
+Overdecorated presentation,
+unnecessary toppings,
+fragmented decorations.
+
+Artificial colors,
+excessive saturation,
+unrealistic moisture,
+unnatural food surfaces.
+
+Unrequested ingredients,
+unwanted decorative elements,
+unrealistic culinary construction.
+
+============================================================
+4. NATURAL LANDSCAPE — POSITIVE
+============================================================
+[NATURAL LANDSCAPE]
+
+Believable natural environment,
+coherent geographical features,
+realistic terrain relationships.
+
+Natural atmospheric perspective,
+appropriate environmental depth,
+believable lighting conditions.
+
+Authentic vegetation,
+natural water behavior,
+realistic cloud formations,
+coherent environmental textures.
+
+Natural color variations,
+balanced landscape composition,
+realistic spatial relationships.
+
+Preserve the intended weather,
+season, location, time of day,
+and environmental atmosphere.
+
+Beautiful natural scenery
+without unnecessary artificial enhancement.
+
+Maintain realistic environmental complexity
+without excessive or repetitive details.
+
+============================================================
+4. NATURAL LANDSCAPE — NEGATIVE
+============================================================
+[NATURAL LANDSCAPE NEGATIVE]
+
+Artificial-looking terrain,
+repetitive vegetation patterns,
+unnatural geological structures.
+
+Impossible water behavior,
+unrealistic cloud formations,
+inconsistent atmospheric perspective.
+
+Excessive saturation,
+artificial HDR appearance,
+unnatural environmental lighting.
+
+Overly perfect scenery,
+unnecessary decorative elements,
+repetitive natural textures.
+
+Unrequested landmarks,
+artificial objects,
+unrealistic spatial relationships.
+
+============================================================
+5. ARCHITECTURE & INTERIOR — POSITIVE
+============================================================
+[ARCHITECTURE & INTERIOR]
+
+Architecturally coherent design,
+believable spatial proportions,
+realistic structural relationships.
+
+Accurate perspective,
+consistent geometric construction,
+plausible architectural details.
+
+Authentic building materials,
+realistic surface textures,
+appropriate light interaction.
+
+Functional spatial organization,
+believable furniture proportions,
+realistic object placement.
+
+Harmonious architectural composition,
+clear visual hierarchy,
+coherent design language.
+
+Preserve the intended architectural style,
+materials, colors, furniture,
+layout, and atmosphere.
+
+Natural visual refinement
+without unnecessary decorative complexity.
+
+============================================================
+5. ARCHITECTURE & INTERIOR — NEGATIVE
+============================================================
+[ARCHITECTURE & INTERIOR NEGATIVE]
+
+Impossible architecture,
+distorted geometry,
+inconsistent perspective.
+
+Unrealistic building structures,
+floating furniture,
+illogical spatial arrangements.
+
+Unnatural material textures,
+incorrect reflections,
+inconsistent lighting.
+
+Excessive decoration,
+unnecessary furniture,
+random architectural elements.
+
+Artificial showroom appearance
+when not requested,
+unrealistic proportions,
+incoherent structural details.
+
+============================================================
+6. OBJECT & PRODUCT — POSITIVE
+============================================================
+[OBJECT & PRODUCT]
+
+Accurate object geometry,
+coherent physical construction,
+realistic proportions.
+
+Authentic material appearance,
+believable surface textures,
+physically plausible reflections.
+
+Clear structural details,
+consistent object design,
+realistic material transitions.
+
+Visually appealing presentation,
+balanced composition,
+appropriate lighting.
+
+Preserve the original product shape,
+colors, materials, dimensions,
+functional components, and design identity.
+
+Maintain appropriate detail density
+without unnecessary embellishment.
+
+Realistic and convincing object appearance.
+
+============================================================
+6. OBJECT & PRODUCT — NEGATIVE
+============================================================
+[OBJECT & PRODUCT NEGATIVE]
+
+Distorted geometry,
+impossible physical construction,
+inaccurate proportions.
+
+Artificial plastic appearance,
+unrealistic reflections,
+incorrect material properties.
+
+Fragmented components,
+floating elements,
+incoherent object structure.
+
+Unnecessary decorations,
+unrequested accessories,
+arbitrary design modifications.
+
+Excessive surface details,
+unrealistic mechanical components,
+inconsistent structural relationships.
+
+============================================================
+7. GRAPHIC DESIGN & COLLAGE — POSITIVE
+============================================================
+[GRAPHIC DESIGN & COLLAGE]
+
+Intentional visual composition,
+clear design hierarchy,
+coherent layout structure.
+
+Balanced spacing,
+purposeful asymmetry,
+harmonious typography,
+consistent visual language.
+
+Thoughtful layering,
+believable material relationships,
+cohesive graphic elements.
+
+Controlled detail density,
+clear focal points,
+appropriate negative space.
+
+Authentic paper, print, or digital textures
+according to the intended design style.
+
+Beautiful and visually distinctive design
+without unnecessary complexity.
+
+Preserve all specified layout elements,
+colors, text, proportions,
+and visual relationships.
+
+Maintain a refined,
+intentional, and cohesive aesthetic.
+
+============================================================
+7. GRAPHIC DESIGN & COLLAGE — NEGATIVE
+============================================================
+[GRAPHIC DESIGN & COLLAGE NEGATIVE]
+
+Visual clutter,
+fragmented composition,
+unnecessary decorative elements.
+
+Inconsistent design language,
+random graphic elements,
+poor visual hierarchy.
+
+Excessive layering,
+unbalanced spacing,
+unintentional overlaps.
+
+Artificial paper textures,
+unnecessary aging effects,
+excessive shadows,
+unwanted three-dimensional appearance.
+
+Illegible typography,
+distorted text,
+unrequested decorative details.
+
+Generic AI-generated graphic design aesthetic.
+
+============================================================
+8. 3D & GAME ART — POSITIVE
+============================================================
+[3D & GAME ART]
+
+Coherent three-dimensional structure,
+consistent artistic direction,
+believable object construction.
+
+Accurate spatial relationships,
+appropriate material properties,
+consistent lighting and shadows.
+
+Clear silhouettes,
+well-defined forms,
+controlled geometric complexity.
+
+Cohesive visual style,
+intentional surface details,
+appropriate texture density.
+
+Preserve the intended rendering style,
+whether realistic, stylized,
+cartoon-like, or semi-realistic.
+
+Maintain strong visual readability
+without excessive surface noise.
+
+Preserve all specified design elements,
+colors, proportions, and artistic characteristics.
+
+============================================================
+8. 3D & GAME ART — NEGATIVE
+============================================================
+[3D & GAME ART NEGATIVE]
+
+Inconsistent geometry,
+broken mesh appearance,
+impossible structural relationships.
+
+Unintentional material distortion,
+incoherent surface details,
+excessive texture noise.
+
+Unnecessary polygonal complexity,
+fragmented objects,
+inconsistent rendering quality.
+
+Unwanted photorealism
+when stylized rendering is requested.
+
+Unwanted cartoon appearance
+when realistic rendering is requested.
+
+Excessive visual effects,
+unnecessary decorations,
+inconsistent artistic direction.
+
+============================================================
+END OF PROMPT LIBRARY
+============================================================
