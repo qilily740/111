@@ -2467,7 +2467,7 @@ ${rerollRule}
     const resolved = cached?.src || (source.startsWith('idb:image:') ? '' : source);
     const size = bubble && cached?.width && cached?.height
       ? ` width="${cached.width}" height="${cached.height}" style="width:${cached.width}px!important;height:${cached.height}px!important;object-fit:contain"` : '';
-    return `<img decoding="async"${bubble ? '' : ' loading="lazy" fetchpriority="low"'} data-emoji-src="${esc(source)}"${resolved ? ` src="${esc(resolved)}"` : ''}${size} referrerpolicy="no-referrer" alt="${bubble ? '图片' : ''}">`;
+    return `<img decoding="async" loading="eager"${bubble ? '' : ' width="70" height="70"'} data-emoji-src="${esc(source)}"${resolved ? ` src="${esc(resolved)}"` : ''}${size} referrerpolicy="no-referrer" alt="${bubble ? '图片' : ''}">`;
   }
   function hydrateEmojiImages(root = app) {
     const selector = '.chat-emoji-panel img, .chat-bubble.sticker img, img[data-emoji-src]';
@@ -2477,6 +2477,7 @@ ${rerollRule}
       if (image.dataset.emojiImageReady === 'true') return;
       image.dataset.emojiImageReady = 'true';
       image.referrerPolicy = 'no-referrer';
+      image.loading = 'eager';
       const source = image.dataset.emojiSrc || image.getAttribute('src') || '';
       const rememberSize = () => {
         if (!image.naturalWidth || !image.naturalHeight) return;

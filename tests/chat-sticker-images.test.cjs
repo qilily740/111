@@ -49,7 +49,8 @@ test('warm stickers reserve their dimensions without lazy-loading conversation b
   assert.match(html, /width="150" height="75"/);
   assert.match(html, /width:150px!important;height:75px!important/);
   assert.doesNotMatch(html, /loading="lazy"/);
-  assert.match(api.emojiImageMarkup('https://example.test/sticker.gif'), /loading="lazy"/);
+  assert.match(api.emojiImageMarkup('https://example.test/sticker.gif'), /loading="eager"/);
+  assert.match(api.emojiImageMarkup('https://example.test/sticker.gif'), /width="70" height="70"/);
 });
 
 test('hydration handles an image added directly and never reassigns an already warm src', async () => {
@@ -66,6 +67,7 @@ test('hydration handles an image added directly and never reassigns an already w
   await Promise.resolve();
   api.hydrateEmojiImages(image);
   assert.equal(assignments, 0);
+  assert.equal(image.loading, 'eager');
   assert.match(api.emojiImageMarkup('idb:image:sticker', true), /width="150" height="75"/);
 });
 
