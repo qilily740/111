@@ -2461,6 +2461,8 @@ body > .desktop-scroll-wrap {
 .chat-generated-image-error button { min-height:28px; padding:0 12px; border:1px solid rgba(0,0,0,.12); border-radius:9px; background:#fff; color:#444; font:inherit; cursor:pointer; }
 .chat-generated-image-error button:disabled { opacity:.55; }
 .chat-bubble.image-error { max-width:min(300px,calc(100vw - 100px)); padding:9px 12px; border:1px solid rgba(157,75,69,.16); border-radius:12px; background:#fff4f2; color:#914c46; font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
+.chat-image-retry { flex:0 0 auto; align-self:center; margin:0 2px; padding:6px 9px; border:1px solid rgba(70,86,102,.2); border-radius:999px; background:rgba(255,255,255,.88); color:#566575; font:inherit; font-size:10px; line-height:1.2; white-space:nowrap; cursor:pointer; }
+.chat-image-retry:disabled { opacity:.62; cursor:wait; }
 @keyframes generated-image-loading { to { background-position:-220% 0; } }
 @media (max-width:600px) { .settings-image-grid, .settings-image-auto-grid { grid-template-columns:1fr; }.settings-image-grid .is-wide { grid-column:auto; } }
 @media not all {
