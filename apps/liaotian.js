@@ -2327,7 +2327,13 @@ ${rerollRule}
     return legacy ? `https://i.postimg.cc/${legacy[1]}/${legacy[2]}` : source;
   }
   function normalizeEmojiImageSource(value) {
-    const source = String(value || '').trim();
+    let source = String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+    const markdown = source.match(/\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i);
+    if (markdown) source = markdown[1];
+    else if (!/^(?:data:|blob:|idb:image:)/i.test(source)) {
+      const url = source.match(/https?:\/\/[^\s<>"\])]+/i);
+      if (url) source = url[0];
+    }
     if (source.startsWith('//')) return `${location.protocol === 'https:' ? 'https:' : 'http:'}${source}`;
     if (location.protocol === 'https:' && /^http:\/\//i.test(source)) return source.replace(/^http:\/\//i, 'https://');
     return source;
@@ -2537,11 +2543,12 @@ ${rerollRule}
     const source = normalizeEmojiImageSource(image.dataset.emojiSrc || image.getAttribute('src') || '');
     if (!/^https?:\/\//i.test(source)) return;
     image.dataset.emojiNoReferrerRetried = 'true';
+    emojiImageCache.delete(source);
     image.referrerPolicy = 'no-referrer';
     requestAnimationFrame(async () => {
       if (!image.isConnected) return;
       try {
-        const response = await nativeChatFetch(source, { mode:'cors', credentials:'omit', cache:'force-cache', referrerPolicy:'no-referrer' });
+        const response = await nativeChatFetch(source, { mode:'cors', credentials:'omit', cache:'reload', referrerPolicy:'no-referrer' });
         if (!response.ok) return;
         const blob = await response.blob();
         if (!blob.type.startsWith('image/')) return;
@@ -9852,7 +9859,14 @@ ${recentConversation}
     if (!message?.sticker && !matchingEmoji) return html;
     const originalSource = matchingEmoji ? normalizeEmojiImageSource(matchingEmoji.url || rawSource) : rawSource;
     const displaySource = emojiDisplaySource(originalSource);
-    return html.replace(/<img src="[^"]*" alt="图片">/, emojiImageMarkup(displaySource, true));
+    // The generic image renderer has already moved IndexedDB keys out of src.
+    // Replace the bubble image through the DOM so both URL and local stickers
+    // receive data-emoji-src and reach the sticker resource loader.
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const image = template.content.querySelector('.chat-bubble.image img');
+    if (image) image.outerHTML = emojiImageMarkup(displaySource, true);
+    return template.innerHTML;
   };
   const messageHtmlWithChatTranslation = messageHtml;
   messageHtml = function(message) {
@@ -10877,7 +10891,7 @@ ${recentConversation}
     app.querySelectorAll('#chatMessages [data-chat-message-id] img[data-emoji-src]').forEach(image => {
       const id = image.closest('[data-chat-message-id]').dataset.chatMessageId;
       const previous = existing.get(`${id}:${image.dataset.emojiSrc}`);
-      if (previous) image.replaceWith(previous);
+      if (previous?.complete && previous.naturalWidth > 0) image.replaceWith(previous);
     });
     hydrateEmojiImages();
   };

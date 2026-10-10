@@ -71,14 +71,47 @@ test('hydration handles an image added directly and never reassigns an already w
 
 test('redrawing the same conversation reuses the loaded sticker node', () => {
   const source = fs.readFileSync(path.join(__dirname, '../apps/liaotian.js'), 'utf8');
-  const previous = { dataset:{ emojiSrc:'https://example.test/sticker.gif' }, closest:() => ({ dataset:{ chatMessageId:'m1' } }) };
+  const previous = { complete:true, naturalWidth:150, dataset:{ emojiSrc:'https://example.test/sticker.gif' }, closest:() => ({ dataset:{ chatMessageId:'m1' } }) };
   let replacedWith;
   let images = [previous];
   const next = { ...previous, replaceWith:image => { replacedWith = image; } };
   const context = vm.createContext({
     activeContact:'contact1', app:{ querySelectorAll:() => images },
-    render:() => { images = [next]; }, hydrateEmojiImages() {}
+    render:() => { images = [next]; }, hydrateEmojiImages() {}, warmEmojiImagesAtStartup() {}
   });
   vm.runInContext(source.slice(source.indexOf('  const renderWithStableEmojiImages ='), source.indexOf('  startActiveMessageAutomation();', source.indexOf('  const renderWithStableEmojiImages ='))) + '\nrender();', context);
   assert.equal(replacedWith, previous);
+});
+
+
+test('local sticker bubbles receive the sticker loader marker after generic asset rendering', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../apps/liaotian.js'), 'utf8');
+  let markup = '';
+  const image = { set outerHTML(value) { markup = value; } };
+  const template = {
+    set innerHTML(value) { markup = value; }, get innerHTML() { return markup; },
+    content:{ querySelector(selector) { assert.equal(selector, '.chat-bubble.image img'); return image; } }
+  };
+  const context = vm.createContext({
+    messageHtml:() => '<img data-chat-image-asset="idb:image:sticker" alt="图片">',
+    state:{ emojis:{ groups:[] } }, normalizeEmojiImageSource:value => value,
+    emojiDisplaySource:value => value,
+    emojiImageMarkup:value => `<img data-emoji-src="${value}">`,
+    document:{ createElement:() => template }
+  });
+  const start = source.indexOf('  const messageHtmlWithEmojiSource =');
+  const end = source.indexOf('  const messageHtmlWithChatTranslation =', start);
+  vm.runInContext(source.slice(start, end), context);
+  assert.match(context.messageHtml({type:'image', sticker:true, text:'idb:image:sticker'}), /data-emoji-src="idb:image:sticker"/);
+});
+
+
+test('URL stickers accept imported Markdown and invisible whitespace', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../apps/liaotian.js'), 'utf8');
+  const context = vm.createContext({ location:{ protocol:'https:' } });
+  vm.runInContext(source.slice(source.indexOf('  function normalizeEmojiImageSource('), source.indexOf('  function cleanEmojiUrl(')), context);
+  const url = 'https://i.postimg.cc/yYxG63v7/a.jpg';
+  assert.equal(context.normalizeEmojiImageSource(`[表情](${url})`), url);
+  assert.equal(context.normalizeEmojiImageSource(`请给我 ${url}\u200B`), url);
+  assert.equal(context.normalizeEmojiImageSource('idb:image:local'), 'idb:image:local');
 });
