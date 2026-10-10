@@ -363,7 +363,6 @@
           <label>质量<select data-image-setting="quality"><option value="">跟随接口默认</option><option value="standard">standard</option><option value="hd">hd</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="auto">auto</option></select></label>
           <label>每次生成<select data-image-setting="count"><option value="1">1 张</option><option value="2">2 张</option><option value="3">3 张</option><option value="4">4 张</option></select></label>
         </div>
-        <p class="settings-image-behavior-note">生图 API 配置成功后，聊天角色会根据聊天内容自行判断是否发图，不会每轮生成；生成角色动态时可在本次操作中选择是否配图。AI 图片不会自动保存到相册，可在图片查看页保存到本地或重新生成。</p>
       </div>
       <div class="settings-image-block">
         <div class="settings-subhead"><b>自定义提示词</b></div>
