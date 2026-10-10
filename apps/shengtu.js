@@ -1,6 +1,8 @@
 (() => {
   const storageKey = 'ideal-machine-image-api';
   const activityKey = 'ideal-machine-image-activity';
+  const builtInRealismPositivePrompt = 'Authentic real-life atmosphere, natural and believable appearance, realistic proportions, organic details, genuine everyday feeling, natural imperfections, subtle asymmetry, soft natural ambient lighting, realistic light and shadow interaction, balanced exposure, natural color reproduction, subtle tonal variations, authentic textures and materials, believable spatial relationships, natural depth and perspective, relaxed and spontaneous composition, slightly imperfect framing, realistic environmental details, subtle signs of everyday use, visually coherent scene, natural visual hierarchy, lifelike details without excessive refinement, realistic but not overly detailed, candid snapshot aesthetic, genuine unfiltered appearance, understated visual quality, ordinary yet aesthetically pleasing, natural and effortless atmosphere.';
+  const builtInRealismNegativePrompt = 'AI-generated aesthetic, artificial appearance, CGI, 3D render, plastic texture, waxy surfaces, excessive smoothing, overprocessed details, excessive sharpening, oversaturated colors, unnatural color grading, exaggerated contrast, dramatic cinematic lighting, studio lighting, artificial glow, excessive bloom, HDR effect, overly polished surfaces, hyperrealistic rendering, exaggerated details, excessive microtextures, overly intricate patterns, visual clutter, fragmented details, unnatural symmetry, overly perfect composition, staged appearance, artificial posing, unrealistic proportions, distorted perspective, inconsistent lighting, unrealistic shadows, floating objects, unnatural reflections, excessive depth of field, artificial background blur, heavy retouching, beauty filters, airbrushed appearance, excessive stylization, artificial perfection, overly decorative elements, unnecessary visual effects, watermark, text artifacts.';
   const previousBuiltInNegativePrompt = '低清晰度，模糊，畸形手指，多余肢体，重复人物，文字，水印，logo';
   const defaults = {
     endpoint: '',
@@ -161,8 +163,9 @@
     return [...new Set(values)];
   }
 
-  function combinedPrompt(prompt, config) {
-    return [config.positivePrompt, prompt].map(item => String(item || '').trim()).filter(Boolean).join('\n');
+  function combinedPrompt(prompt, config, promptScope) {
+    const scoped = promptScope === 'chat' || promptScope === 'moments';
+    return [scoped ? builtInRealismPositivePrompt : '', config.positivePrompt, prompt].map(item => String(item || '').trim()).filter(Boolean).join('\n');
   }
 
   async function fetchImageViaProxy(endpoint, requestOptions) {
@@ -236,8 +239,9 @@
     if (!config.model) throw new Error('请先填写生图模型');
     const purpose = options.purpose === 'moments' ? 'moments' : 'chat';
     const size = options.size || (purpose === 'moments' ? config.momentSize : config.chatSize);
-    let prompt = combinedPrompt(options.prompt, config);
-    const negativePrompt = [config.negativePrompt, options.negativePrompt].map(item => String(item || '').trim()).filter(Boolean).join('，');
+    const scopedPrompt = options.promptScope === 'chat' || options.promptScope === 'moments';
+    let prompt = combinedPrompt(options.prompt, config, options.promptScope);
+    const negativePrompt = [scopedPrompt ? builtInRealismNegativePrompt : '', config.negativePrompt, options.negativePrompt].map(item => String(item || '').trim()).filter(Boolean).join('，');
     if (!prompt) throw new Error('缺少生图提示词');
     if (negativePrompt && config.protocol === 'openai') prompt += `\n画面中避免出现：${negativePrompt}`;
     const count = Math.max(1, Math.min(4, Number(options.count || config.count) || 1));

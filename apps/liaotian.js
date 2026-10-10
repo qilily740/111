@@ -6048,7 +6048,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     if (selfieRequested) rolePrompt = `The user explicitly requested a selfie of the character. Keep the requested location, clothing, action and framing from the image description; show the character visibly in a natural selfie composition.\n${rolePrompt}`;
     if (chatImageShowsCharacter(prompt, latestUserMessage?.text)) rolePrompt = lockCharacterImageAppearance(rolePrompt, getChatImageAppearance(targetChat, contact));
     try {
-      const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', count: 1 });
+      const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', promptScope: 'chat', count: 1 });
       if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源');
       if (existingMessage) Object.assign(existingMessage, { text: result.assetId, generated: true, generatedPrompt: rolePrompt, generatedImageLoading: false });
       else {
@@ -6189,7 +6189,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
         if (!contact || !characterImageEnabled(state.chats?.[contact.id])) return;
         const plan = await planMomentImage(record);
         const prompt = safeMomentImagePrompt(record, contact, plan);
-        const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
+        const result = await api.generate({ prompt, purpose: 'moments', promptScope: 'moments', count: 1 });
         if (result?.assetId) { record.image = result.assetId; record.generatedPrompt = prompt; record.generatedImageLoading = false; save(); render(); }
       }
     } catch (error) {
@@ -6362,7 +6362,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
       try {
         const plan = await planMomentImage(post);
         const prompt = safeMomentImagePrompt(post, contact, plan);
-        const result = await api.generate({ prompt, purpose: 'moments', count: 1 });
+        const result = await api.generate({ prompt, purpose: 'moments', promptScope: 'moments', count: 1 });
         if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源。');
         // API 等待期间可能发生状态刷新；始终更新仍在当前朋友圈状态中的那条动态。
         const livePost = state.moments.find(item => String(item.id) === String(post.id));
