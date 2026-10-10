@@ -5260,11 +5260,11 @@ ${rerollRule}
 
   function characterQuoteFromMarker(attributes, chat) {
     const values = {};
-    String(attributes || '').replace(/([a-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s]+))/ig, (match, key, doubleValue, singleValue, plainValue) => {
+    String(attributes || '').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/([a-z][\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s]+))/ig, (match, key, doubleValue, singleValue, plainValue) => {
       values[key.toLowerCase()] = String(doubleValue ?? singleValue ?? plainValue ?? '').trim();
       return match;
     });
-    const targetId = values.id || values.message || values.messageid || '';
+    const targetId = values.id || values.message || values.messageid || values.message_id || values['message-id'] || String(attributes || '').match(/^\s*[:：]\s*["']?([^\s"']+)["']?\s*$/)?.[1] || '';
     const target = targetId
       ? (chat?.messages || []).find(message => String(message?.id || '') === String(targetId))
       : null;
@@ -5282,11 +5282,11 @@ ${rerollRule}
 
   function parseCharacterQuoteMarker(text, chat) {
     let quote = null;
-    const clean = String(text || '').replace(/\[\[QUOTE\b([^\]]*)\]\]/ig, (match, attributes) => {
+    const clean = normalizeCharacterControlMarkers(text).replace(/\[\[QUOTE\b((?:"[^"]*"|'[^']*'|[^\]])*)\]\]/ig, (match, attributes) => {
       quote ||= characterQuoteFromMarker(attributes, chat);
       return ' ';
     });
-    return { clean, quote };
+    return { clean:clean.replace(/\[\[\s*\/\s*QUOTE\s*\]\]/ig, ''), quote };
   }
 
   function parseCharacterVoiceParts(text) {
@@ -5407,6 +5407,7 @@ ${rerollRule}
   function normalizeCharacterControlMarkers(value) {
     return String(value || '')
       .replace(/［/g, '[').replace(/］/g, ']')
+      .replace(/\[\[\s*(\/?\s*QUOTE)\b([^\]]*)\]\]/gi, (_, name, attributes) => '[[' + name.replace(/\s/g, '').toUpperCase() + attributes.replace(/[“”]/g, '"').replace(/[‘’]/g, "'") + ']]')
       .replace(/\[\[\s*(\/?\s*(?:MSG|THOUGHT|IMAGE_PROMPT|STICKER))\b\s*/gi, (_, name) => '[[' + name.replace(/\s/g, '').toUpperCase())
       .replace(/\[\[\s*(\/?(?:MSG|THOUGHT))\s*\]\]/gi, (_, name) => '[[' + name.toUpperCase() + ']]')
       .replace(/<\s*(\/?)\s*(MSG|THOUGHT)\s*>/gi, (_, closing, name) => '[[' + closing + name.toUpperCase() + ']]')
@@ -5422,7 +5423,7 @@ ${rerollRule}
       // 无法校验的音乐分享也不能把控制标记漏到聊天气泡里。
       .replace(/\[\[MUSIC\b[^\]]*\]\]/ig, '')
       // 角色引用和语音标记在最终入库前也必须被消费，避免旧回复路径把它们显示出来。
-      .replace(/\[\[QUOTE\b[^\]]*\]\]/ig, '')
+      .replace(/\[\[\s*\/?\s*QUOTE\b(?:"[^"]*"|'[^']*'|[^\]])*\]\]/ig, '')
       .replace(/\[\[VOICE\b[^\]]*\]\]/ig, '')
       .replace(/\[\[\s*THOUGHT\s*\]\][\s\S]*?(?:\[\[\s*\/\s*THOUGHT\s*\]\]|$)/ig, '')
       .replace(/\[\[\s*\/?\s*THOUGHT\s*\]\]/ig, '')
