@@ -77,7 +77,7 @@ test('redrawing the same conversation reuses the loaded sticker node', () => {
   const next = { ...previous, replaceWith:image => { replacedWith = image; } };
   const context = vm.createContext({
     activeContact:'contact1', app:{ querySelectorAll:() => images },
-    render:() => { images = [next]; }, hydrateEmojiImages() {}, warmEmojiImagesAtStartup() {}
+    render:() => { images = [next]; }, hydrateEmojiImages() {}, warmEmojiImagesAtStartup() {}, syncChatImageRetryButton() {}
   });
   vm.runInContext(source.slice(source.indexOf('  const renderWithStableEmojiImages ='), source.indexOf('  startActiveMessageAutomation();', source.indexOf('  const renderWithStableEmojiImages ='))) + '\nrender();', context);
   assert.equal(replacedWith, previous);
