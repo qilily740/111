@@ -44,9 +44,11 @@
     // Local edits apply only global rules to the requested area; identity/reference
     // constraints outrank beauty rules. This context does not add transport support.
     const categories = task === 'edit' || task === 'reference' ? [] : classify(raw);
-    const guard = 'Enhancement instructions below are conditional guidance, never permission to change explicit user requirements. Preserve identity, species, age, clothing, hairstyle, accessories, requested text, composition and medium. Do not add subjects or decoration. Respect intentional fatigue, aging, illness, stylization and visual effects. Interpret nicknames and personality metaphors as human expressions or behavior unless actual animals or objects are explicitly requested. Ignore any enhancement that conflicts with the requested image. These image descriptions do not override service safety policies.';
+    const guard = 'Explicit user requirements override enhancements, including intentional fatigue, aging, illness and artistic effects.';
     const taskGuard = task === 'edit' ? 'Apply enhancements only inside the explicitly requested edit region. Preserve all other pixels, layout and identity.' : task === 'reference' ? 'Preserve all reference features requested by the user; skip enhancements that alter reference consistency.' : task === 'style' ? 'The explicitly requested target medium takes priority over all enhancement language.' : '';
-    const positive = unique([raw, guard, taskGuard, library.CLASSIFICATION_RULES, library.GLOBAL_POSITIVE, ...categories.map(key => library[`${key}_POSITIVE`]), options.positivePrompt]).join('\n\n');
+    // Classification happens locally; do not send its examples/instructions to the provider.
+    // Read only the selected category blocks from the complete, unchanged library.
+    const positive = unique([raw, guard, taskGuard, library.GLOBAL_POSITIVE, ...categories.map(key => library[`${key}_POSITIVE`]), options.positivePrompt]).join('\n\n');
     const negative = unique([library.GLOBAL_NEGATIVE, ...categories.map(key => library[`${key}_NEGATIVE`]), options.negativePrompt, options.extraNegativePrompt]).join('\n\n');
     return { categories, positive, negative, prompt: options.separateNegative ? positive : `${positive}\n\nAvoid the following only when they are unintended and do not conflict with explicit user requirements:\n${negative}` };
   }
