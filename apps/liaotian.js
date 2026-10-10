@@ -1784,7 +1784,7 @@ ${languageInstruction}
     return String(value || '').match(/\[\[(?:IMAGE_PROMPT\s*:[\s\S]*?|MUSIC\b[^\]]*|STICKER\s*:[^\]]*|VOICE\b[^\]]*|VIDEO_CALL\b[^\]]*|VIDEO_HANGUP\b[^\]]*|TRANSFER(?:_ACCEPT|_RETURN)?\b[^\]]*|LOCATION\b[^\]]*|SHOPPING_PAID\b[^\]]*|TOGETHER\b[^\]]*)\]\]/ig) || [];
   }
   function extractCombinedThought(value) {
-    const original = String(value || '');
+    const original = normalizeCharacterControlMarkers(value);
     // 生图动作不能进入心声：模型偶尔会把 IMAGE_PROMPT 放进 THOUGHT 区块，
     // 先提取再附回正文，让后续统一的图片处理链路消费它。
     const imageMarkers = [...original.matchAll(/\[\[\s*IMAGE_PROMPT\s*:\s*([\s\S]*?)\]\]/ig)]
@@ -5397,10 +5397,19 @@ ${rerollRule}
     return source;
   }
 
-  function cleanCharacterVisibleText(value) {
+  function normalizeCharacterControlMarkers(value) {
     return String(value || '')
+      .replace(/［/g, '[').replace(/］/g, ']')
+      .replace(/\[\[\s*(\/?\s*(?:MSG|THOUGHT|IMAGE_PROMPT|STICKER))\b\s*/gi, (_, name) => '[[' + name.replace(/\s/g, '').toUpperCase())
+      .replace(/\[\[\s*(\/?(?:MSG|THOUGHT))\s*\]\]/gi, (_, name) => '[[' + name.toUpperCase() + ']]')
+      .replace(/<\s*(\/?)\s*(MSG|THOUGHT)\s*>/gi, (_, closing, name) => '[[' + closing + name.toUpperCase() + ']]')
+      .replace(/(^|\n)[ \t]*(\/?(?:MSG|THOUGHT))[ \t]*[:：]?[ \t]*(?=\n|$)/gi, (_, line, name) => line + '[[' + name.toUpperCase() + ']]');
+  }
+  function cleanCharacterVisibleText(value) {
+    return normalizeCharacterControlMarkers(value)
+      .replace(/\[\[IMAGE_PROMPT\s*[:：][\s\S]*?(?:\]\]|$)/gi, '')
       // 完整的 MSG 已经在分条阶段处理；这里再兜底一次，避免控制标记进入气泡。
-      .replace(/\[\[MSG\]\]/gi, '')
+      .replace(/\[\[\s*\/?\s*MSG\s*\]\]/gi, '')
       // 兼容后台/旧版回复路径，避免未经过表情解析的标记直接显示。
       .replace(/\[\[STICKER\s*:[^\]]+\]\]/ig, '')
       // 无法校验的音乐分享也不能把控制标记漏到聊天气泡里。
@@ -5522,6 +5531,8 @@ ${rerollRule}
   }
 
   async function sendCharacterReplyContent(text, chat, meta = {}) {
+    text = normalizeCharacterControlMarkers(text).replace(/\[\[\s*MSG\s*\]\]/gi, '[[MSG]]').replace(/\[\[\s*\/\s*MSG\s*\]\]/gi, '');
+    const replyContactId = Object.keys(state.chats || {}).find(id => state.chats[id] === chat) || currentContactId();
     const settings = chatSettingsFor(chat);
     const selectedGroups = new Set(settings.characterEmojiGroupIds || []);
     const items = characterEmojiItems().filter(item => selectedGroups.has(item.groupId));
@@ -5670,7 +5681,7 @@ ${rerollRule}
     }
     if (imagePromptMatch?.[1]?.trim()) {
       generatedImageMarkerCount += 1;
-      const imageContact = state.contacts.find(item => item.id === activeContact);
+      const imageContact = state.contacts.find(item => String(item.id) === String(replyContactId));
       latestGeneratedImagePromise = generateCharacterChatImage(imagePromptMatch[1].trim(), chat, imageContact);
       await latestGeneratedImagePromise;
     }
@@ -6083,7 +6094,8 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   async function generateCharacterChatImage(prompt, targetChat, contact, existingMessage = null, retryAnchor = null) {
     const api = window.IdealMachineImageAPI;
-    const retryTarget = retryAnchor || existingMessage || [...(targetChat?.messages || [])].reverse().find(message => message.role === 'character' && !['image', 'image-error'].includes(message.type) && !message.recalled);
+    const targetContactId = contact?.id || Object.keys(state.chats || {}).find(id => state.chats[id] === targetChat);
+    let retryTarget = retryAnchor || existingMessage || [...(targetChat?.messages || [])].reverse().find(message => message.role === 'character' && !['image', 'image-error'].includes(message.type) && !message.recalled);
     if (!characterImageEnabled(targetChat)) {
       if (retryTarget) { retryTarget.imageGenerationRetrying = false; retryTarget.imageGenerationRetryError = '角色生图当前未开启'; save(); if (currentChat() === targetChat) render(); }
       return false;
@@ -6103,6 +6115,11 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     try {
       const result = await api.generate({ prompt: rolePrompt, purpose: 'chat', promptScope: 'chat', count: 1 });
       if (!result?.assetId) throw new Error('生图接口没有返回可保存的图片资源');
+      const liveChat = state.chats?.[targetContactId];
+      if (!liveChat) throw new Error('原聊天已不存在，图片未能添加到聊天记录');
+      targetChat = liveChat;
+      existingMessage = existingMessage ? liveChat.messages.find(item => item.id === existingMessage.id) || null : null;
+      retryTarget = retryTarget ? liveChat.messages.find(item => item.id === retryTarget.id) || null : null;
       if (existingMessage) {
         Object.assign(existingMessage, { text: result.assetId, type: existingMessage.type === 'image-error' ? 'image' : (existingMessage.type || 'image'), generated: true, generatedPrompt: rolePrompt, generatedImageLoading: false });
         delete existingMessage.imageGenerationRetryPrompt;
@@ -6130,6 +6147,9 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     } catch (error) {
       console.warn('角色生图失败，已保留文字回复：', error);
       const errorText = String(error?.message || '生图或图片下载失败').slice(0, 220);
+      targetChat = state.chats?.[targetContactId];
+      if (!targetChat) return false;
+      retryTarget = [...targetChat.messages].reverse().find(message => message.role === 'character' && !['image', 'image-error'].includes(message.type) && !message.recalled) || null;
       const failureMessage = retryTarget || { id:uid('message'), text:`图片没有成功显示：${errorText}`, role:'character', type:'image-error', time:time() };
       Object.assign(failureMessage, { imageGenerationRetryPrompt: rolePrompt, imageGenerationRetryError: errorText, imageGenerationRetrying: false });
       if (!retryTarget) targetChat.messages.push(failureMessage);
@@ -6303,26 +6323,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     if (event.target.closest('[data-generated-image-reroll]')) { rerollGeneratedImage(); }
   }, true);
 
-  const baseGeneratedImageAddMessage = addMessage;
-  addMessage = function(text, role = 'user', type = '', meta = {}) {
-    if (role === 'character' && !type) {
-      const raw = String(text || '');
-      const marker = raw.match(generatedImageMarker);
-      if (marker) {
-        const targetChat = currentChat();
-        const contact = state.contacts.find(item => item.id === currentContactId());
-        const clean = raw.replace(marker[0], '').trim().replace(/\[\[IMAGE_PROMPT\s*:[\s\S]*?\]\]/ig, '').trim();
-        const result = baseGeneratedImageAddMessage(clean || '给你看。', role, type, meta);
-        if (marker[1].trim()) {
-          generatedImageMarkerCount += 1;
-          latestGeneratedImagePromise = generateCharacterChatImage(marker[1].trim(), targetChat, contact);
-        }
-        return result;
-      }
-    }
-    return baseGeneratedImageAddMessage(text, role, type, meta);
-  };
-
+  // Image actions are consumed by sendCharacterReplyContent after text delivery.
   const baseGeneratedImageReply = reply;
   reply = async function() {
     const api = window.IdealMachineImageAPI;
