@@ -4,7 +4,7 @@
 
 文件内容存放在授权 Google 账号的私有 Drive 中，Worker 只使用 `drive.file` 最小范围，并通过 OAuth refresh token 访问。首次成功发帖时会在 Drive 根目录创建“个人文件同步”文件夹；也可以通过 `GOOGLE_DRIVE_FOLDER_ID` 指定已有的应用文件夹。
 
-生图跨域兜底使用已登录理想机账号授权的 `POST /api/image-proxy`。前端仅在生图 API 直连两次均未收到 HTTP 响应时调用；明确的 API HTTP 错误（如 400/401/429）不会转代理。Worker 仅允许 HTTPS 的 `/images/generations` 目标并限制请求体大小，不记录或保存 API Key、提示词及响应，亦不写入 D1；转发时 API Key 和提示词会经过 Cloudflare Worker。该代理兼容 OpenAI 风格生图端点，不会自动转换各家不同的 API 协议。
+生图跨域兜底使用已登录理想机账号授权的 `POST /api/image-proxy`。前端已登录且目标满足代理协议时优先调用一次，其他情况直连；代理明确返回 UNAUTHORIZED 时才安全回退直连。连接中断或 502/504/524 不自动重复提交，以免产生重复任务。客户端生图等待上限为 10 分钟，无法延长服务商网关时限。Worker 仅允许 HTTPS 的 `/images/generations` 目标并限制请求体大小，不记录或保存 API Key、提示词及响应，亦不写入 D1；转发时 API Key 和提示词会经过 Cloudflare Worker。该代理兼容 OpenAI 风格生图端点，不会自动转换各家不同的 API 协议。
 
 部署前设置以下 Worker Secret：`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_REFRESH_TOKEN`。不要把客户端密钥或 refresh token 写入仓库、前端代码或普通环境变量。
 

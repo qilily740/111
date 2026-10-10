@@ -161,6 +161,28 @@
     return [...new Set(values)];
   }
 
+  function canUseImageProxy(endpoint) {
+    const machineConfig = window.IdealMachineConfig || {};
+    if (!String(machineConfig.imageProxyBase || machineConfig.repositoryApiBase || '').trim()
+        || !window.IdealMachineAuth?.getToken?.()) return false;
+    try {
+      const target = new URL(endpoint);
+      return target.protocol === 'https:' && !target.username && !target.password
+        && (!target.port || target.port === '443')
+        && /\/images\/generations\/?$/i.test(target.pathname)
+        && !/^(?:localhost|.*\.localhost|.*\.local|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|0\.|\[)/i.test(target.hostname);
+    } catch { return false; }
+  }
+
+  function imageTransportError(error, route, startedAt) {
+    const elapsed = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+    if (error?.name === 'AbortError') return error;
+    const detail = error?.name === 'TimeoutError'
+      ? `生图等待超时（${route}，已等待 ${elapsed} 秒）：客户端等待时间已用完，未收到完整响应。`
+      : `生图连接中断（${route}，已等待 ${elapsed} 秒）：浏览器未取得可读取的响应，可能是网络、跨域限制或网关断开；不能据此判断提示词过长。`;
+    return new Error(`${detail} 未自动重复提交；服务端可能仍在生成，请先查看服务商任务记录再决定是否重试。`, { cause:error });
+  }
+
   async function fetchImageViaProxy(endpoint, requestOptions) {
     const machineConfig = window.IdealMachineConfig || {};
     const base = String(machineConfig.imageProxyBase || machineConfig.repositoryApiBase || '').trim().replace(/\/+$/, '');
@@ -175,7 +197,7 @@
       ...requestOptions,
       headers,
       idealScope:'image-proxy',
-      idealPurpose:'生图 API 跨域兜底代理'
+      idealPurpose:'生图 API 安全代理'
     });
   }
 
@@ -257,48 +279,47 @@
     }
     const headers = { 'Content-Type':'application/json' };
     if (config.key) headers.Authorization = `Bearer ${config.key}`;
-    const requestOptions = { idealScope:purpose === 'chat' ? 'chat-image-generation' : 'image', idealPurpose:purpose === 'chat' ? '聊天 App－生成聊天图片' : '生图 App－生成图片', method:'POST', headers, body:'' };
+    const requestOptions = { idealScope:purpose === 'chat' ? 'chat-image-generation' : 'image', idealPurpose:purpose === 'chat' ? '聊天 App－生成聊天图片' : '生图 App－生成图片', method:'POST', headers, body:'', timeout:600000 };
     let response;
     let payload;
     let retriedWithoutResponseFormat = false;
-    let retriedTransport = false;
-    let usedImageProxy = false;
+    // Use the authenticated proxy once when available. A lost response may already
+    // have created a paid job: never blindly replay it over another connection.
+    let usedImageProxy = canUseImageProxy(endpoint);
+    const startedAt = Date.now();
     while (true) {
       requestOptions.body = JSON.stringify(body);
+      const route = usedImageProxy ? '安全代理' : '直连';
       try {
-        response = await fetch(endpoint, requestOptions);
+        response = usedImageProxy
+          ? await fetchImageViaProxy(endpoint, requestOptions)
+          : await fetch(endpoint, requestOptions);
       } catch (error) {
-        if (error instanceof TypeError || error?.message === 'Failed to fetch') {
-          if (!retriedTransport && navigator.onLine !== false) {
-            retriedTransport = true;
-            await new Promise(resolve => setTimeout(resolve, 800));
-            continue;
-          }
-          try {
-            response = await fetchImageViaProxy(endpoint, requestOptions);
-            usedImageProxy = true;
-          } catch (proxyError) {
-            if (/尚未配置生图代理地址|登录理想机账号/.test(String(proxyError?.message || ''))) throw proxyError;
-            throw new Error(`生图直连未收到响应，安全代理重试也失败：${proxyError?.message || '代理网络连接失败'}。请检查网络或稍后重试。`, { cause:proxyError });
-          }
-        } else throw error;
+        throw imageTransportError(error, route, startedAt);
       }
       let responseText = '';
-      try { responseText = await response.clone().text(); } catch {}
+      try { responseText = await response.clone().text(); }
+      catch (error) { throw imageTransportError(error, route, startedAt); }
       try { payload = responseText ? JSON.parse(responseText) : null; } catch { payload = null; }
       const providerMessage = String(payload?.error?.message || payload?.error || payload?.message || payload?.detail || responseText || '');
       if (usedImageProxy && response.status === 401 && /UNAUTHORIZED/.test(providerMessage)) {
-        throw new Error('理想机账号登录状态已失效，请重新登录后再尝试代理生图。');
+        // Authorization failed before a provider request was made, so direct fallback is safe.
+        usedImageProxy = false;
+        continue;
       }
       if (usedImageProxy && response.status === 502 && /IMAGE_UPSTREAM_UNREACHABLE/.test(providerMessage)) {
         throw new Error('生图代理已连接，但代理服务器无法连到该 API。请检查接口地址或服务商网络状态。');
       }
-      const rejectsResponseFormat = canRequestBase64 && !retriedWithoutResponseFormat && !response.ok
-        && /response[_ -]?format|unsupported.{0,30}(?:parameter|field)|unknown.{0,20}(?:parameter|field)|不支持.{0,12}(?:参数|字段)/i.test(providerMessage);
+      const rejectsResponseFormat = canRequestBase64 && !retriedWithoutResponseFormat && [400, 422].includes(response.status)
+        && /response[_ -]?format/i.test(providerMessage);
       if (rejectsResponseFormat) {
         delete body.response_format;
         retriedWithoutResponseFormat = true;
         continue;
+      }
+      if ([502, 504, 524].includes(response.status)) {
+        const elapsed = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+        throw new Error(`HTTP ${response.status}（${route}，${elapsed} 秒）：网关未能及时取得生图服务的有效响应。可能发生在服务商或中间代理，不能仅凭状态码认定是提示词过长或跨域。未自动重复提交，请先查看服务商任务状态；若持续出现，请检查接口是否支持同步 /images/generations，或是否要求异步任务查询。`);
       }
       if (!response.ok) {
         const detail = providerMessage.replace(/Bearer\s+\S+/gi, 'Bearer [已隐藏]').slice(0, 400);

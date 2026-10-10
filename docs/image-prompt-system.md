@@ -1,7 +1,7 @@
 # 内置生图提示词
 
 ## 调用链
-聊天、朋友圈、情侣空间交换物品图片、杂志封面调用 `IdealMachineImageAPI.generate`，在 `apps/shengtu.js` 中统一组装提示词，再 POST `/images/generations`。跨域失败时现有 Cloudflare `/api/image-proxy` 原样转发请求，不再次注入。朋友圈已有画面分析文本请求继续使用，新增系统没有网络分类请求。分类说明和示例只保留在配置中，不发送给生图 API；每次只读取并发送全局规则和当前选中的分类正负面模块。
+聊天、朋友圈、情侣空间交换物品图片、杂志封面调用 `IdealMachineImageAPI.generate`，在 `apps/shengtu.js` 中统一组装提示词，再 POST `/images/generations`。已登录且目标符合代理协议时，通过现有 Cloudflare `/api/image-proxy` 原样转发请求，不再次注入；否则直连。朋友圈已有画面分析文本请求继续使用，新增系统没有网络分类请求。分类说明和示例只保留在配置中，不发送给生图 API；每次只读取并发送全局规则和当前选中的分类正负面模块。
 
 配置：`config/image-prompts.txt` 为完整原文，`apps/image-prompt-library.js` 为生成的 19 个命名常量。运行 `python3 scripts/build-image-prompts.py` 更新配置；同时更新 index.html 中配置脚本版本号并发布。
 
