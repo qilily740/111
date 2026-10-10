@@ -6569,18 +6569,20 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
 
   function showGeneratedImageUnavailable(image, message = '图片暂时无法读取') {
     const bubble = image?.closest('.chat-bubble.image');
-    if (!bubble) return;
-    bubble.classList.add('generated-image-unavailable');
-    image.hidden = true;
+    if (!bubble || image.dataset.emojiSrc || image.closest('.chat-emoji-panel, .chat-bubble.sticker')) return;
     const row = image.closest('[data-chat-message-id]');
     const messageId = row?.dataset.chatMessageId || '';
     const chatMessage = currentChat()?.messages?.find(item => String(item.id) === String(messageId));
-    if (chatMessage?.generatedPrompt) {
+    // Only explicitly generated images belong to the image-generation failure flow.
+    if (!chatMessage?.generated || chatMessage.sticker || !chatMessage.generatedPrompt) return;
+    bubble.classList.add('generated-image-unavailable');
+    image.hidden = true;
+    if (chatMessage.generatedPrompt) {
       if (!chatMessage.imageGenerationRetryPrompt) {
         Object.assign(chatMessage, { imageGenerationRetryPrompt: chatMessage.generatedPrompt, imageGenerationRetryError: message, imageGenerationRetrying: false });
         save();
       }
-      }
+    }
     let notice = bubble.querySelector(':scope > .chat-generated-image-error');
     if (!notice) {
       notice = document.createElement('span');
