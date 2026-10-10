@@ -366,7 +366,7 @@
         <p class="settings-image-behavior-note">生图 API 配置成功后，聊天角色会根据聊天内容自行判断是否发图，不会每轮生成；生成角色动态时可在本次操作中选择是否配图。AI 图片不会自动保存到相册，可在图片查看页保存到本地或重新生成。</p>
       </div>
       <div class="settings-image-block">
-        <div class="settings-subhead"><b>自定义提示词</b><small>默认全部关闭，不添加任何预置内容</small></div>
+        <div class="settings-subhead"><b>自定义提示词</b><small>这里只编辑额外提示词；聊天和朋友圈仍会自动使用内置提示词</small></div>
         <div class="settings-image-prompts">
           <label>固定正向提示词<textarea data-image-setting="positivePrompt" placeholder="每张图都需要包含的画面要求"></textarea></label>
           <label>固定负向提示词<textarea data-image-setting="negativePrompt" placeholder="不希望画面出现的内容"></textarea></label>
