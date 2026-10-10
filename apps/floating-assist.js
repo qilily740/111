@@ -119,6 +119,11 @@
       chat:'聊天 App－生成角色回复、心声与音乐选择',
       'chat-background':'聊天 App－后台生成角色回复',
       'chat-moments-background':'聊天 App－后台生成朋友圈互动',
+      'chat-moments-image-plan':'聊天 App－分析朋友圈动态并规划配图',
+      'chat-moments-auto':'聊天 App－生成自动朋友圈动态',
+      'chat-active-message':'聊天 App－生成角色主动消息',
+      'chat-thought-format':'聊天 App－整理角色心声格式',
+      'chat-moments':'聊天 App－生成角色朋友圈内容',
       'chat-thought':'聊天 App－单独补生成或重写角色心声',
       'chat-translation':'聊天 App－翻译角色原文',
       'chat-offline':'聊天 App－生成线下见面回复',
@@ -128,9 +133,12 @@
       'chat-music':'聊天 App－搜索并核验角色要分享的歌曲',
       'chat-music-play':'聊天 App－获取已分享歌曲的播放地址',
       debate:'辩论 App－生成辩论内容', ta:'Ta App－生成角色手机内容',
-      shopping:'购物 App－生成商品或陪逛内容', couple:'情侣空间 App－生成互动内容',
+      shopping:'购物 App－生成商品或陪逛内容', couple:'情侣空间 App－生成情侣互动',
+      'couple-game':'情侣空间 App－运行小游戏',
+      bookapp:'图书 App－生成共读内容',
+      activation:'系统 App－验证功能激活码',
       ifshikong:'if 时空 App－生成平行时空内容',
-      image:'生图 App－生成图片', album:'相册 App－处理图片',
+      image:'生图 App－生成图片', 'image-proxy':'生图 App－通过安全代理请求生图接口', 'image-download':'生图 App－保存生成图片', album:'相册 App－处理图片',
       vector:'记忆库 App－生成语义向量', 'magazine-background':'杂志社 App－生成杂志内容', worldbook:'世界书 App－AI 分析世界书',
       notifications:'设置 App－连接通知服务',
       forum:'论坛 App－生成论坛内容',
@@ -153,6 +161,7 @@
       return labels.chat;
     }
     if (scope === 'shopping') {
+      if (match(/物流时效估算器|shipHours|transitDays|pickupMinutes/)) return '购物 App－估算订单发货与送达时间';
       if (match(/即时外卖平台的搜索结果生成器/)) return '购物 App－搜索外卖';
       if (match(/即时外卖平台的推荐策划/)) return '购物 App－随机推荐外卖';
       if (match(/购物搜索商品生成器/)) return '购物 App－搜索商品';
@@ -161,15 +170,46 @@
       if (match(/以角色身份送礼/)) return '购物 App－生成角色赠礼留言';
     }
     if (scope === 'ta') {
+      if (match(/模拟主角色偷偷查看用户手机中的一个真实 App/)) {
+        const targetApp = body.match(/当前打开：([^\n]+)/)?.[1]?.trim();
+        return targetApp ? `Ta App－反查用户手机：查看${targetApp}` : 'Ta App－反查用户手机：检查指定 App';
+      }
+      if (match(/刚刚偷偷查完用户本人的手机|反查后生成.*聊天/)) return 'Ta App－反查后生成角色聊天消息';
+      if (match(/情侣查岗剧情引擎/)) return 'Ta App－生成反查手机剧情与聊天内容';
+      if (match(/刷新角色.*手机|手机中的七个 App 内容/)) return 'Ta App－刷新角色手机七项内容';
+      if (match(/角色手机联系人分析器/)) return 'Ta App－分析角色手机相关 NPC';
       if (match(/角色日程生成器|CALENDAR｜/)) return 'Ta App－生成角色日程';
       if (match(/顶号功能|Takeover Sender|takeoverMessages/)) return 'Ta App－生成角色顶号消息';
-      if (match(/查手机|查岗|SECRET CHECK/)) return 'Ta App－生成角色查手机剧情';
+      if (match(/查手机|查岗|反查|SECRET CHECK/)) return 'Ta App－反查用户手机内容';
       if (match(/手机内容|手机页面|应用内容/)) return 'Ta App－生成角色手机内容';
+    }
+    if (scope === 'chat-moments') return match(/评论这条朋友圈/) ? '聊天 App－生成角色朋友圈评论' : '聊天 App－生成角色朋友圈动态';
+    if (scope === 'bookapp') {
+      if (match(/聊天记录整理助手|总结以下对话/)) return '图书 App－总结共读聊天记录';
+      if (match(/简短批注|原文写一条简短批注/)) return '图书 App－生成书籍段落批注';
+      if (match(/你正在和用户一起读小说|本次阅读参考/)) return '图书 App－生成角色共读回复';
+      return '图书 App－生成阅读辅助内容';
+    }
+    if (scope === 'chat-moments-image-plan') return '聊天 App－分析朋友圈内容并规划配图';
+    if (scope === 'chat-moments-auto') return '聊天 App－判断并生成角色自动朋友圈';
+    if (scope === 'chat-active-message') return '聊天 App－生成角色主动发起的消息';
+    if (scope === 'chat-thought-format') return '聊天 App－整理角色心声与翻译格式';
+    if (scope === 'vector') return match(/连接测试|测试向量/) ? '设置 App－测试向量 API 连接' : '记忆库 App－生成记忆语义向量';
+    if (scope === 'couple-game') {
+      if (match(/连接测试|只回复 OK/)) return '情侣空间 App－测试游戏 API 连接';
+      if (match(/分类理货/)) return '情侣空间 App－运行分类理货小游戏';
+      return '情侣空间 App－运行角色互动小游戏';
     }
     if (scope === 'couple') {
       if (match(/情书|信件/)) return '情侣空间 App－生成情书内容';
-      if (match(/愿望|心愿/)) return '情侣空间 App－生成心愿互动';
+      if (match(/愿望|心愿|祈愿/)) return '情侣空间 App－回复心愿或祈愿';
       if (match(/纪念日/)) return '情侣空间 App－生成纪念日互动';
+      if (match(/约会.*总结|约会刚刚结束/)) return '情侣空间 App－总结约会记录';
+      if (match(/约会地点|三个不同的现实地点/)) return '情侣空间 App－生成约会地点建议';
+      if (match(/约会玩法|具体的约会玩法/)) return '情侣空间 App－生成约会玩法';
+      if (match(/心动频道/)) return '情侣空间 App－生成心动频道互动';
+      if (match(/交换物品|使用感受/)) return '情侣空间 App－生成交换物品与心情';
+      if (match(/最近想亲口告诉用户|心里话/)) return '情侣空间 App－生成角色心里话';
       return '情侣空间 App－生成情侣互动回复';
     }
     if (scope === 'debate') {
@@ -184,13 +224,18 @@
   function appPurposeLabel(purpose, scope) {
     const text = cleanText(purpose);
     const named = text.match(/^(?:系统|设置|聊天|图书|Ta|论坛|辩论|同人文|杂志社|豆包|购物|日历|情侣空间|音乐|if 时空|世界书|记忆库|生图|相册) App/);
-    if (named) return named[0];
+    if (named || /[－—-]/.test(text) || /\bAPI\b/i.test(text)) return text;
     const base = String(scope || '').split('-')[0];
     return ({ chat:'聊天 App', bookapp:'图书 App', ta:'Ta App', forum:'论坛 App', debate:'辩论 App', fanfic:'同人文 App', magazine:'杂志社 App', 'magazine-background':'杂志社 App', doubao:'豆包 App', shopping:'购物 App', calendar:'日历 App', couple:'情侣空间 App', music:'音乐 App', ifshikong:'if 时空 App', worldbook:'世界书 App', memory:'记忆库 App', vector:'记忆库 App', image:'生图 App', album:'相册 App', notifications:'设置 App', settings:'设置 App' })[base] || text || `${base || '系统'} App`;
   }
   const detailedCallPurpose = callPurpose;
   callPurpose = (scope, rawUrl = '', init = {}) => appPurposeLabel(detailedCallPurpose(scope, rawUrl, init), scope);
-  calls = calls.map(item => ({ ...item, purpose:appPurposeLabel(item?.purpose, item?.scope) }));
+  calls = calls.map(item => {
+    const previous = cleanText(item?.purpose || '');
+    const genericAppName = /^(?:系统|设置|聊天|图书|Ta|论坛|辩论|同人文|杂志社|豆包|购物|日历|情侣空间|音乐|if 时空|世界书|记忆库|生图|相册) App$/;
+    const purpose = genericAppName.test(previous) ? detailedCallPurpose(item?.scope || 'shared', '', {}) : previous;
+    return { ...item, purpose:appPurposeLabel(purpose, item?.scope) };
+  });
   writeJson(callsKey, calls);
 
   function usageParts(usage = {}) {

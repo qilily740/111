@@ -766,6 +766,11 @@
     finally { messageWriteContactId = previousContactId; }
   }
   function currentContactId() { return messageWriteContactId || currentUiActionContactId() || backgroundReplyContactId || activeContact; }
+  function renderContactIfVisible(contactId) {
+    if (!app.classList.contains('is-open') || activeTab !== 'chat') return;
+    if (activeContact && activeContact !== contactId) return;
+    render();
+  }
   // `replying` is shared by the layered reply pipeline, while the user can
   // switch conversations during a background reply. UI state must therefore
   // be scoped to the conversation that owns the active request.
@@ -3908,9 +3913,9 @@ ${rerollRule}
   }
   window.addEventListener('input', event => { if (event.target.closest?.('#transferAmount')) updateTransferConversionPreview(); }, true);
   window.addEventListener('change', event => { if (event.target.closest?.('#transferCurrency')) updateTransferConversionPreview(); }, true);
-  function addMessage(text, role = 'user', type = '', meta = {}) { const chat = currentChat(); if (!chat) return; const targetContactId = activeContact; const raw = String(text || ''); const profileId = chat.profileId || ''; const transfer = role === 'character' ? raw.match(/\[\[TRANSFER\s+amount\s*=\s*([\d.,]+)\s+note\s*=\s*([^\]]*)\]\]/i) : null; if (transfer) { const remaining = raw.replace(transfer[0], '').trim(); const transferNote = transfer[2].trim(); chat.messages.push({ id: uid('message'), text: transferNote, role, type: 'transfer', amount: transfer[1], note: transferNote, status: 'pending', profileId, ...meta, time: time(), createdAt: Date.now() }); if (remaining) chat.messages.push({ id: uid('message'), text: remaining, role, type: '', profileId, ...meta, time: time(), createdAt: Date.now() }); } else chat.messages.push({ id: uid('message'), text: raw, role, type, profileId, ...meta, time: time(), createdAt: Date.now() }); save(); render(); setTimeout(() => { if (targetContactId && activeContact === targetContactId) { requestChatScrollToLatest(targetContactId); const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight); } }, 0); }
+  function addMessage(text, role = 'user', type = '', meta = {}) { const chat = currentChat(); if (!chat) return; const targetContactId = role === 'character' && backgroundReplyContactId ? backgroundReplyContactId : (messageWriteContactId || currentUiActionContactId() || activeContact); const raw = String(text || ''); const profileId = chat.profileId || ''; const transfer = role === 'character' ? raw.match(/\[\[TRANSFER\s+amount\s*=\s*([\d.,]+)\s+note\s*=\s*([^\]]*)\]\]/i) : null; if (transfer) { const remaining = raw.replace(transfer[0], '').trim(); const transferNote = transfer[2].trim(); chat.messages.push({ id: uid('message'), text: transferNote, role, type: 'transfer', amount: transfer[1], note: transferNote, status: 'pending', profileId, ...meta, time: time(), createdAt: Date.now() }); if (remaining) chat.messages.push({ id: uid('message'), text: remaining, role, type: '', profileId, ...meta, time: time(), createdAt: Date.now() }); } else chat.messages.push({ id: uid('message'), text: raw, role, type, profileId, ...meta, time: time(), createdAt: Date.now() }); save(); renderContactIfVisible(targetContactId); setTimeout(() => { if (targetContactId && activeContact === targetContactId) { requestChatScrollToLatest(targetContactId); const box = document.querySelector('#chatMessages'); if (box) box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight); } }, 0); }
 
-  async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => item && item.type !== 'image').map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: chatMessageContentForApi(item) })).filter(item => item.content); const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const answer = requireCharacterReplyText(data); const completionFinishReason = data.choices?.[0]?.finish_reason || ''; const videoCall = answer.match(/\[\[VIDEO_CALL\]\]/i); if (videoCall) { await addMessage('角色发起了视频通话', 'character', 'video'); setTimeout(() => openVideoCallModal(), 0); } if (!videoCall) await addMessage(answer, 'character', '', { completionFinishReason }); } catch (error) { if (error?.name !== 'AbortError') await addMessage(`回复失败：${error.message}`, 'character'); } finally { replying = false; render(); } }
+  async function reply() { const chat = currentChat(); const contact = state.contacts.find(item => item.id === currentContactId()); const profile = state.profiles.find(item => item.id === chat?.profileId); if (!chat || !contact || !profile) return window.alert('请先绑定用户设定。'); const config = window.IdealMachineAPI?.getConfig?.(); const model = window.IdealMachineAPI?.getModel?.('chat'); if (!config?.endpoint || !config.key || !model) return addMessage('请先在设置中为聊天配置 API 模型。', 'character'); replying = true; render(); try { const messages = chat.messages.filter(item => item && item.type !== 'image').map(item => ({ role: item.role === 'user' ? 'user' : 'assistant', content: chatMessageContentForApi(item) })).filter(item => item.content); const response = await chatFetch(`${config.endpoint.replace(/\/$/, '')}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ model, temperature: .8, messages: [{ role: 'system', content: buildChatSystemPrompt(contact, profile, chat) }, ...messages] }) }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); const answer = requireCharacterReplyText(data); const completionFinishReason = data.choices?.[0]?.finish_reason || ''; const videoCall = answer.match(/\[\[VIDEO_CALL\]\]/i); if (videoCall) { await addMessage('角色发起了视频通话', 'character', 'video'); setTimeout(() => openVideoCallModal(), 0); } if (!videoCall) await addMessage(answer, 'character', '', { completionFinishReason }); } catch (error) { if (error?.name !== 'AbortError') await addMessage(`回复失败：${error.message}`, 'character'); } finally { replying = false; renderContactIfVisible(contact?.id); } }
   function ensureWallet(profile) { profile.wallet ||= { balance: 0, records: [] }; profile.wallet.records ||= []; return profile.wallet; }
   function walletCardNumber(ownerKey) {
     const storage='ideal-machine-wallet-card-numbers';let cards={};try{cards=JSON.parse(localStorage.getItem(storage)||'{}')||{};}catch{}
@@ -6720,7 +6725,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     };
     let result;
     try { result = await baseMemoryReply(); }
-    finally { chatFetch = originalFetch; replying = false; render(); }
+    finally { chatFetch = originalFetch; replying = false; renderContactIfVisible(memoryRoleId); }
     if (context.settings?.enabled && context.settings?.autoSummary) {
       setTimeout(() => {
         memory.processAvailable({ roleId: memoryRoleId, role: contact, profile, chat, maxBatches: 3 })
@@ -6939,7 +6944,7 @@ ${selected.length ? `${explicitStickerRequest ? '用户本轮明确要求表情�
     const replacements = chunks.map((text, index) => ({ ...template, id: index === 0 ? template.id : uid('message'), text, time: index === 0 ? template.time : time() }));
     targetChat.messages.splice(Math.max(0, firstIndex), 0, ...replacements);
     save();
-    render();
+    renderContactIfVisible(currentContactId());
     return result;
   };
   // The active legacy reply implementation calls window.fetch directly. Route
@@ -9074,7 +9079,7 @@ ${recentConversation}
       if (isViewingChat(contactId)) markChatRead(contactId);
       if (app.classList.contains('is-open')) {
         requestChatScrollToLatest(contactId);
-        render();
+        renderContactIfVisible(contactId);
       }
     }
   };
